@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Musafir — مسافر | Pakistan Travel Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root{
+    --teal:#006A4E;
+    --emerald:#00875A;
+    --slate:#2F4F4F;
+    --sand:#F4A460;
+    --gold:#F5A623;
+    --gold-2:#E8890B;
+    --cream:#FDF6E3;
+    --dark:#1a1a2e;
+    --gray-100:#f6f4ee;
+    --gray-200:#e9e6dc;
+    --gray-300:#d3cfc1;
+    --gray-500:#7a7568;
+    --gray-700:#3d3a32;
+    --shadow-sm:0 1px 3px rgba(0,0,0,0.06);
+    --shadow:0 4px 14px rgba(0,0,0,0.08);
+    --shadow-lg:0 12px 32px rgba(0,0,0,0.12);
+    --radius-card:12px;
+    --radius-btn:8px;
+    --radius-chip:24px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    background:var(--cream);
+    color:var(--gray-700);
+    line-height:1.5;
+    overflow-x:hidden;
+  }
+  body.urdu-mode .en-text{display:none}
+  body:not(.urdu-mode) .ur-text{display:none}
+  .urdu-mode .ur-text{font-family:'Noto Nastaliq Urdu',serif;direction:rtl}
+
+  /* Layout */
+  .app{display:flex;min-height:100vh}
+  .sidebar{
+    width:260px;
+    background:var(--slate);
+    color:#fff;
+    padding:24px 16px;
+    display:flex;
+    flex-direction:column;
+    position:fixed;
+    height:100vh;
+    overflow-y:auto;
+    z-index:100;
+  }
+  .main{
+    margin-left:260px;
+    flex:1;
+    padding:32px 40px;
+    min-height:100vh;
+    width:calc(100% - 260px);
+  }
+  .brand{padding:8px 12px 24px;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:20px}
+  .brand-name{font-size:24px;font-weight:800;letter-spacing:-0.5px;color:#fff}
+  .brand-ur{font-family:'Noto Nastaliq Urdu',serif;font-size:18px;color:var(--sand);margin-top:2px;direction:rtl}
+  .brand-tag{font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px;letter-spacing:1px;text-transform:uppercase}
+
+  .nav{list-style:none;flex:1}
+  .nav-item{
+    display:flex;align-items:center;gap:12px;
+    padding:12px 14px;margin-bottom:4px;
+    border-radius:var(--radius-btn);
+    cursor:pointer;color:rgba(255,255,255,0.75);
+    font-size:14px;font-weight:500;
+    transition:all 0.2s;
+  }
+  .nav-item:hover{background:rgba(255,255,255,0.06);color:#fff}
+  .nav-item.active{background:var(--teal);color:#fff;box-shadow:0 4px 12px rgba(0,106,78,0.4)}
+  .nav-icon{width:20px;height:20px;flex-shrink:0}
+
+  .sidebar-bottom{margin-top:auto;padding-top:16px;border-top:1px solid rgba(255,255,255,0.1)}
+  .lang-toggle{
+    display:flex;background:rgba(0,0,0,0.2);
+    border-radius:var(--radius-btn);padding:4px;margin-bottom:16px;
+  }
+  .lang-btn{
+    flex:1;padding:8px;border:none;background:transparent;color:rgba(255,255,255,0.6);
+    cursor:pointer;border-radius:6px;font-size:13px;font-weight:600;
+    transition:all 0.2s;font-family:inherit;
+  }
+  .lang-btn.active{background:var(--teal);color:#fff}
+  .lang-btn.ur{font-family:'Noto Nastaliq Urdu',serif;font-size:16px}
+
+  .pay-badges{display:flex;gap:6px;flex-wrap:wrap}
+  .pay-badge{
+    font-size:10px;padding:5px 8px;border-radius:12px;
+    background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.85);
+    font-weight:600;display:flex;align-items:center;gap:4px;
+  }
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .dot-g{background:#22c55e}.dot-o{background:#f97316}.dot-b{background:#3b82f6}
+
+  /* Screens */
+  .screen{display:none;animation:fadeIn 0.4s ease}
+  .screen.active{display:block}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+  .page-title{font-size:30px;font-weight:800;color:var(--slate);margin-bottom:6px;letter-spacing:-0.5px}
+  .page-sub{color:var(--gray-500);font-size:15px;margin-bottom:28px}
+
+  /* ===== HOME ===== */
+  .hero{
+    position:relative;height:340px;border-radius:var(--radius-card);
+    overflow:hidden;margin-bottom:28px;box-shadow:var(--shadow-lg);
+    background:linear-gradient(180deg,#bce7f0 0%,#7bc4d6 35%,#3a8fa8 60%,#1b6b85 100%);
+  }
+  .hero-mountains{position:absolute;bottom:0;left:0;right:0;height:60%}
+  .hero-water{
+    position:absolute;bottom:0;left:0;right:0;height:38%;
+    background:linear-gradient(180deg,#00b4c5 0%,#008a9e 50%,#004f63 100%);
+  }
+  .hero-water::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:6px;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent);
+  }
+  .hero-content{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    justify-content:center;align-items:center;text-align:center;padding:24px;color:#fff;
+    text-shadow:0 2px 10px rgba(0,0,0,0.35);
+  }
+  .hero-title{font-size:38px;font-weight:800;letter-spacing:-1px;margin-bottom:6px}
+  .hero-sub{font-size:16px;opacity:0.95;margin-bottom:24px}
+  .search-bar{
+    background:rgba(255,255,255,0.95);border-radius:var(--radius-chip);
+    padding:6px;display:flex;align-items:center;gap:8px;
+    width:min(560px,92%);box-shadow:var(--shadow-lg);backdrop-filter:blur(8px);
+  }
+  .search-bar input{
+    flex:1;border:none;outline:none;padding:12px 18px;background:transparent;
+    font-size:15px;color:var(--gray-700);font-family:inherit;
+  }
+  .search-btn{
+    background:var(--teal);color:#fff;border:none;padding:12px 22px;
+    border-radius:var(--radius-chip);font-weight:600;cursor:pointer;font-family:inherit;
+    transition:transform 0.2s,background 0.2s;
+  }
+  .search-btn:hover{background:var(--emerald);transform:translateY(-1px)}
+
+  .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px}
+  .stat-card{
+    background:#fff;border-radius:var(--radius-card);padding:20px;
+    box-shadow:var(--shadow-sm);border:1px solid var(--gray-200);
+    transition:transform 0.2s,box-shadow 0.2s;
+  }
+  .stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+  .stat-num{font-size:26px;font-weight:800;color:var(--teal);letter-spacing:-0.5px}
+  .stat-label{font-size:13px;color:var(--gray-500);margin-top:4px;font-weight:500}
+
+  .section-title{font-size:20px;font-weight:700;color:var(--slate);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+  .section-title small{font-size:13px;font-weight:500;color:var(--gray-500)}
+
+  .transport-row{
+    display:flex;gap:14px;overflow-x:auto;padding-bottom:8px;margin-bottom:32px;
+    scrollbar-width:thin;
+  }
+  .transport-card{
+    flex:0 0 130px;background:#fff;border:1px solid var(--gray-200);
+    border-radius:var(--radius-card);padding:18px 12px;text-align:center;
+    cursor:pointer;transition:all 0.2s;
+  }
+  .transport-card:hover{border-color:var(--teal);transform:translateY(-3px);box-shadow:var(--shadow)}
+  .transport-icon{
+    width:54px;height:54px;margin:0 auto 10px;
+    background:linear-gradient(135deg,var(--cream),#fff);
+    border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--teal);
+  }
+  .transport-label{font-size:13px;font-weight:600;color:var(--slate)}
+
+  .dest-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:32px}
+  .dest-card{
+    background:#fff;border-radius:var(--radius-card);overflow:hidden;
+    box-shadow:var(--shadow-sm);border:1px solid var(--gray-200);
+    transition:all 0.25s;cursor:pointer;
+  }
+  .dest-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+  .dest-img{height:160px;position:relative;overflow:hidden}
+  .dest-img.hunza{background:linear-gradient(180deg,#a8d8e8 0%,#5ba5c0 40%,#2d6478 70%,#0e3a4a 100%)}
+  .dest-img.lahore{background:linear-gradient(180deg,#ffb27a 0%,#e8772f 50%,#a64a1a 100%)}
+  .dest-img.moh{background:linear-gradient(180deg,#f5e1a8 0%,#d4a85a 50%,#8b6a2e 100%)}
+  .dest-img svg{position:absolute;bottom:0;left:0;width:100%;height:100%}
+  .weather-badge{
+    position:absolute;top:12px;right:12px;
+    padding:5px 10px;border-radius:var(--radius-chip);font-size:11px;font-weight:700;
+    backdrop-filter:blur(6px);
+  }
+  .wb-green{background:rgba(34,197,94,0.95);color:#fff}
+  .wb-yellow{background:rgba(245,158,11,0.95);color:#fff}
+  .wb-red{background:rgba(220,38,38,0.95);color:#fff}
+  .dest-body{padding:16px}
+  .dest-name{font-size:18px;font-weight:700;color:var(--slate);margin-bottom:4px}
+  .dest-province{display:inline-block;font-size:11px;padding:3px 8px;background:var(--gray-100);color:var(--gray-500);border-radius:8px;font-weight:600;margin-bottom:10px}
+  .dest-rating{display:flex;align-items:center;gap:4px;color:var(--gold);font-weight:600;font-size:14px;margin-bottom:12px}
+  .explore-btn{
+    background:var(--teal);color:#fff;border:none;padding:10px 16px;
+    border-radius:var(--radius-btn);font-weight:600;cursor:pointer;
+    width:100%;transition:all 0.2s;font-family:inherit;font-size:14px;
+  }
+  .explore-btn:hover{background:var(--emerald)}
+
+  /* ===== PLAN WIZARD ===== */
+  .wizard{background:#fff;border-radius:var(--radius-card);padding:32px;box-shadow:var(--shadow-sm);border:1px solid var(--gray-200)}
+  .stepper{display:flex;align-items:center;margin-bottom:32px;gap:8px}
+  .step{display:flex;align-items:center;gap:10px;flex:1}
+  .step-circle{
+    width:36px;height:36px;border-radius:50%;background:var(--gray-200);
+    color:var(--gray-500);display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:14px;transition:all 0.3s;flex-shrink:0;
+  }
+  .step.active .step-circle{background:var(--teal);color:#fff;box-shadow:0 0 0 4px rgba(0,106,78,0.15)}
+  .step.done .step-circle{background:var(--emerald);color:#fff}
+  .step-label{font-size:13px;font-weight:600;color:var(--gray-500)}
+  .step.active .step-label{color:var(--teal)}
+  .step-line{flex:1;height:2px;background:var(--gray-200)}
+  .step.done + .step .step-line, .step.done .step-line{background:var(--emerald)}
+
+  .step-content{min-height:280px}
+  .step-content h3{font-size:22px;color:var(--slate);margin-bottom:6px}
+  .step-content p.helper{color:var(--gray-500);margin-bottom:20px;font-size:14px}
+
+  .chip-grid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px}
+  .chip{
+    padding:10px 18px;border-radius:var(--radius-chip);background:#fff;
+    border:2px solid var(--gray-200);cursor:pointer;font-size:14px;font-weight:600;
+    color:var(--gray-700);transition:all 0.2s;user-select:none;
+  }
+  .chip:hover{border-color:var(--teal);color:var(--teal)}
+  .chip.selected{background:var(--teal);border-color:var(--teal);color:#fff;box-shadow:0 4px 12px rgba(0,106,78,0.25)}
+
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+  .form-group label{display:block;font-size:13px;font-weight:600;color:var(--slate);margin-bottom:8px}
+  .form-group input[type="date"], .form-group input[type="number"]{
+    width:100%;padding:12px 14px;border:2px solid var(--gray-200);
+    border-radius:var(--radius-btn);font-family:inherit;font-size:14px;color:var(--gray-700);
+    transition:border 0.2s;
+  }
+  .form-group input:focus{outline:none;border-color:var(--teal)}
+
+  .stepper-input{display:flex;align-items:center;gap:10px}
+  .step-btn{
+    width:40px;height:40px;border-radius:var(--radius-btn);border:2px solid var(--gray-200);
+    background:#fff;color:var(--teal);font-size:20px;font-weight:700;cursor:pointer;
+    transition:all 0.2s;
+  }
+  .step-btn:hover{border-color:var(--teal);background:var(--teal);color:#fff}
+  .step-count{font-size:20px;font-weight:700;color:var(--slate);min-width:40px;text-align:center}
+
+  .budget-display{font-size:24px;font-weight:800;color:var(--teal);margin-bottom:10px}
+  input[type="range"]{
+    width:100%;height:6px;border-radius:3px;background:var(--gray-200);outline:none;
+    -webkit-appearance:none;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:22px;height:22px;border-radius:50%;
+    background:var(--teal);cursor:pointer;box-shadow:0 2px 8px rgba(0,106,78,0.4);
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:22px;height:22px;border-radius:50%;background:var(--teal);cursor:pointer;border:none;
+  }
+
+  .summary-card{
+    background:linear-gradient(135deg,var(--cream),#fff);
+    border:2px dashed var(--gray-300);border-radius:var(--radius-card);
+    padding:24px;margin-bottom:20px;
+  }
+  .summary-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-200);font-size:14px}
+  .summary-row:last-child{border-bottom:none}
+  .summary-key{color:var(--gray-500);font-weight:500}
+  .summary-val{color:var(--slate);font-weight:600;text-align:right;max-width:60%}
+
+  .wizard-actions{display:flex;justify-content:space-between;margin-top:24px}
+  .btn{
+    padding:12px 24px;border-radius:var(--radius-btn);font-weight:600;
+    cursor:pointer;font-family:inherit;font-size:14px;border:none;
+    transition:all 0.2s;display:inline-flex;align-items:center;gap:8px;
+  }
+  .btn-outline{background:#fff;color:var(--slate);border:2px solid var(--gray-200)}
+  .btn-outline:hover{border-color:var(--teal);color:var(--teal)}
+  .btn-primary{background:var(--teal);color:#fff}
+  .btn-primary:hover{background:var(--emerald);transform:translateY(-1px)}
+  .btn-gold{
+    background:linear-gradient(135deg,var(--gold),var(--gold-2));
+    color:#fff;box-shadow:0 6px 18px rgba(245,166,35,0.35);
+    font-weight:700;
+  }
+  .btn-gold:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(245,166,35,0.45)}
+  .btn-lg{padding:16px 32px;font-size:16px}
+
+  /* ===== ITINERARY ===== */
+  .iti-header{
+    background:linear-gradient(135deg,var(--teal),var(--emerald));
+    color:#fff;border-radius:var(--radius-card);padding:28px;margin-bottom:24px;
+    box-shadow:var(--shadow);
+  }
+  .iti-header h2{font-size:26px;font-weight:800;margin-bottom:8px}
+  .iti-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .meta-chip{background:rgba(255,255,255,0.18);padding:6px 12px;border-radius:var(--radius-chip);font-size:13px;font-weight:600;backdrop-filter:blur(6px)}
+  .iti-actions{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap}
+
+  .iti-layout{display:grid;grid-template-columns:200px 1fr;gap:20px}
+  .day-selector{
+    background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-card);
+    padding:12px;height:fit-content;position:sticky;top:20px;
+  }
+  .day-btn{
+    width:100%;text-align:left;padding:12px 14px;border:none;background:transparent;
+    border-radius:var(--radius-btn);cursor:pointer;font-family:inherit;font-size:14px;
+    font-weight:600;color:var(--gray-500);margin-bottom:4px;transition:all 0.2s;
+  }
+  .day-btn:hover{background:var(--cream);color:var(--slate)}
+  .day-btn.active{background:var(--teal);color:#fff;box-shadow:0 4px 12px rgba(0,106,78,0.3)}
+  .day-btn small{display:block;font-weight:500;font-size:11px;margin-top:2px;opacity:0.85}
+
+  .day-detail{background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-card);padding:24px;min-height:400px}
+  .day-title{font-size:22px;font-weight:800;color:var(--slate);margin-bottom:4px}
+  .day-loc{color:var(--gray-500);margin-bottom:18px;font-size:14px}
+  .road-alert{
+    display:inline-flex;align-items:center;gap:8px;padding:8px 14px;
+    border-radius:var(--radius-chip);font-size:13px;font-weight:600;margin-bottom:18px;
+  }
+  .alert-green{background:#dcfce7;color:#166534}
+  .alert-yellow{background:#fef3c7;color:#92400e}
+  .alert-red{background:#fee2e2;color:#991b1b}
+
+  .timeslot{margin-bottom:18px}
+  .timeslot-title{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--teal);font-weight:700;margin-bottom:10px}
+  .activity{
+    display:flex;gap:14px;padding:14px;background:var(--cream);
+    border-radius:var(--radius-btn);margin-bottom:8px;border-left:3px solid var(--teal);
+    transition:transform 0.2s;
+  }
+  .activity:hover{transform:translateX(4px)}
+  .act-icon{
+    width:44px;height:44px;border-radius:10px;background:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;
+    box-shadow:var(--shadow-sm);
+  }
+  .act-info{flex:1}
+  .act-name{font-weight:700;color:var(--slate);font-size:15px;margin-bottom:2px}
+  .act-loc{font-size:13px;color:var(--gray-500);margin-bottom:6px}
+  .act-tags{display:flex;gap:6px;flex-wrap:wrap}
+  .act-tag{
+    font-size:11px;padding:3px 8px;border-radius:8px;
+    background:rgba(0,106,78,0.1);color:var(--teal);font-weight:600;
+  }
+
+  .float-pdf{
+    position:fixed;bottom:24px;right:24px;
+    background:linear-gradient(135deg,var(--gold),var(--gold-2));color:#fff;
+    border:none;padding:14px 22px;border-radius:50px;font-weight:700;
+    cursor:pointer;font-family:inherit;font-size:14px;
+    box-shadow:0 8px 24px rgba(245,166,35,0.45);z-index:50;
+    display:flex;align-items:center;gap:8px;transition:transform 0.2s;
+  }
+  .float-pdf:hover{transform:translateY(-3px)}
+
+  .shimmer{
+    height:120px;background:linear-gradient(90deg,var(--gray-100) 0%,var(--gray-200) 50%,var(--gray-100) 100%);
+    background-size:200% 100%;animation:shimmer 1.2s infinite;border-radius:var(--radius-card);margin-bottom:12px;
+  }
+  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+  /* ===== SURVIVAL MODE ===== */
+  .survival{background:var(--dark);color:#fff;min-height:calc(100vh - 64px);margin:-32px -40px;padding:24px 32px;border-radius:0}
+  .surv-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+  .surv-title{font-size:22px;font-weight:800;color:#fff}
+  .surv-sub{font-size:13px;color:#9ca3af;margin-top:2px}
+  .offline-badge{
+    display:inline-flex;align-items:center;gap:6px;padding:6px 12px;
+    background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3);
+    border-radius:var(--radius-chip);font-size:12px;font-weight:700;
+  }
+  .offline-badge .dot-g{animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+  .surv-grid{display:grid;grid-template-columns:65% 35%;gap:20px}
+  @media (max-width:980px){.surv-grid{grid-template-columns:1fr}}
+  .map-panel{
+    background:#0d0d20;border:1px solid #2a2a3e;border-radius:var(--radius-card);
+    height:500px;position:relative;overflow:hidden;
+  }
+  .map-panel svg{width:100%;height:100%}
+  .gps-overlay{
+    position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.6);
+    padding:8px 12px;border-radius:8px;font-size:11px;color:#7dd3fc;font-family:monospace;
+    border:1px solid rgba(125,211,252,0.2);
+  }
+  .signal-overlay{
+    position:absolute;top:12px;right:12px;background:rgba(0,0,0,0.6);
+    padding:8px 12px;border-radius:8px;font-size:11px;color:#fbbf24;
+    display:flex;align-items:center;gap:6px;border:1px solid rgba(251,191,36,0.2);
+  }
+  .bars{display:inline-flex;gap:2px;align-items:flex-end}
+  .bar{width:3px;background:#fbbf24;border-radius:1px}
+  .bar.b1{height:4px}.bar.b2{height:7px}.bar.b3{height:10px;background:#3a3a3a}
+
+  .info-panel{display:flex;flex-direction:column;gap:12px}
+  .res-card{
+    background:#1f1f35;border:1px solid #2a2a3e;border-radius:var(--radius-card);
+    padding:14px;display:flex;gap:12px;align-items:center;
+    transition:all 0.2s;
+  }
+  .res-card:hover{border-color:var(--teal);transform:translateX(-2px)}
+  .res-icon{width:42px;height:42px;border-radius:10px;background:rgba(0,106,78,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+  .res-name{font-size:13px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px}
+  .res-detail{font-size:14px;color:#fff;font-weight:600;margin-top:2px}
+  .res-dist{font-size:12px;color:#4ade80;margin-top:2px}
+
+  .sos-btn{
+    background:linear-gradient(135deg,#dc2626,#991b1b);
+    color:#fff;border:none;padding:18px;border-radius:var(--radius-card);
+    font-weight:800;font-size:15px;font-family:inherit;cursor:pointer;
+    width:100%;letter-spacing:0.5px;
+    box-shadow:0 0 0 0 rgba(220,38,38,0.6);animation:sos-pulse 1.8s infinite;
+    margin-top:12px;
+  }
+  @keyframes sos-pulse{
+    0%{box-shadow:0 0 0 0 rgba(220,38,38,0.6)}
+    70%{box-shadow:0 0 0 16px rgba(220,38,38,0)}
+    100%{box-shadow:0 0 0 0 rgba(220,38,38,0)}
+  }
+
+  .elevation-panel{
+    background:#0d0d20;border:1px solid #2a2a3e;border-radius:var(--radius-card);
+    padding:16px;margin-top:20px;
+  }
+  .elev-title{font-size:13px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+
+  .trail-path{
+    stroke:#fbbf24;stroke-width:2.5;fill:none;stroke-dasharray:8 6;
+    stroke-dashoffset:1000;animation:draw-trail 4s ease-out forwards infinite;
+  }
+  @keyframes draw-trail{
+    from{stroke-dashoffset:1000}
+    to{stroke-dashoffset:0}
+  }
+
+  /* ===== EXPORT PDF ===== */
+  .export-grid{display:grid;grid-template-columns:40% 60%;gap:24px}
+  @media (max-width:980px){.export-grid{grid-template-columns:1fr}}
+  .options-panel{background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-card);padding:24px;height:fit-content}
+  .opt-section{margin-bottom:22px}
+  .opt-section h4{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--teal);font-weight:700;margin-bottom:10px}
+  .opt-input{
+    width:100%;padding:11px 14px;border:2px solid var(--gray-200);border-radius:var(--radius-btn);
+    font-family:inherit;font-size:14px;color:var(--gray-700);
+  }
+  .opt-input:focus{outline:none;border-color:var(--teal)}
+  .radio-group, .check-group{display:flex;flex-direction:column;gap:8px}
+  .radio-group.horizontal{flex-direction:row;flex-wrap:wrap;gap:8px}
+  .radio-opt, .check-opt{
+    display:flex;align-items:center;gap:10px;padding:10px 12px;border:2px solid var(--gray-200);
+    border-radius:var(--radius-btn);cursor:pointer;font-size:14px;font-weight:500;
+    transition:all 0.2s;flex:1;
+  }
+  .radio-opt:hover, .check-opt:hover{border-color:var(--teal)}
+  .radio-opt.active, .check-opt.active{border-color:var(--teal);background:rgba(0,106,78,0.05);color:var(--teal);font-weight:600}
+  .radio-opt input, .check-opt input{accent-color:var(--teal)}
+
+  .preview-panel{
+    background:var(--gray-100);border-radius:var(--radius-card);padding:24px;
+    display:flex;justify-content:center;align-items:flex-start;
+  }
+  .pdf-preview{
+    background:#fff;width:100%;max-width:560px;min-height:780px;
+    box-shadow:var(--shadow-lg);border-radius:6px;overflow:hidden;font-family:'Inter',sans-serif;
+  }
+  .pdf-header{
+    background:linear-gradient(135deg,var(--teal),var(--emerald));
+    color:#fff;padding:24px 28px;display:flex;justify-content:space-between;align-items:center;
+  }
+  .pdf-logo{font-size:22px;font-weight:800;letter-spacing:1px}
+  .pdf-logo-ur{font-family:'Noto Nastaliq Urdu',serif;font-size:16px;color:var(--sand);direction:rtl}
+  .pdf-body{padding:28px}
+  .pdf-trip-title{font-size:24px;font-weight:800;color:var(--slate);margin-bottom:6px}
+  .pdf-trip-meta{color:var(--gray-500);font-size:13px;margin-bottom:18px}
+  .pdf-hr{height:2px;background:linear-gradient(90deg,var(--teal),transparent);margin:16px 0}
+  .pdf-day-title{font-size:16px;font-weight:700;color:var(--teal);margin-bottom:10px;margin-top:18px}
+  .pdf-act{font-size:13px;color:var(--gray-700);margin-bottom:8px;padding-left:14px;border-left:2px solid var(--gold);line-height:1.5}
+  .pdf-footer{
+    border-top:1px solid var(--gray-200);padding:14px 28px;
+    display:flex;justify-content:space-between;color:var(--gray-500);font-size:11px;
+  }
+
+  /* Responsive */
+  @media (max-width:880px){
+    .sidebar{
+      width:100%;height:auto;position:fixed;bottom:0;top:auto;
+      flex-direction:row;padding:8px;border-top:1px solid rgba(255,255,255,0.1);
+    }
+    .brand,.sidebar-bottom{display:none}
+    .nav{display:flex;justify-content:space-around;gap:4px}
+    .nav-item{flex-direction:column;font-size:10px;padding:8px 6px;text-align:center;gap:4px}
+    .nav-icon{width:18px;height:18px}
+    .main{margin-left:0;width:100%;padding:20px 16px 100px;}
+    .stats-row{grid-template-columns:repeat(2,1fr)}
+    .dest-grid{grid-template-columns:1fr}
+    .form-row{grid-template-columns:1fr}
+    .iti-layout{grid-template-columns:1fr}
+    .day-selector{position:static}
+    .hero-title{font-size:28px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-name">Musafir</div>
+      <div class="brand-ur">مسافر</div>
+      <div class="brand-tag">Pakistan Travel</div>
+    </div>
+    <ul class="nav">
+      <li class="nav-item active" data-screen="home" onclick="showScreen('home',this)">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12L12 4l9 8"/><path d="M5 10v10h14V10"/></svg>
+        <span class="en-text">Home</span><span class="ur-text">ہوم</span>
+      </li>
+      <li class="nav-item" data-screen="plan" onclick="showScreen('plan',this)">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span class="en-text">Plan Trip</span><span class="ur-text">سفر کا منصوبہ</span>
+      </li>
+      <li class="nav-item" data-screen="itinerary" onclick="showScreen('itinerary',this)">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span class="en-text">My Itinerary</span><span class="ur-text">میرا سفر نامہ</span>
+      </li>
+      <li class="nav-item" data-screen="survival" onclick="showScreen('survival',this)">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L4 22h16L12 2z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/></svg>
+        <span class="en-text">Survival Mode</span><span class="ur-text">بقا موڈ</span>
+      </li>
+      <li class="nav-item" data-screen="export" onclick="showScreen('export',this)">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>
+        <span class="en-text">Export PDF</span><span class="ur-text">پی ڈی ایف</span>
+      </li>
+    </ul>
+    <div class="sidebar-bottom">
+      <div class="lang-toggle">
+        <button class="lang-btn active" onclick="setLang('en',this)">EN</button>
+        <button class="lang-btn ur" onclick="setLang('ur',this)">اردو</button>
+      </div>
+      <div class="pay-badges">
+        <span class="pay-badge"><span class="dot dot-g"></span>JazzCash</span>
+        <span class="pay-badge"><span class="dot dot-o"></span>EasyPaisa</span>
+        <span class="pay-badge"><span class="dot dot-b"></span>1-Bill</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+
+    <!-- ===== SCREEN 1: HOME ===== -->
+    <section class="screen active" id="screen-home">
+      <h1 class="page-title">
+        <span class="en-text">Welcome, Musafir</span>
+        <span class="ur-text">خوش آمدید مسافر</span>
+      </h1>
+      <p class="page-sub">
+        <span class="en-text">Discover the hidden gems of Pakistan — from Karakoram peaks to Sindh coastlines.</span>
+        <span class="ur-text">پاکستان کے چھپے ہوئے خزانے دریافت کریں</span>
+      </p>
+
+      <div class="hero">
+        <svg class="hero-mountains" viewBox="0 0 800 200" preserveAspectRatio="none">
+          <polygon points="0,200 0,90 120,40 220,100 320,30 430,80 540,20 640,70 760,50 800,90 800,200" fill="#3a5a6e" opacity="0.85"/>
+          <polygon points="0,200 0,130 100,90 200,140 310,80 420,130 530,90 640,140 760,110 800,140 800,200" fill="#2c4555" opacity="0.95"/>
+          <polygon points="120,40 160,55 180,30 200,50 220,100 180,80 140,70" fill="#fff" opacity="0.6"/>
+          <polygon points="320,30 360,50 400,25 430,80 380,60 340,55" fill="#fff" opacity="0.5"/>
+          <polygon points="540,20 580,40 620,15 640,70 590,50 555,40" fill="#fff" opacity="0.55"/>
+        </svg>
+        <div class="hero-water"></div>
+        <div class="hero-content">
+          <div class="hero-title">Plan Your Pakistan Adventure</div>
+          <div class="hero-sub">From Attabad Lake to the Arabian Sea — your journey begins here</div>
+          <div class="search-bar">
+            <input type="text" placeholder="Where in Pakistan do you want to go?" id="heroSearch"/>
+            <button class="search-btn" onclick="showScreen('plan',document.querySelector('[data-screen=plan]'))">Search</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-num">89</div><div class="stat-label">Destinations</div></div>
+        <div class="stat-card"><div class="stat-num">50K+</div><div class="stat-label">Travelers</div></div>
+        <div class="stat-card"><div class="stat-num">120+</div><div class="stat-label">Itineraries</div></div>
+        <div class="stat-card"><div class="stat-num">4.8★</div><div class="stat-label">Rating</div></div>
+      </div>
+
+      <div class="section-title">
+        <span><span class="en-text">Choose Transport</span><span class="ur-text">سواری کا انتخاب</span></span>
+        <small>Swipe to explore</small>
+      </div>
+      <div class="transport-row">
+        <div class="transport-card">
+          <div class="transport-icon">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h24M6 20v-5l4-6h12l4 6v5M10 9V6h12v3"/><circle cx="9" cy="22" r="2.5"/><circle cx="23" cy="22" r="2.5"/></svg>
+          </div>
+          <div class="transport-label">4x4 Jeep</div>
+        </div>
+        <div class="transport-card">
+          <div class="transport-icon">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="24" height="16" rx="2"/><path d="M4 14h24M8 10h4M16 10h4M24 10h0"/><circle cx="9" cy="24" r="2"/><circle cx="23" cy="24" r="2"/></svg>
+          </div>
+          <div class="transport-label">Luxury Bus</div>
+        </div>
+        <div class="transport-card">
+          <div class="transport-icon">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 22h20M8 22V14l4-6h8l4 6v8"/><path d="M8 14h16"/><circle cx="10" cy="24" r="2"/><circle cx="22" cy="24" r="2"/><circle cx="16" cy="24" r="2"/></svg>
+          </div>
+          <div class="transport-label">Rickshaw</div>
+        </div>
+        <div class="transport-card">
+          <div class="transport-icon">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 16l28-8-6 14-4-6-10-2-8 2z"/></svg>
+          </div>
+          <div class="transport-label">Flight</div>
+        </div>
+        <div class="transport-card">
+          <div class="transport-icon">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="20" height="20" rx="3"/><path d="M6 16h20M10 8h12M10 24l-2 4M22 24l2 4"/><circle cx="11" cy="20" r="1" fill="currentColor"/><circle cx="21" cy="20" r="1" fill="currentColor"/></svg>
+          </div>
+          <div class="transport-label">Train</div>
+        </div>
+        <div class="transport-card">
+          <div class="transport-icon">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2"><circle cx="16" cy="8" r="4"/><path d="M8 28v-6c0-4 3-6 8-6s8 2 8 6v6"/><path d="M22 4l4 2-4 2"/></svg>
+          </div>
+          <div class="transport-label">Local Guide</div>
+        </div>
+      </div>
+
+      <div class="section-title">
+        <span><span class="en-text">Featured Destinations</span><span class="ur-text">نمایاں مقامات</span></span>
+        <small>Curated for you</small>
+      </div>
+      <div class="dest-grid">
+        <div class="dest-card">
+          <div class="dest-img hunza">
+            <svg viewBox="0 0 300 160" preserveAspectRatio="none">
+              <polygon points="0,160 0,70 60,30 110,70 160,20 220,60 300,40 300,160" fill="#1d4358" opacity="0.9"/>
+              <polygon points="60,30 80,45 90,25 110,70 80,50" fill="#fff" opacity="0.7"/>
+              <polygon points="160,20 190,40 210,15 220,60 180,40" fill="#fff" opacity="0.6"/>
+              <rect x="0" y="120" width="300" height="40" fill="#0a728c"/>
+            </svg>
+            <span class="weather-badge wb-yellow">Snow Closure ❄️</span>
+          </div>
+          <div class="dest-body">
+            <div class="dest-name">Hunza Valley</div>
+            <span class="dest-province">Gilgit-Baltistan</span>
+            <div class="dest-rating">★ 4.9 <span style="color:var(--gray-500);font-weight:400;font-size:13px;margin-left:4px">(2,341 reviews)</span></div>
+            <button class="explore-btn" onclick="showScreen('itinerary',document.querySelector('[data-screen=itinerary]'))">Explore</button>
+          </div>
+        </div>
+        <div class="dest-card">
+          <div class="dest-img lahore">
+            <svg viewBox="0 0 300 160" preserveAspectRatio="none">
+              <rect x="30" y="80" width="60" height="80" fill="#7a2f12" opacity="0.9"/>
+              <polygon points="30,80 60,50 90,80" fill="#a64a1a"/>
+              <circle cx="60" cy="60" r="6" fill="#f5e1a8"/>
+              <rect x="120" y="70" width="40" height="90" fill="#7a2f12"/>
+              <polygon points="120,70 140,40 160,70" fill="#a64a1a"/>
+              <rect x="190" y="85" width="80" height="75" fill="#7a2f12" opacity="0.9"/>
+              <polygon points="190,85 230,55 270,85" fill="#a64a1a"/>
+              <circle cx="230" cy="65" r="5" fill="#f5e1a8"/>
+            </svg>
+            <span class="weather-badge wb-green">Clear ✅</span>
+          </div>
+          <div class="dest-body">
+            <div class="dest-name">Lahore</div>
+            <span class="dest-province">Punjab</span>
+            <div class="dest-rating">★ 4.7 <span style="color:var(--gray-500);font-weight:400;font-size:13px;margin-left:4px">(5,128 reviews)</span></div>
+            <button class="explore-btn">Explore</button>
+          </div>
+        </div>
+        <div class="dest-card">
+          <div class="dest-img moh">
+            <svg viewBox="0 0 300 160" preserveAspectRatio="none">
+              <rect x="20" y="100" width="50" height="60" fill="#8b6a2e"/>
+              <rect x="80" y="90" width="40" height="70" fill="#a8824a"/>
+              <rect x="130" y="80" width="60" height="80" fill="#8b6a2e"/>
+              <rect x="200" y="95" width="45" height="65" fill="#a8824a"/>
+              <rect x="20" y="110" width="50" height="5" fill="#5e4719"/>
+              <rect x="80" y="100" width="40" height="5" fill="#5e4719"/>
+              <rect x="130" y="92" width="60" height="6" fill="#5e4719"/>
+            </svg>
+            <span class="weather-badge wb-red">Landslide Risk ⚠️</span>
+          </div>
+          <div class="dest-body">
+            <div class="dest-name">Mohenjo-daro</div>
+            <span class="dest-province">Sindh</span>
+            <div class="dest-rating">★ 4.6 <span style="color:var(--gray-500);font-weight:400;font-size:13px;margin-left:4px">(987 reviews)</span></div>
+            <button class="explore-btn">Explore</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SCREEN 2: PLAN TRIP ===== -->
+    <section class="screen" id="screen-plan">
+      <h1 class="page-title">
+        <span class="en-text">Plan Your Trip</span>
+        <span class="ur-text">اپنا سفر بنائیں</span>
+      </h1>
+      <p class="page-sub">Build your perfect Pakistan adventure in 4 simple steps.</p>
+
+      <div class="wizard">
+        <div class="stepper" id="stepper">
+          <div class="step active" data-step="1"><div class="step-circle">1</div><div class="step-label">Destination</div></div>
+          <div class="step-line"></div>
+          <div class="step" data-step="2"><div class="step-circle">2</div><div class="step-label">Dates & Travelers</div></div>
+          <div class="step-line"></div>
+          <div class="step" data-step="3"><div class="step-circle">3</div><div class="step-label">Interests</div></div>
+          <div class="step-line"></div>
+          <div class="step" data-step="4"><div class="step-circle">4</div><div class="step-label">Review</div></div>
+        </div>
+
+        <!-- Step 1 -->
+        <div class="step-content" id="step1">
+          <h3>Where would you like to go?</h3>
+          <p class="helper">Select one or more destinations across Pakistan.</p>
+          <div class="chip-grid" id="destChips">
+            <div class="chip" onclick="toggleChip(this,'dest')">Hunza</div>
+            <div class="chip" onclick="toggleChip(this,'dest')">Skardu</div>
+            <div class="chip" onclick="toggleChip(this,'dest')">Lahore</div>
+            <div class="chip" onclick="toggleChip(this,'dest')">Karachi</div>
+            <div class="chip" onclick="toggleChip(this,'dest')">Swat</div>
+            <div class="chip" onclick="toggleChip(this,'dest')">Gilgit</div>
+            <div class="chip" onclick="toggleChip(this,'dest')">Murree</div>
+            <div class="chip" onclick="toggleChip(this,'dest')">Quetta</div>
+            <div class="chip" onclick="toggleChip(this,'dest')">Peshawar</div>
+            <div class="chip" onclick="toggleChip(this,'dest')">Mohenjo-daro</div>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="step-content" id="step2" style="display:none">
+          <h3>When & with whom?</h3>
+          <p class="helper">Pick your travel dates, group size, and budget.</p>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Start Date</label>
+              <input type="date" id="startDate" value="2026-06-10"/>
+            </div>
+            <div class="form-group">
+              <label>End Date</label>
+              <input type="date" id="endDate" value="2026-06-17"/>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Number of Travelers</label>
+              <div class="stepper-input">
+                <button class="step-btn" onclick="adjTravelers(-1)">−</button>
+                <span class="step-count" id="travelerCount">2</span>
+                <button class="step-btn" onclick="adjTravelers(1)">+</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Budget (PKR)</label>
+              <div class="budget-display" id="budgetDisplay">PKR 150,000</div>
+              <input type="range" id="budgetSlider" min="50000" max="500000" step="10000" value="150000" oninput="updateBudget()"/>
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gray-500);margin-top:4px"><span>50K</span><span>500K+</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="step-content" id="step3" style="display:none">
+          <h3>What excites you?</h3>
+          <p class="helper">Pick all that apply. Your AI guide will tailor suggestions.</p>
+          <div class="chip-grid" id="interestChips">
+            <div class="chip" onclick="toggleChip(this,'int')">Trekking 🥾</div>
+            <div class="chip" onclick="toggleChip(this,'int')">Heritage 🏛️</div>
+            <div class="chip" onclick="toggleChip(this,'int')">Food 🍛</div>
+            <div class="chip" onclick="toggleChip(this,'int')">Photography 📷</div>
+            <div class="chip" onclick="toggleChip(this,'int')">Adventure 🏔️</div>
+            <div class="chip" onclick="toggleChip(this,'int')">Wildlife 🦅</div>
+            <div class="chip" onclick="toggleChip(this,'int')">Sufi Music 🎵</div>
+            <div class="chip" onclick="toggleChip(this,'int')">Art & Crafts 🎨</div>
+            <div class="chip" onclick="toggleChip(this,'int')">Beaches 🏖️</div>
+            <div class="chip" onclick="toggleChip(this,'int')">Spiritual 🕌</div>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="step-content" id="step4" style="display:none">
+          <h3>Review your trip</h3>
+          <p class="helper">Confirm your selections, then generate your AI itinerary.</p>
+          <div class="summary-card" id="summaryCard">
+            <div class="summary-row"><span class="summary-key">Destinations</span><span class="summary-val" id="sumDest">—</span></div>
+            <div class="summary-row"><span class="summary-key">Dates</span><span class="summary-val" id="sumDates">—</span></div>
+            <div class="summary-row"><span class="summary-key">Travelers</span><span class="summary-val" id="sumTrav">2</span></div>
+            <div class="summary-row"><span class="summary-key">Budget</span><span class="summary-val" id="sumBudget">PKR 150,000</span></div>
+            <div class="summary-row"><span class="summary-key">Interests</span><span class="summary-val" id="sumInt">—</span></div>
+          </div>
+          <button class="btn btn-gold btn-lg" style="width:100%;justify-content:center" onclick="generateItinerary()">
+            ✨ Generate AI Itinerary
+          </button>
+        </div>
+
+        <div class="wizard-actions">
+          <button class="btn btn-outline" id="backBtn" onclick="prevStep()" style="visibility:hidden">← Back</button>
+          <button class="btn btn-primary" id="nextBtn" onclick="nextStep()">Next →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SCREEN 3: ITINERARY ===== -->
+    <section class="screen" id="screen-itinerary">
+      <div class="iti-header">
+        <h2>Hunza Valley — 7 Day Adventure</h2>
+        <div style="opacity:0.9;font-size:14px">AI-crafted journey through the Karakoram</div>
+        <div class="iti-meta">
+          <span class="meta-chip">📅 Jun 10 — Jun 17, 2026</span>
+          <span class="meta-chip">👥 2 Travelers</span>
+          <span class="meta-chip">💰 PKR 150,000</span>
+          <span class="meta-chip">🏔️ Gilgit-Baltistan</span>
+        </div>
+        <div class="iti-actions">
+          <button class="btn btn-outline" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">+ Add Activity</button>
+          <button class="btn btn-gold">✨ AI Suggest More</button>
+        </div>
+      </div>
+
+      <div id="itiLoading" style="display:none">
+        <div class="shimmer"></div>
+        <div class="shimmer"></div>
+        <div class="shimmer"></div>
+      </div>
+
+      <div class="iti-layout" id="itiLayout">
+        <div class="day-selector" id="daySelector"></div>
+        <div class="day-detail" id="dayDetail"></div>
+      </div>
+    </section>
+
+    <!-- ===== SCREEN 4: SURVIVAL ===== -->
+    <section class="screen" id="screen-survival">
+      <div class="survival">
+        <div class="surv-top">
+          <div>
+            <div class="surv-title">Survival Mode</div>
+            <div class="surv-sub">Fairy Meadows Trail · Nanga Parbat Base</div>
+          </div>
+          <span class="offline-badge"><span class="dot dot-g"></span> OFFLINE READY</span>
+        </div>
+
+        <div class="surv-grid">
+          <div class="map-panel">
+            <div class="gps-overlay">📍 35.3879°N, 74.5781°E · ALT 3306m</div>
+            <div class="signal-overlay">
+              <div class="bars"><div class="bar b1"></div><div class="bar b2"></div><div class="bar b3"></div></div>
+              Weak Signal
+            </div>
+            <svg viewBox="0 0 700 500" preserveAspectRatio="xMidYMid meet">
+              <!-- Contour lines -->
+              <g stroke="#1a4d40" stroke-width="1" fill="none" opacity="0.5">
+                <ellipse cx="350" cy="250" rx="280" ry="180"/>
+                <ellipse cx="350" cy="250" rx="240" ry="155"/>
+                <ellipse cx="350" cy="250" rx="200" ry="130"/>
+                <ellipse cx="350" cy="250" rx="160" ry="105"/>
+                <ellipse cx="350" cy="250" rx="120" ry="80"/>
+                <ellipse cx="350" cy="250" rx="80" ry="55"/>
+                <ellipse cx="350" cy="250" rx="40" ry="30"/>
+              </g>
+              <g stroke="#006A4E" stroke-width="0.8" fill="none" opacity="0.4">
+                <ellipse cx="150" cy="120" rx="60" ry="40"/>
+                <ellipse cx="150" cy="120" rx="40" ry="28"/>
+                <ellipse cx="580" cy="380" rx="80" ry="50"/>
+                <ellipse cx="580" cy="380" rx="55" ry="35"/>
+              </g>
+              <!-- Trail path animated -->
+              <path class="trail-path" d="M 80 420 Q 180 380 250 340 T 380 260 Q 450 220 520 180 T 620 100"/>
+              <!-- Waypoints -->
+              <g>
+                <circle cx="80" cy="420" r="10" fill="#fbbf24" stroke="#1a1a2e" stroke-width="3"/>
+                <text x="98" y="425" fill="#fbbf24" font-size="11" font-weight="700">Trailhead · 0km</text>
+              </g>
+              <g>
+                <circle cx="250" cy="340" r="9" fill="#22c55e" stroke="#1a1a2e" stroke-width="3"/>
+                <text x="268" y="345" fill="#22c55e" font-size="11" font-weight="700">⛺ Camp 1 · 4.2km</text>
+              </g>
+              <g>
+                <circle cx="380" cy="260" r="9" fill="#3b82f6" stroke="#1a1a2e" stroke-width="3"/>
+                <text x="398" y="265" fill="#3b82f6" font-size="11" font-weight="700">🏕️ Camp 2 · 7.8km</text>
+              </g>
+              <g>
+                <circle cx="620" cy="100" r="11" fill="#ef4444" stroke="#1a1a2e" stroke-width="3"/>
+                <text x="490" y="90" fill="#ef4444" font-size="11" font-weight="700">🏔️ Base Camp · 12.1km</text>
+              </g>
+              <!-- North arrow -->
+              <g transform="translate(640,30)">
+                <circle cx="0" cy="0" r="18" fill="#0d0d20" stroke="#4a4a5e" stroke-width="1"/>
+                <polygon points="0,-12 -5,8 0,4 5,8" fill="#ef4444"/>
+                <text x="0" y="-22" fill="#9ca3af" font-size="9" text-anchor="middle">N</text>
+              </g>
+            </svg>
+          </div>
+
+          <div class="info-panel">
+            <div class="res-card">
+              <div class="res-icon">⛽</div>
+              <div>
+                <div class="res-name">Nearest Fuel</div>
+                <div class="res-detail">Raikot Bridge PSO</div>
+                <div class="res-dist">3.2 km · 24hr</div>
+              </div>
+            </div>
+            <div class="res-card">
+              <div class="res-icon">🏥</div>
+              <div>
+                <div class="res-name">Medical Aid</div>
+                <div class="res-detail">Fairy Meadows Clinic</div>
+                <div class="res-dist">1.1 km · On call</div>
+              </div>
+            </div>
+            <div class="res-card">
+              <div class="res-icon">🏠</div>
+              <div>
+                <div class="res-name">Shelter</div>
+                <div class="res-detail">Forest Rest House</div>
+                <div class="res-dist">0.8 km · Available</div>
+              </div>
+            </div>
+            <div class="res-card">
+              <div class="res-icon">🕌</div>
+              <div>
+                <div class="res-name">Nearest Mosque</div>
+                <div class="res-detail">Village Mosque</div>
+                <div class="res-dist">0.5 km · Open</div>
+              </div>
+            </div>
+            <button class="sos-btn" onclick="alert('SOS triggered — emergency services notified (demo)')">
+              🚨 EMERGENCY SOS — Call 1122
+            </button>
+          </div>
+        </div>
+
+        <div class="elevation-panel">
+          <div class="elev-title">Elevation Profile · 2000m → 3300m</div>
+          <svg viewBox="0 0 700 120" preserveAspectRatio="none" style="width:100%;height:120px">
+            <defs>
+              <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#006A4E" stop-opacity="0.5"/>
+                <stop offset="100%" stop-color="#006A4E" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M 0 100 L 80 92 L 160 78 L 240 70 L 320 55 L 400 48 L 480 32 L 560 24 L 640 18 L 700 14 L 700 120 L 0 120 Z" fill="url(#elevGrad)"/>
+            <path d="M 0 100 L 80 92 L 160 78 L 240 70 L 320 55 L 400 48 L 480 32 L 560 24 L 640 18 L 700 14" stroke="#22c55e" stroke-width="2" fill="none"/>
+            <g fill="#9ca3af" font-size="9">
+              <text x="5" y="115">0km · 2000m</text>
+              <text x="320" y="115">6km · 2650m</text>
+              <text x="640" y="115" text-anchor="end">12km · 3300m</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SCREEN 5: EXPORT PDF ===== -->
+    <section class="screen" id="screen-export">
+      <h1 class="page-title">
+        <span class="en-text">Export Your Trip</span>
+        <span class="ur-text">سفر برآمد کریں</span>
+      </h1>
+      <p class="page-sub">Customize and download a beautiful PDF of your itinerary.</p>
+
+      <div class="export-grid">
+        <div class="options-panel">
+          <div class="opt-section">
+            <h4>Trip Details</h4>
+            <input type="text" class="opt-input" id="optTitle" value="Hunza Valley 7-Day Adventure" style="margin-bottom:10px"/>
+            <input type="text" class="opt-input" id="optName" placeholder="Traveler name"/>
+          </div>
+
+          <div class="opt-section">
+            <h4>Layout Style</h4>
+            <div class="radio-group horizontal">
+              <label class="radio-opt active"><input type="radio" name="layout" value="classic" checked/> Classic</label>
+              <label class="radio-opt"><input type="radio" name="layout" value="modern"/> Modern</label>
+              <label class="radio-opt"><input type="radio" name="layout" value="compact"/> Compact</label>
+            </div>
+          </div>
+
+          <div class="opt-section">
+            <h4>Sections</h4>
+            <div class="check-group">
+              <label class="check-opt active"><input type="checkbox" checked data-sec="cover"/> Cover Page</label>
+              <label class="check-opt active"><input type="checkbox" checked data-sec="days"/> Day-by-Day Itinerary</label>
+              <label class="check-opt active"><input type="checkbox" checked data-sec="maps"/> Maps & Routes</label>
+              <label class="check-opt active"><input type="checkbox" checked data-sec="packing"/> Packing List</label>
+              <label class="check-opt active"><input type="checkbox" checked data-sec="emergency"/> Emergency Contacts</label>
+              <label class="check-opt active"><input type="checkbox" checked data-sec="phrases"/> Local Phrases</label>
+            </div>
+          </div>
+
+          <div class="opt-section">
+            <h4>Language</h4>
+            <div class="radio-group horizontal">
+              <label class="radio-opt active"><input type="radio" name="lang" value="en" checked/> English</label>
+              <label class="radio-opt"><input type="radio" name="lang" value="ur"/> Urdu</label>
+              <label class="radio-opt"><input type="radio" name="lang" value="bi"/> Bilingual</label>
+            </div>
+          </div>
+
+          <button class="btn btn-gold btn-lg" style="width:100%;justify-content:center;margin-bottom:10px" onclick="downloadPDF()">
+            📥 Download PDF
+          </button>
+          <button class="btn btn-outline" style="width:100%;justify-content:center" onclick="shareLink()">
+            🔗 Share Link
+          </button>
+        </div>
+
+        <div class="preview-panel">
+          <div class="pdf-preview" id="pdfPreview">
+            <div class="pdf-header">
+              <div>
+                <div class="pdf-logo">MUSAFIR</div>
+                <div class="pdf-logo-ur">مسافر</div>
+              </div>
+              <div style="font-size:32px">🇵🇰</div>
+            </div>
+            <div class="pdf-body">
+              <div class="pdf-trip-title" id="pvTitle">Hunza Valley 7-Day Adventure</div>
+              <div class="pdf-trip-meta">Jun 10 — Jun 17, 2026 · 2 Travelers · PKR 150,000</div>
+              <div class="pdf-hr"></div>
+
+              <div class="pdf-day-title">Day 1 — Islamabad Arrival</div>
+              <div class="pdf-act"><b>Morning:</b> Airport pickup & hotel check-in at Serena</div>
+              <div class="pdf-act"><b>Afternoon:</b> Visit F-9 Park, lunch at Monal Restaurant</div>
+              <div class="pdf-act"><b>Evening:</b> Daman-e-Koh viewpoint, sunset over Islamabad</div>
+
+              <div class="pdf-day-title">Day 2 — Islamabad to Besham (KKH)</div>
+              <div class="pdf-act"><b>Morning:</b> Early start, drive via Karakoram Highway</div>
+              <div class="pdf-act"><b>Afternoon:</b> Lunch stop at Mansehra, photo break at Thakot Bridge</div>
+              <div class="pdf-act"><b>Evening:</b> Arrive Besham, overnight at PTDC Motel</div>
+
+              <div class="pdf-day-title">Day 3 — Besham to Gilgit</div>
+              <div class="pdf-act"><b>Morning:</b> Drive through Kohistan, Indus River views</div>
+              <div class="pdf-act"><b>Afternoon:</b> Visit Kargah Buddha rock carving</div>
+              <div class="pdf-act"><b>Evening:</b> Stroll through Gilgit bazaar</div>
+            </div>
+            <div class="pdf-footer">
+              <span>Musafir · مسافر · Pakistan Travel</span>
+              <span>Page 1 of 12</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<button class="float-pdf" onclick="showScreen('export',document.querySelector('[data-screen=export]'))">
+  📥 Export PDF
+</button>
+
+<script>
+// ============ DATA ============
+const itineraryData = [
+  {
+    day:1, title:'Islamabad Arrival', location:'Federal Capital Territory',
+    alert:{type:'green', text:'Roads Clear ✅'},
+    activities:[
+      {time:'Morning', icon:'✈️', name:'Airport Pickup & Check-in', loc:'Serena Hotel Islamabad', tags:['Arrival','Comfort']},
+      {time:'Afternoon', icon:'🌳', name:'F-9 Park Visit', loc:'Fatima Jinnah Park, F-9', tags:['Nature','Walk']},
+      {time:'Evening', icon:'🌄', name:'Daman-e-Koh Viewpoint', loc:'Margalla Hills', tags:['Sunset','Photography']}
+    ]
+  },
+  {
+    day:2, title:'Drive to Besham via KKH', location:'Karakoram Highway',
+    alert:{type:'green', text:'KKH Road Open ✅'},
+    activities:[
+      {time:'Morning', icon:'🚙', name:'Departure to Mansehra', loc:'Hazara Motorway M-15', tags:['Drive','6 hrs']},
+      {time:'Afternoon', icon:'🍽️', name:'Lunch at Thakot Bridge', loc:'Indus River crossing', tags:['Food','Scenic']},
+      {time:'Evening', icon:'🏨', name:'Overnight at Besham', loc:'PTDC Motel Besham', tags:['Rest','Stay']}
+    ]
+  },
+  {
+    day:3, title:'Gilgit Exploration', location:'Gilgit-Baltistan',
+    alert:{type:'yellow', text:'Snow Patches on Higher Sections ❄️'},
+    activities:[
+      {time:'Morning', icon:'🪨', name:'Kargah Buddha Rock Carving', loc:'Kargah Nala, Gilgit', tags:['Heritage','7th Century']},
+      {time:'Afternoon', icon:'🛍️', name:'Gilgit Bazaar Walk', loc:'Jamat Khana Bazaar', tags:['Shopping','Local']},
+      {time:'Evening', icon:'🍵', name:'Pamiri Tea Experience', loc:'Café de Hunza outlet', tags:['Food','Culture']}
+    ]
+  },
+  {
+    day:4, title:'Hunza — Baltit & Attabad', location:'Karimabad, Hunza',
+    alert:{type:'green', text:'Attabad Lake Boats Active ✅'},
+    activities:[
+      {time:'Morning', icon:'🏰', name:'Baltit Fort Tour', loc:'Karimabad, Central Hunza', tags:['Heritage','UNESCO']},
+      {time:'Afternoon', icon:'🚤', name:'Attabad Lake Boating', loc:'Gojal Valley', tags:['Adventure','Turquoise']},
+      {time:'Evening', icon:'🎶', name:'Traditional Hunza Music Night', loc:'Eagle\'s Nest Hotel', tags:['Culture','Music']}
+    ]
+  },
+  {
+    day:5, title:'Eagle\'s Nest & Rakaposhi', location:'Duikar, Upper Hunza',
+    alert:{type:'green', text:'Clear Mountain Views ✅'},
+    activities:[
+      {time:'Morning', icon:'🌅', name:'Sunrise at Eagle\'s Nest', loc:'Duikar Viewpoint, 2850m', tags:['Sunrise','Photography']},
+      {time:'Afternoon', icon:'🏔️', name:'Rakaposhi View Point', loc:'Ghulmet, 7788m peak', tags:['Mountain','Iconic']},
+      {time:'Evening', icon:'🍲', name:'Hunzai Cuisine Dinner', loc:'Local family home', tags:['Food','Authentic']}
+    ]
+  },
+  {
+    day:6, title:'Nagar Valley — Hopar Glacier', location:'Nagar District',
+    alert:{type:'yellow', text:'Glacier Trek — Carry Spikes ❄️'},
+    activities:[
+      {time:'Morning', icon:'🥾', name:'Trek to Hopar Glacier', loc:'Hopar Valley, Nagar', tags:['Trekking','Glacier']},
+      {time:'Afternoon', icon:'📸', name:'Glacier Lookout Picnic', loc:'Bualtar Glacier edge', tags:['Photography','Scenic']},
+      {time:'Evening', icon:'🏨', name:'Return to Karimabad', loc:'Hunza Embassy Hotel', tags:['Rest','Stay']}
+    ]
+  },
+  {
+    day:7, title:'Return to Islamabad', location:'Departure Day',
+    alert:{type:'green', text:'Flight Status: On Time ✅'},
+    activities:[
+      {time:'Morning', icon:'✈️', name:'Gilgit to Islamabad Flight', loc:'PIA PK-602, scenic route', tags:['Flight','Scenic']},
+      {time:'Afternoon', icon:'🛍️', name:'Souvenir Shopping', loc:'Centaurus Mall, Islamabad', tags:['Shopping','Last day']},
+      {time:'Evening', icon:'🛫', name:'International Departure', loc:'Islamabad International', tags:['Departure']}
+    ]
+  }
+];
+
+// ============ STATE ============
+let currentStep=1;
+let travelers=2;
+let selected={dest:[], int:[]};
+let activeDay=1;
+
+// ============ NAV ============
+function showScreen(name, el){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(el) el.classList.add('active'); else {
+    const nav = document.querySelector(`[data-screen="${name}"]`);
+    if(nav) nav.classList.add('active');
+  }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function setLang(lang, el){
+  document.querySelectorAll('.lang-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  if(lang==='ur') document.body.classList.add('urdu-mode');
+  else document.body.classList.remove('urdu-mode');
+}
+
+// ============ WIZARD ============
+function toggleChip(el, kind){
+  el.classList.toggle('selected');
+  const txt = el.textContent.trim();
+  const arr = selected[kind];
+  const idx = arr.indexOf(txt);
+  if(idx>-1) arr.splice(idx,1); else arr.push(txt);
+}
+
+function nextStep(){
+  if(currentStep<4){
+    document.getElementById('step'+currentStep).style.display='none';
+    currentStep++;
+    document.getElementById('step'+currentStep).style.display='block';
+    updateStepper();
+    if(currentStep===4) updateSummary();
+  }
+}
+function prevStep(){
+  if(currentStep>1){
+    document.getElementById('step'+currentStep).style.display='none';
+    currentStep--;
+    document.getElementById('step'+currentStep).style.display='block';
+    updateStepper();
+  }
+}
+function updateStepper(){
+  document.querySelectorAll('.step').forEach((s,i)=>{
+    s.classList.remove('active','done');
+    if(i+1<currentStep) s.classList.add('done');
+    if(i+1===currentStep) s.classList.add('active');
+  });
+  document.getElementById('backBtn').style.visibility = currentStep===1?'hidden':'visible';
+  document.getElementById('nextBtn').style.display = currentStep===4?'none':'inline-flex';
+}
+function adjTravelers(n){
+  travelers=Math.max(1,Math.min(20,travelers+n));
+  document.getElementById('travelerCount').textContent=travelers;
+}
+function updateBudget(){
+  const v=document.getElementById('budgetSlider').value;
+  document.getElementById('budgetDisplay').textContent='PKR '+Number(v).toLocaleString();
+}
+function updateSummary(){
+  document.getElementById('sumDest').textContent = selected.dest.length?selected.dest.join(', '):'Hunza Valley (default)';
+  document.getElementById('sumDates').textContent = document.getElementById('startDate').value+' → '+document.getElementById('endDate').value;
+  document.getElementById('sumTrav').textContent = travelers;
+  document.getElementById('sumBudget').textContent = 'PKR '+Number(document.getElementById('budgetSlider').value).toLocaleString();
+  document.getElementById('sumInt').textContent = selected.int.length?selected.int.join(', '):'Adventure, Photography (default)';
+}
+
+function generateItinerary(){
+  // Show shimmer then load
+  showScreen('itinerary', document.querySelector('[data-screen=itinerary]'));
+  document.getElementById('itiLayout').style.display='none';
+  document.getElementById('itiLoading').style.display='block';
+  setTimeout(()=>{
+    document.getElementById('itiLoading').style.display='none';
+    document.getElementById('itiLayout').style.display='grid';
+  },300);
+}
+
+// ============ ITINERARY ============
+function renderDaySelector(){
+  const sel = document.getElementById('daySelector');
+  sel.innerHTML = itineraryData.map(d=>`
+    <button class="day-btn ${d.day===activeDay?'active':''}" onclick="selectDay(${d.day})">
+      Day ${d.day}
+      <small>${d.title}</small>
+    </button>
+  `).join('');
+}
+function renderDayDetail(){
+  const d = itineraryData.find(x=>x.day===activeDay);
+  const slots = ['Morning','Afternoon','Evening'];
+  const alertCls = d.alert.type==='green'?'alert-green':d.alert.type==='yellow'?'alert-yellow':'alert-red';
+  document.getElementById('dayDetail').innerHTML = `
+    <div class="day-title">Day ${d.day}: ${d.title}</div>
+    <div class="day-loc">📍 ${d.location}</div>
+    <div class="road-alert ${alertCls}">${d.alert.text}</div>
+    ${slots.map(slot=>{
+      const acts = d.activities.filter(a=>a.time===slot);
+      if(!acts.length) return '';
+      return `
+        <div class="timeslot">
+          <div class="timeslot-title">${slot}</div>
+          ${acts.map(a=>`
+            <div class="activity">
+              <div class="act-icon">${a.icon}</div>
+              <div class="act-info">
+                <div class="act-name">${a.name}</div>
+                <div class="act-loc">📍 ${a.loc}</div>
+                <div class="act-tags">${a.tags.map(t=>`<span class="act-tag">${t}</span>`).join('')}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }).join('')}
+  `;
+}
+function selectDay(d){
+  activeDay=d;
+  renderDaySelector();
+  renderDayDetail();
+}
+
+// ============ EXPORT OPTIONS ============
+document.querySelectorAll('.radio-opt').forEach(el=>{
+  el.addEventListener('click',()=>{
+    const name = el.querySelector('input').name;
+    document.querySelectorAll(`.radio-opt input[name="${name}"]`).forEach(i=>i.closest('.radio-opt').classList.remove('active'));
+    el.classList.add('active');
+    el.querySelector('input').checked=true;
+  });
+});
+document.querySelectorAll('.check-opt').forEach(el=>{
+  el.addEventListener('click',(e)=>{
+    if(e.target.tagName!=='INPUT'){
+      const cb = el.querySelector('input');
+      cb.checked = !cb.checked;
+    }
+    el.classList.toggle('active', el.querySelector('input').checked);
+  });
+});
+
+document.getElementById('optTitle').addEventListener('input', e=>{
+  document.getElementById('pvTitle').textContent = e.target.value || 'Untitled Trip';
+});
+
+function shareLink(){
+  const url = window.location.href + '#trip=hunza-7day';
+  navigator.clipboard && navigator.clipboard.writeText(url);
+  alert('Share link copied to clipboard:\n'+url);
+}
+
+// ============ PDF GENERATION ============
+function downloadPDF(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'pt', format:'a4'});
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const title = document.getElementById('optTitle').value || 'My Pakistan Trip';
+  const traveler = document.getElementById('optName').value || 'Traveler';
+
+  const teal = [0,106,78];
+  const emerald = [0,135,90];
+  const gold = [245,166,35];
+  const slate = [47,79,79];
+  const cream = [253,246,227];
+
+  // ===== Cover page =====
+  doc.setFillColor(...teal);
+  doc.rect(0,0,W,200,'F');
+  doc.setFillColor(...emerald);
+  doc.rect(0,180,W,30,'F');
+
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(36);
+  doc.text('MUSAFIR', 40, 80);
+  doc.setFontSize(14);
+  doc.setFont('helvetica','normal');
+  doc.text('Pakistan Travel Planner', 40, 105);
+  doc.setFontSize(40);
+  doc.text('🇵🇰', W-90, 90);
+
+  doc.setTextColor(...slate);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(28);
+  const wrappedTitle = doc.splitTextToSize(title, W-80);
+  doc.text(wrappedTitle, 40, 270);
+
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(12);
+  doc.setTextColor(100,100,100);
+  doc.text('Prepared for: '+traveler, 40, 320);
+  doc.text('Travel Dates: Jun 10 — Jun 17, 2026', 40, 340);
+  doc.text('Travelers: 2 · Budget: PKR 150,000', 40, 360);
+  doc.text('Region: Gilgit-Baltistan, Pakistan', 40, 380);
+
+  // Decorative bar
+  doc.setFillColor(...gold);
+  doc.rect(40,410,W-80,4,'F');
+
+  doc.setFontSize(11);
+  doc.setTextColor(80,80,80);
+  const intro = 'This itinerary takes you through the heart of the Karakoram mountains — from the federal capital Islamabad, along the legendary Karakoram Highway, into the storied valleys of Hunza and Nagar. Every day is balanced between heritage, adventure, and authentic local experiences.';
+  doc.text(doc.splitTextToSize(intro, W-80), 40, 440);
+
+  doc.setFontSize(9);
+  doc.setTextColor(150,150,150);
+  doc.text('Generated by Musafir · مسافر · '+new Date().toLocaleDateString(), 40, H-30);
+
+  // ===== Day-by-day pages =====
+  itineraryData.forEach((d, idx)=>{
+    doc.addPage();
+    // Header bar
+    doc.setFillColor(...teal);
+    doc.rect(0,0,W,70,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(18);
+    doc.text('MUSAFIR · مسافر', 40, 40);
+    doc.setFontSize(10);
+    doc.setFont('helvetica','normal');
+    doc.text('Day '+d.day+' of 7', W-90, 40);
+
+    // Day title
+    doc.setTextColor(...slate);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(22);
+    doc.text('Day '+d.day+' — '+d.title, 40, 110);
+
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(11);
+    doc.setTextColor(120,120,120);
+    doc.text('Location: '+d.location, 40, 130);
+    doc.text('Status: '+d.alert.text, 40, 148);
+
+    // Decorative line
+    doc.setDrawColor(...gold);
+    doc.setLineWidth(2);
+    doc.line(40, 165, W-40, 165);
+
+    let y = 195;
+    d.activities.forEach(a=>{
+      doc.setFillColor(...cream);
+      doc.roundedRect(40, y-15, W-80, 60, 6, 6, 'F');
+      doc.setDrawColor(...teal);
+      doc.setLineWidth(2);
+      doc.line(40, y-15, 40, y+45);
+
+      doc.setTextColor(...teal);
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(11);
+      doc.text(a.time.toUpperCase(), 55, y);
+
+      doc.setTextColor(...slate);
+      doc.setFontSize(13);
+      doc.text(a.name, 55, y+18);
+
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(10);
+      doc.setTextColor(120,120,120);
+      doc.text('📍 '+a.loc+'  ·  '+a.tags.join(' · '), 55, y+35);
+
+      y += 75;
+    });
+
+    // Footer
+    doc.setFontSize(9);
+    doc.setTextColor(150,150,150);
+    doc.text('Musafir · Pakistan Travel · Page '+(idx+2)+' of 11', 40, H-25);
+  });
+
+  // ===== Emergency contacts page =====
+  doc.addPage();
+  doc.setFillColor(...slate);
+  doc.rect(0,0,W,70,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(18);
+  doc.text('EMERGENCY CONTACTS', 40, 40);
+
+  doc.setTextColor(...slate);
+  doc.setFontSize(22);
+  doc.text('In case of emergency', 40, 110);
+
+  const contacts = [
+    ['Rescue 1122','Nationwide emergency · Free'],
+    ['Police','15'],
+    ['Tourist Police Punjab','1422'],
+    ['Motorway Police','130'],
+    ['Edhi Foundation','115'],
+    ['Gilgit-Baltistan Tourism','+92 5811 920026'],
+    ['Pak Army (NDMA)','051 9205037'],
+    ['ICT Police Islamabad','051-9261240'],
+    ['US Embassy Islamabad','+92 51 2080-0000'],
+    ['UK High Commission','+92 51 201-2000']
+  ];
+
+  let cy = 145;
+  doc.setFontSize(11);
+  contacts.forEach(c=>{
+    doc.setFillColor(...cream);
+    doc.roundedRect(40, cy-12, W-80, 28, 4, 4, 'F');
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(...slate);
+    doc.text(c[0], 55, cy+5);
+    doc.setFont('helvetica','normal');
+    doc.setTextColor(...teal);
+    doc.text(c[1], W-200, cy+5);
+    cy += 35;
+  });
+
+  doc.setFontSize(9);
+  doc.setTextColor(150,150,150);
+  doc.text('Musafir · Pakistan Travel · Page 9 of 11', 40, H-25);
+
+  // ===== Local phrases page =====
+  doc.addPage();
+  doc.setFillColor(...emerald);
+  doc.rect(0,0,W,70,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(18);
+  doc.text('LOCAL PHRASES (URDU)', 40, 40);
+
+  doc.setTextColor(...slate);
+  doc.setFontSize(22);
+  doc.text('Useful Urdu phrases', 40, 110);
+
+  const phrases = [
+    ['Hello / Peace be upon you', 'Assalam-o-Alaikum', 'السلام علیکم'],
+    ['Thank you', 'Shukriya', 'شکریہ'],
+    ['Please', 'Meherbani', 'مہربانی'],
+    ['Yes / No', 'Han / Nahi', 'ہاں / نہیں'],
+    ['How much?', 'Kitne ka hai?', 'کتنے کا ہے؟'],
+    ['Where is...?', 'Kahan hai...?', 'کہاں ہے؟'],
+    ['Water', 'Paani', 'پانی'],
+    ['Food', 'Khana', 'کھانا'],
+    ['Help!', 'Madad!', 'مدد!'],
+    ['I don\'t understand', 'Mujhe samajh nahi aaya', 'مجھے سمجھ نہیں آیا'],
+    ['Good morning', 'Subah bakhair', 'صبح بخیر'],
+    ['Goodbye', 'Khuda hafiz', 'خدا حافظ']
+  ];
+
+  let py = 145;
+  doc.setFontSize(10);
+  phrases.forEach(p=>{
+    doc.setFillColor(...cream);
+    doc.roundedRect(40, py-12, W-80, 32, 4, 4, 'F');
+    doc.setFont('helvetica','normal');
+    doc.setTextColor(120,120,120);
+    doc.setFontSize(9);
+    doc.text(p[0], 55, py);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(...slate);
+    doc.setFontSize(12);
+    doc.text(p[1], 55, py+15);
+    doc.setTextColor(...teal);
+    doc.setFontSize(11);
+    doc.text(p[2], W-120, py+10);
+    py += 40;
+  });
+
+  doc.setFontSize(9);
+  doc.setTextColor(150,150,150);
+  doc.text('Musafir · Pakistan Travel · Page 10 of 11', 40, H-25);
+
+  // ===== Packing list page =====
+  doc.addPage();
+  doc.setFillColor(...gold);
+  doc.rect(0,0,W,70,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(18);
+  doc.text('PACKING ESSENTIALS', 40, 40);
+
+  doc.setTextColor(...slate);
+  doc.setFontSize(22);
+  doc.text('For your Karakoram journey', 40, 110);
+
+  const packing = [
+    'Warm jacket (down or fleece) — temperatures drop sharply at night',
+    'Sturdy hiking boots with ankle support',
+    'Sun hat, sunglasses, and SPF 50+ sunscreen (UV is intense at altitude)',
+    'Reusable water bottle (1L minimum) and water purification tablets',
+    'Power bank — power outages are common in remote valleys',
+    'Universal travel adapter (Pakistan uses Type C, D, G)',
+    'Basic first aid kit, altitude sickness medication (Diamox)',
+    'Cash in PKR — many areas have no ATMs or card acceptance',
+    'CNIC / Passport (always carry — security checkpoints en route)',
+    'Modest clothing for visits to mosques and shrines',
+    'Lightweight backpack for day hikes',
+    'Camera with extra batteries — cold drains them faster'
+  ];
+
+  let kx = 145;
+  doc.setFontSize(11);
+  doc.setFont('helvetica','normal');
+  packing.forEach(item=>{
+    doc.setDrawColor(...teal);
+    doc.setLineWidth(1.5);
+    doc.rect(45, kx-9, 12, 12);
+    doc.setTextColor(80,80,80);
+    const lines = doc.splitTextToSize(item, W-110);
+    doc.text(lines, 65, kx);
+    kx += 8 + (lines.length * 14);
+  });
+
+  doc.setFontSize(9);
+  doc.setTextColor(150,150,150);
+  doc.text('Musafir · Pakistan Travel · Page 11 of 11', 40, H-25);
+
+  doc.save(title.replace(/[^a-z0-9]/gi,'_')+'.pdf');
+}
+
+// ============ INIT ============
+renderDaySelector();
+renderDayDetail();
+</script>
+</body>
+</html>
