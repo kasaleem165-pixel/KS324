@@ -1,0 +1,5053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#006A4E">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Musafir">
+  <meta name="description" content="AI-powered Pakistan travel planner with offline maps and PDF export">
+  <title>Musafir — Pakistan Travel Planner مسافر</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+/* ============================================================
+   Musafir — Pakistan Travel Planner
+   Premium Dashboard CSS  |  Production Build
+   ============================================================
+   Table of Contents:
+   01. Design Tokens
+   02. Global Reset & Base
+   03. Bottom Navigation
+   04. Screen Layout
+   05. App Header
+   06. Install Banner
+   07. Hero Section — Attabad Lake CSS Art
+   08. Stats Row
+   09. Quick Actions Grid
+   10. Section Headers
+   11. Category Chips Row
+   12. Transport Icons Row
+   13. Destination Cards
+   14. Weather Badges
+   15. CTA / Button Row
+   16. Trip Wizard
+   17. Chip Multi-select
+   18. Itinerary Screen
+   19. Activity Cards
+   20. AI Chat Screen
+   21. Survival Mode (dark)
+   22. PDF Export Screen
+   23. Form Elements
+   24. Modal Sheet
+   25. Loading Overlay
+   26. Saved Trips Screen
+   27. Payment Badges
+   28. Language Toggle
+   29. Map Container
+   30. FAB Button
+   31. Stepper
+   32. Toast Notification
+   33. Skeleton Loaders
+   34. Trip Summary Card
+   35. Animations & Keyframes
+   36. Utility Classes
+   37. Responsive — tablet / desktop
+   38. Reduced Motion
+   39. Dark Mode (system preference)
+   ============================================================ */
+
+/* ── 01. Design Tokens ──────────────────────────────────────── */
+:root {
+  --teal:         #006A4E;
+  --emerald:      #00875A;
+  --slate:        #2F4F4F;
+  --sand:         #F4A460;
+  --gold:         #F5A623;
+  --gold-dark:    #D4901F;
+  --cream:        #FDF6E3;
+  --cream-dark:   #F5EDD6;
+  --dark:         #1a1a2e;
+  --dark-2:       #16213e;
+  --dark-3:       #0f3460;
+  --text:         #1a1a1a;
+  --text-light:   #666;
+  --white:        #fff;
+  --danger:       #E53935;
+  --warning:      #FF9800;
+  --success:      #43A047;
+  --radius:       16px;
+  --radius-sm:    10px;
+  --radius-chip:  24px;
+  --shadow:       0 4px 20px rgba(0,0,0,0.08);
+  --shadow-lg:    0 12px 40px rgba(0,0,0,0.15);
+  --shadow-teal:  0 8px 24px rgba(0,106,78,0.25);
+  --shadow-gold:  0 8px 24px rgba(245,166,35,0.35);
+  --transition:   0.25s cubic-bezier(0.4,0,0.2,1);
+  --font:         'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ── 02. Global Reset & Base ────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--cream);
+  overflow: hidden;
+  height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: var(--font);
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+/* ── 03. Bottom Navigation ──────────────────────────────────── */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 68px;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(0,0,0,0.06);
+  display: flex;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.06);
+}
+
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: color var(--transition), transform var(--transition);
+  border: none;
+  background: transparent;
+  padding: 0;
+  position: relative;
+}
+
+.bottom-nav-item:active {
+  transform: scale(0.92);
+}
+
+.bottom-nav-item.active {
+  color: var(--teal);
+}
+
+.bottom-nav-item.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--teal), var(--emerald));
+  border-radius: 0 0 3px 3px;
+}
+
+.bottom-nav-item svg {
+  width: 22px;
+  height: 22px;
+}
+
+.bottom-nav-item .nav-label {
+  font-weight: 600;
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* ── 04. Screen Layout ──────────────────────────────────────── */
+.screen {
+  display: none;
+  flex-direction: column;
+  height: 100dvh;
+  padding-bottom: 68px;
+  overflow-y: auto;
+  background: var(--cream);
+  overscroll-behavior: contain;
+}
+
+.screen.active {
+  display: flex;
+  animation: fadeIn 0.25s ease;
+}
+
+/* ── 05. App Header ─────────────────────────────────────────── */
+.app-header {
+  background: linear-gradient(135deg, var(--teal) 0%, var(--slate) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: white;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 4px 20px rgba(0,106,78,0.3);
+}
+
+.app-header h1 {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.3px;
+}
+
+.header-subtitle {
+  font-size: 11px;
+  opacity: 0.75;
+  margin-top: 2px;
+  font-weight: 500;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.header-icon-btn {
+  width: 38px;
+  height: 38px;
+  background: rgba(255,255,255,0.15);
+  border: none;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+  transition: background var(--transition);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.header-icon-btn:hover {
+  background: rgba(255,255,255,0.28);
+}
+
+.header-icon-btn:active {
+  transform: scale(0.93);
+}
+
+/* ── 06. Install Banner ─────────────────────────────────────── */
+.install-banner {
+  background: linear-gradient(135deg, var(--teal), var(--emerald));
+  color: white;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  position: relative;
+  z-index: 90;
+  flex-shrink: 0;
+}
+
+.install-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 60%, rgba(255,255,255,0.07) 100%);
+  pointer-events: none;
+}
+
+/* ── 07. Hero Section — Attabad Lake CSS Art ────────────────── */
+.hero {
+  position: relative;
+  height: 260px;
+  background: linear-gradient(
+    180deg,
+    #87ceeb 0%,
+    #b0e0e6 35%,
+    #5f9ea0 50%,
+    #008b8b 65%,
+    #006994 80%,
+    #004d6e 100%
+  );
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.hero-mountains {
+  position: absolute;
+  bottom: 40%;
+  left: 0;
+  right: 0;
+  height: 80px;
+}
+
+.hero-mountains svg {
+  width: 100%;
+  height: 100%;
+}
+
+.hero-lake {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40%;
+  background: linear-gradient(
+    180deg,
+    #40e0d0 0%,
+    #00ced1 40%,
+    #008b8b 100%
+  );
+}
+
+.hero-lake::before {
+  content: '';
+  position: absolute;
+  top: -22px;
+  left: 0;
+  right: 0;
+  height: 44px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(64,224,208,0.55) 100%
+  );
+}
+
+.hero-lake::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 0;
+  right: 0;
+  height: 7px;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 40px,
+    rgba(255,255,255,0.09) 40px,
+    rgba(255,255,255,0.09) 80px
+  );
+}
+
+/* Hero gradient overlay */
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 30%,
+    rgba(0,0,0,0.18) 70%,
+    rgba(0,0,0,0.38) 100%
+  );
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Hero title block */
+.hero-title-block {
+  position: absolute;
+  bottom: 68px;
+  left: 16px;
+  right: 16px;
+  z-index: 3;
+}
+
+.hero-title-block .hero-title {
+  font-size: 22px;
+  font-weight: 900;
+  color: white;
+  line-height: 1.15;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.35);
+  letter-spacing: -0.5px;
+}
+
+.hero-title-block .hero-tagline {
+  font-size: 13px;
+  color: rgba(255,255,255,0.88);
+  margin-top: 3px;
+  font-weight: 500;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.3);
+}
+
+/* Hero search */
+.hero-content {
+  position: absolute;
+  bottom: 12px;
+  left: 0;
+  right: 0;
+  padding: 0 16px;
+  z-index: 3;
+}
+
+.hero-search {
+  background: rgba(255,255,255,0.97);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: none;
+  border-radius: 28px;
+  padding: 14px 20px 14px 46px;
+  width: 100%;
+  font-size: 14px;
+  font-family: var(--font);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  outline: none;
+  color: var(--text);
+  transition: box-shadow var(--transition);
+}
+
+.hero-search:focus {
+  box-shadow: 0 12px 40px rgba(0,0,0,0.28);
+}
+
+.hero-search::placeholder {
+  color: var(--text-light);
+}
+
+/* Search icon pseudo-element — parent must be relative */
+.hero-content::before {
+  content: '🔍';
+  position: absolute;
+  left: 32px;
+  bottom: 50%;
+  transform: translateY(50%);
+  font-size: 16px;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.hero-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(255,255,255,0.22);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 12px;
+  z-index: 3;
+  border: 1px solid rgba(255,255,255,0.3);
+  letter-spacing: 0.2px;
+}
+
+/* ── 08. Stats Row ──────────────────────────────────────────── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 16px;
+}
+
+.stat-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 12px 8px;
+  text-align: center;
+  box-shadow: var(--shadow);
+  animation: slideUp 0.4s ease both;
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+
+.stat-card:nth-child(1) {
+  background: linear-gradient(135deg, #E8F5E9, #C8E6C9);
+  animation-delay: 0.05s;
+}
+
+.stat-card:nth-child(1) .stat-number {
+  color: #2E7D32;
+}
+
+.stat-card:nth-child(2) {
+  background: linear-gradient(135deg, #E3F2FD, #BBDEFB);
+  animation-delay: 0.1s;
+}
+
+.stat-card:nth-child(2) .stat-number {
+  color: #1565C0;
+}
+
+.stat-card:nth-child(3) {
+  background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
+  animation-delay: 0.15s;
+}
+
+.stat-card:nth-child(3) .stat-number {
+  color: #E65100;
+}
+
+.stat-card:nth-child(4) {
+  background: linear-gradient(135deg, #FCE4EC, #F8BBD9);
+  animation-delay: 0.2s;
+}
+
+.stat-card:nth-child(4) .stat-number {
+  color: #880E4F;
+}
+
+.stat-number {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 10px;
+  color: var(--text-light);
+  margin-top: 4px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+/* ── 09. Quick Actions Grid ─────────────────────────────────── */
+.quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 0 16px 16px;
+}
+
+.quick-action-card {
+  border-radius: var(--radius);
+  padding: 20px 16px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  transition: transform var(--transition), box-shadow var(--transition);
+  box-shadow: var(--shadow);
+  animation: scaleIn 0.3s ease both;
+}
+
+.quick-action-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.quick-action-card:active {
+  transform: scale(0.97);
+}
+
+.quick-action-card:nth-child(1) { animation-delay: 0.1s; }
+.quick-action-card:nth-child(2) { animation-delay: 0.15s; }
+.quick-action-card:nth-child(3) { animation-delay: 0.2s; }
+.quick-action-card:nth-child(4) { animation-delay: 0.25s; }
+
+/* Decorative circles */
+.quick-action-card::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  pointer-events: none;
+}
+
+.quick-action-card::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  pointer-events: none;
+}
+
+.qa-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 2;
+}
+
+.qa-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: white;
+  line-height: 1.2;
+  position: relative;
+  z-index: 2;
+}
+
+.qa-sub {
+  font-size: 11px;
+  color: rgba(255,255,255,0.75);
+  margin-top: 2px;
+  position: relative;
+  z-index: 2;
+}
+
+/* Card gradient variants */
+.qa-plan {
+  background: linear-gradient(135deg, #006A4E 0%, #00875A 100%);
+}
+
+.qa-itinerary {
+  background: linear-gradient(135deg, #F5A623 0%, #D4901F 100%);
+}
+
+.qa-survival {
+  background: linear-gradient(135deg, #2F4F4F 0%, #1a3a2e 100%);
+}
+
+.qa-export {
+  background: linear-gradient(135deg, #1565C0 0%, #0D47A1 100%);
+}
+
+/* ── 10. Section Headers ────────────────────────────────────── */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 16px 10px;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--slate);
+  letter-spacing: -0.3px;
+}
+
+.section-badge {
+  font-size: 11px;
+  background: var(--teal);
+  color: white;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.see-all {
+  font-size: 13px;
+  color: var(--teal);
+  font-weight: 700;
+  cursor: pointer;
+  background: rgba(0,106,78,0.08);
+  border: none;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-family: var(--font);
+  transition: background var(--transition);
+}
+
+.see-all:hover {
+  background: rgba(0,106,78,0.16);
+}
+
+/* ── 11. Category Chips Row ─────────────────────────────────── */
+.category-row {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex-shrink: 0;
+}
+
+.category-row::-webkit-scrollbar {
+  display: none;
+}
+
+.cat-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-chip);
+  background: var(--white);
+  border: 2px solid #E8E8E8;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: var(--shadow);
+  font-family: var(--font);
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.cat-chip:hover:not(.selected) {
+  border-color: var(--teal);
+  color: var(--teal);
+  transform: translateY(-1px);
+}
+
+.cat-chip.selected {
+  background: linear-gradient(135deg, var(--teal), var(--emerald));
+  border-color: transparent;
+  color: white;
+  box-shadow: var(--shadow-teal);
+  transform: translateY(-1px);
+}
+
+/* ── 12. Transport Icons Row ────────────────────────────────── */
+.transport-row {
+  display: flex;
+  gap: 14px;
+  padding: 8px 16px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.transport-row::-webkit-scrollbar {
+  display: none;
+}
+
+.transport-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 68px;
+  cursor: pointer;
+}
+
+.transport-icon {
+  width: 60px;
+  height: 60px;
+  background: var(--white);
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow);
+  font-size: 24px;
+  transition: var(--transition);
+  border: 2px solid transparent;
+  flex-shrink: 0;
+}
+
+.transport-icon:hover,
+.transport-icon.active {
+  background: linear-gradient(135deg, var(--teal), var(--emerald));
+  border-color: transparent;
+  box-shadow: var(--shadow-teal);
+  transform: translateY(-3px);
+}
+
+.transport-label {
+  font-size: 11px;
+  color: var(--text-light);
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+/* ── 13. Destination Cards ──────────────────────────────────── */
+.destinations-grid {
+  display: flex;
+  gap: 14px;
+  padding: 0 16px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.destinations-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.dest-card {
+  min-width: 200px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  background: var(--white);
+  cursor: pointer;
+  transition: transform var(--transition), box-shadow var(--transition);
+  flex-shrink: 0;
+}
+
+.dest-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.dest-image {
+  height: 140px;
+  position: relative;
+  overflow: hidden;
+}
+
+.dest-image::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.52) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.dest-image-bg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.dest-card:hover .dest-image-bg {
+  transform: scale(1.05);
+}
+
+.dest-name {
+  position: absolute;
+  bottom: 10px;
+  left: 12px;
+  right: 40px;
+  font-size: 16px;
+  font-weight: 800;
+  color: white;
+  z-index: 2;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  line-height: 1.2;
+}
+
+.dest-info {
+  padding: 10px 12px;
+}
+
+.dest-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+}
+
+.dest-province {
+  font-size: 11px;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.dest-rating {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gold-dark);
+}
+
+/* ── 14. Weather Badges ─────────────────────────────────────── */
+.weather-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  z-index: 3;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  letter-spacing: 0.3px;
+}
+
+.badge-clear     { background: rgba(67,160,71,0.85);   color: white; }
+.badge-snow      { background: rgba(33,150,243,0.85);   color: white; }
+.badge-landslide { background: rgba(229,57,35,0.85);    color: white; }
+.badge-hot       { background: rgba(255,152,0,0.85);    color: white; }
+.badge-cloudy    { background: rgba(96,125,139,0.85);   color: white; }
+.badge-rain      { background: rgba(21,101,192,0.85);   color: white; }
+
+/* ── 15. CTA / Button Row ───────────────────────────────────── */
+.cta-section {
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(0,106,78,0.05), rgba(0,135,90,0.03));
+  border-radius: var(--radius);
+  margin: 0 16px 16px;
+}
+
+.btn {
+  padding: 14px 24px;
+  border-radius: var(--radius-sm);
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+  color: white;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 16px;
+  border-radius: var(--radius);
+  border: none;
+  width: 100%;
+  cursor: pointer;
+  box-shadow: var(--shadow-gold);
+  transition: var(--transition);
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(245,166,35,0.45);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--shadow-gold);
+}
+
+.btn-secondary {
+  background: var(--cream-dark);
+  color: var(--slate);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #e8dfc8;
+  transform: translateY(-1px);
+}
+
+.btn-teal {
+  background: linear-gradient(135deg, var(--teal), var(--emerald));
+  color: white;
+  box-shadow: var(--shadow-teal);
+}
+
+.btn-teal:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px rgba(0,106,78,0.38);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 2px solid var(--teal);
+  color: var(--teal);
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: var(--teal);
+  color: white;
+  box-shadow: var(--shadow-teal);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, var(--danger), #b71c1c);
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(229,57,35,0.35);
+}
+
+.btn-sm {
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.btn-icon {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── 16. Trip Wizard ────────────────────────────────────────── */
+.wizard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.wizard-steps {
+  display: flex;
+  padding: 20px 16px 8px;
+  gap: 8px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.wizard-step {
+  flex: 1;
+  height: 6px;
+  background: #E8E8E8;
+  border-radius: 3px;
+  transition: background var(--transition);
+  overflow: hidden;
+  position: relative;
+}
+
+.wizard-step.done {
+  background: var(--teal);
+}
+
+.wizard-step.active {
+  background: linear-gradient(90deg, var(--teal), var(--gold));
+  background-size: 200% auto;
+  animation: shimmer-step 1.5s linear infinite;
+}
+
+@keyframes shimmer-step {
+  0%   { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+
+.wizard-pane {
+  display: none;
+  flex: 1;
+  padding: 16px;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.wizard-pane.active {
+  display: flex;
+}
+
+.wizard-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--teal);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.wizard-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--slate);
+  margin-bottom: 4px;
+  line-height: 1.15;
+  letter-spacing: -0.4px;
+}
+
+.wizard-desc {
+  font-size: 14px;
+  color: var(--text-light);
+  line-height: 1.55;
+}
+
+.wizard-footer {
+  padding: 16px;
+  display: flex;
+  gap: 10px;
+  background: var(--white);
+  border-top: 1px solid rgba(0,0,0,0.06);
+  flex-shrink: 0;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.04);
+}
+
+/* ── 17. Chip Multi-select ──────────────────────────────────── */
+.chips-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  padding: 10px 16px;
+  border-radius: var(--radius-chip);
+  border: 2px solid #E8E8E8;
+  background: var(--white);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: var(--transition);
+  user-select: none;
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.chip.selected {
+  background: linear-gradient(135deg, var(--teal), var(--emerald));
+  border-color: transparent;
+  color: white;
+  box-shadow: var(--shadow-teal);
+  transform: scale(1.03);
+}
+
+.chip:hover:not(.selected) {
+  border-color: var(--teal);
+  color: var(--teal);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+/* ── 18. Itinerary Screen ───────────────────────────────────── */
+.itinerary-days {
+  display: flex;
+  gap: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex-shrink: 0;
+}
+
+.itinerary-days::-webkit-scrollbar {
+  display: none;
+}
+
+.day-pill {
+  padding: 10px 18px;
+  border-radius: var(--radius-chip);
+  background: var(--white);
+  border: 2px solid #e0e0e0;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--transition);
+  flex-shrink: 0;
+  box-shadow: var(--shadow);
+  color: var(--text);
+}
+
+.day-pill.active {
+  background: linear-gradient(135deg, var(--teal), var(--emerald));
+  color: white;
+  border-color: transparent;
+  box-shadow: var(--shadow-teal);
+  transform: translateY(-1px);
+}
+
+.day-content {
+  flex: 1;
+  padding: 0 16px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.day-header {
+  padding: 14px 0 10px;
+}
+
+.day-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--slate);
+  line-height: 1.2;
+  letter-spacing: -0.3px;
+}
+
+.day-subtitle {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-top: 3px;
+  font-weight: 500;
+}
+
+.activity-slot {
+  margin-bottom: 18px;
+}
+
+.slot-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slot-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, #ddd, transparent);
+}
+
+/* ── 19. Activity Cards ─────────────────────────────────────── */
+.activity-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow);
+  margin-bottom: 10px;
+  display: flex;
+  gap: 12px;
+  border-left: 4px solid var(--teal);
+  transition: var(--transition);
+}
+
+.activity-card:hover {
+  transform: translateX(3px);
+  box-shadow: var(--shadow-lg);
+}
+
+.activity-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.icon-bg-teal   { background: rgba(0,106,78,0.12); }
+.icon-bg-gold   { background: rgba(245,166,35,0.15); }
+.icon-bg-blue   { background: rgba(33,150,243,0.12); }
+.icon-bg-red    { background: rgba(229,57,35,0.1); }
+.icon-bg-green  { background: rgba(67,160,71,0.12); }
+.icon-bg-purple { background: rgba(156,39,176,0.1); }
+
+.activity-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-location {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-meta {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  padding: 3px 9px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.tag-teal   { background: rgba(0,106,78,0.1);    color: var(--teal); }
+.tag-orange { background: rgba(244,164,96,0.2);   color: #8B5E2E; }
+.tag-red    { background: rgba(229,57,35,0.1);    color: var(--danger); }
+.tag-blue   { background: rgba(33,150,243,0.1);   color: #1565C0; }
+.tag-green  { background: rgba(67,160,71,0.1);    color: #2E7D32; }
+.tag-purple { background: rgba(156,39,176,0.1);   color: #7B1FA2; }
+.tag-gold   { background: rgba(245,166,35,0.15);  color: #7A5200; }
+
+/* ── 20. AI Chat Screen ─────────────────────────────────────── */
+.chat-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overscroll-behavior: contain;
+}
+
+.chat-bubble {
+  max-width: 85%;
+  padding: 14px 16px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.6;
+  word-break: break-word;
+  animation: fadeIn 0.2s ease;
+}
+
+.chat-bubble.user {
+  background: linear-gradient(135deg, var(--teal), var(--emerald));
+  color: white;
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+  box-shadow: var(--shadow-teal);
+}
+
+.chat-bubble.ai {
+  background: var(--white);
+  color: var(--text);
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+  box-shadow: var(--shadow);
+}
+
+.chat-bubble.ai .bubble-header {
+  font-size: 11px;
+  color: var(--teal);
+  font-weight: 800;
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.chat-bubble.ai p + p {
+  margin-top: 8px;
+}
+
+.chat-timestamp {
+  font-size: 10px;
+  color: var(--text-light);
+  text-align: center;
+  margin: 4px 0;
+}
+
+.chat-input-bar {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--white);
+  border-top: 1px solid rgba(0,0,0,0.06);
+  align-items: flex-end;
+  flex-shrink: 0;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.04);
+}
+
+.chat-input {
+  flex: 1;
+  border: 2px solid #E8E8E8;
+  border-radius: 22px;
+  padding: 11px 16px;
+  font-size: 14px;
+  font-family: var(--font);
+  resize: none;
+  max-height: 120px;
+  outline: none;
+  line-height: 1.4;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  color: var(--text);
+  background: var(--white);
+}
+
+.chat-input:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 4px rgba(0,106,78,0.08);
+}
+
+.chat-input::placeholder {
+  color: var(--text-light);
+}
+
+.chat-send {
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, var(--teal), var(--emerald));
+  border: none;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: var(--transition);
+  color: white;
+  box-shadow: var(--shadow-teal);
+}
+
+.chat-send:hover {
+  transform: scale(1.06) translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0,106,78,0.38);
+}
+
+.chat-send:active {
+  transform: scale(0.95);
+}
+
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.typing-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--teal);
+  border-radius: 50%;
+  animation: typing 1.2s infinite;
+  flex-shrink: 0;
+}
+
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typing {
+  0%, 80%, 100% {
+    transform: scale(0.7);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ── 21. Survival Mode (dark) ───────────────────────────────── */
+.survival-screen {
+  background: var(--dark) !important;
+  color: white;
+}
+
+.survival-header {
+  background: linear-gradient(135deg, #0a0a1a, #1a1a2e);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.survival-header h1,
+.survival-header .header-subtitle {
+  color: white;
+}
+
+.survival-map {
+  flex: 1;
+  position: relative;
+  background: var(--dark-2);
+  overflow: hidden;
+}
+
+.survival-info {
+  background: var(--dark-2);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.resource-card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: var(--transition);
+}
+
+.resource-card:hover {
+  background: rgba(255,255,255,0.08);
+  transform: translateX(2px);
+}
+
+.resource-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+  width: 30px;
+  text-align: center;
+}
+
+.resource-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.resource-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resource-detail {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  margin-top: 2px;
+}
+
+.resource-distance {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--gold);
+  flex-shrink: 0;
+}
+
+.sos-button {
+  background: linear-gradient(135deg, #D32F2F, #B71C1C);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  padding: 18px;
+  font-size: 17px;
+  font-weight: 800;
+  font-family: var(--font);
+  letter-spacing: 1px;
+  cursor: pointer;
+  margin: 12px 16px;
+  animation: sos-pulse 2s infinite;
+  width: calc(100% - 32px);
+  transition: background var(--transition);
+  box-shadow: 0 0 0 0 rgba(211,47,47,0.4);
+}
+
+.sos-button:hover {
+  background: linear-gradient(135deg, #c62828, #8e0000);
+}
+
+@keyframes sos-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(211,47,47,0.6); }
+  70%  { box-shadow: 0 0 0 16px rgba(211,47,47,0); }
+  100% { box-shadow: 0 0 0 0 rgba(211,47,47,0); }
+}
+
+.signal-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 8px 16px;
+}
+
+.signal-dot {
+  width: 6px;
+  background: var(--warning);
+  border-radius: 2px;
+}
+
+.signal-dot:nth-child(1) { height: 8px; }
+.signal-dot:nth-child(2) { height: 12px; }
+.signal-dot:nth-child(3) { height: 16px; opacity: 0.4; }
+.signal-dot:nth-child(4) { height: 20px; opacity: 0.4; }
+
+.signal-label {
+  font-size: 11px;
+  color: rgba(255,255,255,0.6);
+  margin-left: 6px;
+  font-weight: 600;
+}
+
+/* ── 22. PDF Export Screen ──────────────────────────────────── */
+.export-screen {
+  gap: 0;
+}
+
+.export-options {
+  padding: 16px;
+  background: var(--white);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  flex-shrink: 0;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+
+.export-preview-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--cream-dark);
+}
+
+.pdf-preview {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.pdf-preview-header {
+  background: linear-gradient(135deg, var(--teal) 0%, var(--slate) 100%);
+  color: white;
+  padding: 24px 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.pdf-preview-header::before {
+  content: '🧭';
+  position: absolute;
+  right: -10px;
+  top: -10px;
+  font-size: 80px;
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+.pdf-preview-header::after {
+  content: '';
+  position: absolute;
+  bottom: -30px;
+  left: -20px;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  pointer-events: none;
+}
+
+.pdf-preview-header h2 {
+  font-size: 20px;
+  font-weight: 800;
+  position: relative;
+  z-index: 2;
+}
+
+.pdf-preview-header p {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 4px;
+  position: relative;
+  z-index: 2;
+}
+
+.pdf-preview-body {
+  padding: 20px;
+}
+
+.pdf-preview-body p {
+  font-size: 13px;
+  color: var(--text-light);
+  line-height: 1.65;
+}
+
+/* ── 23. Form Elements ──────────────────────────────────────── */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-light);
+  margin-bottom: 8px;
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid #E8E8E8;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-family: var(--font);
+  background: var(--white);
+  transition: var(--transition);
+  box-sizing: border-box;
+  outline: none;
+  color: var(--text);
+}
+
+.form-input:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 4px rgba(0,106,78,0.1);
+}
+
+.form-input::placeholder {
+  color: var(--text-light);
+}
+
+.radio-group,
+.toggle-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.radio-option,
+.toggle-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition);
+}
+
+.radio-option:hover,
+.toggle-option:hover {
+  background: rgba(0,106,78,0.04);
+}
+
+.radio-option input,
+.toggle-option input {
+  accent-color: var(--teal);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* ── 24. Modal Sheet ────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 200;
+  display: none;
+  align-items: flex-end;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.modal-overlay.open {
+  display: flex;
+}
+
+.modal-sheet {
+  background: var(--white);
+  border-radius: 24px 24px 0 0;
+  padding: 24px;
+  width: 100%;
+  max-height: 85dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  animation: slideUp 0.3s cubic-bezier(0.4,0,0.2,1);
+  padding-bottom: max(24px, env(safe-area-inset-bottom, 24px));
+}
+
+.modal-handle {
+  width: 44px;
+  height: 5px;
+  background: #ddd;
+  border-radius: 3px;
+  margin: 0 auto 20px;
+}
+
+.modal-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--slate);
+  margin-bottom: 16px;
+  letter-spacing: -0.3px;
+}
+
+/* ── 25. Loading Overlay ────────────────────────────────────── */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, var(--teal) 0%, var(--slate) 100%);
+  z-index: 300;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.loading-overlay.active {
+  display: flex;
+}
+
+.spinner {
+  width: 52px;
+  height: 52px;
+  border: 4px solid rgba(255,255,255,0.2);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 17px;
+  color: white;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.loading-logo {
+  font-size: 48px;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.1); }
+}
+
+/* ── 26. Saved Trips Screen ─────────────────────────────────── */
+.saved-trips-list {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.saved-trip-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  transition: var(--transition);
+  border: 1px solid #f0f0f0;
+}
+
+.saved-trip-card:hover {
+  transform: translateX(4px);
+  box-shadow: var(--shadow-lg);
+  border-color: rgba(0,106,78,0.2);
+}
+
+.trip-thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--teal), var(--emerald));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.trip-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.trip-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trip-details {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.trip-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ── 27. Payment Badges ─────────────────────────────────────── */
+.payment-badges {
+  display: flex;
+  gap: 8px;
+  padding: 16px;
+  justify-content: center;
+  background: var(--white);
+  border-top: 1px solid #f0f0f0;
+  margin-bottom: 68px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.payment-badge {
+  padding: 6px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.badge-jazz { background: linear-gradient(135deg, #00A651, #007A3D); color: white; }
+.badge-easy { background: linear-gradient(135deg, #FF6600, #CC5200); color: white; }
+.badge-bill { background: linear-gradient(135deg, #003087, #001f5b); color: white; }
+
+/* ── 28. Language Toggle ────────────────────────────────────── */
+.lang-toggle {
+  display: flex;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: var(--radius-chip);
+  overflow: hidden;
+}
+
+.lang-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: var(--transition);
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+}
+
+.lang-btn.active {
+  background: rgba(255,255,255,0.2);
+  color: white;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* Urdu / RTL Mode */
+body.urdu-mode {
+  font-family: 'Noto Nastaliq Urdu', var(--font);
+  direction: rtl;
+}
+
+body.urdu-mode .bottom-nav {
+  direction: rtl;
+}
+
+body.urdu-mode .activity-card {
+  flex-direction: row-reverse;
+  border-left: none;
+  border-right: 4px solid var(--teal);
+}
+
+body.urdu-mode .chat-bubble.user {
+  align-self: flex-start;
+  border-bottom-right-radius: 18px;
+  border-bottom-left-radius: 4px;
+}
+
+body.urdu-mode .chat-bubble.ai {
+  align-self: flex-end;
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 4px;
+}
+
+/* ── 29. Map Container ──────────────────────────────────────── */
+#survival-map-container {
+  width: 100%;
+  height: 300px;
+  position: relative;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+#main-map {
+  width: 100%;
+  height: 100%;
+}
+
+/* Leaflet attribution override for dark mode */
+.survival-screen .leaflet-control-attribution {
+  background: rgba(0,0,0,0.6);
+  color: rgba(255,255,255,0.7);
+  border-radius: 6px;
+}
+
+/* ── 30. FAB Button ─────────────────────────────────────────── */
+.fab {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, var(--teal), var(--emerald));
+  border: none;
+  border-radius: 18px;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: var(--shadow-teal);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  transition: var(--transition);
+  z-index: 50;
+}
+
+.fab:hover {
+  transform: scale(1.08) translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0,106,78,0.42);
+}
+
+.fab:active {
+  transform: scale(0.96);
+  box-shadow: var(--shadow-teal);
+}
+
+/* ── 31. Stepper ────────────────────────────────────────────── */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--cream-dark);
+  border-radius: 14px;
+  padding: 4px;
+  width: fit-content;
+}
+
+.stepper-btn {
+  width: 44px;
+  height: 44px;
+  background: var(--white);
+  border: none;
+  border-radius: 10px;
+  font-size: 22px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow);
+  transition: var(--transition);
+  color: var(--teal);
+  font-weight: 700;
+  font-family: var(--font);
+}
+
+.stepper-btn:hover {
+  background: var(--teal);
+  color: white;
+  box-shadow: var(--shadow-teal);
+}
+
+.stepper-btn:active {
+  transform: scale(0.9);
+}
+
+.stepper-value {
+  min-width: 44px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--slate);
+  padding: 0 6px;
+}
+
+/* ── 32. Toast Notification ─────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--slate);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 500;
+  opacity: 0;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.toast.success { background: var(--success); }
+.toast.error   { background: var(--danger); }
+.toast.warning { background: var(--warning); }
+
+/* ── 33. Skeleton Loaders ───────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-text {
+  height: 14px;
+  margin-bottom: 8px;
+}
+
+.skeleton-text:last-child {
+  width: 60%;
+}
+
+.skeleton-card {
+  height: 120px;
+  border-radius: var(--radius);
+}
+
+/* ── 34. Trip Summary Card ──────────────────────────────────── */
+.trip-summary-card {
+  background: linear-gradient(135deg, rgba(0,106,78,0.06), rgba(0,135,90,0.04));
+  border: 1px solid rgba(0,106,78,0.15);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.summary-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  font-size: 14px;
+}
+
+.summary-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.summary-label {
+  color: var(--text-light);
+  font-size: 12px;
+  min-width: 100px;
+  font-weight: 600;
+}
+
+.summary-value {
+  font-weight: 700;
+  color: var(--slate);
+}
+
+/* ── 35. Keyframe Animations ────────────────────────────────── */
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ── Icon Button (generic) ──────────────────────────────────── */
+.icon-btn {
+  width: 38px;
+  height: 38px;
+  background: rgba(255,255,255,0.15);
+  border: none;
+  border-radius: 10px;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: white;
+  font-family: var(--font);
+}
+
+.icon-btn:hover {
+  background: rgba(255,255,255,0.28);
+}
+
+.icon-btn:active {
+  transform: scale(0.92);
+}
+
+/* ── 36. Utility Classes ────────────────────────────────────── */
+.hidden          { display: none !important; }
+.text-center     { text-align: center; }
+.text-right      { text-align: right; }
+.text-left       { text-align: left; }
+
+.mt-4    { margin-top: 4px; }
+.mt-8    { margin-top: 8px; }
+.mt-12   { margin-top: 12px; }
+.mt-16   { margin-top: 16px; }
+.mb-8    { margin-bottom: 8px; }
+.mb-16   { margin-bottom: 16px; }
+
+.p-16    { padding: 16px; }
+.px-16   { padding-left: 16px; padding-right: 16px; }
+.py-8    { padding-top: 8px; padding-bottom: 8px; }
+
+.flex            { display: flex; }
+.flex-col        { flex-direction: column; }
+.flex-1          { flex: 1; }
+.items-center    { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-8           { gap: 8px; }
+.gap-12          { gap: 12px; }
+
+.font-bold   { font-weight: 700; }
+.font-heavy  { font-weight: 800; }
+.text-sm     { font-size: 13px; }
+.text-xs     { font-size: 11px; }
+
+.color-teal    { color: var(--teal); }
+.color-light   { color: var(--text-light); }
+.color-danger  { color: var(--danger); }
+.color-success { color: var(--success); }
+.color-white   { color: white; }
+
+.rounded       { border-radius: var(--radius); }
+.rounded-sm    { border-radius: var(--radius-sm); }
+.rounded-full  { border-radius: 9999px; }
+
+.shadow        { box-shadow: var(--shadow); }
+.shadow-lg     { box-shadow: var(--shadow-lg); }
+
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #e8e8e8 20%, #e8e8e8 80%, transparent);
+  margin: 12px 0;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 52px 24px;
+  text-align: center;
+}
+
+.empty-state-icon {
+  font-size: 52px;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
+}
+
+.empty-state h3 {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--slate);
+  letter-spacing: -0.3px;
+}
+
+.empty-state p {
+  font-size: 14px;
+  color: var(--text-light);
+  line-height: 1.55;
+  max-width: 260px;
+}
+
+/* ── 37. Responsive — tablet / desktop companion view ───────── */
+@media (min-width: 480px) {
+  body {
+    max-width: 440px;
+    margin: 0 auto;
+    box-shadow: 0 0 60px rgba(0,0,0,0.15);
+  }
+
+  .bottom-nav {
+    max-width: 440px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .modal-overlay {
+    transform: none;
+    right: auto;
+    width: 440px;
+    left: 50%;
+    margin-left: -220px;
+  }
+
+  .loading-overlay,
+  .toast {
+    max-width: 440px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .toast.show {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .toast {
+    bottom: 90px;
+  }
+
+  .fab {
+    right: calc(50% - 220px + 20px);
+  }
+}
+
+/* ── 38. Reduced Motion ─────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── 39. Dark Mode (system preference, non-survival screens) ── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cream:        #1e1e2e;
+    --cream-dark:   #181826;
+    --white:        #252538;
+    --text:         #e8e8f0;
+    --text-light:   #9898b0;
+    --shadow:       0 4px 20px rgba(0,0,0,0.3);
+    --shadow-lg:    0 12px 40px rgba(0,0,0,0.45);
+  }
+
+  .app-header {
+    background: linear-gradient(135deg, #004a37 0%, #1a2a2a 100%);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+
+  .bottom-nav {
+    background: rgba(26,26,46,0.97);
+    border-top-color: #2a2a4a;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+  }
+
+  .modal-sheet {
+    background: #252538;
+  }
+
+  .form-input {
+    background: #1e1e2e;
+    border-color: #3a3a5a;
+    color: var(--text);
+  }
+
+  .form-input:focus {
+    border-color: var(--teal);
+    box-shadow: 0 0 0 4px rgba(0,106,78,0.2);
+  }
+
+  .chat-input {
+    background: #1e1e2e;
+    border-color: #3a3a5a;
+    color: var(--text);
+  }
+
+  .dest-card,
+  .activity-card,
+  .saved-trip-card,
+  .stat-card,
+  .resource-card {
+    background: #252538;
+    border-color: #3a3a5a;
+  }
+
+  /* Stat card gradients in dark mode — softer */
+  .stat-card:nth-child(1) { background: linear-gradient(135deg, #1a2e1a, #1e3a2a); }
+  .stat-card:nth-child(2) { background: linear-gradient(135deg, #1a2234, #1a2a3e); }
+  .stat-card:nth-child(3) { background: linear-gradient(135deg, #2e2618, #3a2c18); }
+  .stat-card:nth-child(4) { background: linear-gradient(135deg, #2e1822, #3a1a2a); }
+
+  .transport-icon {
+    background: #252538;
+    border-color: #3a3a5a;
+  }
+
+  .chip {
+    background: #252538;
+    border-color: #3a3a5a;
+    color: var(--text);
+  }
+
+  .chip.selected {
+    background: linear-gradient(135deg, var(--teal), var(--emerald));
+    border-color: transparent;
+    color: white;
+  }
+
+  .cat-chip {
+    background: #252538;
+    border-color: #3a3a5a;
+    color: var(--text);
+  }
+
+  .day-pill {
+    background: #252538;
+    border-color: #3a3a5a;
+    color: var(--text);
+  }
+
+  .wizard-footer {
+    background: #1a1a2e;
+    border-top-color: #2a2a4a;
+  }
+
+  .chat-input-bar {
+    background: #1a1a2e;
+    border-top-color: #2a2a4a;
+  }
+
+  .export-options {
+    background: #1a1a2e;
+    border-bottom-color: #2a2a4a;
+  }
+
+  .payment-badges {
+    background: #1a1a2e;
+    border-top-color: #2a2a4a;
+  }
+
+  .pdf-preview {
+    background: #252538;
+  }
+
+  .pdf-preview-body p {
+    color: var(--text-light);
+  }
+
+  .slot-label::after {
+    background: linear-gradient(90deg, #2a2a4a, transparent);
+  }
+
+  .skeleton {
+    background: linear-gradient(90deg, #252538 25%, #2e2e4a 50%, #252538 75%);
+    background-size: 200% 100%;
+  }
+
+  .saved-trip-card {
+    border-color: #2a2a4a;
+  }
+
+  .saved-trip-card:hover {
+    border-color: rgba(0,106,78,0.4);
+  }
+
+  .activity-card {
+    border-left-color: var(--emerald);
+  }
+
+  .quick-action-card.qa-plan {
+    background: linear-gradient(135deg, #004d38, #005a40);
+  }
+
+  .modal-handle {
+    background: #4a4a6a;
+  }
+
+  .modal-title {
+    color: var(--text);
+  }
+
+  .trip-summary-card {
+    background: linear-gradient(135deg, rgba(0,106,78,0.12), rgba(0,135,90,0.08));
+    border-color: rgba(0,106,78,0.3);
+  }
+
+  .hero-search {
+    background: rgba(37,37,56,0.97);
+    color: var(--text);
+  }
+
+  .hero-search::placeholder {
+    color: var(--text-light);
+  }
+
+  .cta-section {
+    background: linear-gradient(135deg, rgba(0,106,78,0.1), rgba(0,135,90,0.06));
+  }
+
+  .divider {
+    background: linear-gradient(90deg, transparent, #3a3a5a 20%, #3a3a5a 80%, transparent);
+  }
+
+  .see-all {
+    background: rgba(0,106,78,0.15);
+  }
+
+  .section-title {
+    color: var(--text);
+  }
+
+  .day-title {
+    color: var(--text);
+  }
+
+  .wizard-title {
+    color: var(--text);
+  }
+
+  .empty-state h3 {
+    color: var(--text);
+  }
+}
+  </style>
+</head>
+<body>
+
+
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="loading-overlay active">
+    <div class="loading-logo">🧭</div>
+    <div class="spinner"></div>
+    <div class="loading-text" data-en="Loading Musafir..." data-ur="مسافر لوڈ ہو رہا ہے...">Loading Musafir...</div>
+    <div style="color:rgba(255,255,255,0.6);font-size:13px;margin-top:-8px;">Pakistan Travel Planner</div>
+  </div>
+
+  <!-- PWA Install Banner -->
+  <div id="install-banner" class="install-banner hidden">
+    <span>📱 Install Musafir on your home screen</span>
+    <button id="install-btn" class="btn btn-teal" style="padding:6px 12px;font-size:12px;">Install</button>
+    <button id="install-dismiss" class="btn" style="padding:6px 10px;font-size:12px;">✕</button>
+  </div>
+
+  <!-- ===================== SCREEN 1: Home ===================== -->
+  <div id="screen-home" class="screen active">
+
+    <!-- App Header -->
+    <div class="app-header">
+      <div>
+        <div style="font-size:20px;font-weight:800;letter-spacing:-0.5px;">Musafir <span style="font-family:serif;font-size:14px;">مسافر</span></div>
+        <div class="header-subtitle" data-en="Pakistan Travel Planner" data-ur="پاکستان سفر منصوبہ ساز">Pakistan Travel Planner</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div class="lang-toggle">
+          <button class="lang-btn active" id="lang-en" onclick="setLanguage('en')">EN</button>
+          <button class="lang-btn" id="lang-ur" onclick="setLanguage('ur')">اردو</button>
+        </div>
+        <button class="icon-btn" onclick="showSettings()" title="Settings">⚙️</button>
+      </div>
+    </div>
+
+    <!-- Hero — Attabad Lake CSS art -->
+    <div class="hero">
+      <svg class="hero-mountains" viewBox="0 0 400 80" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="0,80 40,20 80,50 130,10 180,40 230,5 280,35 320,15 360,45 400,20 400,80" fill="#2F4F4F" opacity="0.9"/>
+        <polygon points="0,80 30,35 70,55 100,25 150,50 200,20 250,45 300,30 350,55 400,35 400,80" fill="#1a3a2e" opacity="0.7"/>
+      </svg>
+      <div class="hero-lake"></div>
+      <div class="hero-overlay"></div>
+      <div class="hero-title-block">
+        <div class="hero-title" data-en="Discover Pakistan 🇵🇰" data-ur="پاکستان دریافت کریں 🇵🇰">Discover Pakistan 🇵🇰</div>
+        <div class="hero-subtitle" data-en="Plan your perfect journey" data-ur="اپنا بہترین سفر منصوبہ بنائیں">Plan your perfect journey</div>
+      </div>
+      <div class="hero-search-wrap">
+        <span class="hero-search-icon">🔍</span>
+        <input type="text" class="hero-search" id="hero-search"
+          data-en-placeholder="Search destinations in Pakistan..."
+          data-ur-placeholder="پاکستان میں منزل تلاش کریں..."
+          placeholder="Search destinations in Pakistan..."
+          oninput="filterBySearch(this.value)">
+      </div>
+      <div class="hero-badge">🌟 Trending</div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-number">89</div>
+        <div class="stat-label" data-en="Destinations" data-ur="مقامات">Destinations</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">50K+</div>
+        <div class="stat-label" data-en="Travelers" data-ur="مسافر">Travelers</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">120+</div>
+        <div class="stat-label" data-en="Itineraries" data-ur="سفرنامے">Itineraries</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">4.8★</div>
+        <div class="stat-label" data-en="Rating" data-ur="درجہ">Rating</div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="section-header">
+      <span class="section-title" data-en="Quick Actions" data-ur="فوری اقدامات">Quick Actions</span>
+    </div>
+    <div class="quick-actions">
+      <div class="quick-action-card qa-plan" onclick="showScreen('plan')">
+        <div class="qa-icon">✨</div>
+        <div class="qa-title" data-en="Plan a Trip" data-ur="سفر منصوبہ">Plan a Trip</div>
+        <div class="qa-sub" data-en="AI-powered itinerary" data-ur="اے آئی سفرنامہ">AI-powered itinerary</div>
+      </div>
+      <div class="quick-action-card qa-itinerary" onclick="showScreen('itinerary')">
+        <div class="qa-icon">📋</div>
+        <div class="qa-title" data-en="My Itinerary" data-ur="میرا سفرنامہ">My Itinerary</div>
+        <div class="qa-sub" data-en="View your 7-day plan" data-ur="7 دن کا منصوبہ">View your 7-day plan</div>
+      </div>
+      <div class="quick-action-card qa-survival" onclick="showScreen('survival')">
+        <div class="qa-icon">🧭</div>
+        <div class="qa-title" data-en="Survival Mode" data-ur="بقا موڈ">Survival Mode</div>
+        <div class="qa-sub" data-en="Offline maps & SOS" data-ur="آف لائن نقشے">Offline maps & SOS</div>
+      </div>
+      <div class="quick-action-card qa-export" onclick="showScreen('export')">
+        <div class="qa-icon">📄</div>
+        <div class="qa-title" data-en="Export PDF" data-ur="پی ڈی ایف">Export PDF</div>
+        <div class="qa-sub" data-en="Download your plan" data-ur="منصوبہ ڈاؤن لوڈ">Download your plan</div>
+      </div>
+    </div>
+
+    <!-- Category Filter Chips -->
+    <div class="section-header">
+      <span class="section-title" data-en="Explore by Category" data-ur="زمرے سے دریافت کریں">Explore by Category</span>
+    </div>
+    <div class="category-row" id="category-chips">
+      <!-- Rendered by JS -->
+    </div>
+
+    <!-- Transport Row -->
+    <div class="section-header">
+      <span class="section-title" data-en="Get Around Pakistan" data-ur="پاکستان میں سفر">Get Around Pakistan</span>
+    </div>
+    <div class="transport-row" id="transport-row">
+      <!-- Rendered by JS -->
+    </div>
+
+    <!-- Featured Destinations -->
+    <div class="section-header">
+      <span class="section-title" data-en="Destinations" data-ur="مقامات">Destinations</span>
+      <span class="see-all" onclick="showAllDestinations()" data-en="See All" data-ur="سب دیکھیں">See All</span>
+    </div>
+    <div class="destinations-grid" id="destinations-grid">
+      <!-- Rendered by JS -->
+    </div>
+
+    <!-- CTA -->
+    <div class="cta-section">
+      <button class="btn btn-primary" onclick="showScreen('plan')" data-en="✨ Start Planning Your Adventure" data-ur="✨ اپنا سفر شروع کریں">✨ Start Planning Your Adventure</button>
+    </div>
+
+    <!-- Payment Badges -->
+    <div class="payment-badges">
+      <span class="payment-badge badge-jazz">JazzCash</span>
+      <span class="payment-badge badge-easy">EasyPaisa</span>
+      <span class="payment-badge badge-bill">1-Bill</span>
+    </div>
+
+  </div><!-- /screen-home -->
+
+  <!-- ===================== SCREEN 2: Plan Trip ===================== -->
+  <div id="screen-plan" class="screen">
+
+    <!-- Header -->
+    <div class="app-header">
+      <button class="icon-btn" onclick="showScreen('home')" style="color:white;">← Back</button>
+      <div data-en="Plan Your Trip" data-ur="اپنا سفر منصوبہ بنائیں" style="font-weight:700;font-size:16px;">Plan Your Trip</div>
+      <div style="width:40px;"></div>
+    </div>
+
+    <!-- Wizard Step Indicators -->
+    <div class="wizard-steps">
+      <div class="wizard-step active" id="ws-1"></div>
+      <div class="wizard-step" id="ws-2"></div>
+      <div class="wizard-step" id="ws-3"></div>
+      <div class="wizard-step" id="ws-4"></div>
+    </div>
+    <div class="wizard-step-labels" style="display:flex;padding:0 16px;justify-content:space-between;font-size:10px;color:var(--text-light);">
+      <span data-en="Destination" data-ur="منزل">Destination</span>
+      <span data-en="Dates" data-ur="تاریخیں">Dates</span>
+      <span data-en="Interests" data-ur="دلچسپیاں">Interests</span>
+      <span data-en="Review" data-ur="جائزہ">Review</span>
+    </div>
+
+    <!-- Step 1 — Destination -->
+    <div class="wizard-pane active" id="wp-1">
+      <div class="wizard-title" data-en="Where to?" data-ur="کہاں جانا ہے؟">Where to?</div>
+      <div class="wizard-label" data-en="Select your destinations (multiple allowed)" data-ur="منزلیں منتخب کریں">Select your destinations (multiple allowed)</div>
+      <div id="dest-filter-hint" style="font-size:12px;color:var(--teal);margin-bottom:8px;"></div>
+      <div class="chips-grid" id="dest-chips">
+        <!-- Rendered by JS based on selected categories -->
+      </div>
+    </div>
+
+    <!-- Step 2 — Dates -->
+    <div class="wizard-pane" id="wp-2">
+      <div class="wizard-title" data-en="When &amp; Who?" data-ur="کب اور کون؟">When &amp; Who?</div>
+      <div class="form-group">
+        <label class="form-label" data-en="Start Date" data-ur="شروع تاریخ">Start Date</label>
+        <input type="date" class="form-input" id="trip-start" onchange="state.tripData.startDate=this.value">
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-en="End Date" data-ur="ختم تاریخ">End Date</label>
+        <input type="date" class="form-input" id="trip-end" onchange="state.tripData.endDate=this.value">
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-en="Number of Travelers" data-ur="مسافروں کی تعداد">Number of Travelers</label>
+        <div class="stepper">
+          <button class="stepper-btn" onclick="changeTravelers(-1)">−</button>
+          <span id="traveler-count" style="font-size:20px;font-weight:700;min-width:40px;text-align:center;">2</span>
+          <button class="stepper-btn" onclick="changeTravelers(1)">+</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-en="Budget (PKR)" data-ur="بجٹ (روپے)">Budget (PKR)</label>
+        <input type="range" id="budget-slider" min="50000" max="500000" step="10000" value="150000" oninput="updateBudget(this.value)" style="width:100%;">
+        <div id="budget-display" style="font-size:16px;font-weight:700;color:var(--teal);margin-top:4px;">PKR 1,50,000</div>
+      </div>
+    </div>
+
+    <!-- Step 3 — Interests -->
+    <div class="wizard-pane" id="wp-3">
+      <div class="wizard-title" data-en="What's your vibe?" data-ur="آپ کی دلچسپی؟">What's your vibe?</div>
+      <div class="wizard-label" data-en="Pick your travel interests" data-ur="اپنی دلچسپیاں چنیں">Pick your travel interests</div>
+      <div class="chips-grid" id="interest-chips">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+
+    <!-- Step 4 — Review -->
+    <div class="wizard-pane" id="wp-4">
+      <div class="wizard-title" data-en="Your Trip" data-ur="آپ کا سفر">Your Trip</div>
+      <div id="trip-summary" class="trip-summary-card">
+        <!-- Rendered by JS -->
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-en="Trip Name (optional)" data-ur="سفر کا نام">Trip Name (optional)</label>
+        <input type="text" class="form-input" id="trip-name" placeholder="e.g. Hunza Adventure 2025" oninput="state.tripData.name=this.value">
+      </div>
+    </div>
+
+    <!-- Wizard Footer -->
+    <div class="wizard-footer">
+      <button class="btn btn-secondary" id="btn-back" onclick="prevStep()" style="display:none;" data-en="Back" data-ur="واپس">Back</button>
+      <button class="btn btn-primary" id="btn-next" onclick="nextStep()" data-en="Next →" data-ur="آگے →">Next →</button>
+    </div>
+
+  </div><!-- /screen-plan -->
+
+  <!-- ===================== SCREEN 3: Itinerary ===================== -->
+  <div id="screen-itinerary" class="screen">
+
+    <!-- Header -->
+    <div class="app-header">
+      <button class="icon-btn" onclick="showScreen('home')" style="color:white;">← Back</button>
+      <div style="text-align:center;">
+        <div style="font-weight:700;font-size:15px;" data-en="My Itinerary" data-ur="میرا سفرنامہ">My Itinerary</div>
+        <div style="font-size:11px;opacity:0.8;" id="itin-subtitle">Hunza Valley · 7 Days</div>
+      </div>
+      <button class="icon-btn" onclick="showChatModal()" style="color:white;" title="AI Assistant">🤖</button>
+    </div>
+
+    <!-- Trip Meta Chips -->
+    <div id="trip-meta-chips" style="display:flex;gap:6px;padding:10px 16px;overflow-x:auto;scrollbar-width:none;">
+      <!-- Rendered by JS -->
+    </div>
+
+    <!-- Day Pills -->
+    <div class="itinerary-days" id="day-pills">
+      <!-- Rendered by JS -->
+    </div>
+
+    <!-- Day Content Area -->
+    <div class="day-content" id="day-content">
+      <!-- Rendered by JS -->
+    </div>
+
+    <!-- Floating Export Button -->
+    <button class="fab" onclick="showScreen('export')" title="Export PDF">
+      📄
+      <span style="font-size:10px;display:block;">PDF</span>
+    </button>
+
+  </div><!-- /screen-itinerary -->
+
+  <!-- ===================== SCREEN 4: Survival Mode ===================== -->
+  <div id="screen-survival" class="screen survival-screen">
+
+    <!-- Header -->
+    <div class="app-header survival-header">
+      <button class="icon-btn" onclick="showScreen('home')" style="color:rgba(255,255,255,0.7);">← Back</button>
+      <div style="text-align:center;">
+        <div style="font-weight:700;font-size:15px;color:white;" data-en="Survival Mode" data-ur="بقا موڈ">Survival Mode</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.6);">Fairy Meadows Trail · <span style="color:#43A047;font-weight:700;">OFFLINE READY</span></div>
+      </div>
+      <div id="signal-indicator" style="display:flex;gap:3px;align-items:flex-end;height:20px;">
+        <!-- JS renders signal bars -->
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div id="survival-map-container">
+      <div id="survival-map"></div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="survival-info" id="survival-resources">
+      <!-- Rendered by JS -->
+    </div>
+
+    <!-- SOS Button -->
+    <button class="sos-button" onclick="triggerSOS()">
+      🆘 EMERGENCY SOS — Call 1122
+    </button>
+
+    <!-- Elevation Profile -->
+    <div style="padding:12px 16px;background:var(--dark-2);">
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:6px;" data-en="Elevation Profile" data-ur="بلندی پروفائل">Elevation Profile</div>
+      <svg viewBox="0 0 300 60" width="100%" style="display:block;">
+        <defs>
+          <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#006A4E" stop-opacity="0.8"/>
+            <stop offset="100%" stop-color="#006A4E" stop-opacity="0.1"/>
+          </linearGradient>
+        </defs>
+        <path d="M0,55 L30,50 L70,42 L110,30 L150,20 L190,12 L230,8 L270,5 L300,3 L300,60 L0,60 Z" fill="url(#elevGrad)"/>
+        <polyline points="0,55 30,50 70,42 110,30 150,20 190,12 230,8 270,5 300,3" fill="none" stroke="#00875A" stroke-width="2"/>
+        <text x="0" y="58" font-size="8" fill="rgba(255,255,255,0.4)">2000m</text>
+        <text x="260" y="10" font-size="8" fill="rgba(255,255,255,0.4)">3300m</text>
+      </svg>
+    </div>
+
+  </div><!-- /screen-survival -->
+
+  <!-- ===================== SCREEN 5: Export PDF ===================== -->
+  <div id="screen-export" class="screen export-screen">
+
+    <!-- Header -->
+    <div class="app-header">
+      <button class="icon-btn" onclick="showScreen('itinerary')" style="color:white;">← Back</button>
+      <div style="font-weight:700;" data-en="Export PDF" data-ur="پی ڈی ایف برآمد">Export PDF</div>
+      <div style="width:40px;"></div>
+    </div>
+
+    <div style="overflow-y:auto;flex:1;">
+
+      <!-- Options -->
+      <div class="export-options">
+        <div class="form-group">
+          <label class="form-label" data-en="Trip Title" data-ur="سفر کا عنوان">Trip Title</label>
+          <input type="text" class="form-input" id="pdf-title" value="Hunza Valley 7-Day Adventure" oninput="updatePDFPreview()">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-en="Traveler Name" data-ur="مسافر کا نام">Traveler Name</label>
+          <input type="text" class="form-input" id="pdf-traveler" placeholder="Your name" oninput="updatePDFPreview()">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-en="Layout" data-ur="ترتیب">Layout</label>
+          <div style="display:flex;gap:8px;">
+            <label style="flex:1;"><input type="radio" name="pdf-layout" value="classic" checked onchange="updatePDFPreview()"> <span data-en="Classic" data-ur="کلاسک">Classic</span></label>
+            <label style="flex:1;"><input type="radio" name="pdf-layout" value="modern" onchange="updatePDFPreview()"> <span data-en="Modern" data-ur="جدید">Modern</span></label>
+            <label style="flex:1;"><input type="radio" name="pdf-layout" value="compact" onchange="updatePDFPreview()"> <span data-en="Compact" data-ur="مختصر">Compact</span></label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-en="Include Sections" data-ur="شامل حصے">Include Sections</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <label><input type="checkbox" id="sec-cover" checked onchange="updatePDFPreview()"> <span data-en="Cover Page" data-ur="سرورق">Cover Page</span></label>
+            <label><input type="checkbox" id="sec-itinerary" checked onchange="updatePDFPreview()"> <span data-en="Itinerary" data-ur="سفرنامہ">Itinerary</span></label>
+            <label><input type="checkbox" id="sec-emergency" checked onchange="updatePDFPreview()"> <span data-en="Emergency Contacts" data-ur="ہنگامی رابطے">Emergency Contacts</span></label>
+            <label><input type="checkbox" id="sec-phrases" checked onchange="updatePDFPreview()"> <span data-en="Urdu Phrases" data-ur="اردو جملے">Urdu Phrases</span></label>
+            <label><input type="checkbox" id="sec-packing" checked onchange="updatePDFPreview()"> <span data-en="Packing List" data-ur="سامان کی فہرست">Packing List</span></label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-en="Language" data-ur="زبان">Language</label>
+          <div style="display:flex;gap:12px;">
+            <label><input type="radio" name="pdf-lang" value="en" checked onchange="updatePDFPreview()"> English</label>
+            <label><input type="radio" name="pdf-lang" value="ur" onchange="updatePDFPreview()"> اردو</label>
+            <label><input type="radio" name="pdf-lang" value="bi" onchange="updatePDFPreview()"> <span data-en="Bilingual" data-ur="دو زبانی">Bilingual</span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Preview -->
+      <div class="export-preview-container">
+        <div style="font-size:11px;color:var(--text-light);margin-bottom:8px;text-align:center;" data-en="Preview" data-ur="پیش نظارہ">Preview</div>
+        <div class="pdf-preview" id="pdf-preview">
+          <div class="pdf-preview-header">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+              <span style="font-size:24px;">🧭</span>
+              <div>
+                <div style="font-size:20px;font-weight:800;letter-spacing:-0.5px;">MUSAFIR <span style="font-size:12px;opacity:0.8;">مسافر</span></div>
+                <div style="font-size:11px;opacity:0.7;">Pakistan Travel Planner 🇵🇰</div>
+              </div>
+            </div>
+            <div id="preview-title" style="font-size:16px;font-weight:700;">Hunza Valley 7-Day Adventure</div>
+            <div id="preview-meta" style="font-size:12px;opacity:0.8;margin-top:4px;">2 Travelers · PKR 1,50,000</div>
+          </div>
+          <div class="pdf-preview-body" id="preview-body">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="padding:16px;display:flex;gap:8px;">
+        <button class="btn btn-primary" style="flex:1;" onclick="downloadPDF()" data-en="⬇️ Download PDF" data-ur="⬇️ پی ڈی ایف ڈاؤن لوڈ کریں">⬇️ Download PDF</button>
+        <button class="btn btn-outline" onclick="shareTrip()" data-en="↗ Share" data-ur="↗ شیئر">↗ Share</button>
+      </div>
+
+    </div><!-- /overflow-y scroll -->
+
+  </div><!-- /screen-export -->
+
+  <!-- ===================== AI Chat Modal ===================== -->
+  <div class="modal-overlay" id="chat-modal">
+    <div class="modal-sheet" style="max-height:85dvh;display:flex;flex-direction:column;padding:0;border-radius:20px 20px 0 0;">
+      <div style="padding:16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:700;" data-en="AI Travel Assistant" data-ur="اے آئی سفری معاون">AI Travel Assistant</div>
+          <div style="font-size:12px;color:var(--text-light);">Powered by Claude · مسافر</div>
+        </div>
+        <button onclick="hideChatModal()" style="background:none;border:none;font-size:20px;cursor:pointer;">✕</button>
+      </div>
+      <div class="chat-container">
+        <div class="chat-messages" id="chat-messages">
+          <div class="chat-bubble ai">
+            <div class="bubble-header">🤖 Musafir AI</div>
+            <span data-en="Assalam o Alaikum! I'm your Pakistan travel guide. Ask me anything about destinations, food, safety, culture, or routes!" data-ur="السلام علیکم! میں آپ کا پاکستان سفر گائیڈ ہوں۔">Assalam o Alaikum! I'm your Pakistan travel guide. Ask me anything about destinations, food, safety, culture, or routes!</span>
+          </div>
+        </div>
+        <div class="chat-input-bar">
+          <textarea class="chat-input" id="chat-input" rows="1"
+            data-en-placeholder="Ask about Pakistan travel..."
+            data-ur-placeholder="پاکستان سفر کے بارے میں پوچھیں..."
+            placeholder="Ask about Pakistan travel..."
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+          <button class="chat-send" onclick="sendMessage()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== Settings Modal ===================== -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 style="font-size:18px;font-weight:800;margin-bottom:20px;" data-en="Settings" data-ur="ترتیبات">Settings</h2>
+
+      <div class="form-group">
+        <label class="form-label" data-en="Claude API Key (for AI features)" data-ur="کلاڈ API کلید">Claude API Key (for AI features)</label>
+        <div style="display:flex;gap:8px;">
+          <input type="password" class="form-input" id="api-key-input" placeholder="sk-ant-..." style="flex:1;">
+          <button class="btn btn-teal" onclick="saveApiKey()" data-en="Save" data-ur="محفوظ">Save</button>
+        </div>
+        <div style="font-size:11px;color:var(--text-light);margin-top:4px;" data-en="Your key is stored locally on your device only." data-ur="آپ کی کلید صرف آپ کے آلے پر محفوظ ہے۔">Your key is stored locally on your device only.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" data-en="Language" data-ur="زبان">Language</label>
+        <div class="lang-toggle" style="width:fit-content;">
+          <button class="lang-btn active" id="settings-lang-en" onclick="setLanguage('en')">English</button>
+          <button class="lang-btn" id="settings-lang-ur" onclick="setLanguage('ur')">اردو</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" data-en="Saved Trips" data-ur="محفوظ سفر">Saved Trips</label>
+        <div id="saved-trips-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;">
+          <!-- Rendered by JS -->
+        </div>
+        <button class="btn btn-outline" style="width:100%;font-size:13px;" onclick="clearSavedTrips()" data-en="Clear All Saved Trips" data-ur="تمام محفوظ سفر حذف کریں">Clear All Saved Trips</button>
+      </div>
+
+      <div style="margin-top:8px;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:var(--text-light);text-align:center;">
+        <strong>Musafir مسافر</strong> v1.0.0<br>
+        Pakistan Travel Planner · Made with ❤️ for Pakistan
+      </div>
+
+      <button class="btn btn-secondary" style="width:100%;margin-top:16px;" onclick="hideSettings()" data-en="Close" data-ur="بند کریں">Close</button>
+    </div>
+  </div>
+
+
+  <!-- Bottom Navigation (populated by JS) -->
+  <nav class="bottom-nav" id="bottom-nav" role="navigation" aria-label="Main navigation">
+    <!-- JS renders nav items -->
+  </nav>
+
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+/* ============================================================
+   Musafir — Pakistan Travel Planner  |  app.js
+   Vanilla JS, no frameworks, production-quality PWA
+   ============================================================ */
+
+'use strict';
+
+// ── Data ─────────────────────────────────────────────────────────────────────
+
+const DESTINATIONS = [
+  // Mountains / Trekking
+  { id: 'hunza', name: 'Hunza Valley', urdu: 'ہنزہ', province: 'Gilgit-Baltistan', categories: ['mountains','trekking','photography'], weather: 'snow', rating: 4.9, emoji: '🏔️', gradient: 'linear-gradient(135deg, #2F4F4F 0%, #4A7C59 50%, #87CEEB 100%)' },
+  { id: 'skardu', name: 'Skardu', urdu: 'اسکردو', province: 'Gilgit-Baltistan', categories: ['mountains','trekking','adventure'], weather: 'clear', rating: 4.8, emoji: '⛰️', gradient: 'linear-gradient(135deg, #1a3a4a 0%, #2F6F8F 50%, #87CEEB 100%)' },
+  { id: 'fairy-meadows', name: 'Fairy Meadows', urdu: 'پری گھاٹی', province: 'Gilgit-Baltistan', categories: ['mountains','trekking','wildlife'], weather: 'clear', rating: 4.9, emoji: '🌿', gradient: 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 50%, #81C784 100%)' },
+  { id: 'swat', name: 'Swat Valley', urdu: 'سوات', province: 'KPK', categories: ['mountains','heritage','trekking'], weather: 'clear', rating: 4.7, emoji: '🌲', gradient: 'linear-gradient(135deg, #1B5E20 0%, #388E3C 50%, #A5D6A7 100%)' },
+  { id: 'chitral', name: 'Chitral', urdu: 'چترال', province: 'KPK', categories: ['mountains','wildlife','heritage'], weather: 'snow', rating: 4.6, emoji: '🦅', gradient: 'linear-gradient(135deg, #37474F 0%, #546E7A 50%, #B0BEC5 100%)' },
+  { id: 'nathia-gali', name: 'Nathia Gali', urdu: 'ناتھیا گلی', province: 'KPK', categories: ['mountains','photography'], weather: 'clear', rating: 4.5, emoji: '🌄', gradient: 'linear-gradient(135deg, #2E7D32 0%, #43A047 50%, #C8E6C9 100%)' },
+  { id: 'gilgit', name: 'Gilgit', urdu: 'گلگت', province: 'Gilgit-Baltistan', categories: ['mountains','heritage','trekking'], weather: 'clear', rating: 4.6, emoji: '🏞️', gradient: 'linear-gradient(135deg, #4E342E 0%, #795548 50%, #D7CCC8 100%)' },
+  { id: 'naltar', name: 'Naltar Valley', urdu: 'نالتر', province: 'Gilgit-Baltistan', categories: ['mountains','photography'], weather: 'snow', rating: 4.7, emoji: '🎿', gradient: 'linear-gradient(135deg, #0D47A1 0%, #1976D2 50%, #90CAF9 100%)' },
+
+  // Coastal / Beaches
+  { id: 'karachi', name: 'Karachi', urdu: 'کراچی', province: 'Sindh', categories: ['coastal','food','heritage'], weather: 'hot', rating: 4.3, emoji: '🌊', gradient: 'linear-gradient(135deg, #01579B 0%, #0288D1 50%, #80DEEA 100%)' },
+  { id: 'gwadar', name: 'Gwadar', urdu: 'گوادر', province: 'Balochistan', categories: ['coastal','photography'], weather: 'hot', rating: 4.5, emoji: '🏖️', gradient: 'linear-gradient(135deg, #00838F 0%, #00ACC1 50%, #80DEEA 100%)' },
+  { id: 'ormara', name: 'Ormara', urdu: 'اورماڑہ', province: 'Balochistan', categories: ['coastal','photography'], weather: 'clear', rating: 4.4, emoji: '🐠', gradient: 'linear-gradient(135deg, #004D40 0%, #00695C 50%, #80CBC4 100%)' },
+
+  // Heritage / History
+  { id: 'lahore', name: 'Lahore', urdu: 'لاہور', province: 'Punjab', categories: ['heritage','food','spiritual','art'], weather: 'hot', rating: 4.8, emoji: '🕌', gradient: 'linear-gradient(135deg, #B71C1C 0%, #C62828 50%, #EF9A9A 100%)' },
+  { id: 'mohenjo-daro', name: 'Mohenjo-daro', urdu: 'موہن جو دڑو', province: 'Sindh', categories: ['heritage','photography'], weather: 'landslide', rating: 4.6, emoji: '🏛️', gradient: 'linear-gradient(135deg, #E65100 0%, #EF6C00 50%, #FFCC80 100%)' },
+  { id: 'taxila', name: 'Taxila', urdu: 'تکسلا', province: 'Punjab', categories: ['heritage'], weather: 'clear', rating: 4.5, emoji: '🗿', gradient: 'linear-gradient(135deg, #4E342E 0%, #6D4C41 50%, #D7CCC8 100%)' },
+  { id: 'multan', name: 'Multan', urdu: 'ملتان', province: 'Punjab', categories: ['heritage','spiritual','art'], weather: 'hot', rating: 4.4, emoji: '🎨', gradient: 'linear-gradient(135deg, #880E4F 0%, #AD1457 50%, #F48FB1 100%)' },
+  { id: 'peshawar', name: 'Peshawar', urdu: 'پشاور', province: 'KPK', categories: ['heritage','food','art'], weather: 'clear', rating: 4.5, emoji: '🫖', gradient: 'linear-gradient(135deg, #4A148C 0%, #6A1B9A 50%, #CE93D8 100%)' },
+  { id: 'thatta', name: 'Thatta', urdu: 'ٹھٹہ', province: 'Sindh', categories: ['heritage','spiritual'], weather: 'hot', rating: 4.3, emoji: '🕍', gradient: 'linear-gradient(135deg, #33691E 0%, #558B2F 50%, #C5E1A5 100%)' },
+
+  // Food
+  { id: 'islamabad', name: 'Islamabad', urdu: 'اسلام آباد', province: 'ICT', categories: ['food','heritage','trekking'], weather: 'clear', rating: 4.6, emoji: '🌆', gradient: 'linear-gradient(135deg, #006A4E 0%, #00875A 50%, #80CBC4 100%)' },
+
+  // Spiritual
+  { id: 'sehwan', name: 'Sehwan Sharif', urdu: 'سیہون شریف', province: 'Sindh', categories: ['spiritual','heritage'], weather: 'hot', rating: 4.5, emoji: '✨', gradient: 'linear-gradient(135deg, #F57F17 0%, #F9A825 50%, #FFF59D 100%)' },
+
+  // Wildlife / Nature
+  { id: 'deosai', name: 'Deosai Plains', urdu: 'دیوسائی', province: 'Gilgit-Baltistan', categories: ['wildlife','photography','trekking'], weather: 'snow', rating: 4.8, emoji: '🐻', gradient: 'linear-gradient(135deg, #1B5E20 0%, #33691E 50%, #F9A825 100%)' },
+  { id: 'haleji', name: 'Haleji Lake', urdu: 'ہالیجی جھیل', province: 'Sindh', categories: ['wildlife','photography'], weather: 'hot', rating: 4.2, emoji: '🦩', gradient: 'linear-gradient(135deg, #006064 0%, #00838F 50%, #80DEEA 100%)' },
+
+  // Desert
+  { id: 'thar', name: 'Thar Desert', urdu: 'تھر', province: 'Sindh', categories: ['adventure','photography','art'], weather: 'hot', rating: 4.4, emoji: '🐪', gradient: 'linear-gradient(135deg, #F57F17 0%, #FF8F00 50%, #FFE082 100%)' },
+  { id: 'quetta', name: 'Quetta', urdu: 'کوئٹہ', province: 'Balochistan', categories: ['mountains','food','heritage'], weather: 'clear', rating: 4.3, emoji: '🍑', gradient: 'linear-gradient(135deg, #4E342E 0%, #5D4037 50%, #D7CCC8 100%)' },
+];
+
+const CATEGORIES = [
+  { id: 'mountains',   label: 'Mountains',        urdu: 'پہاڑ',       icon: '🏔️' },
+  { id: 'trekking',   label: 'Trekking',          urdu: 'ٹریکنگ',    icon: '🥾' },
+  { id: 'coastal',    label: 'Coastal & Beaches', urdu: 'ساحل',       icon: '🏖️' },
+  { id: 'heritage',   label: 'Heritage',          urdu: 'ورثہ',       icon: '🏛️' },
+  { id: 'food',       label: 'Food & Cuisine',    urdu: 'کھانا',      icon: '🍛' },
+  { id: 'spiritual',  label: 'Spiritual',         urdu: 'روحانی',     icon: '🕌' },
+  { id: 'wildlife',   label: 'Wildlife',          urdu: 'جنگلی',      icon: '🦅' },
+  { id: 'photography',label: 'Photography',       urdu: 'فوٹوگرافی', icon: '📷' },
+  { id: 'adventure',  label: 'Adventure',         urdu: 'ایڈونچر',   icon: '🎒' },
+  { id: 'art',        label: 'Art & Crafts',      urdu: 'فنون',       icon: '🎨' },
+];
+
+const TRANSPORT = [
+  { id: 'jeep',     icon: '🚙', label: 'Jeep 4x4',        urdu: 'جیپ'   },
+  { id: 'bus',      icon: '🚌', label: 'Luxury Bus',       urdu: 'بس'    },
+  { id: 'rickshaw', icon: '🛺', label: 'Rickshaw',         urdu: 'رکشہ'  },
+  { id: 'flight',   icon: '✈️', label: 'Domestic Flight', urdu: 'پرواز' },
+  { id: 'train',    icon: '🚂', label: 'Train',            urdu: 'ٹرین'  },
+  { id: 'guide',    icon: '🧭', label: 'Local Guide',      urdu: 'گائیڈ' },
+];
+
+const HUNZA_ITINERARY = [
+  {
+    day: 1, title: 'Islamabad Arrival', urdu: 'اسلام آباد آمد',
+    location: 'Islamabad, ICT',
+    alert: null,
+    activities: {
+      morning:   [{ name: 'Arrive at Islamabad Airport', icon: '✈️', location: 'Islamabad International Airport', duration: '2h', category: 'Transport', color: '#E3F2FD' }],
+      afternoon: [{ name: 'Faisal Mosque Visit', icon: '🕌', location: 'Islamabad', duration: '1.5h', category: 'Heritage', color: '#E8F5E9' }, { name: 'Daman-e-Koh Viewpoint', icon: '🌄', location: 'Margalla Hills', duration: '2h', category: 'Photography', color: '#FFF3E0' }],
+      evening:   [{ name: 'Dinner at F-7 Markaz', icon: '🍛', location: 'F-7, Islamabad', duration: '2h', category: 'Food', color: '#FCE4EC' }]
+    }
+  },
+  {
+    day: 2, title: 'Drive via KKH', urdu: 'شاہراہ قراقرم سفر',
+    location: 'Islamabad → Besham',
+    alert: { type: 'warning', text: '⚠️ KKH Road: Check conditions at Thakot' },
+    activities: {
+      morning:   [{ name: 'Early departure on KKH', icon: '🚙', location: 'Islamabad → Attock', duration: '3h', category: 'Transport', color: '#E3F2FD' }],
+      afternoon: [{ name: 'Thakot Bridge Stop', icon: '🌉', location: 'Thakot, KPK', duration: '30m', category: 'Photography', color: '#FFF3E0' }, { name: 'Continue to Besham', icon: '🚙', location: 'Thakot → Besham', duration: '2h', category: 'Transport', color: '#E3F2FD' }],
+      evening:   [{ name: 'Hotel Check-in & Rest', icon: '🏨', location: 'Besham', duration: '1h', category: 'Rest', color: '#F3E5F5' }, { name: 'Local Chapli Kebab Dinner', icon: '🥩', location: 'Besham Bazaar', duration: '1h', category: 'Food', color: '#FCE4EC' }]
+    }
+  },
+  {
+    day: 3, title: 'Gilgit City', urdu: 'گلگت شہر',
+    location: 'Besham → Gilgit',
+    alert: { type: 'info', text: '✅ Road open — Gilgit reachable via Sazin' },
+    activities: {
+      morning:   [{ name: 'Drive Besham → Gilgit', icon: '🚙', location: 'KKH Mountain Road', duration: '5h', category: 'Transport', color: '#E3F2FD' }],
+      afternoon: [{ name: 'Kargah Buddha Rock Carving', icon: '🗿', location: '10km west of Gilgit', duration: '1.5h', category: 'Heritage', color: '#E8F5E9' }, { name: 'Gilgit Bazaar', icon: '🛍️', location: 'Main Bazaar, Gilgit', duration: '1.5h', category: 'Shopping', color: '#FFF8E1' }],
+      evening:   [{ name: 'Sunset at Gilgit River', icon: '🌅', location: 'Gilgit River Banks', duration: '1h', category: 'Photography', color: '#FFF3E0' }, { name: 'Chapshuro Bread Dinner', icon: '🫓', location: 'Local Dhaba, Gilgit', duration: '1h', category: 'Food', color: '#FCE4EC' }]
+    }
+  },
+  {
+    day: 4, title: 'Hunza Valley Highlights', urdu: 'ہنزہ وادی',
+    location: 'Gilgit → Karimabad, Hunza',
+    alert: { type: 'snow', text: '❄️ Snow possible above 3000m tonight' },
+    activities: {
+      morning:   [{ name: 'Drive to Karimabad', icon: '🚙', location: 'Gilgit → Karimabad', duration: '2h', category: 'Transport', color: '#E3F2FD' }, { name: 'Baltit Fort', icon: '🏰', location: 'Karimabad, Hunza', duration: '2h', category: 'Heritage', color: '#E8F5E9' }],
+      afternoon: [{ name: 'Attabad Lake Boat Ride', icon: '⛵', location: 'Attabad Lake', duration: '2h', category: 'Adventure', color: '#E3F2FD' }, { name: 'Altit Fort', icon: '🏯', location: 'Altit Village', duration: '1.5h', category: 'Heritage', color: '#E8F5E9' }],
+      evening:   [{ name: "Eagle's Nest Sunset", icon: '🦅', location: 'Duikar, 3100m', duration: '2h', category: 'Photography', color: '#FFF3E0' }, { name: 'Hunza Apricot Chicken Dinner', icon: '🍑', location: 'Karimabad', duration: '1h', category: 'Food', color: '#FCE4EC' }]
+    }
+  },
+  {
+    day: 5, title: 'Rakaposhi & Passu', urdu: 'راکاپوشی و پاسو',
+    location: 'Hunza Valley Exploration',
+    alert: null,
+    activities: {
+      morning:   [{ name: 'Rakaposhi Base View Point', icon: '🏔️', location: 'Minapin, Nagar', duration: '3h', category: 'Photography', color: '#FFF3E0' }],
+      afternoon: [{ name: 'Passu Cones Photo Stop', icon: '📷', location: 'Passu, Upper Hunza', duration: '2h', category: 'Photography', color: '#FFF3E0' }, { name: 'Hussaini Suspension Bridge', icon: '🌉', location: 'Hussaini Village', duration: '1h', category: 'Adventure', color: '#FCE4EC' }],
+      evening:   [{ name: 'Sost Dry Fruit Market', icon: '🌰', location: 'Sost Bazaar', duration: '1h', category: 'Shopping', color: '#FFF8E1' }, { name: 'Local Diram & Mamtu Dinner', icon: '🥟', location: 'Hunza Restaurant', duration: '1h', category: 'Food', color: '#FCE4EC' }]
+    }
+  },
+  {
+    day: 6, title: 'Nagar & Hopar Glacier', urdu: 'ناگر و ہوپر گلیشئر',
+    location: 'Nagar Valley, GB',
+    alert: { type: 'warning', text: '⚠️ Glacier trail requires guide — hire locally' },
+    activities: {
+      morning:   [{ name: 'Hopar Glacier Trek', icon: '🧊', location: 'Hopar, Nagar', duration: '4h', category: 'Trekking', color: '#E3F2FD' }],
+      afternoon: [{ name: 'Nagar Fort', icon: '🏰', location: 'Nagar Town', duration: '1.5h', category: 'Heritage', color: '#E8F5E9' }, { name: 'Shishper Glacier View', icon: '🏔️', location: 'Hassanabad', duration: '1h', category: 'Photography', color: '#FFF3E0' }],
+      evening:   [{ name: 'Rest & Photography', icon: '🌙', location: 'Karimabad', duration: '2h', category: 'Photography', color: '#FFF3E0' }, { name: 'Hunza Tea & Walnuts', icon: '🫖', location: 'Gulmit Café', duration: '1h', category: 'Food', color: '#FCE4EC' }]
+    }
+  },
+  {
+    day: 7, title: 'Return to Islamabad', urdu: 'واپسی اسلام آباد',
+    location: 'Hunza → Islamabad',
+    alert: { type: 'info', text: '✅ Flight ISB→GIL available 07:30' },
+    activities: {
+      morning:   [{ name: 'Gilgit Airport', icon: '✈️', location: 'Gilgit Airport', duration: '3h', category: 'Transport', color: '#E3F2FD' }],
+      afternoon: [{ name: 'Arrive Islamabad', icon: '🌆', location: 'Islamabad', duration: '1h', category: 'Transport', color: '#E3F2FD' }, { name: 'F-6 Super Market Souvenirs', icon: '🛍️', location: 'F-6, Islamabad', duration: '1.5h', category: 'Shopping', color: '#FFF8E1' }],
+      evening:   [{ name: 'Farewell Dinner — Monal Restaurant', icon: '🍽️', location: 'Margalla Hills', duration: '2h', category: 'Food', color: '#FCE4EC' }]
+    }
+  }
+];
+
+// ── App State ─────────────────────────────────────────────────────────────────
+
+const state = {
+  currentScreen: 'home',
+  language: 'en',
+  selectedCategories: [],
+  selectedDestinations: [],
+  tripData: {
+    destinations: [],
+    startDate: '',
+    endDate: '',
+    travelers: 2,
+    budget: 150000,
+    interests: [],
+    name: ''
+  },
+  currentDay: 1,
+  savedTrips: [],
+  apiKey: '',
+  chatMessages: [],
+  wizardStep: 1,
+  activeTransport: null,
+  generatedItinerary: null,
+};
+
+// PWA install prompt reference
+let deferredPrompt = null;
+
+// Leaflet map instance (re-used to avoid double-init)
+let survivalMap = null;
+
+// ── Utility ───────────────────────────────────────────────────────────────────
+
+/** Escape HTML to prevent XSS in dynamically built strings */
+function esc(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** Format PKR currency */
+function formatPKR(amount) {
+  if (amount >= 100000) {
+    return `PKR ${(amount / 100000).toFixed(1)}L`;
+  }
+  return `PKR ${amount.toLocaleString()}`;
+}
+
+/** Format date for display */
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** Generate a unique trip id */
+function generateId() {
+  return 'trip_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+}
+
+/** Clamp a number between min and max */
+function clamp(val, min, max) {
+  return Math.max(min, Math.min(max, val));
+}
+
+/** Return a label string depending on current language */
+function t(en, ur) {
+  return state.language === 'ur' ? ur : en;
+}
+
+/** Show a transient toast notification */
+function showToast(msg, duration = 2800) {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast';
+    toast.style.cssText = [
+      'position:fixed', 'bottom:90px', 'left:50%', 'transform:translateX(-50%)',
+      'background:#1a1a1a', 'color:#fff', 'padding:10px 20px', 'border-radius:20px',
+      'font-size:14px', 'font-weight:500', 'z-index:9999', 'pointer-events:none',
+      'opacity:0', 'transition:opacity 0.25s ease', 'max-width:80vw', 'text-align:center'
+    ].join(';');
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, duration);
+}
+
+// ── Service Worker Registration ───────────────────────────────────────────────
+
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('[SW] Registered, scope:', reg.scope))
+      .catch(err => console.warn('[SW] Registration failed:', err));
+  }
+}
+
+// ── localStorage Persistence ──────────────────────────────────────────────────
+
+function loadSavedTrips() {
+  try {
+    const raw = localStorage.getItem('musafir_trips');
+    state.savedTrips = raw ? JSON.parse(raw) : [];
+  } catch {
+    state.savedTrips = [];
+  }
+}
+
+function saveTripToStorage(trip) {
+  state.savedTrips.unshift(trip);
+  try {
+    localStorage.setItem('musafir_trips', JSON.stringify(state.savedTrips));
+  } catch (e) {
+    console.warn('Could not save trip:', e);
+  }
+}
+
+function deleteSavedTrip(id) {
+  state.savedTrips = state.savedTrips.filter(t => t.id !== id);
+  try {
+    localStorage.setItem('musafir_trips', JSON.stringify(state.savedTrips));
+  } catch (e) {
+    console.warn('Could not delete trip:', e);
+  }
+}
+
+function loadSettings() {
+  try {
+    const key = localStorage.getItem('musafir_api_key');
+    if (key) state.apiKey = key;
+    const lang = localStorage.getItem('musafir_language');
+    if (lang === 'en' || lang === 'ur') state.language = lang;
+  } catch { /* ignore */ }
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem('musafir_api_key', state.apiKey);
+    localStorage.setItem('musafir_language', state.language);
+  } catch { /* ignore */ }
+}
+
+// ── Screen Management ─────────────────────────────────────────────────────────
+
+function showScreen(name) {
+  state.currentScreen = name;
+
+  document.querySelectorAll('.screen').forEach(el => {
+    el.classList.remove('active');
+    el.setAttribute('aria-hidden', 'true');
+  });
+
+  const target = document.getElementById('screen-' + name);
+  if (target) {
+    target.classList.add('active');
+    target.setAttribute('aria-hidden', 'false');
+    target.scrollTop = 0;
+  }
+
+  // Update bottom nav
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    const isActive = btn.dataset.screen === name;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-current', isActive ? 'page' : 'false');
+  });
+
+  // Lazy init screens
+  if (name === 'home') renderHome();
+  if (name === 'plan') initPlanScreen();
+  if (name === 'itinerary') renderItinerary();
+  if (name === 'survival') initSurvivalScreen();
+  if (name === 'export') initExportScreen();
+}
+
+// ── Bottom Navigation ─────────────────────────────────────────────────────────
+
+function initBottomNav() {
+  document.querySelectorAll('.nav-item[data-screen]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const screen = btn.dataset.screen;
+      showScreen(screen);
+    });
+  });
+}
+
+// ── Language Toggle ───────────────────────────────────────────────────────────
+
+function setLanguage(lang) {
+  state.language = lang;
+  saveSettings();
+
+  if (lang === 'ur') {
+    document.body.classList.add('urdu-mode');
+    document.documentElement.lang = 'ur';
+    document.documentElement.dir = 'rtl';
+  } else {
+    document.body.classList.remove('urdu-mode');
+    document.documentElement.lang = 'en';
+    document.documentElement.dir = 'ltr';
+  }
+
+  // Update all elements that carry data-en / data-ur
+  document.querySelectorAll('[data-en]').forEach(el => {
+    el.textContent = lang === 'ur' ? (el.dataset.ur || el.dataset.en) : el.dataset.en;
+  });
+
+  // Re-render active screen
+  if (state.currentScreen === 'home') renderHome();
+  if (state.currentScreen === 'plan') renderWizardStep(state.wizardStep);
+  if (state.currentScreen === 'itinerary') renderItinerary();
+}
+
+// ── PWA Install Banner ────────────────────────────────────────────────────────
+
+function initInstallBanner() {
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    showInstallBanner();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    hideInstallBanner();
+    deferredPrompt = null;
+    showToast('Musafir installed! Find it on your home screen.');
+  });
+}
+
+function showInstallBanner() {
+  const banner = document.getElementById('install-banner');
+  if (banner) {
+    banner.classList.remove('hidden');
+    banner.setAttribute('aria-hidden', 'false');
+  }
+}
+
+function hideInstallBanner() {
+  const banner = document.getElementById('install-banner');
+  if (banner) {
+    banner.classList.add('hidden');
+    banner.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function handleInstallClick() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(result => {
+    if (result.outcome === 'accepted') {
+      showToast('Installing Musafir…');
+    }
+    deferredPrompt = null;
+    hideInstallBanner();
+  });
+}
+
+// ── Home Screen ───────────────────────────────────────────────────────────────
+
+function renderHome() {
+  renderCategoryChips();
+  renderDestinationCards();
+  renderTransportRow();
+}
+
+function renderCategoryChips() {
+  const container = document.getElementById('category-chips');
+  if (!container) return;
+
+  container.innerHTML = CATEGORIES.map(cat => {
+    const active = state.selectedCategories.includes(cat.id);
+    return `<button
+      class="chip${active ? ' chip--active' : ''}"
+      data-category="${esc(cat.id)}"
+      aria-pressed="${active}"
+      title="${esc(cat.label)}"
+    >
+      <span class="chip-icon">${cat.icon}</span>
+      <span class="chip-label">${esc(t(cat.label, cat.urdu))}</span>
+    </button>`;
+  }).join('');
+
+  container.querySelectorAll('.chip[data-category]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.category;
+      const idx = state.selectedCategories.indexOf(id);
+      if (idx === -1) {
+        state.selectedCategories.push(id);
+      } else {
+        state.selectedCategories.splice(idx, 1);
+      }
+      renderHome();
+    });
+  });
+}
+
+function renderDestinationCards() {
+  const container = document.getElementById('destination-cards');
+  if (!container) return;
+
+  const filtered = state.selectedCategories.length === 0
+    ? DESTINATIONS
+    : DESTINATIONS.filter(d =>
+        d.categories.some(c => state.selectedCategories.includes(c))
+      );
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🗺️</div>
+        <p>${esc(t('No destinations match your filters', 'کوئی منزل نہیں ملی'))}</p>
+        <button class="btn btn-outline" id="clear-filters-btn">${esc(t('Clear Filters', 'فلٹر صاف کریں'))}</button>
+      </div>`;
+    document.getElementById('clear-filters-btn')?.addEventListener('click', () => {
+      state.selectedCategories = [];
+      renderHome();
+    });
+    return;
+  }
+
+  container.innerHTML = filtered.map(dest => `
+    <article class="dest-card" data-id="${esc(dest.id)}" role="button" tabindex="0"
+      aria-label="${esc(dest.name)}, ${esc(dest.province)}, rated ${dest.rating}">
+      <div class="dest-card__hero" style="background:${dest.gradient}">
+        <span class="dest-card__emoji" aria-hidden="true">${dest.emoji}</span>
+        <span class="dest-card__rating">⭐ ${dest.rating}</span>
+        <span class="dest-card__weather dest-card__weather--${esc(dest.weather)}">${weatherIcon(dest.weather)}</span>
+      </div>
+      <div class="dest-card__body">
+        <h3 class="dest-card__name">${esc(state.language === 'ur' ? dest.urdu : dest.name)}</h3>
+        <p class="dest-card__province">${esc(dest.province)}</p>
+        <div class="dest-card__tags">
+          ${dest.categories.slice(0, 3).map(cid => {
+            const cat = CATEGORIES.find(c => c.id === cid);
+            return cat ? `<span class="tag">${cat.icon} ${esc(t(cat.label, cat.urdu))}</span>` : '';
+          }).join('')}
+        </div>
+        <button class="btn btn-primary btn-sm dest-card__plan-btn" data-id="${esc(dest.id)}">
+          ${esc(t('Plan Trip', 'سفر منصوبہ'))}
+        </button>
+      </div>
+    </article>
+  `).join('');
+
+  // Destination card clicks — open detail or pre-select for planning
+  container.querySelectorAll('.dest-card').forEach(card => {
+    card.addEventListener('click', e => {
+      if (e.target.closest('.dest-card__plan-btn')) return; // handled below
+      showDestinationDetail(card.dataset.id);
+    });
+    card.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        showDestinationDetail(card.dataset.id);
+      }
+    });
+  });
+
+  container.querySelectorAll('.dest-card__plan-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const dest = DESTINATIONS.find(d => d.id === btn.dataset.id);
+      if (dest) {
+        state.tripData.destinations = [dest.id];
+        state.wizardStep = 1;
+        showScreen('plan');
+      }
+    });
+  });
+}
+
+function weatherIcon(type) {
+  const icons = { snow: '❄️', clear: '☀️', hot: '🌡️', landslide: '⚠️', rain: '🌧️' };
+  return icons[type] || '🌤️';
+}
+
+function renderTransportRow() {
+  const container = document.getElementById('transport-row');
+  if (!container) return;
+
+  container.innerHTML = TRANSPORT.map(tr => `
+    <button class="transport-item${state.activeTransport === tr.id ? ' transport-item--active' : ''}"
+      data-transport="${esc(tr.id)}" aria-pressed="${state.activeTransport === tr.id}"
+      title="${esc(tr.label)}">
+      <span class="transport-icon">${tr.icon}</span>
+      <span class="transport-label">${esc(t(tr.label, tr.urdu))}</span>
+    </button>
+  `).join('');
+
+  container.querySelectorAll('.transport-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.transport;
+      state.activeTransport = state.activeTransport === id ? null : id;
+      renderTransportRow();
+    });
+  });
+}
+
+function showDestinationDetail(id) {
+  const dest = DESTINATIONS.find(d => d.id === id);
+  if (!dest) return;
+
+  const modal = document.getElementById('dest-modal');
+  const body = document.getElementById('dest-modal-body');
+  if (!modal || !body) return;
+
+  body.innerHTML = `
+    <div class="dest-modal__hero" style="background:${dest.gradient}">
+      <span class="dest-modal__emoji">${dest.emoji}</span>
+      <button class="dest-modal__close" id="close-dest-modal" aria-label="Close">✕</button>
+    </div>
+    <div class="dest-modal__content">
+      <h2>${esc(dest.name)} <span class="dest-modal__urdu">${esc(dest.urdu)}</span></h2>
+      <p class="dest-modal__province">📍 ${esc(dest.province)}</p>
+      <div class="dest-modal__meta">
+        <span>⭐ ${dest.rating} rating</span>
+        <span>${weatherIcon(dest.weather)} ${esc(dest.weather)}</span>
+      </div>
+      <div class="dest-modal__cats">
+        ${dest.categories.map(cid => {
+          const cat = CATEGORIES.find(c => c.id === cid);
+          return cat ? `<span class="tag tag--large">${cat.icon} ${esc(cat.label)}</span>` : '';
+        }).join('')}
+      </div>
+      <button class="btn btn-primary btn-full dest-modal__plan" data-id="${esc(dest.id)}">
+        ${esc(t('Plan a Trip Here', 'یہاں سفر منصوبہ بنائیں'))} →
+      </button>
+    </div>
+  `;
+
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+
+  document.getElementById('close-dest-modal')?.addEventListener('click', closeDestModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeDestModal(); });
+
+  body.querySelector('.dest-modal__plan')?.addEventListener('click', e => {
+    const did = e.currentTarget.dataset.id;
+    const d = DESTINATIONS.find(x => x.id === did);
+    if (d) {
+      state.tripData.destinations = [d.id];
+      state.wizardStep = 1;
+      closeDestModal();
+      showScreen('plan');
+    }
+  });
+}
+
+function closeDestModal() {
+  const modal = document.getElementById('dest-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+// ── Plan Trip Wizard ───────────────────────────────────────────────────────────
+
+function initPlanScreen() {
+  state.wizardStep = 1;
+  renderWizardStep(1);
+}
+
+function showWizard(step) {
+  state.wizardStep = step;
+  renderWizardStep(step);
+}
+
+function renderWizardStep(step) {
+  // Update step indicators
+  document.querySelectorAll('.wizard-step-indicator').forEach((el, i) => {
+    const stepNum = i + 1;
+    el.classList.toggle('active', stepNum === step);
+    el.classList.toggle('completed', stepNum < step);
+    el.setAttribute('aria-current', stepNum === step ? 'step' : 'false');
+  });
+
+  // Show/hide panes
+  document.querySelectorAll('.wizard-pane').forEach(pane => {
+    const paneStep = parseInt(pane.dataset.step, 10);
+    pane.classList.toggle('hidden', paneStep !== step);
+    pane.setAttribute('aria-hidden', paneStep !== step ? 'true' : 'false');
+  });
+
+  // Nav buttons
+  const prevBtn = document.getElementById('wizard-prev');
+  const nextBtn = document.getElementById('wizard-next');
+  if (prevBtn) {
+    prevBtn.classList.toggle('hidden', step === 1);
+    prevBtn.textContent = t('Back', 'واپس');
+  }
+  if (nextBtn) {
+    if (step === 4) {
+      nextBtn.textContent = t('Generate AI Itinerary ✨', 'AI سفرنامہ بنائیں ✨');
+      nextBtn.classList.add('btn-generate');
+    } else {
+      nextBtn.textContent = t('Next →', 'آگے →');
+      nextBtn.classList.remove('btn-generate');
+    }
+  }
+
+  // Render pane content
+  if (step === 1) renderStep1();
+  if (step === 2) renderStep2();
+  if (step === 3) renderStep3();
+  if (step === 4) renderStep4();
+}
+
+function renderStep1() {
+  const container = document.getElementById('step1-destinations');
+  if (!container) return;
+
+  const pool = state.selectedCategories.length > 0
+    ? DESTINATIONS.filter(d => d.categories.some(c => state.selectedCategories.includes(c)))
+    : DESTINATIONS;
+
+  container.innerHTML = pool.map(dest => {
+    const sel = state.tripData.destinations.includes(dest.id);
+    return `<button
+      class="dest-chip${sel ? ' dest-chip--active' : ''}"
+      data-dest="${esc(dest.id)}"
+      aria-pressed="${sel}">
+      <span>${dest.emoji}</span>
+      <span>${esc(state.language === 'ur' ? dest.urdu : dest.name)}</span>
+    </button>`;
+  }).join('');
+
+  container.querySelectorAll('.dest-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.dest;
+      const idx = state.tripData.destinations.indexOf(id);
+      if (idx === -1) {
+        state.tripData.destinations.push(id);
+      } else {
+        state.tripData.destinations.splice(idx, 1);
+      }
+      btn.classList.toggle('dest-chip--active', state.tripData.destinations.includes(id));
+      btn.setAttribute('aria-pressed', String(state.tripData.destinations.includes(id)));
+    });
+  });
+}
+
+function renderStep2() {
+  const startInput = document.getElementById('trip-start-date');
+  const endInput   = document.getElementById('trip-end-date');
+  const travelerDisplay = document.getElementById('traveler-count');
+  const budgetDisplay   = document.getElementById('budget-display');
+  const budgetSlider    = document.getElementById('budget-slider');
+  const tripNameInput   = document.getElementById('trip-name-input');
+
+  // Set today as min date
+  const today = new Date().toISOString().split('T')[0];
+  if (startInput) {
+    startInput.min = today;
+    startInput.value = state.tripData.startDate;
+    startInput.addEventListener('change', () => {
+      state.tripData.startDate = startInput.value;
+      if (endInput && endInput.value && endInput.value < startInput.value) {
+        endInput.value = startInput.value;
+        state.tripData.endDate = endInput.value;
+      }
+      if (endInput) endInput.min = startInput.value;
+    });
+  }
+  if (endInput) {
+    endInput.min = state.tripData.startDate || today;
+    endInput.value = state.tripData.endDate;
+    endInput.addEventListener('change', () => { state.tripData.endDate = endInput.value; });
+  }
+
+  // Traveler stepper
+  if (travelerDisplay) travelerDisplay.textContent = state.tripData.travelers;
+  const decBtn = document.getElementById('traveler-dec');
+  const incBtn = document.getElementById('traveler-inc');
+  if (decBtn) {
+    decBtn.onclick = () => {
+      state.tripData.travelers = clamp(state.tripData.travelers - 1, 1, 20);
+      if (travelerDisplay) travelerDisplay.textContent = state.tripData.travelers;
+    };
+  }
+  if (incBtn) {
+    incBtn.onclick = () => {
+      state.tripData.travelers = clamp(state.tripData.travelers + 1, 1, 20);
+      if (travelerDisplay) travelerDisplay.textContent = state.tripData.travelers;
+    };
+  }
+
+  // Budget slider
+  if (budgetSlider) {
+    budgetSlider.min = 50000;
+    budgetSlider.max = 500000;
+    budgetSlider.step = 10000;
+    budgetSlider.value = state.tripData.budget;
+    const updateBudgetDisplay = () => {
+      if (budgetDisplay) budgetDisplay.textContent = formatPKR(state.tripData.budget);
+    };
+    updateBudgetDisplay();
+    budgetSlider.addEventListener('input', () => {
+      state.tripData.budget = parseInt(budgetSlider.value, 10);
+      updateBudgetDisplay();
+    });
+  }
+
+  // Trip name
+  if (tripNameInput) {
+    tripNameInput.value = state.tripData.name;
+    tripNameInput.addEventListener('input', () => {
+      state.tripData.name = tripNameInput.value.trim();
+    });
+  }
+}
+
+function renderStep3() {
+  const container = document.getElementById('step3-interests');
+  if (!container) return;
+
+  container.innerHTML = CATEGORIES.map(cat => {
+    const sel = state.tripData.interests.includes(cat.id);
+    return `<button
+      class="interest-chip${sel ? ' interest-chip--active' : ''}"
+      data-interest="${esc(cat.id)}"
+      aria-pressed="${sel}">
+      <span class="interest-icon">${cat.icon}</span>
+      <span>${esc(t(cat.label, cat.urdu))}</span>
+    </button>`;
+  }).join('');
+
+  container.querySelectorAll('.interest-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.interest;
+      const idx = state.tripData.interests.indexOf(id);
+      if (idx === -1) {
+        state.tripData.interests.push(id);
+      } else {
+        state.tripData.interests.splice(idx, 1);
+      }
+      btn.classList.toggle('interest-chip--active', state.tripData.interests.includes(id));
+      btn.setAttribute('aria-pressed', String(state.tripData.interests.includes(id)));
+    });
+  });
+}
+
+function renderStep4() {
+  const container = document.getElementById('step4-review');
+  if (!container) return;
+
+  const destNames = state.tripData.destinations
+    .map(id => DESTINATIONS.find(d => d.id === id))
+    .filter(Boolean)
+    .map(d => `${d.emoji} ${state.language === 'ur' ? d.urdu : d.name}`)
+    .join(', ') || t('None selected', 'کوئی نہیں');
+
+  const interestNames = state.tripData.interests
+    .map(id => CATEGORIES.find(c => c.id === id))
+    .filter(Boolean)
+    .map(c => `${c.icon} ${t(c.label, c.urdu)}`)
+    .join(', ') || t('None selected', 'کوئی نہیں');
+
+  const duration = (state.tripData.startDate && state.tripData.endDate)
+    ? (() => {
+        const diff = (new Date(state.tripData.endDate) - new Date(state.tripData.startDate)) / 86400000;
+        return `${diff + 1} ${t('days', 'دن')}`;
+      })()
+    : t('Not set', 'متعین نہیں');
+
+  container.innerHTML = `
+    <div class="review-card">
+      <h3>${esc(state.tripData.name || t('My Pakistan Trip', 'میرا پاکستان سفر'))}</h3>
+      <div class="review-row">
+        <span class="review-label">${esc(t('Destinations', 'منازل'))}</span>
+        <span class="review-value">${esc(destNames)}</span>
+      </div>
+      <div class="review-row">
+        <span class="review-label">${esc(t('Travel Dates', 'سفر کی تاریخیں'))}</span>
+        <span class="review-value">${esc(formatDate(state.tripData.startDate) || t('Not set', 'متعین نہیں'))} – ${esc(formatDate(state.tripData.endDate) || t('Not set', 'متعین نہیں'))}</span>
+      </div>
+      <div class="review-row">
+        <span class="review-label">${esc(t('Duration', 'مدت'))}</span>
+        <span class="review-value">${esc(duration)}</span>
+      </div>
+      <div class="review-row">
+        <span class="review-label">${esc(t('Travelers', 'مسافرین'))}</span>
+        <span class="review-value">${esc(String(state.tripData.travelers))}</span>
+      </div>
+      <div class="review-row">
+        <span class="review-label">${esc(t('Budget', 'بجٹ'))}</span>
+        <span class="review-value">${esc(formatPKR(state.tripData.budget))}</span>
+      </div>
+      <div class="review-row">
+        <span class="review-label">${esc(t('Interests', 'دلچسپیاں'))}</span>
+        <span class="review-value">${esc(interestNames)}</span>
+      </div>
+    </div>
+    <p class="review-hint">
+      ${esc(t(
+        state.apiKey
+          ? 'Claude AI will generate a personalised itinerary based on your preferences.'
+          : 'A sample Hunza Valley itinerary will be used. Add your Claude API key in Settings for a personalised plan.',
+        state.apiKey
+          ? 'Claude AI آپ کی ترجیحات کی بنیاد پر ذاتی سفرنامہ بنائے گا۔'
+          : 'نمونہ ہنزہ سفرنامہ استعمال ہوگا۔ ذاتی منصوبے کے لیے ترتیبات میں API کلید شامل کریں۔'
+      ))}
+    </p>
+  `;
+}
+
+function nextStep() {
+  const step = state.wizardStep;
+
+  // Validate
+  if (step === 1) {
+    // Destinations are optional — user might explore on itinerary
+  }
+  if (step === 2) {
+    if (!state.tripData.startDate || !state.tripData.endDate) {
+      showToast(t('Please select travel dates', 'سفر کی تاریخیں منتخب کریں'));
+      return;
+    }
+    if (state.tripData.endDate < state.tripData.startDate) {
+      showToast(t('End date must be after start date', 'اختتام کی تاریخ شروع کے بعد ہونی چاہیے'));
+      return;
+    }
+  }
+
+  if (step < 4) {
+    showWizard(step + 1);
+  } else {
+    generateItinerary();
+  }
+}
+
+function prevStep() {
+  if (state.wizardStep > 1) {
+    showWizard(state.wizardStep - 1);
+  }
+}
+
+function initPlanButtons() {
+  const nextBtn = document.getElementById('wizard-next');
+  const prevBtn = document.getElementById('wizard-prev');
+  if (nextBtn) nextBtn.addEventListener('click', nextStep);
+  if (prevBtn) prevBtn.addEventListener('click', prevStep);
+}
+
+// ── Generate Itinerary ────────────────────────────────────────────────────────
+
+async function generateItinerary() {
+  const overlay = document.getElementById('loading-overlay');
+  const loadingText = document.getElementById('loading-text');
+
+  if (overlay) {
+    overlay.classList.remove('hidden');
+    overlay.setAttribute('aria-hidden', 'false');
+  }
+  if (loadingText) loadingText.textContent = t('Generating your Pakistan adventure…', 'آپ کا پاکستان سفر بنایا جا رہا ہے…');
+
+  let aiSummary = null;
+
+  if (state.apiKey) {
+    try {
+      const destNames = state.tripData.destinations
+        .map(id => DESTINATIONS.find(d => d.id === id)?.name)
+        .filter(Boolean)
+        .join(', ');
+
+      const prompt = `Create a brief travel summary (3-4 sentences) for a Pakistan trip with these details:
+- Destinations: ${destNames || 'Hunza Valley'}
+- Dates: ${state.tripData.startDate} to ${state.tripData.endDate}
+- Travelers: ${state.tripData.travelers}
+- Budget: ${formatPKR(state.tripData.budget)}
+- Interests: ${state.tripData.interests.join(', ') || 'general tourism'}
+
+Highlight what makes this trip special and include one safety tip.`;
+
+      aiSummary = await callClaude(
+        [{ role: 'user', content: prompt }],
+        'You are an expert Pakistan travel guide. Provide concise, enthusiastic travel summaries highlighting the best of Pakistan.'
+      );
+    } catch (err) {
+      console.warn('AI generation failed:', err.message);
+      aiSummary = null;
+    }
+  }
+
+  // Build trip object
+  const trip = {
+    id: generateId(),
+    name: state.tripData.name || t('My Pakistan Trip', 'میرا پاکستان سفر'),
+    destinations: [...state.tripData.destinations],
+    startDate: state.tripData.startDate,
+    endDate: state.tripData.endDate,
+    travelers: state.tripData.travelers,
+    budget: state.tripData.budget,
+    interests: [...state.tripData.interests],
+    aiSummary,
+    createdAt: new Date().toISOString(),
+    itinerary: HUNZA_ITINERARY,
+  };
+
+  state.generatedItinerary = trip;
+  saveTripToStorage(trip);
+
+  // Small delay for UX
+  await delay(600);
+
+  if (overlay) {
+    overlay.classList.add('hidden');
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+
+  showScreen('itinerary');
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ── Claude API ────────────────────────────────────────────────────────────────
+
+async function callClaude(messages, systemPrompt) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': state.apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 512,
+      system: systemPrompt,
+      messages: messages
+    })
+  });
+  if (!response.ok) throw new Error(`API error: ${response.status}`);
+  const data = await response.json();
+  return data.content[0].text;
+}
+
+// ── Itinerary Screen ──────────────────────────────────────────────────────────
+
+function renderItinerary() {
+  const trip = state.generatedItinerary || state.savedTrips[0] || null;
+  const itinerary = trip?.itinerary || HUNZA_ITINERARY;
+
+  renderItineraryHeader(trip);
+  renderDayPills(itinerary);
+  renderDayContent(itinerary[state.currentDay - 1] || itinerary[0]);
+  if (trip?.aiSummary) renderAiSummaryBanner(trip.aiSummary);
+}
+
+function renderItineraryHeader(trip) {
+  const titleEl = document.getElementById('itinerary-trip-name');
+  if (titleEl) {
+    titleEl.textContent = trip?.name || t('Hunza Valley — 7 Days', 'ہنزہ — 7 دن');
+  }
+  const subtitleEl = document.getElementById('itinerary-trip-dates');
+  if (subtitleEl && trip?.startDate && trip?.endDate) {
+    subtitleEl.textContent = `${formatDate(trip.startDate)} – ${formatDate(trip.endDate)} · ${trip.travelers} ${t('travelers', 'مسافرین')}`;
+  }
+}
+
+function renderAiSummaryBanner(summary) {
+  const banner = document.getElementById('ai-summary-banner');
+  const text = document.getElementById('ai-summary-text');
+  if (banner && text) {
+    text.textContent = summary;
+    banner.classList.remove('hidden');
+    banner.setAttribute('aria-hidden', 'false');
+  }
+}
+
+function renderDayPills(itinerary) {
+  const container = document.getElementById('day-pills');
+  if (!container) return;
+
+  container.innerHTML = itinerary.map(day => `
+    <button
+      class="day-pill${state.currentDay === day.day ? ' day-pill--active' : ''}"
+      data-day="${day.day}"
+      aria-pressed="${state.currentDay === day.day}"
+      aria-label="${esc(t('Day', 'دن'))} ${day.day}: ${esc(day.title)}">
+      <span class="day-pill__num">${esc(t('Day', 'دن'))} ${day.day}</span>
+      <span class="day-pill__title">${esc(state.language === 'ur' ? day.urdu : day.title)}</span>
+    </button>
+  `).join('');
+
+  container.querySelectorAll('.day-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.currentDay = parseInt(btn.dataset.day, 10);
+      renderDayPills(itinerary);
+      const day = itinerary.find(d => d.day === state.currentDay);
+      if (day) renderDayContent(day);
+    });
+  });
+}
+
+function renderDayContent(day) {
+  const container = document.getElementById('day-content');
+  if (!container || !day) return;
+
+  const alertHtml = day.alert ? `
+    <div class="day-alert day-alert--${esc(day.alert.type)}" role="alert">
+      ${esc(day.alert.text)}
+    </div>
+  ` : '';
+
+  container.innerHTML = `
+    <div class="day-header">
+      <div class="day-header__meta">
+        <span class="day-badge">${esc(t('Day', 'دن'))} ${day.day}</span>
+        <span class="day-location">📍 ${esc(day.location)}</span>
+      </div>
+      <h2 class="day-title">${esc(state.language === 'ur' ? day.urdu : day.title)}</h2>
+    </div>
+    ${alertHtml}
+    ${renderTimeSlot('morning',   '🌅', t('Morning',   'صبح'),   day.activities.morning)}
+    ${renderTimeSlot('afternoon', '☀️', t('Afternoon', 'دوپہر'), day.activities.afternoon)}
+    ${renderTimeSlot('evening',   '🌙', t('Evening',   'شام'),   day.activities.evening)}
+  `;
+}
+
+function renderTimeSlot(slot, icon, label, activities) {
+  if (!activities || activities.length === 0) return '';
+  return `
+    <section class="time-slot" aria-label="${esc(label)}">
+      <h3 class="time-slot__header">${icon} ${esc(label)}</h3>
+      <div class="time-slot__activities">
+        ${activities.map(act => renderActivityCard(act)).join('')}
+      </div>
+    </section>
+  `;
+}
+
+function renderActivityCard(act) {
+  return `
+    <div class="activity-card" style="border-left: 4px solid ${act.color}; background: ${act.color}22">
+      <div class="activity-card__icon">${act.icon}</div>
+      <div class="activity-card__body">
+        <strong class="activity-card__name">${esc(act.name)}</strong>
+        <span class="activity-card__location">📍 ${esc(act.location)}</span>
+        <div class="activity-card__meta">
+          <span class="activity-card__duration">⏱ ${esc(act.duration)}</span>
+          <span class="activity-card__cat tag">${esc(act.category)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── AI Chat ───────────────────────────────────────────────────────────────────
+
+function initChatScreen() {
+  const form = document.getElementById('chat-form');
+  const input = document.getElementById('chat-input');
+  if (form) {
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const text = input?.value.trim();
+      if (text) {
+        input.value = '';
+        sendChatMessage(text);
+      }
+    });
+  }
+}
+
+async function sendChatMessage(text) {
+  addChatBubble(text, 'user');
+  state.chatMessages.push({ role: 'user', content: text });
+
+  if (!state.apiKey) {
+    addChatBubble(
+      t(
+        'Please add your Claude API key in Settings to enable AI chat.',
+        'AI چیٹ فعال کرنے کے لیے ترتیبات میں Claude API کلید شامل کریں۔'
+      ),
+      'ai'
+    );
+    return;
+  }
+
+  const typingId = showTypingIndicator();
+
+  try {
+    const reply = await callClaude(
+      state.chatMessages,
+      'You are an expert Pakistan travel guide. Give concise, helpful advice about travel in Pakistan. Include safety tips, local food recommendations, and cultural advice. Keep responses under 150 words.'
+    );
+    state.chatMessages.push({ role: 'assistant', content: reply });
+    removeTypingIndicator(typingId);
+    addChatBubble(reply, 'ai');
+  } catch (err) {
+    removeTypingIndicator(typingId);
+    addChatBubble(
+      t(
+        `Sorry, something went wrong: ${err.message}`,
+        `معذرت، کچھ غلط ہو گیا: ${err.message}`
+      ),
+      'ai error'
+    );
+  }
+}
+
+function addChatBubble(text, role) {
+  const container = document.getElementById('chat-messages');
+  if (!container) return;
+
+  const bubble = document.createElement('div');
+  bubble.className = `chat-bubble chat-bubble--${role.includes('user') ? 'user' : 'ai'}`;
+  if (role.includes('error')) bubble.classList.add('chat-bubble--error');
+  bubble.textContent = text;
+  bubble.setAttribute('role', 'listitem');
+  container.appendChild(bubble);
+  container.scrollTop = container.scrollHeight;
+}
+
+function showTypingIndicator() {
+  const container = document.getElementById('chat-messages');
+  if (!container) return null;
+  const id = 'typing-' + Date.now();
+  const div = document.createElement('div');
+  div.className = 'chat-bubble chat-bubble--ai chat-bubble--typing';
+  div.id = id;
+  div.innerHTML = '<span></span><span></span><span></span>';
+  div.setAttribute('aria-label', t('AI is typing…', 'AI لکھ رہا ہے…'));
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return id;
+}
+
+function removeTypingIndicator(id) {
+  if (id) document.getElementById(id)?.remove();
+}
+
+function openChatModal() {
+  const modal = document.getElementById('chat-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.getElementById('chat-input')?.focus();
+  }
+}
+
+function closeChatModal() {
+  const modal = document.getElementById('chat-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+// ── Survival / Offline Map ────────────────────────────────────────────────────
+
+const TRAIL_WAYPOINTS = [
+  { name: 'Raikot Bridge',            lat: 35.1856, lng: 74.5960, icon: '🌉', info: 'Starting point — 1450m' },
+  { name: 'Tato Village',             lat: 35.2431, lng: 74.5730, icon: '🏘️', info: 'Jeep stop — 2860m' },
+  { name: 'Fairy Meadows',            lat: 35.3731, lng: 74.5785, icon: '🌿', info: 'Camp base — 3300m' },
+  { name: 'Nanga Parbat Base Camp',   lat: 35.4118, lng: 74.6028, icon: '🏔️', info: 'Advance camp — 4200m' },
+  { name: 'Camp 1',                   lat: 35.4390, lng: 74.6140, icon: '⛺', info: 'Camp 1 — 5000m' },
+];
+
+function initSurvivalScreen() {
+  renderSignalStrength();
+  initSOSButton();
+  initSurvivalMap();
+}
+
+function renderSignalStrength() {
+  const container = document.getElementById('signal-bars');
+  if (!container) return;
+  const bars = Math.floor(Math.random() * 3) + 1; // 1-3
+  container.innerHTML = [1, 2, 3].map(i =>
+    `<span class="signal-bar${i <= bars ? ' signal-bar--active' : ''}" aria-hidden="true"></span>`
+  ).join('');
+  container.setAttribute('aria-label', `${bars} bar${bars > 1 ? 's' : ''} signal`);
+}
+
+function initSOSButton() {
+  const btn = document.getElementById('sos-btn');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      const confirmed = window.confirm(
+        t(
+          'Send SOS? This will alert emergency services.\n\nEmergency: 1122\nMountain Rescue: 1122\nPTDC: +92-51-9201731',
+          'SOS بھیجیں؟ یہ ہنگامی خدمات کو الرٹ کرے گا۔\n\nایمرجنسی: 1122'
+        )
+      );
+      if (confirmed) {
+        alert(t('Emergency SOS activated! Calling 1122…', 'ایمرجنسی SOS فعال! 1122 کال ہو رہی ہے…'));
+      }
+    });
+  }
+}
+
+function initSurvivalMap() {
+  const mapEl = document.getElementById('survival-map');
+  if (!mapEl) return;
+
+  // Avoid re-initialising an existing map
+  if (survivalMap) {
+    survivalMap.invalidateSize();
+    return;
+  }
+
+  // Wait for Leaflet to be available (loaded via CDN)
+  if (typeof L === 'undefined') {
+    mapEl.innerHTML = `<div class="map-offline-msg">
+      <p>🗺️ ${esc(t('Map unavailable offline', 'آف لائن نقشہ دستیاب نہیں'))}</p>
+    </div>`;
+    return;
+  }
+
+  try {
+    survivalMap = L.map(mapEl, {
+      center: [35.3731, 74.5785],
+      zoom: 11,
+      zoomControl: true,
+      attributionControl: true,
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      crossOrigin: true,
+    }).addTo(survivalMap);
+
+    // Draw trail polyline
+    const latlngs = TRAIL_WAYPOINTS.map(wp => [wp.lat, wp.lng]);
+    L.polyline(latlngs, {
+      color: '#006A4E',
+      weight: 3,
+      opacity: 0.8,
+      dashArray: '6, 4',
+    }).addTo(survivalMap);
+
+    // Add markers
+    TRAIL_WAYPOINTS.forEach(wp => {
+      const icon = L.divIcon({
+        className: 'trail-marker',
+        html: `<div style="
+          background:#006A4E; color:white; border-radius:50%;
+          width:32px; height:32px; display:flex; align-items:center;
+          justify-content:center; font-size:16px; border:2px solid white;
+          box-shadow:0 2px 4px rgba(0,0,0,0.3);">${wp.icon}</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -20],
+      });
+
+      L.marker([wp.lat, wp.lng], { icon })
+        .bindPopup(`<strong>${esc(wp.name)}</strong><br><small>${esc(wp.info)}</small>`)
+        .addTo(survivalMap);
+    });
+  } catch (err) {
+    console.warn('Map init failed:', err);
+    mapEl.innerHTML = `<div class="map-offline-msg">
+      <p>🗺️ ${esc(t('Map unavailable', 'نقشہ دستیاب نہیں'))}</p>
+    </div>`;
+  }
+}
+
+// ── Export / PDF Screen ───────────────────────────────────────────────────────
+
+function initExportScreen() {
+  const titleInput     = document.getElementById('export-title');
+  const travelerInput  = document.getElementById('export-traveler');
+  const layoutRadios   = document.querySelectorAll('input[name="export-layout"]');
+  const langRadios     = document.querySelectorAll('input[name="export-lang"]');
+  const downloadBtn    = document.getElementById('download-pdf-btn');
+
+  const trip = state.generatedItinerary || state.savedTrips[0];
+
+  if (titleInput) {
+    titleInput.value = trip?.name || 'My Pakistan Trip — Hunza Valley';
+    titleInput.addEventListener('input', updateExportPreview);
+  }
+  if (travelerInput) {
+    travelerInput.value = trip?.travelers ? `${trip.travelers} Travelers` : '2 Travelers';
+    travelerInput.addEventListener('input', updateExportPreview);
+  }
+
+  layoutRadios.forEach(r => r.addEventListener('change', updateExportPreview));
+  langRadios.forEach(r => r.addEventListener('change', updateExportPreview));
+
+  document.querySelectorAll('.export-section-check').forEach(cb => {
+    cb.addEventListener('change', updateExportPreview);
+  });
+
+  if (downloadBtn) downloadBtn.addEventListener('click', downloadPDF);
+
+  updateExportPreview();
+}
+
+function getExportOptions() {
+  const title     = document.getElementById('export-title')?.value.trim() || 'My Pakistan Trip';
+  const traveler  = document.getElementById('export-traveler')?.value.trim() || '';
+  const layout    = document.querySelector('input[name="export-layout"]:checked')?.value || 'classic';
+  const lang      = document.querySelector('input[name="export-lang"]:checked')?.value || 'en';
+  const sections  = {};
+  document.querySelectorAll('.export-section-check').forEach(cb => {
+    sections[cb.dataset.section] = cb.checked;
+  });
+  return { title, traveler, layout, lang, sections };
+}
+
+function updateExportPreview() {
+  const preview = document.getElementById('export-preview');
+  if (!preview) return;
+  const { title, traveler, layout } = getExportOptions();
+  const trip = state.generatedItinerary || state.savedTrips[0];
+
+  const dates = (trip?.startDate && trip?.endDate)
+    ? `${formatDate(trip.startDate)} – ${formatDate(trip.endDate)}`
+    : 'Dates TBD';
+
+  preview.innerHTML = `
+    <div class="pdf-preview pdf-preview--${esc(layout)}">
+      <div class="pdf-cover-header">
+        <div class="pdf-cover-logo">🧭 MUSAFIR</div>
+        <div class="pdf-cover-flag">🇵🇰</div>
+      </div>
+      <h2 class="pdf-cover-title">${esc(title)}</h2>
+      <p class="pdf-cover-dates">${esc(dates)}</p>
+      ${traveler ? `<p class="pdf-cover-traveler">👤 ${esc(traveler)}</p>` : ''}
+      <div class="pdf-preview-days">
+        ${HUNZA_ITINERARY.slice(0, 3).map(day => `
+          <div class="pdf-day-preview">
+            <strong>Day ${day.day}: ${esc(day.title)}</strong>
+            <small>${esc(day.location)}</small>
+          </div>
+        `).join('')}
+        <div class="pdf-day-preview pdf-day-preview--more">+ ${HUNZA_ITINERARY.length - 3} more days…</div>
+      </div>
+    </div>
+  `;
+}
+
+async function downloadPDF() {
+  const btn = document.getElementById('download-pdf-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = t('Generating PDF…', 'PDF بن رہی ہے…');
+  }
+
+  try {
+    if (typeof window.jspdf === 'undefined' && typeof jsPDF === 'undefined') {
+      throw new Error('jsPDF not loaded');
+    }
+
+    // jsPDF UMD exposes as window.jspdf.jsPDF
+    const JsPDF = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : jsPDF;
+    const doc = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+    const { title, traveler, sections } = getExportOptions();
+    const trip = state.generatedItinerary || state.savedTrips[0];
+    const itinerary = trip?.itinerary || HUNZA_ITINERARY;
+    const dates = (trip?.startDate && trip?.endDate)
+      ? `${formatDate(trip.startDate)} – ${formatDate(trip.endDate)}`
+      : '';
+
+    const W = 210; // A4 width mm
+    const MARGIN = 16;
+    const CONTENT_W = W - MARGIN * 2;
+
+    // ── Page 1: Cover ────────────────────────────────────────────────
+    // Teal header rectangle
+    doc.setFillColor(0, 106, 78);
+    doc.rect(0, 0, W, 80, 'F');
+
+    // MUSAFIR title
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(36);
+    doc.setFont('helvetica', 'bold');
+    doc.text('MUSAFIR', W / 2, 32, { align: 'center' });
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Pakistan Travel Planner', W / 2, 43, { align: 'center' });
+
+    // Flag line
+    doc.setFontSize(22);
+    doc.text('🇵🇰', W / 2, 60, { align: 'center' });
+
+    // Trip details below header
+    doc.setTextColor(30, 30, 30);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text(title, W / 2, 100, { align: 'center', maxWidth: CONTENT_W });
+
+    if (dates) {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(80, 80, 80);
+      doc.text(dates, W / 2, 112, { align: 'center' });
+    }
+
+    if (traveler) {
+      doc.setFontSize(11);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Traveler: ${traveler}`, W / 2, 122, { align: 'center' });
+    }
+
+    // Decorative separator
+    doc.setDrawColor(0, 106, 78);
+    doc.setLineWidth(0.5);
+    doc.line(MARGIN, 132, W - MARGIN, 132);
+
+    // AI summary if available
+    let coverY = 140;
+    if (trip?.aiSummary && sections?.summary !== false) {
+      doc.setFontSize(10);
+      doc.setTextColor(50, 50, 50);
+      doc.setFont('helvetica', 'italic');
+      const lines = doc.splitTextToSize(trip.aiSummary, CONTENT_W);
+      doc.text(lines, MARGIN, coverY);
+      coverY += lines.length * 5 + 8;
+    }
+
+    // Quick stats
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(60, 60, 60);
+    const stats = [
+      `Destinations: ${(trip?.destinations || ['hunza']).map(id => DESTINATIONS.find(d => d.id === id)?.name || id).join(', ')}`,
+      `Duration: ${itinerary.length} days`,
+      `Travelers: ${trip?.travelers || 2}`,
+      `Budget: ${formatPKR(trip?.budget || 150000)}`,
+    ];
+    stats.forEach((s, i) => {
+      doc.text(`• ${s}`, MARGIN, coverY + i * 7);
+    });
+
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(160, 160, 160);
+    doc.text('Generated by Musafir PWA — musafir.pk', W / 2, 287, { align: 'center' });
+
+    // ── Pages 2-8: Daily Itinerary ───────────────────────────────────
+    if (sections?.itinerary !== false) {
+      itinerary.forEach(day => {
+        doc.addPage();
+
+        // Day header bar
+        doc.setFillColor(0, 106, 78);
+        doc.rect(0, 0, W, 22, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Day ${day.day}: ${day.title}`, MARGIN, 14);
+
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(day.location, W - MARGIN, 14, { align: 'right' });
+
+        let y = 30;
+
+        // Alert
+        if (day.alert) {
+          doc.setFillColor(255, 243, 205);
+          doc.setDrawColor(255, 193, 7);
+          doc.roundedRect(MARGIN, y, CONTENT_W, 12, 2, 2, 'FD');
+          doc.setTextColor(120, 80, 0);
+          doc.setFontSize(9);
+          doc.text(day.alert.text.replace(/[^\x00-\x7F]/g, '').trim() || day.alert.text, MARGIN + 3, y + 8);
+          y += 18;
+        }
+
+        // Time slots
+        const slots = [
+          { key: 'morning',   label: 'Morning',   icon: 'M' },
+          { key: 'afternoon', label: 'Afternoon', icon: 'A' },
+          { key: 'evening',   label: 'Evening',   icon: 'E' },
+        ];
+
+        slots.forEach(slot => {
+          const acts = day.activities[slot.key];
+          if (!acts || acts.length === 0) return;
+
+          if (y > 255) {
+            doc.addPage();
+            y = 20;
+          }
+
+          // Slot label
+          doc.setFillColor(240, 248, 245);
+          doc.rect(MARGIN, y, CONTENT_W, 8, 'F');
+          doc.setTextColor(0, 106, 78);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text(slot.label, MARGIN + 2, y + 5.5);
+          y += 11;
+
+          acts.forEach(act => {
+            if (y > 260) {
+              doc.addPage();
+              y = 20;
+            }
+            doc.setTextColor(30, 30, 30);
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`${act.icon}  ${act.name}`, MARGIN + 4, y);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(90, 90, 90);
+            doc.setFontSize(8);
+            doc.text(`     ${act.location}  •  ${act.duration}  •  ${act.category}`, MARGIN + 4, y + 5);
+            y += 13;
+          });
+        });
+
+        // Page footer
+        doc.setFontSize(8);
+        doc.setTextColor(180, 180, 180);
+        doc.text(`Musafir — Day ${day.day} of ${itinerary.length}`, W / 2, 290, { align: 'center' });
+      });
+    }
+
+    // ── Emergency Contacts ────────────────────────────────────────────
+    if (sections?.emergency !== false) {
+      doc.addPage();
+      doc.setFillColor(220, 38, 38);
+      doc.rect(0, 0, W, 22, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Emergency Contacts', MARGIN, 14);
+
+      let y = 32;
+      const contacts = [
+        { name: 'Mountain Rescue',         number: '1122',                  note: '24/7 emergency' },
+        { name: 'PTDC (Tourism)',           number: '+92-51-9201731',        note: 'Mon-Fri 9am-5pm' },
+        { name: 'Aga Khan Health Service', number: '+92-5811-960200',       note: 'GB hospitals' },
+        { name: 'Police',                  number: '15',                    note: 'All provinces' },
+        { name: 'Ambulance',               number: '1122',                  note: 'Punjab / KPK' },
+        { name: 'Fire Brigade',            number: '16',                    note: 'Major cities' },
+      ];
+
+      contacts.forEach((c, i) => {
+        const rowBg = i % 2 === 0 ? [248, 248, 248] : [255, 255, 255];
+        doc.setFillColor(...rowBg);
+        doc.rect(MARGIN, y - 2, CONTENT_W, 12, 'F');
+        doc.setTextColor(30, 30, 30);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text(c.name, MARGIN + 2, y + 6);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 106, 78);
+        doc.text(c.number, MARGIN + 80, y + 6);
+        doc.setTextColor(120, 120, 120);
+        doc.setFontSize(9);
+        doc.text(c.note, MARGIN + 130, y + 6);
+        y += 14;
+      });
+    }
+
+    // ── Urdu Phrases ─────────────────────────────────────────────────
+    if (sections?.phrases !== false) {
+      doc.addPage();
+      doc.setFillColor(0, 106, 78);
+      doc.rect(0, 0, W, 22, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Useful Urdu Phrases', MARGIN, 14);
+
+      let y = 32;
+      const phrases = [
+        { roman: 'Shukriya',       urdu: 'شکریہ',                       meaning: 'Thank you' },
+        { roman: 'Kitna hai?',     urdu: 'کتنا ہے؟',           meaning: 'How much is it?' },
+        { roman: 'Kahan hai?',     urdu: 'کہاں ہے؟',           meaning: 'Where is it?' },
+        { roman: 'Pani chahiye',   urdu: 'پانی چاہیے', meaning: 'I need water' },
+        { roman: 'Madad karo',     urdu: 'مدد کرو',                 meaning: 'Help me!' },
+        { roman: 'Halal khana',    urdu: 'حلال کھانا', meaning: 'Halal food' },
+        { roman: 'Kitna door hai?',urdu: 'کتنا دور ہے؟', meaning: 'How far is it?' },
+        { roman: 'Ruk jao',        urdu: 'رک جاؤ',                       meaning: 'Stop!' },
+        { roman: 'Mujhe hospital le jao', urdu: 'مجھے ہسپتال لے جاؤ', meaning: 'Take me to hospital' },
+        { roman: 'Bahut acha',     urdu: 'بہت اچھا',           meaning: 'Very good / Excellent' },
+      ];
+
+      // Table header
+      doc.setFillColor(0, 106, 78);
+      doc.rect(MARGIN, y - 2, CONTENT_W, 10, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Romanised',    MARGIN + 2, y + 5);
+      doc.text('English',      MARGIN + 75, y + 5);
+      doc.text('Urdu Script',  MARGIN + 130, y + 5);
+      y += 12;
+
+      phrases.forEach((p, i) => {
+        const rowBg = i % 2 === 0 ? [248, 248, 248] : [255, 255, 255];
+        doc.setFillColor(...rowBg);
+        doc.rect(MARGIN, y - 2, CONTENT_W, 11, 'F');
+        doc.setTextColor(30, 30, 30);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(p.roman,   MARGIN + 2, y + 5);
+        doc.text(p.meaning, MARGIN + 75, y + 5);
+        // Urdu script needs special handling — show romanised as fallback in PDF
+        doc.text(p.roman,   MARGIN + 130, y + 5);
+        y += 13;
+      });
+    }
+
+    // ── Packing List ─────────────────────────────────────────────────
+    if (sections?.packing !== false) {
+      doc.addPage();
+      doc.setFillColor(0, 106, 78);
+      doc.rect(0, 0, W, 22, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Packing List', MARGIN, 14);
+
+      const packingGroups = [
+        {
+          group: 'Clothing',
+          items: ['Warm jacket / down vest', 'Thermal base layers (x2)', 'Waterproof outer layer', 'Trekking trousers (x2)', 'Moisture-wicking t-shirts (x3)', 'Warm hat & gloves', 'Sun hat / cap', 'Good hiking boots (broken in)', 'Sandals / camp shoes', 'Woollen socks (x4)'],
+        },
+        {
+          group: 'Documents',
+          items: ['CNIC / Passport', 'PTDC permit (if required)', 'Travel insurance docs', 'Emergency contacts card', 'Hotel booking confirmations', 'Printed itinerary (this PDF!)'],
+        },
+        {
+          group: 'Medical',
+          items: ['Altitude sickness pills (Diamox)', 'Rehydration sachets (ORS)', 'Pain relievers (paracetamol)', 'Antiseptic cream & bandages', 'Sunscreen SPF 50+', 'Lip balm (high altitude)', 'Personal prescription medicines', 'Blister plasters'],
+        },
+        {
+          group: 'Gear',
+          items: ['Daypack (25-30L)', 'Trekking poles', 'Headlamp + spare batteries', 'Sleeping bag (-10°C rated)', 'Water bottle (1L x2)', 'Water purification tablets', 'Portable charger / power bank', 'Offline maps downloaded', 'Whistle & mirror (emergency)'],
+        },
+        {
+          group: 'Food & Snacks',
+          items: ['Energy bars (x10)', 'Dried fruit & nuts', 'Instant noodles (for camps)', 'Electrolyte powder', 'Chocolate / halwa'],
+        },
+      ];
+
+      let y = 30;
+      let col = 0; // 0 = left, 1 = right
+      const colWidth = (CONTENT_W - 8) / 2;
+      const colX = [MARGIN, MARGIN + colWidth + 8];
+
+      packingGroups.forEach(group => {
+        if (y > 255 && col === 0) {
+          col = 1;
+          y = 30;
+        } else if (y > 255 && col === 1) {
+          doc.addPage();
+          col = 0;
+          y = 30;
+        }
+
+        const x = colX[col];
+
+        doc.setFillColor(0, 106, 78);
+        doc.setTextColor(255, 255, 255);
+        doc.roundedRect(x, y, colWidth, 9, 1.5, 1.5, 'F');
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text(group.group, x + 3, y + 6);
+        y += 12;
+
+        group.items.forEach(item => {
+          if (y > 262) {
+            if (col === 0) { col = 1; y = 30; }
+            else { doc.addPage(); col = 0; y = 30; }
+          }
+          // Checkbox square
+          doc.setDrawColor(180, 180, 180);
+          doc.setFillColor(255, 255, 255);
+          doc.rect(colX[col] + 1, y - 4, 4, 4, 'FD');
+          doc.setTextColor(40, 40, 40);
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'normal');
+          doc.text(item, colX[col] + 7, y - 1);
+          y += 7;
+        });
+        y += 4; // group spacing
+      });
+
+      // Footer
+      doc.setFontSize(8);
+      doc.setTextColor(160, 160, 160);
+      doc.text('Musafir — Packing List', W / 2, 290, { align: 'center' });
+    }
+
+    // ── Save the PDF ──────────────────────────────────────────────────
+    const filename = (title.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-') || 'Musafir-Trip') + '.pdf';
+    doc.save(filename);
+    showToast(t('PDF downloaded!', 'PDF ڈاؤن لوڈ ہو گئی!'));
+
+  } catch (err) {
+    console.error('PDF generation failed:', err);
+    showToast(t('PDF generation failed. Check console.', 'PDF بنانے میں ناکامی۔'));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = t('Download PDF', 'PDF ڈاؤن لوڈ کریں');
+    }
+  }
+}
+
+// ── Saved Trips Modal ─────────────────────────────────────────────────────────
+
+function openSavedTripsModal() {
+  const modal = document.getElementById('saved-trips-modal');
+  if (!modal) return;
+  renderSavedTripsList();
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeSavedTripsModal() {
+  const modal = document.getElementById('saved-trips-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function renderSavedTripsList() {
+  const container = document.getElementById('saved-trips-list');
+  if (!container) return;
+
+  if (state.savedTrips.length === 0) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🗺️</div>
+      <p>${esc(t('No saved trips yet', 'ابھی تک کوئی محفوظ سفر نہیں'))}</p>
+    </div>`;
+    return;
+  }
+
+  container.innerHTML = state.savedTrips.map(trip => `
+    <div class="saved-trip-card" data-id="${esc(trip.id)}">
+      <div class="saved-trip-card__info">
+        <strong>${esc(trip.name)}</strong>
+        <span>${trip.destinations.map(id => DESTINATIONS.find(d => d.id === id)?.emoji || '📍').join(' ')}</span>
+        <small>${esc(formatDate(trip.startDate) || '')} ${trip.endDate ? '– ' + esc(formatDate(trip.endDate)) : ''}</small>
+        <small>${trip.travelers} ${esc(t('travelers', 'مسافرین'))} · ${esc(formatPKR(trip.budget))}</small>
+      </div>
+      <div class="saved-trip-card__actions">
+        <button class="btn btn-outline btn-sm view-trip-btn" data-id="${esc(trip.id)}">${esc(t('View', 'دیکھیں'))}</button>
+        <button class="btn btn-danger btn-sm delete-trip-btn" data-id="${esc(trip.id)}" aria-label="${esc(t('Delete trip', 'سفر حذف کریں'))}">🗑️</button>
+      </div>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.view-trip-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const trip = state.savedTrips.find(t => t.id === btn.dataset.id);
+      if (trip) {
+        state.generatedItinerary = trip;
+        state.currentDay = 1;
+        closeSavedTripsModal();
+        showScreen('itinerary');
+      }
+    });
+  });
+
+  container.querySelectorAll('.delete-trip-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (window.confirm(t('Delete this trip?', 'یہ سفر حذف کریں؟'))) {
+        deleteSavedTrip(btn.dataset.id);
+        renderSavedTripsList();
+        showToast(t('Trip deleted', 'سفر حذف ہو گیا'));
+      }
+    });
+  });
+}
+
+// ── Settings Modal ────────────────────────────────────────────────────────────
+
+function openSettingsModal() {
+  const modal = document.getElementById('settings-modal');
+  if (!modal) return;
+
+  const keyInput = document.getElementById('settings-api-key');
+  if (keyInput) keyInput.value = state.apiKey;
+
+  // Reflect current language
+  const langEn = document.getElementById('lang-en');
+  const langUr = document.getElementById('lang-ur');
+  if (langEn) langEn.classList.toggle('active', state.language === 'en');
+  if (langUr) langUr.classList.toggle('active', state.language === 'ur');
+
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeSettingsModal() {
+  const modal = document.getElementById('settings-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function saveApiKey() {
+  const keyInput = document.getElementById('settings-api-key');
+  if (keyInput) {
+    state.apiKey = keyInput.value.trim();
+    saveSettings();
+    showToast(state.apiKey ? t('API key saved!', 'API کلید محفوظ!') : t('API key cleared', 'API کلید صاف'));
+  }
+}
+
+function clearAllTrips() {
+  if (!window.confirm(t('Clear all saved trips? This cannot be undone.', 'تمام محفوظ سفر صاف کریں؟ یہ واپس نہیں ہو سکتا۔'))) return;
+  state.savedTrips = [];
+  try { localStorage.removeItem('musafir_trips'); } catch { /* ignore */ }
+  showToast(t('All trips cleared', 'تمام سفر صاف ہو گئے'));
+}
+
+function initSettingsModal() {
+  const saveKeyBtn   = document.getElementById('save-api-key-btn');
+  const clearBtn     = document.getElementById('clear-trips-btn');
+  const closeBtn     = document.getElementById('close-settings-btn');
+  const overlay      = document.getElementById('settings-modal');
+  const langEnBtn    = document.getElementById('lang-en');
+  const langUrBtn    = document.getElementById('lang-ur');
+
+  if (saveKeyBtn)   saveKeyBtn.addEventListener('click', saveApiKey);
+  if (clearBtn)     clearBtn.addEventListener('click', clearAllTrips);
+  if (closeBtn)     closeBtn.addEventListener('click', closeSettingsModal);
+  if (overlay)      overlay.addEventListener('click', e => { if (e.target === overlay) closeSettingsModal(); });
+  if (langEnBtn)    langEnBtn.addEventListener('click', () => { setLanguage('en'); langEnBtn.classList.add('active'); document.getElementById('lang-ur')?.classList.remove('active'); });
+  if (langUrBtn)    langUrBtn.addEventListener('click', () => { setLanguage('ur'); langUrBtn.classList.add('active'); document.getElementById('lang-en')?.classList.remove('active'); });
+
+  // Settings button(s) in various headers
+  document.querySelectorAll('[data-action="open-settings"]').forEach(btn => {
+    btn.addEventListener('click', openSettingsModal);
+  });
+}
+
+// ── Global Event Bindings ─────────────────────────────────────────────────────
+
+function bindGlobalEvents() {
+  // Install banner
+  const installBtn = document.getElementById('install-app-btn');
+  if (installBtn) installBtn.addEventListener('click', handleInstallClick);
+  const dismissInstall = document.getElementById('dismiss-install-btn');
+  if (dismissInstall) dismissInstall.addEventListener('click', hideInstallBanner);
+
+  // Dest modal backdrop
+  const destModal = document.getElementById('dest-modal');
+  if (destModal) destModal.addEventListener('click', e => { if (e.target === destModal) closeDestModal(); });
+
+  // Saved trips
+  document.querySelectorAll('[data-action="open-saved-trips"]').forEach(btn => {
+    btn.addEventListener('click', openSavedTripsModal);
+  });
+  const closeSavedBtn = document.getElementById('close-saved-trips-btn');
+  if (closeSavedBtn) closeSavedBtn.addEventListener('click', closeSavedTripsModal);
+  const savedModal = document.getElementById('saved-trips-modal');
+  if (savedModal) savedModal.addEventListener('click', e => { if (e.target === savedModal) closeSavedTripsModal(); });
+
+  // Itinerary chat button
+  document.querySelectorAll('[data-action="open-chat"]').forEach(btn => {
+    btn.addEventListener('click', openChatModal);
+  });
+  const closeChatBtn = document.getElementById('close-chat-btn');
+  if (closeChatBtn) closeChatBtn.addEventListener('click', closeChatModal);
+  const chatModal = document.getElementById('chat-modal');
+  if (chatModal) chatModal.addEventListener('click', e => { if (e.target === chatModal) closeChatModal(); });
+
+  // Plan screen quick-start button (from itinerary header)
+  document.querySelectorAll('[data-action="new-trip"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.wizardStep = 1;
+      state.tripData = {
+        destinations: [], startDate: '', endDate: '',
+        travelers: 2, budget: 150000, interests: [], name: ''
+      };
+      showScreen('plan');
+    });
+  });
+
+  // Export from itinerary
+  document.querySelectorAll('[data-action="export"]').forEach(btn => {
+    btn.addEventListener('click', () => showScreen('export'));
+  });
+
+  // Keyboard: close modals with Escape
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeDestModal();
+      closeSavedTripsModal();
+      closeChatModal();
+      closeSettingsModal();
+    }
+  });
+}
+
+// ── init ──────────────────────────────────────────────────────────────────────
+
+function init() {
+  // Load persisted state
+  loadSettings();
+  loadSavedTrips();
+
+  // Apply language immediately
+  if (state.language === 'ur') {
+    document.body.classList.add('urdu-mode');
+    document.documentElement.lang = 'ur';
+    document.documentElement.dir = 'rtl';
+  }
+
+  // Register service worker
+  registerServiceWorker();
+
+  // Wire up all static event bindings
+  initBottomNav();
+  initInstallBanner();
+  initSettingsModal();
+  bindGlobalEvents();
+  initPlanButtons();
+  initChatScreen();
+
+  // Show initial screen
+  showScreen('home');
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+  </script>
+</body>
+</html>
