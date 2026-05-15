@@ -1966,8 +1966,10 @@ function init() {
   initPlanButtons();
   initChatScreen();
 
-  // Show initial screen
+  // Show initial screen and hide loading overlay
   showScreen('home');
+  const loadingEl = document.getElementById('loading-overlay');
+  if (loadingEl) loadingEl.classList.remove('active');
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
