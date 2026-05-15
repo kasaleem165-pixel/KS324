@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#006A4E">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Musafir">
+  <meta name="description" content="AI-powered Pakistan travel planner with offline maps and PDF export">
+  <title>Musafir — Pakistan Travel Planner</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="loading-overlay active">
+    <div class="spinner"></div>
+    <div class="loading-text" data-en="Loading Musafir..." data-ur="مسافر لوڈ ہو رہا ہے...">Loading Musafir...</div>
+  </div>
+
+  <!-- PWA Install Banner -->
+  <div id="install-banner" class="install-banner hidden">
+    <span>📱 Install Musafir on your home screen</span>
+    <button id="install-btn" class="btn btn-teal" style="padding:6px 12px;font-size:12px;">Install</button>
+    <button id="install-dismiss" class="btn" style="padding:6px 10px;font-size:12px;">✕</button>
+  </div>
+
+  <!-- ===================== SCREEN 1: Home ===================== -->
+  <div id="screen-home" class="screen active">
+
+    <!-- App Header -->
+    <div class="app-header">
+      <div>
+        <div style="font-size:20px;font-weight:800;letter-spacing:-0.5px;">Musafir <span style="font-family:serif;font-size:14px;">مسافر</span></div>
+        <div class="header-subtitle" data-en="Pakistan Travel Planner" data-ur="پاکستان سفر منصوبہ ساز">Pakistan Travel Planner</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div class="lang-toggle">
+          <button class="lang-btn active" id="lang-en" onclick="setLanguage('en')">EN</button>
+          <button class="lang-btn" id="lang-ur" onclick="setLanguage('ur')">اردو</button>
+        </div>
+        <button class="icon-btn" onclick="showSettings()" title="Settings">⚙️</button>
+      </div>
+    </div>
+
+    <!-- Hero — Attabad Lake CSS art -->
+    <div class="hero">
+      <svg class="hero-mountains" viewBox="0 0 400 80" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="0,80 40,20 80,50 130,10 180,40 230,5 280,35 320,15 360,45 400,20 400,80" fill="#2F4F4F" opacity="0.9"/>
+        <polygon points="0,80 30,35 70,55 100,25 150,50 200,20 250,45 300,30 350,55 400,35 400,80" fill="#1a3a2e" opacity="0.7"/>
+      </svg>
+      <div class="hero-lake"></div>
+      <div class="hero-content">
+        <input type="text" class="hero-search" id="hero-search"
+          data-en-placeholder="Search destinations in Pakistan..."
+          data-ur-placeholder="پاکستان میں منزل تلاش کریں..."
+          placeholder="Search destinations in Pakistan..."
+          oninput="filterBySearch(this.value)">
+      </div>
+      <div class="hero-badge">
+        <span>🇵🇰</span>
+        <span data-en="Explore Pakistan" data-ur="پاکستان دریافت کریں">Explore Pakistan</span>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-number">89</div>
+        <div class="stat-label" data-en="Destinations" data-ur="مقامات">Destinations</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">50K+</div>
+        <div class="stat-label" data-en="Travelers" data-ur="مسافر">Travelers</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">120+</div>
+        <div class="stat-label" data-en="Itineraries" data-ur="سفرنامے">Itineraries</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">4.8★</div>
+        <div class="stat-label" data-en="Rating" data-ur="درجہ">Rating</div>
+      </div>
+    </div>
+
+    <!-- Category Filter Chips -->
+    <div class="section-header">
+      <span class="section-title" data-en="Explore by Category" data-ur="زمرے سے دریافت کریں">Explore by Category</span>
+    </div>
+    <div class="category-row" id="category-chips">
+      <!-- Rendered by JS -->
+    </div>
+
+    <!-- Transport Row -->
+    <div class="section-header">
+      <span class="section-title" data-en="Get Around Pakistan" data-ur="پاکستان میں سفر">Get Around Pakistan</span>
+    </div>
+    <div class="transport-row" id="transport-row">
+      <!-- Rendered by JS -->
+    </div>
+
+    <!-- Featured Destinations -->
+    <div class="section-header">
+      <span class="section-title" data-en="Destinations" data-ur="مقامات">Destinations</span>
+      <span class="see-all" onclick="showAllDestinations()" data-en="See All" data-ur="سب دیکھیں">See All</span>
+    </div>
+    <div class="destinations-grid" id="destinations-grid">
+      <!-- Rendered by JS -->
+    </div>
+
+    <!-- CTA -->
+    <div style="padding:16px;">
+      <button class="btn btn-primary" style="width:100%;" onclick="showScreen('plan')" data-en="✨ Plan My Trip" data-ur="✨ میرا سفر منصوبہ بنائیں">✨ Plan My Trip</button>
+    </div>
+
+    <!-- Payment Badges -->
+    <div class="payment-badges">
+      <span class="payment-badge badge-jazz">JazzCash</span>
+      <span class="payment-badge badge-easy">EasyPaisa</span>
+      <span class="payment-badge badge-bill">1-Bill</span>
+    </div>
+
+  </div><!-- /screen-home -->
+
+  <!-- ===================== SCREEN 2: Plan Trip ===================== -->
+  <div id="screen-plan" class="screen">
+
+    <!-- Header -->
+    <div class="app-header">
+      <button class="icon-btn" onclick="showScreen('home')" style="color:white;">← Back</button>
+      <div data-en="Plan Your Trip" data-ur="اپنا سفر منصوبہ بنائیں" style="font-weight:700;font-size:16px;">Plan Your Trip</div>
+      <div style="width:40px;"></div>
+    </div>
+
+    <!-- Wizard Step Indicators -->
+    <div class="wizard-steps">
+      <div class="wizard-step active" id="ws-1"></div>
+      <div class="wizard-step" id="ws-2"></div>
+      <div class="wizard-step" id="ws-3"></div>
+      <div class="wizard-step" id="ws-4"></div>
+    </div>
+    <div class="wizard-step-labels" style="display:flex;padding:0 16px;justify-content:space-between;font-size:10px;color:var(--text-light);">
+      <span data-en="Destination" data-ur="منزل">Destination</span>
+      <span data-en="Dates" data-ur="تاریخیں">Dates</span>
+      <span data-en="Interests" data-ur="دلچسپیاں">Interests</span>
+      <span data-en="Review" data-ur="جائزہ">Review</span>
+    </div>
+
+    <!-- Step 1 — Destination -->
+    <div class="wizard-pane active" id="wp-1">
+      <div class="wizard-title" data-en="Where to?" data-ur="کہاں جانا ہے؟">Where to?</div>
+      <div class="wizard-label" data-en="Select your destinations (multiple allowed)" data-ur="منزلیں منتخب کریں">Select your destinations (multiple allowed)</div>
+      <div id="dest-filter-hint" style="font-size:12px;color:var(--teal);margin-bottom:8px;"></div>
+      <div class="chips-grid" id="dest-chips">
+        <!-- Rendered by JS based on selected categories -->
+      </div>
+    </div>
+
+    <!-- Step 2 — Dates -->
+    <div class="wizard-pane" id="wp-2">
+      <div class="wizard-title" data-en="When &amp; Who?" data-ur="کب اور کون؟">When &amp; Who?</div>
+      <div class="form-group">
+        <label class="form-label" data-en="Start Date" data-ur="شروع تاریخ">Start Date</label>
+        <input type="date" class="form-input" id="trip-start" onchange="state.tripData.startDate=this.value">
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-en="End Date" data-ur="ختم تاریخ">End Date</label>
+        <input type="date" class="form-input" id="trip-end" onchange="state.tripData.endDate=this.value">
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-en="Number of Travelers" data-ur="مسافروں کی تعداد">Number of Travelers</label>
+        <div class="stepper">
+          <button class="stepper-btn" onclick="changeTravelers(-1)">−</button>
+          <span id="traveler-count" style="font-size:20px;font-weight:700;min-width:40px;text-align:center;">2</span>
+          <button class="stepper-btn" onclick="changeTravelers(1)">+</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-en="Budget (PKR)" data-ur="بجٹ (روپے)">Budget (PKR)</label>
+        <input type="range" id="budget-slider" min="50000" max="500000" step="10000" value="150000" oninput="updateBudget(this.value)" style="width:100%;">
+        <div id="budget-display" style="font-size:16px;font-weight:700;color:var(--teal);margin-top:4px;">PKR 1,50,000</div>
+      </div>
+    </div>
+
+    <!-- Step 3 — Interests -->
+    <div class="wizard-pane" id="wp-3">
+      <div class="wizard-title" data-en="What's your vibe?" data-ur="آپ کی دلچسپی؟">What's your vibe?</div>
+      <div class="wizard-label" data-en="Pick your travel interests" data-ur="اپنی دلچسپیاں چنیں">Pick your travel interests</div>
+      <div class="chips-grid" id="interest-chips">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+
+    <!-- Step 4 — Review -->
+    <div class="wizard-pane" id="wp-4">
+      <div class="wizard-title" data-en="Your Trip" data-ur="آپ کا سفر">Your Trip</div>
+      <div id="trip-summary" class="trip-summary-card">
+        <!-- Rendered by JS -->
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-en="Trip Name (optional)" data-ur="سفر کا نام">Trip Name (optional)</label>
+        <input type="text" class="form-input" id="trip-name" placeholder="e.g. Hunza Adventure 2025" oninput="state.tripData.name=this.value">
+      </div>
+    </div>
+
+    <!-- Wizard Footer -->
+    <div class="wizard-footer">
+      <button class="btn btn-secondary" id="btn-back" onclick="prevStep()" style="display:none;" data-en="Back" data-ur="واپس">Back</button>
+      <button class="btn btn-primary" id="btn-next" onclick="nextStep()" data-en="Next →" data-ur="آگے →">Next →</button>
+    </div>
+
+  </div><!-- /screen-plan -->
+
+  <!-- ===================== SCREEN 3: Itinerary ===================== -->
+  <div id="screen-itinerary" class="screen">
+
+    <!-- Header -->
+    <div class="app-header">
+      <button class="icon-btn" onclick="showScreen('home')" style="color:white;">← Back</button>
+      <div style="text-align:center;">
+        <div style="font-weight:700;font-size:15px;" data-en="My Itinerary" data-ur="میرا سفرنامہ">My Itinerary</div>
+        <div style="font-size:11px;opacity:0.8;" id="itin-subtitle">Hunza Valley · 7 Days</div>
+      </div>
+      <button class="icon-btn" onclick="showChatModal()" style="color:white;" title="AI Assistant">🤖</button>
+    </div>
+
+    <!-- Trip Meta Chips -->
+    <div id="trip-meta-chips" style="display:flex;gap:6px;padding:10px 16px;overflow-x:auto;scrollbar-width:none;">
+      <!-- Rendered by JS -->
+    </div>
+
+    <!-- Day Pills -->
+    <div class="itinerary-days" id="day-pills">
+      <!-- Rendered by JS -->
+    </div>
+
+    <!-- Day Content Area -->
+    <div class="day-content" id="day-content">
+      <!-- Rendered by JS -->
+    </div>
+
+    <!-- Floating Export Button -->
+    <button class="fab" onclick="showScreen('export')" title="Export PDF">
+      📄
+      <span style="font-size:10px;display:block;">PDF</span>
+    </button>
+
+  </div><!-- /screen-itinerary -->
+
+  <!-- ===================== SCREEN 4: Survival Mode ===================== -->
+  <div id="screen-survival" class="screen survival-screen">
+
+    <!-- Header -->
+    <div class="app-header survival-header">
+      <button class="icon-btn" onclick="showScreen('home')" style="color:rgba(255,255,255,0.7);">← Back</button>
+      <div style="text-align:center;">
+        <div style="font-weight:700;font-size:15px;color:white;" data-en="Survival Mode" data-ur="بقا موڈ">Survival Mode</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.6);">Fairy Meadows Trail · <span style="color:#43A047;font-weight:700;">OFFLINE READY</span></div>
+      </div>
+      <div id="signal-indicator" style="display:flex;gap:3px;align-items:flex-end;height:20px;">
+        <!-- JS renders signal bars -->
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div id="survival-map-container">
+      <div id="survival-map"></div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="survival-info" id="survival-resources">
+      <!-- Rendered by JS -->
+    </div>
+
+    <!-- SOS Button -->
+    <button class="sos-button" onclick="triggerSOS()">
+      🆘 EMERGENCY SOS — Call 1122
+    </button>
+
+    <!-- Elevation Profile -->
+    <div style="padding:12px 16px;background:var(--dark-2);">
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:6px;" data-en="Elevation Profile" data-ur="بلندی پروفائل">Elevation Profile</div>
+      <svg viewBox="0 0 300 60" width="100%" style="display:block;">
+        <defs>
+          <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#006A4E" stop-opacity="0.8"/>
+            <stop offset="100%" stop-color="#006A4E" stop-opacity="0.1"/>
+          </linearGradient>
+        </defs>
+        <path d="M0,55 L30,50 L70,42 L110,30 L150,20 L190,12 L230,8 L270,5 L300,3 L300,60 L0,60 Z" fill="url(#elevGrad)"/>
+        <polyline points="0,55 30,50 70,42 110,30 150,20 190,12 230,8 270,5 300,3" fill="none" stroke="#00875A" stroke-width="2"/>
+        <text x="0" y="58" font-size="8" fill="rgba(255,255,255,0.4)">2000m</text>
+        <text x="260" y="10" font-size="8" fill="rgba(255,255,255,0.4)">3300m</text>
+      </svg>
+    </div>
+
+  </div><!-- /screen-survival -->
+
+  <!-- ===================== SCREEN 5: Export PDF ===================== -->
+  <div id="screen-export" class="screen export-screen">
+
+    <!-- Header -->
+    <div class="app-header">
+      <button class="icon-btn" onclick="showScreen('itinerary')" style="color:white;">← Back</button>
+      <div style="font-weight:700;" data-en="Export PDF" data-ur="پی ڈی ایف برآمد">Export PDF</div>
+      <div style="width:40px;"></div>
+    </div>
+
+    <div style="overflow-y:auto;flex:1;">
+
+      <!-- Options -->
+      <div class="export-options">
+        <div class="form-group">
+          <label class="form-label" data-en="Trip Title" data-ur="سفر کا عنوان">Trip Title</label>
+          <input type="text" class="form-input" id="pdf-title" value="Hunza Valley 7-Day Adventure" oninput="updatePDFPreview()">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-en="Traveler Name" data-ur="مسافر کا نام">Traveler Name</label>
+          <input type="text" class="form-input" id="pdf-traveler" placeholder="Your name" oninput="updatePDFPreview()">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-en="Layout" data-ur="ترتیب">Layout</label>
+          <div style="display:flex;gap:8px;">
+            <label style="flex:1;"><input type="radio" name="pdf-layout" value="classic" checked onchange="updatePDFPreview()"> <span data-en="Classic" data-ur="کلاسک">Classic</span></label>
+            <label style="flex:1;"><input type="radio" name="pdf-layout" value="modern" onchange="updatePDFPreview()"> <span data-en="Modern" data-ur="جدید">Modern</span></label>
+            <label style="flex:1;"><input type="radio" name="pdf-layout" value="compact" onchange="updatePDFPreview()"> <span data-en="Compact" data-ur="مختصر">Compact</span></label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-en="Include Sections" data-ur="شامل حصے">Include Sections</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <label><input type="checkbox" id="sec-cover" checked onchange="updatePDFPreview()"> <span data-en="Cover Page" data-ur="سرورق">Cover Page</span></label>
+            <label><input type="checkbox" id="sec-itinerary" checked onchange="updatePDFPreview()"> <span data-en="Itinerary" data-ur="سفرنامہ">Itinerary</span></label>
+            <label><input type="checkbox" id="sec-emergency" checked onchange="updatePDFPreview()"> <span data-en="Emergency Contacts" data-ur="ہنگامی رابطے">Emergency Contacts</span></label>
+            <label><input type="checkbox" id="sec-phrases" checked onchange="updatePDFPreview()"> <span data-en="Urdu Phrases" data-ur="اردو جملے">Urdu Phrases</span></label>
+            <label><input type="checkbox" id="sec-packing" checked onchange="updatePDFPreview()"> <span data-en="Packing List" data-ur="سامان کی فہرست">Packing List</span></label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-en="Language" data-ur="زبان">Language</label>
+          <div style="display:flex;gap:12px;">
+            <label><input type="radio" name="pdf-lang" value="en" checked onchange="updatePDFPreview()"> English</label>
+            <label><input type="radio" name="pdf-lang" value="ur" onchange="updatePDFPreview()"> اردو</label>
+            <label><input type="radio" name="pdf-lang" value="bi" onchange="updatePDFPreview()"> <span data-en="Bilingual" data-ur="دو زبانی">Bilingual</span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Preview -->
+      <div class="export-preview-container">
+        <div style="font-size:11px;color:var(--text-light);margin-bottom:8px;text-align:center;" data-en="Preview" data-ur="پیش نظارہ">Preview</div>
+        <div class="pdf-preview" id="pdf-preview">
+          <div class="pdf-preview-header">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+              <span style="font-size:24px;">🧭</span>
+              <div>
+                <div style="font-size:20px;font-weight:800;letter-spacing:-0.5px;">MUSAFIR <span style="font-size:12px;opacity:0.8;">مسافر</span></div>
+                <div style="font-size:11px;opacity:0.7;">Pakistan Travel Planner 🇵🇰</div>
+              </div>
+            </div>
+            <div id="preview-title" style="font-size:16px;font-weight:700;">Hunza Valley 7-Day Adventure</div>
+            <div id="preview-meta" style="font-size:12px;opacity:0.8;margin-top:4px;">2 Travelers · PKR 1,50,000</div>
+          </div>
+          <div class="pdf-preview-body" id="preview-body">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="padding:16px;display:flex;gap:8px;">
+        <button class="btn btn-primary" style="flex:1;" onclick="downloadPDF()" data-en="⬇️ Download PDF" data-ur="⬇️ پی ڈی ایف ڈاؤن لوڈ کریں">⬇️ Download PDF</button>
+        <button class="btn btn-outline" onclick="shareTrip()" data-en="↗ Share" data-ur="↗ شیئر">↗ Share</button>
+      </div>
+
+    </div><!-- /overflow-y scroll -->
+
+  </div><!-- /screen-export -->
+
+  <!-- ===================== AI Chat Modal ===================== -->
+  <div class="modal-overlay" id="chat-modal">
+    <div class="modal-sheet" style="max-height:85dvh;display:flex;flex-direction:column;padding:0;border-radius:20px 20px 0 0;">
+      <div style="padding:16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:700;" data-en="AI Travel Assistant" data-ur="اے آئی سفری معاون">AI Travel Assistant</div>
+          <div style="font-size:12px;color:var(--text-light);">Powered by Claude · مسافر</div>
+        </div>
+        <button onclick="hideChatModal()" style="background:none;border:none;font-size:20px;cursor:pointer;">✕</button>
+      </div>
+      <div class="chat-container">
+        <div class="chat-messages" id="chat-messages">
+          <div class="chat-bubble ai">
+            <div class="bubble-header">🤖 Musafir AI</div>
+            <span data-en="Assalam o Alaikum! I'm your Pakistan travel guide. Ask me anything about destinations, food, safety, culture, or routes!" data-ur="السلام علیکم! میں آپ کا پاکستان سفر گائیڈ ہوں۔">Assalam o Alaikum! I'm your Pakistan travel guide. Ask me anything about destinations, food, safety, culture, or routes!</span>
+          </div>
+        </div>
+        <div class="chat-input-bar">
+          <textarea class="chat-input" id="chat-input" rows="1"
+            data-en-placeholder="Ask about Pakistan travel..."
+            data-ur-placeholder="پاکستان سفر کے بارے میں پوچھیں..."
+            placeholder="Ask about Pakistan travel..."
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+          <button class="chat-send" onclick="sendMessage()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== Settings Modal ===================== -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 style="font-size:18px;font-weight:800;margin-bottom:20px;" data-en="Settings" data-ur="ترتیبات">Settings</h2>
+
+      <div class="form-group">
+        <label class="form-label" data-en="Claude API Key (for AI features)" data-ur="کلاڈ API کلید">Claude API Key (for AI features)</label>
+        <div style="display:flex;gap:8px;">
+          <input type="password" class="form-input" id="api-key-input" placeholder="sk-ant-..." style="flex:1;">
+          <button class="btn btn-teal" onclick="saveApiKey()" data-en="Save" data-ur="محفوظ">Save</button>
+        </div>
+        <div style="font-size:11px;color:var(--text-light);margin-top:4px;" data-en="Your key is stored locally on your device only." data-ur="آپ کی کلید صرف آپ کے آلے پر محفوظ ہے۔">Your key is stored locally on your device only.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" data-en="Language" data-ur="زبان">Language</label>
+        <div class="lang-toggle" style="width:fit-content;">
+          <button class="lang-btn active" id="settings-lang-en" onclick="setLanguage('en')">English</button>
+          <button class="lang-btn" id="settings-lang-ur" onclick="setLanguage('ur')">اردو</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" data-en="Saved Trips" data-ur="محفوظ سفر">Saved Trips</label>
+        <div id="saved-trips-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;">
+          <!-- Rendered by JS -->
+        </div>
+        <button class="btn btn-outline" style="width:100%;font-size:13px;" onclick="clearSavedTrips()" data-en="Clear All Saved Trips" data-ur="تمام محفوظ سفر حذف کریں">Clear All Saved Trips</button>
+      </div>
+
+      <div style="margin-top:8px;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:var(--text-light);text-align:center;">
+        <strong>Musafir مسافر</strong> v1.0.0<br>
+        Pakistan Travel Planner · Made with ❤️ for Pakistan
+      </div>
+
+      <button class="btn btn-secondary" style="width:100%;margin-top:16px;" onclick="hideSettings()" data-en="Close" data-ur="بند کریں">Close</button>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(console.error);
+    }
+  </script>
+  <script src="app.js"></script>
+
+</body>
+</html>
