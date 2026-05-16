@@ -20,9 +20,11 @@ nav button:hover,nav button.active{color:#fff;background:rgba(255,255,255,.12)}
 .card-title{font-size:1rem;font-weight:700;color:#1a3a5c;margin-bottom:14px}
 
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
-.stat{background:#fff;border-radius:10px;box-shadow:0 1px 5px rgba(0,0,0,.09);padding:14px 16px;text-align:center}
+.stat{background:#fff;border-radius:10px;box-shadow:0 1px 5px rgba(0,0,0,.09);padding:14px 16px;text-align:center;cursor:pointer;transition:box-shadow .15s,transform .1s}
+.stat:hover{box-shadow:0 4px 14px rgba(0,0,0,.14);transform:translateY(-2px)}
 .stat .n{font-size:1.5rem;font-weight:700;color:#1a3a5c}
 .stat .l{font-size:.75rem;color:#777;margin-top:3px}
+.stat .hint-click{font-size:.68rem;color:#b0b8c4;margin-top:4px}
 .stat.g .n{color:#059669}.stat.r .n{color:#dc2626}.stat.a .n{color:#d97706}
 
 .tbl-wrap{overflow-x:auto}
@@ -314,6 +316,14 @@ input[readonly]{background:#f8fafc}
         <input type="file" accept=".json" style="display:none" onchange="importData(event)">
       </label>
     </div>
+  </div>
+</div>
+
+<!-- ══════════ DASHBOARD DETAIL MODAL ══════════ -->
+<div class="overlay" id="dashdetail-overlay">
+  <div class="modal" style="max-width:820px">
+    <button class="modal-close" onclick="closeModal('dashdetail-overlay')">&#10005;</button>
+    <div id="dashdetail-content"></div>
   </div>
 </div>
 
@@ -676,13 +686,14 @@ function renderDashboard(){
   const col=DB.payments.reduce((a,p)=>a+(p.amount||0),0);
   const dis=DB.payments.reduce((a,p)=>a+(p.discount||0),0);
   const pend=rev-col-dis;
-  document.getElementById('dash-stats').innerHTML=`
-    <div class="stat"><div class="n">${ta}</div><div class="l">Total Animals</div></div>
-    <div class="stat g"><div class="n">${av}</div><div class="l">Available</div></div>
-    <div class="stat r"><div class="n">${sold}</div><div class="l">Sold</div></div>
-    <div class="stat"><div class="n">${Rs(rev)}</div><div class="l">Total Revenue</div></div>
-    <div class="stat g"><div class="n">${Rs(col)}</div><div class="l">Collected</div></div>
-    <div class="stat a"><div class="n">${Rs(pend)}</div><div class="l">Pending</div></div>`;
+  function card(cls,n,label,key){return `<div class="stat ${cls}" onclick="showDashDetail('${key}')"><div class="n">${n}</div><div class="l">${label}</div><div class="hint-click">tap for details</div></div>`;}
+  document.getElementById('dash-stats').innerHTML=
+    card('',''+ta,'Total Animals','all')+
+    card('g',''+av,'Available','available')+
+    card('r',''+sold,'Sold','sold')+
+    card('',Rs(rev),'Total Revenue','revenue')+
+    card('g',Rs(col),'Collected','collected')+
+    card('a',Rs(pend),'Pending Balance','pending');
   const recent=[...DB.sales].reverse().slice(0,6);
   const tb=document.getElementById('dash-body');
   if(!recent.length){tb.innerHTML=`<tr><td colspan="6" class="empty">No sales yet. Click "+ New Sale".</td></tr>`;return;}
@@ -692,6 +703,116 @@ function renderDashboard(){
     <td><strong>${Rs(s.amount)}</strong></td>
     <td><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Receipt</button></td>
   </tr>`).join('');
+}
+
+function showDashDetail(key){
+  const np=DB.settings.num_persons||7;
+  let html='';
+  if(key==='all'||key==='available'||key==='sold'){
+    const list=key==='all'?DB.animals:DB.animals.filter(a=>a.status===key);
+    const title={all:'All Animals',available:'Available Animals',sold:'Sold Animals'}[key];
+    html=`<h2 style="color:#1a3a5c;margin-bottom:14px">${title} <span style="font-size:.85rem;font-weight:400;color:#777">(${list.length})</span></h2>`;
+    if(!list.length){html+='<p style="color:#aaa;font-style:italic">No animals found.</p>';}
+    else{
+      html+=`<div class="tbl-wrap"><table><thead><tr>
+        <th>Code</th><th>Age</th><th>Weight (kg)</th><th>Sale Price</th><th>Admin</th><th>Total Cost</th><th>Status</th><th>Customer</th>${key==='sold'?'<th>Sale</th>':''}
+      </tr></thead><tbody>`;
+      list.forEach(a=>{
+        const f=calcFields(a.weight_final||0,a.admin_charges||0);
+        const sale=DB.sales.find(s=>s.animal_code===a.code);
+        const custId=a.assigned_customer||(sale?sale.customer_id:null);
+        html+=`<tr>
+          <td><strong>${a.code}</strong></td><td>${a.age_type||'-'}</td>
+          <td>${a.weight_final||'-'} kg</td>
+          <td>${a.weight_final?Rs(f.salePrice):'-'}</td>
+          <td>${a.admin_charges!=null?Rs(a.admin_charges):'-'}</td>
+          <td>${a.weight_final?Rs(f.totalCost):'-'}</td>
+          <td><span class="badge ${a.status}">${a.status==='available'?'Available':'Sold'}</span></td>
+          <td>${custId?cName(custId):'-'}</td>
+          ${key==='sold'&&sale?`<td><button class="btn btn-primary btn-sm" onclick="showReceipt('${sale.receipt_no}')">Receipt</button></td>`:(key==='sold'?'<td>-</td>':'')}
+        </tr>`;
+      });
+      html+='</tbody></table></div>';
+    }
+  } else if(key==='revenue'){
+    const total=DB.sales.reduce((a,s)=>a+s.amount,0);
+    html=`<h2 style="color:#1a3a5c;margin-bottom:6px">Total Revenue</h2>
+      <p style="font-size:1.4rem;font-weight:700;color:#1a3a5c;margin-bottom:16px">${Rs(total)}</p>`;
+    if(!DB.sales.length){html+='<p style="color:#aaa;font-style:italic">No sales yet.</p>';}
+    else{
+      html+=`<div class="tbl-wrap"><table><thead><tr>
+        <th>Receipt</th><th>Date</th><th>Animal</th><th>Customer</th>
+        <th>Weight</th><th>Rate/kg</th><th>Sale Price</th><th>Admin</th><th>Total</th><th></th>
+      </tr></thead><tbody>`;
+      [...DB.sales].reverse().forEach(s=>{
+        const sp=s.weight_at_sale*s.rate_per_kg;
+        html+=`<tr>
+          <td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td>
+          <td><strong>${s.animal_code}</strong></td><td>${cName(s.customer_id)}</td>
+          <td>${s.weight_at_sale} kg</td><td>${fmtN(s.rate_per_kg)}</td>
+          <td>${Rs(sp)}</td><td>${Rs(s.admin_charges||0)}</td>
+          <td><strong>${Rs(s.amount)}</strong></td>
+          <td><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Receipt</button></td>
+        </tr>`;
+      });
+      html+=`</tbody></table></div>`;
+    }
+  } else if(key==='collected'){
+    const total=DB.payments.reduce((a,p)=>a+(p.amount||0),0);
+    const disc=DB.payments.reduce((a,p)=>a+(p.discount||0),0);
+    html=`<h2 style="color:#1a3a5c;margin-bottom:6px">Collected Payments</h2>
+      <div style="display:flex;gap:18px;margin-bottom:16px;flex-wrap:wrap">
+        <span style="font-size:1.1rem;font-weight:700;color:#059669">${Rs(total)} Received</span>
+        <span style="font-size:1.1rem;font-weight:700;color:#7c3aed">${Rs(disc)} Discount</span>
+      </div>`;
+    if(!DB.payments.length){html+='<p style="color:#aaa;font-style:italic">No payments yet.</p>';}
+    else{
+      html+=`<div class="tbl-wrap"><table><thead><tr>
+        <th>Receipt</th><th>Date</th><th>Customer</th><th>Method</th><th>Bank</th><th>Amount</th><th>Discount</th><th></th>
+      </tr></thead><tbody>`;
+      [...DB.payments].reverse().forEach(p=>{
+        html+=`<tr>
+          <td>${p.receipt_no||'-'}</td><td>${fmtD(p.pay_date)}</td>
+          <td><strong>${cName(p.customer_id)}</strong></td>
+          <td>${p.type||'Cash'}</td><td>${p.bank_name||'-'}</td>
+          <td style="color:#059669"><strong>${Rs(p.amount)}</strong></td>
+          <td style="color:#7c3aed">${p.discount?Rs(p.discount):'-'}</td>
+          <td><button class="btn btn-primary btn-sm" onclick="showPayReceipt('${p.receipt_no}')">Receipt</button></td>
+        </tr>`;
+      });
+      html+='</tbody></table></div>';
+    }
+  } else if(key==='pending'){
+    const pendingCusts=DB.customers.map(c=>{
+      const {ts,tp,td,balance}=custTotals(c.id);
+      return {c,ts,tp,td,balance};
+    }).filter(x=>x.balance>0).sort((a,b)=>b.balance-a.balance);
+    const totalPend=pendingCusts.reduce((a,x)=>a+x.balance,0);
+    html=`<h2 style="color:#1a3a5c;margin-bottom:6px">Pending Balances</h2>
+      <p style="font-size:1.4rem;font-weight:700;color:#d97706;margin-bottom:16px">${Rs(totalPend)} outstanding</p>`;
+    if(!pendingCusts.length){html+='<p style="color:#aaa;font-style:italic">No outstanding balances — all settled!</p>';}
+    else{
+      html+=`<div class="tbl-wrap"><table><thead><tr>
+        <th>Customer</th><th>Phone</th><th>Total Sales</th><th>Received</th><th>Discount</th><th>Balance Due</th><th></th>
+      </tr></thead><tbody>`;
+      pendingCusts.forEach(({c,ts,tp,td,balance})=>{
+        html+=`<tr>
+          <td><strong>${c.name}</strong></td><td>${c.phone||'-'}</td>
+          <td>${Rs(ts)}</td>
+          <td style="color:#059669">${Rs(tp)}</td>
+          <td style="color:#7c3aed">${Rs(td)}</td>
+          <td style="color:#d97706;font-weight:700">${Rs(balance)}</td>
+          <td style="white-space:nowrap">
+            <button class="btn btn-primary btn-sm" onclick="closeModal('dashdetail-overlay');showLedger(${c.id})">Ledger</button>
+            <button class="btn btn-success btn-sm" style="margin-left:4px" onclick="closeModal('dashdetail-overlay');openPayment(${c.id})">+ Pay</button>
+          </td>
+        </tr>`;
+      });
+      html+='</tbody></table></div>';
+    }
+  }
+  document.getElementById('dashdetail-content').innerHTML=html;
+  document.getElementById('dashdetail-overlay').classList.add('open');
 }
 
 // ══════════════════════════ ANIMALS ══════════════════════════
