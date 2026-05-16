@@ -196,6 +196,36 @@ input[readonly]{background:#f8fafc}
       <tbody id="animals-body"></tbody>
     </table></div>
   </div>
+  <!-- Available Stock Report -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px">
+      <div class="card-title" style="margin:0">Available Stock Report</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:.82rem;color:#555;font-weight:500">Sort by:</label>
+        <select id="stock-sort-col" onchange="renderStockReport()" style="font-size:.83rem;padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px">
+          <option value="code">Code</option>
+          <option value="purchase_date">Date</option>
+          <option value="age_type">Age / Type</option>
+          <option value="_w">Weight (kg)</option>
+          <option value="_sp">Sale Price</option>
+          <option value="admin_charges">Admin Charges</option>
+          <option value="_tc">Total Cost</option>
+          <option value="_bq">Beef Qty / Person</option>
+          <option value="_br">Beef Rate / Person</option>
+        </select>
+        <select id="stock-sort-dir" onchange="renderStockReport()" style="font-size:.83rem;padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px">
+          <option value="asc">▲ Ascending</option>
+          <option value="desc">▼ Descending</option>
+        </select>
+        <button class="btn btn-light btn-sm" onclick="window.print()">&#128438; Print</button>
+      </div>
+    </div>
+    <p style="font-size:.8rem;color:#888;margin-bottom:12px">Showing available animals only. Click any column header to sort.</p>
+    <div class="tbl-wrap"><table>
+      <thead id="stock-head"></thead>
+      <tbody id="stock-body"></tbody>
+    </table></div>
+  </div>
 </div>
 
 <!-- ══════════ CUSTOMERS ══════════ -->
@@ -508,8 +538,8 @@ input[readonly]{background:#f8fafc}
 const STORE='animal_sales_db';
 let DB={animals:[],customers:[],sales:[],payments:[],banks:[],settings:{rate_per_kg:780,admin_charges:30000,num_persons:7}};
 
-const SORT={animals:{col:'code',dir:'asc'},customers:{col:'name',dir:'asc'},sales:{col:'receipt_no',dir:'desc'},payments:{col:'receipt_no',dir:'desc'}};
-function sortToggle(tbl,col){if(SORT[tbl].col===col){SORT[tbl].dir=SORT[tbl].dir==='asc'?'desc':'asc';}else{SORT[tbl].col=col;SORT[tbl].dir='asc';}const fn={animals:renderAnimals,customers:renderCustomers,sales:renderSales,payments:renderPayments}[tbl];if(fn)fn();}
+const SORT={animals:{col:'code',dir:'asc'},customers:{col:'name',dir:'asc'},sales:{col:'receipt_no',dir:'desc'},payments:{col:'receipt_no',dir:'desc'},stock:{col:'code',dir:'asc'}};
+function sortToggle(tbl,col){if(SORT[tbl].col===col){SORT[tbl].dir=SORT[tbl].dir==='asc'?'desc':'asc';}else{SORT[tbl].col=col;SORT[tbl].dir='asc';}const fn={animals:renderAnimals,customers:renderCustomers,sales:renderSales,payments:renderPayments,stock:renderStockReport}[tbl];if(fn)fn();}
 function sortArr(arr,col,dir){return [...arr].sort((a,b)=>{let av=a[col]??'',bv=b[col]??'';if(typeof av==='number'&&typeof bv==='number')return dir==='asc'?av-bv:bv-av;return dir==='asc'?String(av).localeCompare(String(bv)):String(bv).localeCompare(String(av));});}
 function th(label,tbl,col){return `<th class="sortable${SORT[tbl].col===col?' sort-'+SORT[tbl].dir:''}" onclick="sortToggle('${tbl}','${col}')">${label}</th>`;}
 
@@ -957,58 +987,96 @@ function clearAnimalForm(){
   populateCustDropdown('a-cust');
 }
 
+function animalComputedList(filterFn){
+  const np=DB.settings.num_persons||7;
+  return DB.animals.filter(filterFn||Boolean).map(a=>{
+    const sale=DB.sales.find(s=>s.animal_code===a.code);
+    const w=sale?sale.weight_at_sale:(a.weight_final||0);
+    const adm=sale?sale.admin_charges:(a.admin_charges||0);
+    const f=w?calcFields(w,adm):{salePrice:0,totalCost:0,beefQty:0,beefRate:0};
+    return Object.assign({},a,{_w:w,_adm:adm,_sp:f.salePrice,_tc:f.totalCost,_bq:f.beefQty,_br:f.beefRate,_sale:sale,_custId:sale?sale.customer_id:a.assigned_customer});
+  });
+}
+
 function renderAnimals(){
   populateCustDropdown('a-cust');
   document.getElementById('a-admin').value=DB.settings.admin_charges||30000;
   const head=document.getElementById('animals-head');
-  head.innerHTML='<tr><th>Photo</th>'+th('Code','animals','code')+th('Date','animals','purchase_date')+'<th>Description</th>'+th('Age','animals','age_type')+th('Wt Latest (kg)','animals','weight_final')+th('Sale Price (Rs.)','animals','weight_final')+th('Admin Charges','animals','admin_charges')+th('Total Cost','animals','weight_final')+`<th>Beef Qty/person (kg)</th><th>Beef Rate/person</th>`+th('Status','animals','status')+'<th>Customer</th><th></th></tr>';
+  head.innerHTML='<tr><th>Photo</th>'+
+    th('Code','animals','code')+
+    th('Date','animals','purchase_date')+
+    '<th>Description</th>'+
+    th('Age','animals','age_type')+
+    th('Weight (kg)','animals','_w')+
+    th('Sale Price (Rs.)','animals','_sp')+
+    th('Admin Charges','animals','_adm')+
+    th('Total Cost','animals','_tc')+
+    th('Beef Qty/person','animals','_bq')+
+    th('Beef Rate/person','animals','_br')+
+    th('Status','animals','status')+
+    '<th>Customer</th><th></th></tr>';
   const tb=document.getElementById('animals-body');
   if(!DB.animals.length){tb.innerHTML=`<tr><td colspan="14" class="empty">No animals yet. Add one above.</td></tr>`;return;}
-  const col=SORT.animals.col;
-  const dir=SORT.animals.dir;
-  let list;
-  if(col==='weight_final'){
-    list=[...DB.animals].sort((a,b)=>{
-      const aw=DB.sales.find(s=>s.animal_code===a.code)?.weight_at_sale??(a.weight_final||0);
-      const bw=DB.sales.find(s=>s.animal_code===b.code)?.weight_at_sale??(b.weight_final||0);
-      return dir==='asc'?aw-bw:bw-aw;
-    });
-  } else if(col==='admin_charges'){
-    list=[...DB.animals].sort((a,b)=>{
-      const aa=DB.sales.find(s=>s.animal_code===a.code)?.admin_charges??(a.admin_charges||DB.settings.admin_charges||0);
-      const ba=DB.sales.find(s=>s.animal_code===b.code)?.admin_charges??(b.admin_charges||DB.settings.admin_charges||0);
-      return dir==='asc'?aa-ba:ba-aa;
-    });
-  } else {
-    list=sortArr(DB.animals,col,dir);
-  }
+  const list=sortArr(animalComputedList(),SORT.animals.col,SORT.animals.dir);
   tb.innerHTML=list.map(a=>{
-    const sale=DB.sales.find(s=>s.animal_code===a.code);
-    const w=sale?sale.weight_at_sale:(a.weight_final||0);
-    const adm=sale?sale.admin_charges:(a.admin_charges||DB.settings.admin_charges||0);
-    const f=w?calcFields(w,adm):{salePrice:0,totalCost:0,beefQty:0,beefRate:0};
-    const custId=sale?sale.customer_id:a.assigned_customer;
     const firstPhoto=a.photos&&a.photos.length?a.photos[0]:null;
     const photoCell=firstPhoto
-      ? `<img class="tbl-thumb" src="${firstPhoto}" onclick="openPhotoViewer('${a.code}')" title="Click to view/manage photos">`
-      : `<span class="no-photo" onclick="openPhotoViewer('${a.code}')" title="Click to add photos">&#128247;</span>`;
+      ?`<img class="tbl-thumb" src="${firstPhoto}" onclick="openPhotoViewer('${a.code}')" title="Click to view/manage photos">`
+      :`<span class="no-photo" onclick="openPhotoViewer('${a.code}')" title="Click to add photos">&#128247;</span>`;
     return `<tr>
       <td>${photoCell}</td>
       <td><strong>${a.code}</strong></td>
       <td>${fmtD(a.purchase_date)}</td>
       <td style="max-width:170px;font-size:.79rem">${a.description||'-'}</td>
       <td>${a.age_type||'-'}</td>
-      <td>${w||'-'}</td>
-      <td>${w?Rs(f.salePrice):'-'}</td>
-      <td>${Rs(adm)}</td>
-      <td>${w?Rs(f.totalCost):'-'}</td>
-      <td>${w?fmtN(f.beefQty,2)+' kg':'-'}</td>
-      <td>${w?Rs(f.beefRate)+'/kg':'-'}</td>
+      <td>${a._w||'-'}</td>
+      <td>${a._w?Rs(a._sp):'-'}</td>
+      <td>${Rs(a._adm)}</td>
+      <td>${a._w?Rs(a._tc):'-'}</td>
+      <td>${a._w?fmtN(a._bq,2)+' kg':'-'}</td>
+      <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
       <td><span class="badge ${a.status}">${a.status==='available'?'Available':'Sold'}</span></td>
-      <td>${custId?cName(custId):'-'}</td>
-      <td>${sale?`<button class="btn btn-primary btn-sm" onclick="showReceipt('${sale.receipt_no}')">Receipt</button>`:''}</td>
+      <td>${a._custId?cName(a._custId):'-'}</td>
+      <td>${a._sale?`<button class="btn btn-primary btn-sm" onclick="showReceipt('${a._sale.receipt_no}')">Receipt</button>`:''}</td>
     </tr>`;
   }).join('');
+  renderStockReport();
+}
+
+function renderStockReport(){
+  const colEl=document.getElementById('stock-sort-col');
+  const dirEl=document.getElementById('stock-sort-dir');
+  if(!colEl) return;
+  const col=colEl.value;
+  const dir=dirEl.value;
+  SORT.stock.col=col; SORT.stock.dir=dir;
+  const head=document.getElementById('stock-head');
+  head.innerHTML='<tr>'+
+    th('Code','stock','code')+
+    th('Date','stock','purchase_date')+
+    th('Age / Type','stock','age_type')+
+    th('Weight (kg)','stock','_w')+
+    th('Sale Price','stock','_sp')+
+    th('Admin Charges','stock','_adm')+
+    th('Total Cost','stock','_tc')+
+    th('Beef Qty / Person','stock','_bq')+
+    th('Beef Rate / Person','stock','_br')+
+    '</tr>';
+  const tb=document.getElementById('stock-body');
+  const available=animalComputedList(a=>a.status==='available');
+  if(!available.length){tb.innerHTML=`<tr><td colspan="9" class="empty">No available animals.</td></tr>`;return;}
+  const list=sortArr(available,col,dir);
+  tb.innerHTML=list.map(a=>`<tr>
+    <td><strong>${a.code}</strong></td>
+    <td>${fmtD(a.purchase_date)}</td>
+    <td>${a.age_type||'-'}</td>
+    <td><strong>${a._w||'-'}</strong></td>
+    <td>${a._w?Rs(a._sp):'-'}</td>
+    <td>${Rs(a._adm)}</td>
+    <td>${a._w?Rs(a._tc):'-'}</td>
+    <td>${a._w?fmtN(a._bq,2)+' kg':'-'}</td>
+    <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
+  </tr>`).join('');
 }
 
 // ══════════════════════════ CUSTOMERS ══════════════════════════
