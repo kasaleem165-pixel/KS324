@@ -1130,8 +1130,9 @@ function renderStockReport(){
   const col=colEl.value;
   const dir=dirEl.value;
   SORT.stock.col=col; SORT.stock.dir=dir;
-  const head=document.getElementById('stock-head');
-  head.innerHTML='<tr>'+
+
+  const thead=document.getElementById('stock-head');
+  const theadRow='<tr>'+
     th('Code','stock','code')+
     th('Date','stock','purchase_date')+
     th('Age / Type','stock','age_type')+
@@ -1142,21 +1143,93 @@ function renderStockReport(){
     th('Beef Qty / Person','stock','_bq')+
     th('Beef Rate / Person','stock','_br')+
     '</tr>';
+  thead.innerHTML=theadRow;
+
   const tb=document.getElementById('stock-body');
   const available=animalComputedList(a=>a.status==='available');
   if(!available.length){tb.innerHTML=`<tr><td colspan="9" class="empty">No available animals.</td></tr>`;return;}
-  const list=sortArr(available,col,dir);
-  tb.innerHTML=list.map(a=>`<tr>
-    <td><strong>${a.code}</strong></td>
-    <td>${fmtD(a.purchase_date)}</td>
-    <td>${a.age_type||'-'}</td>
-    <td><strong>${a._w||'-'}</strong></td>
-    <td>${a._w?Rs(a._sp):'-'}</td>
-    <td>${Rs(a._adm)}</td>
-    <td>${a._w?Rs(a._tc):'-'}</td>
-    <td>${a._w?fmtN(a._bq,2)+' kg':'-'}</td>
-    <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
-  </tr>`).join('');
+
+  const dondha=sortArr(available.filter(a=>(a.age_type||'').toLowerCase()==='dondha'),col,dir);
+  const kheera=sortArr(available.filter(a=>(a.age_type||'').toLowerCase()==='kheera'),col,dir);
+  const others=sortArr(available.filter(a=>{const t=(a.age_type||'').toLowerCase();return t!=='dondha'&&t!=='kheera';}),col,dir);
+
+  function sumRow(list,label,color){
+    if(!list.length) return '';
+    const tw=list.reduce((s,a)=>s+(a._w||0),0);
+    const tsp=list.reduce((s,a)=>s+a._sp,0);
+    const tadm=list.reduce((s,a)=>s+a._adm,0);
+    const ttc=list.reduce((s,a)=>s+a._tc,0);
+    const tbq=list.reduce((s,a)=>s+a._bq,0);
+    return `<tr style="background:${color};font-weight:700;font-size:.82rem;border-top:2px solid #cbd5e1">
+      <td colspan="3" style="color:#1a3a5c">${label} — Subtotal (${list.length} animals)</td>
+      <td>${tw.toFixed(1)} kg</td>
+      <td>${Rs(tsp)}</td><td>${Rs(tadm)}</td><td>${Rs(ttc)}</td>
+      <td>${tbq.toFixed(2)} kg</td><td>—</td>
+    </tr>`;
+  }
+
+  function animalRows(list,bgColor){
+    return list.map(a=>`<tr style="${bgColor?'background:'+bgColor+';':''}" >
+      <td><strong>${a.code}</strong></td>
+      <td>${fmtD(a.purchase_date)}</td>
+      <td>${a.age_type||'-'}</td>
+      <td><strong>${a._w||'-'}</strong></td>
+      <td>${a._w?Rs(a._sp):'-'}</td>
+      <td>${Rs(a._adm)}</td>
+      <td>${a._w?Rs(a._tc):'-'}</td>
+      <td>${a._w?fmtN(a._bq,2)+' kg':'-'}</td>
+      <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
+    </tr>`).join('');
+  }
+
+  let html='';
+
+  // ── Dondha section ──
+  if(dondha.length){
+    html+=`<tr style="background:#dbeafe;font-weight:700">
+      <td colspan="9" style="color:#1e40af;padding:9px 10px;font-size:.85rem">
+        &#9654; Dondha &nbsp;<span style="background:#1e40af;color:#fff;border-radius:10px;padding:1px 8px;font-size:.75rem">${dondha.length}</span>
+      </td></tr>`;
+    html+=animalRows(dondha,'');
+    html+=sumRow(dondha,'Dondha','#e0f2fe');
+  }
+
+  // ── Kheera section ──
+  if(kheera.length){
+    html+=`<tr style="background:#fef3c7;font-weight:700">
+      <td colspan="9" style="color:#92400e;padding:9px 10px;font-size:.85rem">
+        &#9654; Kheera &nbsp;<span style="background:#d97706;color:#fff;border-radius:10px;padding:1px 8px;font-size:.75rem">${kheera.length}</span>
+      </td></tr>`;
+    html+=animalRows(kheera,'#fffbeb');
+    html+=sumRow(kheera,'Kheera','#fef3c7');
+  }
+
+  // ── Others section ──
+  if(others.length){
+    html+=`<tr style="background:#f3f4f6;font-weight:700">
+      <td colspan="9" style="color:#374151;padding:9px 10px;font-size:.85rem">
+        &#9654; Other &nbsp;<span style="background:#6b7280;color:#fff;border-radius:10px;padding:1px 8px;font-size:.75rem">${others.length}</span>
+      </td></tr>`;
+    html+=animalRows(others,'');
+    html+=sumRow(others,'Other','#f3f4f6');
+  }
+
+  // ── Grand Total ──
+  const all=available;
+  const gtw=all.reduce((s,a)=>s+(a._w||0),0);
+  const gtsp=all.reduce((s,a)=>s+a._sp,0);
+  const gtadm=all.reduce((s,a)=>s+a._adm,0);
+  const gttc=all.reduce((s,a)=>s+a._tc,0);
+  const gtbq=all.reduce((s,a)=>s+a._bq,0);
+  html+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.88rem;border-top:3px solid #0f2540">
+    <td colspan="3">GRAND TOTAL — ${all.length} animals
+      &nbsp;(Dondha: ${dondha.length} &nbsp;|&nbsp; Kheera: ${kheera.length}${others.length?' &nbsp;|&nbsp; Other: '+others.length:''})</td>
+    <td>${gtw.toFixed(1)} kg</td>
+    <td>${Rs(gtsp)}</td><td>${Rs(gtadm)}</td><td>${Rs(gttc)}</td>
+    <td>${gtbq.toFixed(2)} kg</td><td>—</td>
+  </tr>`;
+
+  tb.innerHTML=html;
 }
 
 // ══════════════════════════ CUSTOMERS ══════════════════════════
