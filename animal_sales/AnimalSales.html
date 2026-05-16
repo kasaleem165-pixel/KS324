@@ -27,6 +27,11 @@ nav button:hover,nav button.active{color:#fff;background:rgba(255,255,255,.12)}
 .stat .hint-click{font-size:.68rem;color:#b0b8c4;margin-top:4px}
 .stat.g .n{color:#059669}.stat.r .n{color:#dc2626}.stat.a .n{color:#d97706}
 
+th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+th.sortable:hover{background:#e2e8f0}
+th.sort-asc::after{content:' ▲';font-size:.7rem;color:#1a3a5c}
+th.sort-desc::after{content:' ▼';font-size:.7rem;color:#1a3a5c}
+
 .tbl-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:.84rem}
 th{background:#f1f5f9;padding:8px 10px;text-align:left;color:#555;font-weight:600;border-bottom:2px solid #e2e8f0;white-space:nowrap}
@@ -187,12 +192,7 @@ input[readonly]{background:#f8fafc}
   <div class="card">
     <div class="card-title">Animals Register</div>
     <div class="tbl-wrap"><table>
-      <thead><tr>
-        <th>Photo</th><th>Code</th><th>Date</th><th>Description</th><th>Age</th>
-        <th>Wt Latest (kg)</th><th>Sale Price (Rs.)</th><th>Admin Charges</th>
-        <th>Total Cost</th><th>Beef Qty/person (kg)</th><th>Beef Rate/person</th>
-        <th>Status</th><th>Customer</th><th></th>
-      </tr></thead>
+      <thead id="animals-head"></thead>
       <tbody id="animals-body"></tbody>
     </table></div>
   </div>
@@ -220,7 +220,7 @@ input[readonly]{background:#f8fafc}
   <div class="card">
     <div class="card-title">All Customers</div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>Name</th><th>Phone</th><th>Admin Charges</th><th>Address</th><th>Total Sales</th><th>Received</th><th>Discount</th><th>Balance</th><th></th></tr></thead>
+      <thead id="customers-head"></thead>
       <tbody id="customers-body"></tbody>
     </table></div>
   </div>
@@ -270,9 +270,7 @@ input[readonly]{background:#f8fafc}
   <div class="card">
     <div class="card-title">All Sales</div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>Receipt</th><th>Date</th><th>Animal Code</th><th>Age</th><th>Customer</th>
-        <th>Weight (kg)</th><th>Rate/kg</th><th>Sale Price (Rs.)</th><th>Admin Charges</th><th>Total (Rs.)</th><th>Beef Qty/person</th><th>Beef Rate/person</th><th>Actions</th>
-      </tr></thead>
+      <thead id="sales-head"></thead>
       <tbody id="sales-body"></tbody>
     </table></div>
   </div>
@@ -286,11 +284,7 @@ input[readonly]{background:#f8fafc}
       <button class="btn btn-success btn-sm" onclick="openPayment(0)">+ Record Payment</button>
     </div>
     <div class="tbl-wrap"><table>
-      <thead><tr>
-        <th>Receipt#</th><th>Date</th><th>Customer</th><th>Cash/Bank</th>
-        <th>Bank Name</th><th>Sender</th><th>Place</th>
-        <th>Amount (Rs.)</th><th>Discount (Rs.)</th><th></th>
-      </tr></thead>
+      <thead id="payments-head"></thead>
       <tbody id="payments-body"></tbody>
     </table></div>
   </div>
@@ -316,6 +310,24 @@ input[readonly]{background:#f8fafc}
         <input type="file" accept=".json" style="display:none" onchange="importData(event)">
       </label>
     </div>
+  </div>
+  <div class="card" style="max-width:520px;margin-left:auto;margin-right:auto;margin-top:20px">
+    <div class="card-title">Bank Accounts</div>
+    <p style="color:#666;font-size:.83rem;margin-bottom:14px">Banks listed here appear in the Payment modal's Bank dropdown.</p>
+    <div id="bank-flash"></div>
+    <div class="form-grid">
+      <div class="fg"><label>Bank / Wallet Name *</label><input id="b-name" placeholder="e.g. Meezan Bank"></div>
+      <div class="fg"><label>Account Title</label><input id="b-title" placeholder="e.g. Muhammad Aslam"></div>
+      <div class="fg full"><label>Account Number / IBAN</label><input id="b-acno" placeholder="e.g. PK36MEZN0001234567890123"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="addBank()">Add Bank</button>
+      <button class="btn btn-light" onclick="clearBankForm()">Clear</button>
+    </div>
+    <div class="tbl-wrap" style="margin-top:14px"><table>
+      <thead><tr><th>Bank Name</th><th>Account Title</th><th>Account No.</th><th></th></tr></thead>
+      <tbody id="banks-body"></tbody>
+    </table></div>
   </div>
 </div>
 
@@ -433,20 +445,6 @@ input[readonly]{background:#f8fafc}
       <div class="fg" id="bank-name-row" style="display:none"><label>Bank Name</label>
         <select id="p-bank" onchange="toggleBankOther()">
           <option value="">-- Select Bank --</option>
-          <option>Meezan Bank</option>
-          <option>HBL (Habib Bank)</option>
-          <option>UBL (United Bank)</option>
-          <option>MCB Bank</option>
-          <option>Allied Bank</option>
-          <option>Bank Alfalah</option>
-          <option>Standard Chartered</option>
-          <option>Faysal Bank</option>
-          <option>Silk Bank</option>
-          <option>JS Bank</option>
-          <option>EasyPaisa</option>
-          <option>JazzCash</option>
-          <option>Sadapay</option>
-          <option value="Other">Other</option>
         </select></div>
       <div class="fg" id="bank-other-row" style="display:none"><label>Bank / Wallet Name</label>
         <input id="p-bank-other" placeholder="Enter bank or wallet name"></div>
@@ -508,7 +506,12 @@ input[readonly]{background:#f8fafc}
 <script>
 // ══════════════════════════ DATA LAYER ══════════════════════════
 const STORE='animal_sales_db';
-let DB={animals:[],customers:[],sales:[],payments:[],settings:{rate_per_kg:780,admin_charges:30000,num_persons:7}};
+let DB={animals:[],customers:[],sales:[],payments:[],banks:[],settings:{rate_per_kg:780,admin_charges:30000,num_persons:7}};
+
+const SORT={animals:{col:'code',dir:'asc'},customers:{col:'name',dir:'asc'},sales:{col:'receipt_no',dir:'desc'},payments:{col:'receipt_no',dir:'desc'}};
+function sortToggle(tbl,col){if(SORT[tbl].col===col){SORT[tbl].dir=SORT[tbl].dir==='asc'?'desc':'asc';}else{SORT[tbl].col=col;SORT[tbl].dir='asc';}const fn={animals:renderAnimals,customers:renderCustomers,sales:renderSales,payments:renderPayments}[tbl];if(fn)fn();}
+function sortArr(arr,col,dir){return [...arr].sort((a,b)=>{let av=a[col]??'',bv=b[col]??'';if(typeof av==='number'&&typeof bv==='number')return dir==='asc'?av-bv:bv-av;return dir==='asc'?String(av).localeCompare(String(bv)):String(bv).localeCompare(String(av));});}
+function th(label,tbl,col){return `<th class="sortable${SORT[tbl].col===col?' sort-'+SORT[tbl].dir:''}" onclick="sortToggle('${tbl}','${col}')">${label}</th>`;}
 
 // ── Excel seed data (37 animals from Sale sheet) ──────────────────────────
 const SEED_PHOTOS={
@@ -599,6 +602,7 @@ function load(){
     DB=JSON.parse(d);
     // migrate older records
     if(!DB.payments) DB.payments=[];
+    if(!DB.banks) DB.banks=[{id:1,name:'Meezan Bank',account_no:'',account_title:''},{id:2,name:'UBL (United Bank)',account_no:'',account_title:''}];
     if(!DB.settings) DB.settings=Object.assign({},SEED_SETTINGS);
     if(!DB.settings.num_persons) DB.settings.num_persons=7;
     if(!DB.settings.admin_charges) DB.settings.admin_charges=DB.settings.expenses_default||30000;
@@ -619,6 +623,7 @@ function load(){
       return Object.assign({},a,{photos});
     });
     DB.settings = Object.assign({},SEED_SETTINGS);
+    DB.banks=[{id:1,name:'Meezan Bank',account_no:'',account_title:''},{id:2,name:'UBL (United Bank)',account_no:'',account_title:''}];
     save();
   }
 }
@@ -955,9 +960,29 @@ function clearAnimalForm(){
 function renderAnimals(){
   populateCustDropdown('a-cust');
   document.getElementById('a-admin').value=DB.settings.admin_charges||30000;
+  const head=document.getElementById('animals-head');
+  head.innerHTML='<tr><th>Photo</th>'+th('Code','animals','code')+th('Date','animals','purchase_date')+'<th>Description</th>'+th('Age','animals','age_type')+th('Wt Latest (kg)','animals','weight_final')+th('Sale Price (Rs.)','animals','weight_final')+th('Admin Charges','animals','admin_charges')+th('Total Cost','animals','weight_final')+`<th>Beef Qty/person (kg)</th><th>Beef Rate/person</th>`+th('Status','animals','status')+'<th>Customer</th><th></th></tr>';
   const tb=document.getElementById('animals-body');
   if(!DB.animals.length){tb.innerHTML=`<tr><td colspan="14" class="empty">No animals yet. Add one above.</td></tr>`;return;}
-  tb.innerHTML=[...DB.animals].reverse().map(a=>{
+  const col=SORT.animals.col;
+  const dir=SORT.animals.dir;
+  let list;
+  if(col==='weight_final'){
+    list=[...DB.animals].sort((a,b)=>{
+      const aw=DB.sales.find(s=>s.animal_code===a.code)?.weight_at_sale??(a.weight_final||0);
+      const bw=DB.sales.find(s=>s.animal_code===b.code)?.weight_at_sale??(b.weight_final||0);
+      return dir==='asc'?aw-bw:bw-aw;
+    });
+  } else if(col==='admin_charges'){
+    list=[...DB.animals].sort((a,b)=>{
+      const aa=DB.sales.find(s=>s.animal_code===a.code)?.admin_charges??(a.admin_charges||DB.settings.admin_charges||0);
+      const ba=DB.sales.find(s=>s.animal_code===b.code)?.admin_charges??(b.admin_charges||DB.settings.admin_charges||0);
+      return dir==='asc'?aa-ba:ba-aa;
+    });
+  } else {
+    list=sortArr(DB.animals,col,dir);
+  }
+  tb.innerHTML=list.map(a=>{
     const sale=DB.sales.find(s=>s.animal_code===a.code);
     const w=sale?sale.weight_at_sale:(a.weight_final||0);
     const adm=sale?sale.admin_charges:(a.admin_charges||DB.settings.admin_charges||0);
