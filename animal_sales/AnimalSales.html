@@ -160,7 +160,15 @@ input[readonly]{background:#f8fafc}
         <input id="a-code" placeholder="e.g. 151">
         <span class="hint">Each animal must have a unique number.</span></div>
       <div class="fg"><label>Transaction Date</label><input id="a-date" type="date"></div>
-      <div class="fg"><label>Age (e.g. Dondha, Kheera)</label><input id="a-type" placeholder="Dondha"></div>
+      <div class="fg"><label>Age / Type</label>
+        <select id="a-type" onchange="toggleAgeOther()">
+          <option value="">-- Select Age --</option>
+          <option value="Dondha">Dondha</option>
+          <option value="Kheera">Kheera</option>
+          <option value="Other">Other (type below)</option>
+        </select></div>
+      <div class="fg" id="a-type-other-row" style="display:none"><label>Age / Type (custom)</label>
+        <input id="a-type-other" placeholder="Enter age or type"></div>
       <div class="fg"><label>Weight Latest (kg)</label><input id="a-wf" type="number" step="0.1" placeholder="Current / latest weight" oninput="previewCalc()"></div>
       <div class="fg full"><label>Description</label>
         <textarea id="a-desc" rows="2" placeholder="e.g. 1 Waccha purchased from Ludan Mandi"></textarea></div>
@@ -510,6 +518,51 @@ input[readonly]{background:#f8fafc}
     <div style="display:flex;gap:10px;margin-top:16px">
       <button class="btn btn-success" onclick="savePayment()">Save &amp; View Receipt</button>
       <button class="btn btn-light" onclick="closeModal('payment-overlay')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ EDIT PAYMENT MODAL ══════════ -->
+<div class="overlay" id="editpay-overlay">
+  <div class="modal" style="max-width:540px">
+    <button class="modal-close" onclick="closeModal('editpay-overlay')">&#10005;</button>
+    <div class="card-title">Edit Payment</div>
+    <div id="editpay-flash"></div>
+    <input type="hidden" id="ep-rno">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+      <div class="fg"><label>Customer *</label>
+        <select id="ep-cid"><option value="">-- Select Customer --</option></select></div>
+      <div class="fg"><label>Date *</label><input id="ep-date" type="date"></div>
+      <div class="fg full">
+        <label>Payment Method *</label>
+        <div class="type-toggle">
+          <input type="radio" name="ep-paytype" id="ep-cash" value="Cash" checked onchange="epToggleBank()">
+          <label for="ep-cash">Cash</label>
+          <input type="radio" name="ep-paytype" id="ep-bank" value="Bank" onchange="epToggleBank()">
+          <label for="ep-bank">Bank Transfer</label>
+        </div>
+      </div>
+      <div class="fg" id="ep-bank-row" style="display:none"><label>Bank Name</label>
+        <select id="ep-bank-sel" onchange="epToggleBankOther()">
+          <option value="">-- Select Bank --</option>
+        </select></div>
+      <div class="fg" id="ep-bank-other-row" style="display:none"><label>Bank / Wallet Name</label>
+        <input id="ep-bank-other" placeholder="Enter bank or wallet name"></div>
+      <div class="fg"><label>Sender Name</label>
+        <input id="ep-sender" placeholder="Name of person sending money"></div>
+      <div class="fg"><label>Amount Received (Rs.) *</label>
+        <input id="ep-amount" type="number" step="1"></div>
+      <div class="fg" id="ep-place-row"><label>Place of Receiving Cash</label>
+        <input id="ep-place" placeholder="e.g. Office, Home, Market"></div>
+      <div class="fg"><label>Discount Allowed (Rs.)</label>
+        <input id="ep-discount" type="number" step="1" value="0">
+        <span class="hint">Deducted from customer's outstanding balance.</span></div>
+      <div class="fg"><label>Notes</label>
+        <input id="ep-notes" placeholder="Optional remarks"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-success" onclick="savePaymentEdit()">Save Changes</button>
+      <button class="btn btn-light" onclick="closeModal('editpay-overlay')">Cancel</button>
     </div>
   </div>
 </div>
@@ -970,6 +1023,17 @@ function deleteAnimalPhoto(code,idx){
   save(); renderPhotoViewer(a); renderAnimals();
 }
 
+function toggleAgeOther(){
+  const v=document.getElementById('a-type').value;
+  document.getElementById('a-type-other-row').style.display=v==='Other'?'flex':'none';
+  if(v!=='Other') document.getElementById('a-type-other').value='';
+}
+function getAgeValue(){
+  const v=document.getElementById('a-type').value;
+  if(v==='Other') return document.getElementById('a-type-other').value.trim()||null;
+  return v||null;
+}
+
 // ── Animal form ────────────────────────────────────────────────
 function addAnimal(){
   const code=(document.getElementById('a-code').value||'').trim();
@@ -981,7 +1045,7 @@ function addAnimal(){
   DB.animals.push({
     code, purchase_date:document.getElementById('a-date').value||null,
     description:document.getElementById('a-desc').value||null,
-    age_type:document.getElementById('a-type').value||null,
+    age_type:getAgeValue(),
     weight_final:wf, admin_charges:admin,
     assigned_customer:custId, status:'available',
     photos:[..._formPhotos]
@@ -990,9 +1054,12 @@ function addAnimal(){
 }
 
 function clearAnimalForm(){
-  ['a-code','a-date','a-type','a-desc','a-wf','a-preview-vals'].forEach(id=>{
+  ['a-code','a-date','a-desc','a-wf','a-preview-vals'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
+  document.getElementById('a-type').value='';
+  document.getElementById('a-type-other').value='';
+  document.getElementById('a-type-other-row').style.display='none';
   document.getElementById('a-admin').value=DB.settings.admin_charges||30000;
   document.getElementById('a-preview').style.display='none';
   _formPhotos=[];
@@ -1389,8 +1456,94 @@ function renderPayments(){
     <td>${p.place||'-'}</td>
     <td style="color:#059669"><strong>${Rs(p.amount)}</strong></td>
     <td style="color:#7c3aed">${p.discount?Rs(p.discount):'-'}</td>
-    <td><button class="btn btn-primary btn-sm" onclick="showPayReceipt('${p.receipt_no}')">Receipt</button></td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-primary btn-sm" onclick="showPayReceipt('${p.receipt_no}')">Receipt</button>
+      <button class="btn btn-light btn-sm" style="margin-left:4px" onclick="openPaymentEdit('${p.receipt_no}')">&#9998; Edit</button>
+    </td>
   </tr>`).join('');
+}
+
+// ══════════════════════════ EDIT PAYMENT ══════════════════════════
+function populateEpBankDropdown(){
+  const sel=document.getElementById('ep-bank-sel');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">-- Select Bank --</option>';
+  (DB.banks||[]).forEach(b=>sel.innerHTML+=`<option value="${b.name}">${b.name}${b.account_title?' — '+b.account_title:''}</option>`);
+  sel.innerHTML+='<option value="Other">Other (type below)</option>';
+  if(cur) sel.value=cur;
+}
+function epToggleBank(){
+  const isBank=document.getElementById('ep-bank').checked;
+  document.getElementById('ep-bank-row').style.display=isBank?'flex':'none';
+  document.getElementById('ep-bank-other-row').style.display='none';
+  document.getElementById('ep-place-row').style.display=isBank?'none':'flex';
+  if(!isBank) document.getElementById('ep-bank-sel').selectedIndex=0;
+}
+function epToggleBankOther(){
+  const isOther=document.getElementById('ep-bank-sel').value==='Other';
+  document.getElementById('ep-bank-other-row').style.display=isOther?'flex':'none';
+}
+function openPaymentEdit(rno){
+  const p=DB.payments.find(x=>x.receipt_no===rno); if(!p) return;
+  document.getElementById('ep-rno').value=rno;
+  document.getElementById('editpay-flash').innerHTML='';
+  // customer dropdown
+  const csel=document.getElementById('ep-cid');
+  csel.innerHTML='<option value="">-- Select Customer --</option>';
+  DB.customers.forEach(c=>csel.innerHTML+=`<option value="${c.id}"${c.id===p.customer_id?' selected':''}>${c.name}</option>`);
+  document.getElementById('ep-date').value=p.pay_date||today();
+  // method
+  const isBank=p.type==='Bank';
+  document.getElementById('ep-cash').checked=!isBank;
+  document.getElementById('ep-bank').checked=isBank;
+  // bank dropdown
+  populateEpBankDropdown();
+  if(isBank){
+    const sel=document.getElementById('ep-bank-sel');
+    const match=[...sel.options].find(o=>o.value===p.bank_name);
+    sel.value=match?p.bank_name:'Other';
+    document.getElementById('ep-bank-other').value=match?'':(p.bank_name||'');
+  }
+  epToggleBank();
+  if(isBank&&!document.getElementById('ep-bank-sel').options[[...document.getElementById('ep-bank-sel').options].findIndex(o=>o.value===p.bank_name)]){
+    document.getElementById('ep-bank-other-row').style.display='flex';
+  }
+  document.getElementById('ep-sender').value=p.sender_name||'';
+  document.getElementById('ep-amount').value=p.amount||'';
+  document.getElementById('ep-place').value=p.place||'';
+  document.getElementById('ep-discount').value=p.discount||0;
+  document.getElementById('ep-notes').value=p.notes||'';
+  document.getElementById('editpay-overlay').classList.add('open');
+}
+function savePaymentEdit(){
+  const rno=document.getElementById('ep-rno').value;
+  const p=DB.payments.find(x=>x.receipt_no===rno); if(!p) return;
+  const cid=parseInt(document.getElementById('ep-cid').value);
+  const dateVal=document.getElementById('ep-date').value;
+  const amount=parseFloat(document.getElementById('ep-amount').value)||0;
+  const discount=parseFloat(document.getElementById('ep-discount').value)||0;
+  const errors=[];
+  if(!cid||isNaN(cid)) errors.push('Customer is required.');
+  if(!dateVal) errors.push('Date is required.');
+  if(amount<=0&&discount<=0) errors.push('Amount or Discount must be greater than zero.');
+  if(errors.length){flash('editpay-flash',errors.join(' '),'err');return;}
+  const isBank=document.getElementById('ep-bank').checked;
+  const bankSel=document.getElementById('ep-bank-sel').value;
+  const bankName=isBank?(bankSel==='Other'?document.getElementById('ep-bank-other').value||'Other':bankSel):'';
+  p.customer_id=cid;
+  p.pay_date=dateVal;
+  p.type=isBank?'Bank':'Cash';
+  p.bank_name=bankName;
+  p.sender_name=document.getElementById('ep-sender').value||'';
+  p.amount=amount;
+  p.place=isBank?'':document.getElementById('ep-place').value||'';
+  p.discount=discount;
+  p.notes=document.getElementById('ep-notes').value||'';
+  save();
+  closeModal('editpay-overlay');
+  renderPayments();
+  renderCustomers();
+  flash('','','');
 }
 
 // ══════════════════════════ SALE RECEIPT MODAL ══════════════════════════
