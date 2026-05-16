@@ -225,6 +225,7 @@ input[readonly]{background:#f8fafc}
           <option value="_sp">Sale Price</option>
           <option value="admin_charges">Admin Charges</option>
           <option value="_tc">Total Cost</option>
+          <option value="_spp">Share / Person</option>
           <option value="_bq">Beef Qty / Person</option>
           <option value="_br">Beef Rate / Person</option>
         </select>
@@ -760,7 +761,8 @@ function calcFields(weight, adminCharges){
   const totalCost=salePrice+(adminCharges||0);
   const beefQty=(weight/2)/np;
   const beefRate=beefQty>0?(totalCost/np)/beefQty:0;
-  return {salePrice,totalCost,beefQty,beefRate};
+  const sharePerPerson=totalCost/np;
+  return {salePrice,totalCost,sharePerPerson,beefQty,beefRate};
 }
 
 // next IDs
@@ -825,13 +827,13 @@ function showDashDetail(key){
         const sale=DB.sales.find(s=>s.animal_code===a.code);
         const w=sale?sale.weight_at_sale:(a.weight_final||0);
         const adm=sale?sale.admin_charges:(a.admin_charges||0);
-        const f=w?calcFields(w,adm):{salePrice:0,totalCost:0,beefQty:0,beefRate:0};
-        return Object.assign({},a,{_w:w,_adm:adm,_sp:f.salePrice,_tc:f.totalCost,_bq:f.beefQty,_br:f.beefRate,_sale:sale,_custId:sale?sale.customer_id:a.assigned_customer});
+        const f=w?calcFields(w,adm):{salePrice:0,totalCost:0,sharePerPerson:0,beefQty:0,beefRate:0};
+        return Object.assign({},a,{_w:w,_adm:adm,_sp:f.salePrice,_tc:f.totalCost,_spp:f.sharePerPerson,_bq:f.beefQty,_br:f.beefRate,_sale:sale,_custId:sale?sale.customer_id:a.assigned_customer});
       });
-      const cols=9+(hasSaleCol?1:0);
+      const cols=10+(hasSaleCol?1:0);
       const thead=`<thead><tr>
         <th>Code</th><th>Age</th><th>Weight (kg)</th><th>Sale Price</th><th>Admin</th>
-        <th>Total Cost</th><th>Beef Qty/P</th><th>Beef Rate/P</th>
+        <th>Total Cost</th><th>Share/Person</th><th>Beef Qty/P</th><th>Beef Rate/P</th>
         <th>Status</th>${hasSaleCol?'<th>Sale</th>':''}
       </tr></thead>`;
 
@@ -845,6 +847,7 @@ function showDashDetail(key){
           <td>${a._w?Rs(a._sp):'-'}</td>
           <td>${Rs(a._adm)}</td>
           <td>${a._w?Rs(a._tc):'-'}</td>
+          <td>${a._w?Rs(a._spp):'-'}</td>
           <td>${a._w?fmtN(a._bq,2)+' kg':'-'}</td>
           <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
           <td><span class="badge ${a.status}">${a.status==='available'?'Available':'Sold'}</span></td>
@@ -857,11 +860,12 @@ function showDashDetail(key){
         const tsp=grpList.reduce((s,a)=>s+a._sp,0);
         const tadm=grpList.reduce((s,a)=>s+a._adm,0);
         const ttc=grpList.reduce((s,a)=>s+a._tc,0);
+        const tspp=grpList.reduce((s,a)=>s+(a._spp||0),0);
         const tbq=grpList.reduce((s,a)=>s+a._bq,0);
         return `<tr style="background:${color};font-weight:700;font-size:.81rem;border-top:2px solid #cbd5e1">
           <td colspan="2" style="color:#1a3a5c">${label} Subtotal (${grpList.length})</td>
           <td>${tw.toFixed(1)} kg</td><td>${Rs(tsp)}</td><td>${Rs(tadm)}</td>
-          <td>${Rs(ttc)}</td><td>${tbq.toFixed(2)} kg</td><td>—</td><td></td>${hasSaleCol?'<td></td>':''}
+          <td>${Rs(ttc)}</td><td>${Rs(tspp)}</td><td>${tbq.toFixed(2)} kg</td><td>—</td><td></td>${hasSaleCol?'<td></td>':''}
         </tr>`;
       }
       const dondha=list.filter(a=>(a.age_type||'').toLowerCase()==='dondha');
@@ -871,6 +875,7 @@ function showDashDetail(key){
       const gtsp=list.reduce((s,a)=>s+a._sp,0);
       const gtadm=list.reduce((s,a)=>s+a._adm,0);
       const gttc=list.reduce((s,a)=>s+a._tc,0);
+      const gtspp=list.reduce((s,a)=>s+(a._spp||0),0);
       const gtbq=list.reduce((s,a)=>s+a._bq,0);
       let tbody='';
       if(dondha.length){
@@ -891,7 +896,7 @@ function showDashDetail(key){
       tbody+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.85rem;border-top:3px solid #0f2540">
         <td colspan="2">TOTAL — ${list.length} &nbsp;(D:${dondha.length} K:${kheera.length}${others.length?' O:'+others.length:''})</td>
         <td>${gtw.toFixed(1)} kg</td><td>${Rs(gtsp)}</td><td>${Rs(gtadm)}</td>
-        <td>${Rs(gttc)}</td><td>${gtbq.toFixed(2)} kg</td><td>—</td><td></td>${hasSaleCol?'<td></td>':''}
+        <td>${Rs(gttc)}</td><td>${Rs(gtspp)}</td><td>${gtbq.toFixed(2)} kg</td><td>—</td><td></td>${hasSaleCol?'<td></td>':''}
       </tr>`;
       html+=`<div class="tbl-wrap"><table>${thead}<tbody>${tbody}</tbody></table></div>`;
     }
@@ -993,6 +998,7 @@ function previewCalc(){
   document.getElementById('a-preview-vals').innerHTML=`
     <div><span style="color:#777">Sale Price:</span> <strong>${Rs(f.salePrice)}</strong></div>
     <div><span style="color:#777">Total Cost:</span> <strong>${Rs(f.totalCost)}</strong></div>
+    <div><span style="color:#777">Share per Person:</span> <strong>${Rs(f.sharePerPerson)}</strong></div>
     <div><span style="color:#777">Beef Qty/person:</span> <strong>${fmtN(f.beefQty,2)} kg</strong></div>
     <div><span style="color:#777">Beef Rate/person:</span> <strong>${Rs(f.beefRate)}/kg</strong></div>`;
 }
@@ -1133,8 +1139,8 @@ function animalComputedList(filterFn){
     const sale=DB.sales.find(s=>s.animal_code===a.code);
     const w=sale?sale.weight_at_sale:(a.weight_final||0);
     const adm=sale?sale.admin_charges:(a.admin_charges||0);
-    const f=w?calcFields(w,adm):{salePrice:0,totalCost:0,beefQty:0,beefRate:0};
-    return Object.assign({},a,{_w:w,_adm:adm,_sp:f.salePrice,_tc:f.totalCost,_bq:f.beefQty,_br:f.beefRate,_sale:sale,_custId:sale?sale.customer_id:a.assigned_customer});
+    const f=w?calcFields(w,adm):{salePrice:0,totalCost:0,sharePerPerson:0,beefQty:0,beefRate:0};
+    return Object.assign({},a,{_w:w,_adm:adm,_sp:f.salePrice,_tc:f.totalCost,_spp:f.sharePerPerson,_bq:f.beefQty,_br:f.beefRate,_sale:sale,_custId:sale?sale.customer_id:a.assigned_customer});
   });
 }
 
@@ -1151,12 +1157,13 @@ function renderAnimals(){
     th('Sale Price (Rs.)','animals','_sp')+
     th('Admin Charges','animals','_adm')+
     th('Total Cost','animals','_tc')+
+    th('Share/Person','animals','_spp')+
     th('Beef Qty/person','animals','_bq')+
     th('Beef Rate/person','animals','_br')+
     th('Status','animals','status')+
     '<th>Customer</th><th></th></tr>';
   const tb=document.getElementById('animals-body');
-  if(!DB.animals.length){tb.innerHTML=`<tr><td colspan="14" class="empty">No animals yet. Add one above.</td></tr>`;return;}
+  if(!DB.animals.length){tb.innerHTML=`<tr><td colspan="15" class="empty">No animals yet. Add one above.</td></tr>`;return;}
   const list=sortArr(animalComputedList(),SORT.animals.col,SORT.animals.dir);
   tb.innerHTML=list.map(a=>{
     const firstPhoto=a.photos&&a.photos.length?a.photos[0]:null;
@@ -1173,6 +1180,7 @@ function renderAnimals(){
       <td>${a._w?Rs(a._sp):'-'}</td>
       <td>${Rs(a._adm)}</td>
       <td>${a._w?Rs(a._tc):'-'}</td>
+      <td>${a._w?Rs(a._spp):'-'}</td>
       <td>${a._w?fmtN(a._bq,2)+' kg':'-'}</td>
       <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
       <td><span class="badge ${a.status}">${a.status==='available'?'Available':'Sold'}</span></td>
@@ -1199,6 +1207,7 @@ function renderStockReport(){
     th('Sale Price','stock','_sp')+
     th('Admin Charges','stock','_adm')+
     th('Total Cost','stock','_tc')+
+    th('Share / Person','stock','_spp')+
     th('Beef Qty / Person','stock','_bq')+
     th('Beef Rate / Person','stock','_br')+
     '</tr>';
@@ -1206,7 +1215,7 @@ function renderStockReport(){
 
   const tb=document.getElementById('stock-body');
   const available=animalComputedList(a=>a.status==='available');
-  if(!available.length){tb.innerHTML=`<tr><td colspan="9" class="empty">No available animals.</td></tr>`;return;}
+  if(!available.length){tb.innerHTML=`<tr><td colspan="10" class="empty">No available animals.</td></tr>`;return;}
 
   const dondha=sortArr(available.filter(a=>(a.age_type||'').toLowerCase()==='dondha'),col,dir);
   const kheera=sortArr(available.filter(a=>(a.age_type||'').toLowerCase()==='kheera'),col,dir);
@@ -1218,12 +1227,13 @@ function renderStockReport(){
     const tsp=list.reduce((s,a)=>s+a._sp,0);
     const tadm=list.reduce((s,a)=>s+a._adm,0);
     const ttc=list.reduce((s,a)=>s+a._tc,0);
+    const tspp=list.reduce((s,a)=>s+(a._spp||0),0);
     const tbq=list.reduce((s,a)=>s+a._bq,0);
     return `<tr style="background:${color};font-weight:700;font-size:.82rem;border-top:2px solid #cbd5e1">
       <td colspan="3" style="color:#1a3a5c">${label} — Subtotal (${list.length} animals)</td>
       <td>${tw.toFixed(1)} kg</td>
       <td>${Rs(tsp)}</td><td>${Rs(tadm)}</td><td>${Rs(ttc)}</td>
-      <td>${tbq.toFixed(2)} kg</td><td>—</td>
+      <td>${Rs(tspp)}</td><td>${tbq.toFixed(2)} kg</td><td>—</td>
     </tr>`;
   }
 
@@ -1236,6 +1246,7 @@ function renderStockReport(){
       <td>${a._w?Rs(a._sp):'-'}</td>
       <td>${Rs(a._adm)}</td>
       <td>${a._w?Rs(a._tc):'-'}</td>
+      <td>${a._w?Rs(a._spp):'-'}</td>
       <td>${a._w?fmtN(a._bq,2)+' kg':'-'}</td>
       <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
     </tr>`).join('');
@@ -1246,7 +1257,7 @@ function renderStockReport(){
   // ── Dondha section ──
   if(dondha.length){
     html+=`<tr style="background:#dbeafe;font-weight:700">
-      <td colspan="9" style="color:#1e40af;padding:9px 10px;font-size:.85rem">
+      <td colspan="10" style="color:#1e40af;padding:9px 10px;font-size:.85rem">
         &#9654; Dondha &nbsp;<span style="background:#1e40af;color:#fff;border-radius:10px;padding:1px 8px;font-size:.75rem">${dondha.length}</span>
       </td></tr>`;
     html+=animalRows(dondha,'');
@@ -1256,7 +1267,7 @@ function renderStockReport(){
   // ── Kheera section ──
   if(kheera.length){
     html+=`<tr style="background:#fef3c7;font-weight:700">
-      <td colspan="9" style="color:#92400e;padding:9px 10px;font-size:.85rem">
+      <td colspan="10" style="color:#92400e;padding:9px 10px;font-size:.85rem">
         &#9654; Kheera &nbsp;<span style="background:#d97706;color:#fff;border-radius:10px;padding:1px 8px;font-size:.75rem">${kheera.length}</span>
       </td></tr>`;
     html+=animalRows(kheera,'#fffbeb');
@@ -1266,7 +1277,7 @@ function renderStockReport(){
   // ── Others section ──
   if(others.length){
     html+=`<tr style="background:#f3f4f6;font-weight:700">
-      <td colspan="9" style="color:#374151;padding:9px 10px;font-size:.85rem">
+      <td colspan="10" style="color:#374151;padding:9px 10px;font-size:.85rem">
         &#9654; Other &nbsp;<span style="background:#6b7280;color:#fff;border-radius:10px;padding:1px 8px;font-size:.75rem">${others.length}</span>
       </td></tr>`;
     html+=animalRows(others,'');
@@ -1279,13 +1290,14 @@ function renderStockReport(){
   const gtsp=all.reduce((s,a)=>s+a._sp,0);
   const gtadm=all.reduce((s,a)=>s+a._adm,0);
   const gttc=all.reduce((s,a)=>s+a._tc,0);
+  const gtspp=all.reduce((s,a)=>s+(a._spp||0),0);
   const gtbq=all.reduce((s,a)=>s+a._bq,0);
   html+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.88rem;border-top:3px solid #0f2540">
     <td colspan="3">GRAND TOTAL — ${all.length} animals
       &nbsp;(Dondha: ${dondha.length} &nbsp;|&nbsp; Kheera: ${kheera.length}${others.length?' &nbsp;|&nbsp; Other: '+others.length:''})</td>
     <td>${gtw.toFixed(1)} kg</td>
     <td>${Rs(gtsp)}</td><td>${Rs(gtadm)}</td><td>${Rs(gttc)}</td>
-    <td>${gtbq.toFixed(2)} kg</td><td>—</td>
+    <td>${Rs(gtspp)}</td><td>${gtbq.toFixed(2)} kg</td><td>—</td>
   </tr>`;
 
   tb.innerHTML=html;
@@ -1436,22 +1448,23 @@ function recordSale(){
 // ══════════════════════════ ALL SALES ══════════════════════════
 function renderSales(){
   const head=document.getElementById('sales-head');
-  head.innerHTML='<tr>'+th('Receipt','sales','receipt_no')+th('Date','sales','sale_date')+th('Animal Code','sales','animal_code')+'<th>Age</th>'+th('Customer','sales','customerName')+th('Weight (kg)','sales','weight_at_sale')+th('Rate/kg','sales','rate_per_kg')+th('Sale Price','sales','sp')+th('Admin Charges','sales','admin_charges')+th('Total Amount','sales','amount')+'<th>Beef Qty</th><th>Beef Rate</th><th></th></tr>';
+  head.innerHTML='<tr>'+th('Receipt','sales','receipt_no')+th('Date','sales','sale_date')+th('Animal Code','sales','animal_code')+'<th>Age</th>'+th('Customer','sales','customerName')+th('Weight (kg)','sales','weight_at_sale')+th('Rate/kg','sales','rate_per_kg')+th('Sale Price','sales','sp')+th('Admin Charges','sales','admin_charges')+th('Total Amount','sales','amount')+th('Share/Person','sales','spp')+'<th>Beef Qty</th><th>Beef Rate</th><th></th></tr>';
   const tb=document.getElementById('sales-body');
-  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="13" class="empty">No sales yet.</td></tr>`;return;}
+  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="14" class="empty">No sales yet.</td></tr>`;return;}
   const np=DB.settings.num_persons||7;
   // Attach computed fields for sorting
-  const withComputed=DB.sales.map(s=>Object.assign({},s,{customerName:cName(s.customer_id),sp:s.weight_at_sale*s.rate_per_kg}));
+  const withComputed=DB.sales.map(s=>{const sp=s.weight_at_sale*s.rate_per_kg;const spp=s.amount/np;return Object.assign({},s,{customerName:cName(s.customer_id),sp,spp});});
   const col=SORT.sales.col;
   const dir=SORT.sales.dir;
   let list;
-  if(['weight_at_sale','rate_per_kg','sp','admin_charges','amount'].includes(col)){
+  if(['weight_at_sale','rate_per_kg','sp','admin_charges','amount','spp'].includes(col)){
     list=[...withComputed].sort((a,b)=>dir==='asc'?(a[col]||0)-(b[col]||0):(b[col]||0)-(a[col]||0));
   } else {
     list=sortArr(withComputed,col,dir);
   }
   tb.innerHTML=list.map(s=>{
     const sp=s.weight_at_sale*s.rate_per_kg;
+    const spp=s.amount/np;
     const bq=(s.weight_at_sale/2)/np;
     const br=bq>0?(s.amount/np)/bq:0;
     return `<tr>
@@ -1461,6 +1474,7 @@ function renderSales(){
       <td>${s.weight_at_sale} kg</td><td>${fmtN(s.rate_per_kg)}</td>
       <td>${Rs(sp)}</td><td>${Rs(s.admin_charges||0)}</td>
       <td><strong>${Rs(s.amount)}</strong></td>
+      <td><strong>${Rs(spp)}</strong></td>
       <td>${fmtN(bq,2)} kg</td><td>${Rs(br)}/kg</td>
       <td style="white-space:nowrap">
         <button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Receipt</button>
@@ -1706,6 +1720,7 @@ function showReceipt(rno){
     <div class="rcp-row"><span>Admin Charges</span><span>${Rs(s.admin_charges||0)}</span></div>
     <div class="rcp-row total"><span>TOTAL AMOUNT</span><span>${Rs(s.amount)}</span></div>
     <p style="font-weight:600;color:#1a3a5c;margin:13px 0 8px;font-size:.88rem">Beef Details (${np} Persons)</p>
+    <div class="rcp-row"><span>Share per Person</span><strong>${Rs(s.amount/np)}</strong></div>
     <div class="rcp-row"><span>Beef Qty per Person</span><span>${fmtN(bq,2)} kg</span></div>
     <div class="rcp-row"><span>Beef Rate per Person</span><span>${Rs(br)}/kg</span></div>
     ${s.notes?`<p style="margin-top:11px;font-size:.81rem;color:#555;background:#f8fafc;padding:7px 11px;border-radius:6px"><strong>Notes:</strong> ${s.notes}</p>`:''}
@@ -1909,11 +1924,11 @@ function exportCSV(headers,rows,filename){
 function exportAnimalsExcel(){
   const np=DB.settings.num_persons||7;
   const list=sortArr(animalComputedList(),SORT.animals.col,SORT.animals.dir);
-  const headers=['Code','Purchase Date','Age/Type','Description','Weight (kg)','Sale Price (Rs.)','Admin Charges (Rs.)','Total Cost (Rs.)','Beef Qty/Person (kg)','Beef Rate/Person (Rs./kg)','Status','Customer'];
+  const headers=['Code','Purchase Date','Age/Type','Description','Weight (kg)','Sale Price (Rs.)','Admin Charges (Rs.)','Total Cost (Rs.)','Share/Person (Rs.)','Beef Qty/Person (kg)','Beef Rate/Person (Rs./kg)','Status','Customer'];
   const rows=list.map(a=>[
     a.code,a.purchase_date||'',a.age_type||'',a.description||'',
     a._w||'',a._w?a._sp.toFixed(0):'',a._adm.toFixed(0),a._w?a._tc.toFixed(0):'',
-    a._w?a._bq.toFixed(2):'',a._w?a._br.toFixed(0):'',
+    a._w?a._spp.toFixed(0):'',a._w?a._bq.toFixed(2):'',a._w?a._br.toFixed(0):'',
     a.status==='available'?'Available':'Sold',
     a._custId?cName(a._custId):''
   ]);
@@ -1924,11 +1939,11 @@ function exportStockExcel(){
   const col=document.getElementById('stock-sort-col').value;
   const dir=document.getElementById('stock-sort-dir').value;
   const list=sortArr(animalComputedList(a=>a.status==='available'),col,dir);
-  const headers=['Code','Purchase Date','Age/Type','Weight (kg)','Sale Price (Rs.)','Admin Charges (Rs.)','Total Cost (Rs.)','Beef Qty/Person (kg)','Beef Rate/Person (Rs./kg)'];
+  const headers=['Code','Purchase Date','Age/Type','Weight (kg)','Sale Price (Rs.)','Admin Charges (Rs.)','Total Cost (Rs.)','Share/Person (Rs.)','Beef Qty/Person (kg)','Beef Rate/Person (Rs./kg)'];
   const rows=list.map(a=>[
     a.code,a.purchase_date||'',a.age_type||'',
     a._w||'',a._w?a._sp.toFixed(0):'',a._adm.toFixed(0),a._w?a._tc.toFixed(0):'',
-    a._w?a._bq.toFixed(2):'',a._w?a._br.toFixed(0):''
+    a._w?a._spp.toFixed(0):'',a._w?a._bq.toFixed(2):'',a._w?a._br.toFixed(0):''
   ]);
   exportCSV(headers,rows,'Available_Stock');
 }
@@ -1937,13 +1952,14 @@ function exportSalesExcel(){
   const np=DB.settings.num_persons||7;
   const withC=[...DB.sales].map(s=>Object.assign({},s,{customerName:cName(s.customer_id),sp:s.weight_at_sale*s.rate_per_kg}));
   const list=sortArr(withC,SORT.sales.col,SORT.sales.dir);
-  const headers=['Receipt No','Date','Animal Code','Age/Type','Customer','Weight (kg)','Rate/kg (Rs.)','Sale Price (Rs.)','Admin Charges (Rs.)','Total Amount (Rs.)','Beef Qty/Person (kg)','Beef Rate/Person (Rs./kg)','Notes'];
+  const headers=['Receipt No','Date','Animal Code','Age/Type','Customer','Weight (kg)','Rate/kg (Rs.)','Sale Price (Rs.)','Admin Charges (Rs.)','Total Amount (Rs.)','Share/Person (Rs.)','Beef Qty/Person (kg)','Beef Rate/Person (Rs./kg)','Notes'];
   const rows=list.map(s=>{
     const bq=(s.weight_at_sale/2)/np;
     const br=bq>0?(s.amount/np)/bq:0;
+    const spp=s.amount/np;
     return [s.receipt_no,s.sale_date,s.animal_code,aType(s.animal_code),s.customerName,
       s.weight_at_sale,s.rate_per_kg,s.sp.toFixed(0),(s.admin_charges||0).toFixed(0),s.amount.toFixed(0),
-      bq.toFixed(2),br.toFixed(0),s.notes||''];
+      spp.toFixed(0),bq.toFixed(2),br.toFixed(0),s.notes||''];
   });
   exportCSV(headers,rows,'Sales_Records');
 }
