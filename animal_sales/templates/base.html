@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Animal Sales Records</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4f8; color: #222; }
+
+    /* Nav */
+    nav { background: #1a3a5c; padding: 0 24px; display: flex; align-items: center; gap: 0; }
+    nav .brand { color: #fff; font-size: 1.15rem; font-weight: 700; padding: 14px 0; margin-right: 28px; }
+    nav a { color: #b8d0e8; text-decoration: none; padding: 16px 14px; display: inline-block; font-size: .92rem; }
+    nav a:hover, nav a.active { color: #fff; background: rgba(255,255,255,0.1); }
+
+    /* Container */
+    .container { max-width: 1100px; margin: 28px auto; padding: 0 20px; }
+
+    /* Flash messages */
+    .flash { padding: 10px 16px; border-radius: 6px; margin-bottom: 16px; font-size: .92rem; }
+    .flash.success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+    .flash.error   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+
+    /* Cards */
+    .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 22px 26px; margin-bottom: 22px; }
+    .card h2 { font-size: 1.1rem; margin-bottom: 16px; color: #1a3a5c; }
+
+    /* Stat grid */
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-box { background: #fff; border-radius: 10px; padding: 18px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08); text-align: center; }
+    .stat-box .num { font-size: 1.9rem; font-weight: 700; color: #1a3a5c; }
+    .stat-box .lbl { font-size: .8rem; color: #666; margin-top: 4px; }
+    .stat-box.green .num { color: #059669; }
+    .stat-box.red   .num { color: #dc2626; }
+    .stat-box.amber .num { color: #d97706; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th { background: #f1f5f9; text-align: left; padding: 9px 12px; color: #555; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; }
+    tr:hover td { background: #fafbfd; }
+
+    /* Badge */
+    .badge { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: .78rem; font-weight: 600; }
+    .badge.available { background: #d1fae5; color: #065f46; }
+    .badge.sold      { background: #fee2e2; color: #991b1b; }
+
+    /* Buttons */
+    .btn { display: inline-block; padding: 8px 18px; border-radius: 6px; font-size: .9rem; text-decoration: none; cursor: pointer; border: none; font-family: inherit; }
+    .btn-primary  { background: #1a3a5c; color: #fff; }
+    .btn-primary:hover  { background: #143050; }
+    .btn-success  { background: #059669; color: #fff; }
+    .btn-success:hover  { background: #047857; }
+    .btn-sm { padding: 4px 12px; font-size: .82rem; }
+
+    /* Form */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full { grid-column: 1 / -1; }
+    label { font-size: .85rem; color: #444; font-weight: 500; }
+    input, select, textarea {
+      padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 6px;
+      font-size: .92rem; font-family: inherit; width: 100%;
+    }
+    input:focus, select:focus, textarea:focus { outline: 2px solid #1a3a5c; border-color: #1a3a5c; }
+    .hint { font-size: .78rem; color: #888; }
+
+    /* Receipt */
+    .receipt-box { max-width: 640px; margin: 0 auto; }
+    .receipt-header { text-align: center; border-bottom: 2px solid #1a3a5c; padding-bottom: 14px; margin-bottom: 18px; }
+    .receipt-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: .93rem; }
+    .receipt-row.total { font-weight: 700; font-size: 1.05rem; border-top: 2px solid #1a3a5c; border-bottom: none; margin-top: 6px; }
+
+    @media print {
+      nav, .btn, .no-print { display: none !important; }
+      body { background: #fff; }
+      .container { margin: 0; padding: 0; }
+    }
+    @media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<nav>
+  <span class="brand">&#127803; Animal Sales</span>
+  <a href="/">Dashboard</a>
+  <a href="/animals">Animals</a>
+  <a href="/customers">Customers</a>
+  <a href="/sales">Sales</a>
+  <a href="/settings">Settings</a>
+</nav>
+<div class="container">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="flash {{ cat }}">{{ msg }}</div>
+    {% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</div>
+</body>
+</html>

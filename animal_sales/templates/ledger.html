@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+  <div>
+    <h1 style="font-size:1.4rem; color:#1a3a5c;">{{ customer.name }}</h1>
+    {% if customer.phone %}<p style="color:#666; margin-top:4px;">{{ customer.phone }}</p>{% endif %}
+  </div>
+  <div style="display:flex; gap:10px;" class="no-print">
+    <a href="/customers/{{ customer.id }}/payment" class="btn btn-success">+ Record Payment</a>
+    <a href="/sales/new" class="btn btn-primary">+ New Sale</a>
+    <button onclick="window.print()" class="btn" style="background:#e2e8f0; color:#444;">Print Ledger</button>
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="stat-grid" style="margin-bottom:20px;">
+  <div class="stat-box">
+    <div class="num">Rs. {{ "{:,.0f}".format(total_sale) }}</div>
+    <div class="lbl">Total Sales</div>
+  </div>
+  <div class="stat-box green">
+    <div class="num">Rs. {{ "{:,.0f}".format(total_paid) }}</div>
+    <div class="lbl">Amount Received</div>
+  </div>
+  <div class="stat-box {{ 'amber' if balance > 0 else 'green' }}">
+    <div class="num">Rs. {{ "{:,.0f}".format(balance) }}</div>
+    <div class="lbl">{{ 'Balance Payable' if balance > 0 else 'Settled' }}</div>
+  </div>
+</div>
+
+<!-- Sales -->
+<div class="card">
+  <h2>Sales to {{ customer.name }}</h2>
+  {% if sales %}
+  <table>
+    <thead><tr>
+      <th>Receipt</th><th>Date</th><th>Animal Code</th><th>Type</th>
+      <th>Weight (kg)</th><th>Rate/kg</th><th>Expenses</th><th>Amount (Rs.)</th><th></th>
+    </tr></thead>
+    <tbody>
+    {% for s in sales %}
+    <tr>
+      <td>{{ s.receipt_no }}</td>
+      <td>{{ s.sale_date[:10] }}</td>
+      <td><strong>{{ s.animal_code }}</strong></td>
+      <td>{{ s.age_type or '-' }}</td>
+      <td>{{ s.weight_at_sale }}</td>
+      <td>{{ "{:,.0f}".format(s.rate_per_kg) }}</td>
+      <td>{{ "{:,.0f}".format(s.expenses) if s.expenses else '-' }}</td>
+      <td><strong>{{ "{:,.0f}".format(s.amount) }}</strong></td>
+      <td><a href="/receipt/{{ s.receipt_no }}" class="btn btn-primary btn-sm">Receipt</a></td>
+    </tr>
+    {% endfor %}
+    <tr style="background:#f8fafc; font-weight:700;">
+      <td colspan="7" style="text-align:right;">Total Sales</td>
+      <td>Rs. {{ "{:,.0f}".format(total_sale) }}</td>
+      <td></td>
+    </tr>
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#888;">No sales recorded yet.</p>
+  {% endif %}
+</div>
+
+<!-- Payments -->
+<div class="card">
+  <h2>Payments Received</h2>
+  {% if payments %}
+  <table>
+    <thead><tr>
+      <th>Date</th><th>Method / Bank</th><th>Notes</th><th>Amount (Rs.)</th>
+    </tr></thead>
+    <tbody>
+    {% for p in payments %}
+    <tr>
+      <td>{{ p.pay_date[:10] }}</td>
+      <td>{{ p.method }}</td>
+      <td>{{ p.notes or '-' }}</td>
+      <td style="color:#059669;"><strong>{{ "{:,.0f}".format(p.amount) }}</strong></td>
+    </tr>
+    {% endfor %}
+    <tr style="background:#f8fafc; font-weight:700;">
+      <td colspan="3" style="text-align:right;">Total Received</td>
+      <td style="color:#059669;">Rs. {{ "{:,.0f}".format(total_paid) }}</td>
+    </tr>
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#888;">No payments recorded yet.</p>
+  {% endif %}
+</div>
+
+<!-- Net Balance -->
+<div class="card" style="background:{{ '#fff7ed' if balance > 0 else '#f0fdf4' }}; border: 1px solid {{ '#fbbf24' if balance > 0 else '#6ee7b7' }};">
+  <div class="receipt-row total" style="font-size:1.1rem;">
+    <span>Net Balance (Sales − Payments)</span>
+    <span style="color:{{ '#d97706' if balance > 0 else '#059669' }};">
+      Rs. {{ "{:,.0f}".format(balance) }}
+      {{ '(Payable by Customer)' if balance > 0 else '(Fully Settled)' }}
+    </span>
+  </div>
+</div>
+{% endblock %}

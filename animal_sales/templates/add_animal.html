@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width:680px; margin:0 auto;">
+  <h2>{{ 'Edit Animal' if animal else 'Add New Animal' }}</h2>
+  <form method="POST">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Animal Code (Unique ID) *</label>
+        <input name="code" required value="{{ animal.code if animal else '' }}"
+               {{ 'readonly style=background:#f1f5f9' if animal else '' }}
+               placeholder="e.g. 118">
+        <span class="hint">Each animal must have a unique numeric code.</span>
+      </div>
+      <div class="form-group">
+        <label>S.No (Weight List)</label>
+        <input name="sno_weight" type="number" value="{{ animal.sno_weight if animal else '' }}" placeholder="e.g. 37">
+      </div>
+      <div class="form-group">
+        <label>Purchase Date</label>
+        <input name="purchase_date" type="date"
+               value="{{ (animal.purchase_date or '')[:10] if animal else '' }}">
+      </div>
+      <div class="form-group">
+        <label>Type / Age (e.g. Dondha)</label>
+        <input name="age_type" value="{{ animal.age_type if animal else '' }}" placeholder="Dondha">
+      </div>
+      <div class="form-group full">
+        <label>Description</label>
+        <textarea name="description" rows="2" placeholder="e.g. Batch of 8 Wacchas purchased from Ludan Mandi">{{ animal.description if animal else '' }}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Initial Weight (kg)</label>
+        <input name="weight_initial" type="number" step="0.1"
+               value="{{ animal.weight_initial if animal else '' }}" placeholder="Weight at purchase">
+      </div>
+      <div class="form-group">
+        <label>Final / Current Weight (kg)</label>
+        <input name="weight_final" type="number" step="0.1"
+               value="{{ animal.weight_final if animal else '' }}" placeholder="Latest measured weight">
+      </div>
+    </div>
+    <div style="display:flex; gap:12px; margin-top:20px;">
+      <button type="submit" class="btn btn-primary">{{ 'Update' if animal else 'Add Animal' }}</button>
+      <a href="/animals" class="btn" style="background:#e2e8f0; color:#444;">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
