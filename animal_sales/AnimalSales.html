@@ -200,13 +200,14 @@ input[readonly]{background:#f8fafc}
 <div class="page" id="page-customers">
   <div class="card">
     <div class="card-title">Add New Customer</div>
+    <p style="color:#666;font-size:.83rem;margin-bottom:14px">Admin Charges set here are automatically applied to every sale for this customer.</p>
     <div id="cust-flash"></div>
     <div class="form-grid">
       <div class="fg"><label>Customer Name *</label><input id="c-name" placeholder="e.g. Sajid Bhai"></div>
       <div class="fg"><label>Phone</label><input id="c-phone" placeholder="0300-0000000"></div>
-      <div class="fg"><label>Admin Charges (Rs.)</label>
+      <div class="fg"><label>Admin Charges (Rs.) *</label>
         <input id="c-admin" type="number" step="1" placeholder="e.g. 30000">
-        <span class="hint">Fixed admin charges applied to every sale for this customer.</span></div>
+        <span class="hint">Fixed per sale — transport, qasai, other expenses.</span></div>
       <div class="fg full"><label>Address</label><input id="c-address" placeholder="Optional"></div>
     </div>
     <div class="form-actions">
@@ -297,10 +298,9 @@ input[readonly]{background:#f8fafc}
 <div class="page" id="page-settings">
   <div class="card" style="max-width:520px;margin-left:auto;margin-right:auto">
     <div class="card-title">Default Settings</div>
-    <p style="color:#666;font-size:.83rem;margin-bottom:14px">Pre-filled defaults when adding animals or recording sales. Override anytime.</p>
+    <p style="color:#666;font-size:.83rem;margin-bottom:14px">Pre-filled defaults when recording sales. Override anytime.</p>
     <div style="display:flex;flex-direction:column;gap:13px">
       <div class="fg"><label>Rate per kg Live Weight (Rs.)</label><input id="cfg-rate" type="number"></div>
-      <div class="fg"><label>Default Admin Charges per Animal (Rs.)</label><input id="cfg-admin" type="number"></div>
       <div class="fg"><label>Number of Persons (for Beef calculations)</label><input id="cfg-persons" type="number">
         <span class="hint">Used to calculate Beef Qty per person and Beef Rate per person.</span></div>
       <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:4px">Save Settings</button>
@@ -369,6 +369,31 @@ input[readonly]{background:#f8fafc}
     <button class="modal-close no-print" onclick="closeModal('ledger-overlay')">&#10005;</button>
     <div class="print-area" id="ledger-content"></div>
     <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap" class="no-print" id="ledger-actions"></div>
+  </div>
+</div>
+
+<!-- ══════════ EDIT CUSTOMER MODAL ══════════ -->
+<div class="overlay" id="editcust-overlay">
+  <div class="modal" style="max-width:500px">
+    <button class="modal-close" onclick="closeModal('editcust-overlay')">&#10005;</button>
+    <div class="card-title">Edit Customer</div>
+    <div id="editcust-flash"></div>
+    <input type="hidden" id="ec-id">
+    <div class="form-grid" style="margin-top:14px">
+      <div class="fg"><label>Customer Name *</label>
+        <input id="ec-name" placeholder="e.g. Sajid Bhai"></div>
+      <div class="fg"><label>Phone</label>
+        <input id="ec-phone" placeholder="0300-0000000"></div>
+      <div class="fg"><label>Admin Charges (Rs.)</label>
+        <input id="ec-admin" type="number" step="1" placeholder="e.g. 30000">
+        <span class="hint">Fixed admin charges for every sale to this customer.</span></div>
+      <div class="fg full"><label>Address</label>
+        <input id="ec-address" placeholder="Optional"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-success" onclick="saveCustomerEdit()">Save Changes</button>
+      <button class="btn btn-light" onclick="closeModal('editcust-overlay')">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -867,9 +892,38 @@ function renderCustomers(){
       <td style="display:flex;gap:5px;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="showLedger(${c.id})">Ledger</button>
         <button class="btn btn-success btn-sm" onclick="openPayment(${c.id})">+ Pay</button>
+        <button class="btn btn-light btn-sm" onclick="openCustomerEdit(${c.id})">&#9998; Edit</button>
       </td>
     </tr>`;
   }).join('');
+}
+
+function openCustomerEdit(cid){
+  const c=DB.customers.find(x=>x.id===cid); if(!c) return;
+  document.getElementById('ec-id').value=cid;
+  document.getElementById('ec-name').value=c.name||'';
+  document.getElementById('ec-phone').value=c.phone||'';
+  document.getElementById('ec-admin').value=c.admin_charges!=null?c.admin_charges:'';
+  document.getElementById('ec-address').value=c.address||'';
+  document.getElementById('editcust-flash').innerHTML='';
+  document.getElementById('editcust-overlay').classList.add('open');
+}
+
+function saveCustomerEdit(){
+  const cid=parseInt(document.getElementById('ec-id').value);
+  const c=DB.customers.find(x=>x.id===cid); if(!c) return;
+  const name=(document.getElementById('ec-name').value||'').trim();
+  if(!name){flash('editcust-flash','Customer name is required.','err');return;}
+  const adminVal=document.getElementById('ec-admin').value;
+  c.name=name;
+  c.phone=document.getElementById('ec-phone').value||'';
+  c.admin_charges=adminVal!==''?parseFloat(adminVal):null;
+  c.address=document.getElementById('ec-address').value||'';
+  save();
+  closeModal('editcust-overlay');
+  renderCustomers();
+  // refresh sale dropdowns so updated admin charge takes effect
+  if(document.getElementById('page-sale').classList.contains('active')) initSaleForm();
 }
 
 // ══════════════════════════ NEW SALE ══════════════════════════
@@ -884,17 +938,13 @@ function initSaleForm(){
   DB.customers.forEach(c=>csel.innerHTML+=`<option value="${c.id}" data-adm="${c.admin_charges!=null?c.admin_charges:''}">${c.name}</option>`);
   document.getElementById('s-date').value=today();
   document.getElementById('s-rate').value=DB.settings.rate_per_kg||780;
-  document.getElementById('s-admin').value=DB.settings.admin_charges||30000;
+  document.getElementById('s-admin').value='';
   ['s-weight','s-saleprice','s-total','s-beefqty','s-beefrate','s-notes'].forEach(id=>document.getElementById(id).value='');
 }
 
 function customerSelected(){
   const opt=document.getElementById('s-customer').options[document.getElementById('s-customer').selectedIndex];
-  if(opt.dataset.adm!==undefined&&opt.dataset.adm!==''){
-    document.getElementById('s-admin').value=opt.dataset.adm;
-  } else {
-    document.getElementById('s-admin').value=DB.settings.admin_charges||30000;
-  }
+  document.getElementById('s-admin').value=(opt.dataset.adm!==undefined&&opt.dataset.adm!=='')?opt.dataset.adm:'';
   calcSaleTotal();
 }
 
@@ -1012,10 +1062,8 @@ function esCalc(){
 
 function esCustomerChanged(){
   const opt=document.getElementById('es-customer').options[document.getElementById('es-customer').selectedIndex];
-  if(opt&&opt.dataset.adm!==undefined&&opt.dataset.adm!==''){
-    document.getElementById('es-admin').value=opt.dataset.adm;
-  } else if(opt&&opt.value){
-    document.getElementById('es-admin').value=DB.settings.admin_charges||30000;
+  if(opt&&opt.value){
+    document.getElementById('es-admin').value=(opt.dataset.adm!==undefined&&opt.dataset.adm!=='')?opt.dataset.adm:'';
   }
   esCalc();
 }
@@ -1254,12 +1302,10 @@ function showPayReceipt(rno){
 // ══════════════════════════ SETTINGS ══════════════════════════
 function renderSettings(){
   document.getElementById('cfg-rate').value=DB.settings.rate_per_kg||780;
-  document.getElementById('cfg-admin').value=DB.settings.admin_charges||30000;
   document.getElementById('cfg-persons').value=DB.settings.num_persons||7;
 }
 function saveSettings(){
   DB.settings.rate_per_kg=parseFloat(document.getElementById('cfg-rate').value)||780;
-  DB.settings.admin_charges=parseFloat(document.getElementById('cfg-admin').value)||0;
   DB.settings.num_persons=parseInt(document.getElementById('cfg-persons').value)||7;
   save(); alert('Settings saved!');
 }
