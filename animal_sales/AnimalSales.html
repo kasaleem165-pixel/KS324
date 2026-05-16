@@ -466,7 +466,7 @@ const SEED_ANIMALS=[
   {code:"148",purchase_date:"2025-08-13",description:"Batch of 8 Wacchas purchased from Ludan Mandi",age_type:"Dondha",weight_final:201,admin_charges:30000,assigned_customer:null,status:"available"},
   {code:"149",purchase_date:"2025-08-13",description:"Batch of 8 Wacchas purchased from Ludan Mandi",age_type:"Dondha",weight_final:235,admin_charges:30000,assigned_customer:null,status:"available"},
   {code:"150",purchase_date:"2025-08-13",description:"Batch of 8 Wacchas purchased from Ludan Mandi",age_type:"Dondha",weight_final:240,admin_charges:30000,assigned_customer:null,status:"available"},
-  {code:"151",purchase_date:"2025-08-13",description:"Batch of 8 Wacchas purchased from Ludan Mandi",age_type:"Dondha",weight_final:324,admin_charges:30000,assigned_customer:null,status:"sold"},
+  {code:"151",purchase_date:"2025-08-13",description:"Batch of 8 Wacchas purchased from Ludan Mandi",age_type:"Dondha",weight_final:324,admin_charges:30000,assigned_customer:null,status:"available"},
   {code:"152",purchase_date:"2025-08-13",description:"Batch of 8 Wacchas purchased from Ludan Mandi",age_type:"Dondha",weight_final:250,admin_charges:30000,assigned_customer:null,status:"available"},
   {code:"154",purchase_date:"2025-08-13",description:"Batch of 8 Wacchas purchased from Ludan Mandi",age_type:"Dondha",weight_final:260,admin_charges:30000,assigned_customer:null,status:"available"},
   {code:"155",purchase_date:"2025-08-16",description:"Batch of 6 Wacchas purchased from Multan Mandi",age_type:"Dondha",weight_final:213,admin_charges:30000,assigned_customer:null,status:"available"},
@@ -482,11 +482,11 @@ const SEED_ANIMALS=[
   {code:"168",purchase_date:"2026-02-15",description:"Batch of 3 Waccha lot purchased from ???",age_type:"Dondha",weight_final:268,admin_charges:30000,assigned_customer:null,status:"available"},
   {code:"169",purchase_date:"2026-02-15",description:"Batch of 3 Waccha lot purchased from ???",age_type:"Kheera",weight_final:241,admin_charges:30000,assigned_customer:null,status:"available"},
   {code:"176",purchase_date:"2026-03-27",description:"1 Waccha purchased from Taragarh Tibba",age_type:"Dondha",weight_final:271,admin_charges:30000,assigned_customer:null,status:"available"},
-  {code:"177",purchase_date:"2026-04-01",description:"1 Waccha purchased from Mustafa Bhai",age_type:"Dondha",weight_final:161,admin_charges:30000,assigned_customer:null,status:"sold"},
+  {code:"177",purchase_date:"2026-04-01",description:"1 Waccha purchased from Mustafa Bhai",age_type:"Dondha",weight_final:161,admin_charges:30000,assigned_customer:null,status:"available"},
   {code:"178",purchase_date:"2026-04-01",description:"1 Waccha purchased from Mustafa Bhai",age_type:"Dondha",weight_final:190,admin_charges:30000,assigned_customer:null,status:"available"},
-  {code:"181",purchase_date:"2026-04-14",description:"1 Waccha white colour purchased from Tahir Dealer",age_type:"Kheera",weight_final:192,admin_charges:30000,assigned_customer:null,status:"sold"},
-  {code:"182",purchase_date:"2026-05-01",description:"1 Waccha purchased from Biibi Shahnaz 180 Kg",age_type:"Dondha",weight_final:170,admin_charges:30000,assigned_customer:null,status:"sold"},
-  {code:"183",purchase_date:"2026-05-01",description:"1 Waccha purchased from Waqar 160 Kg",age_type:"Dondha",weight_final:170,admin_charges:30000,assigned_customer:null,status:"sold"},
+  {code:"181",purchase_date:"2026-04-14",description:"1 Waccha white colour purchased from Tahir Dealer",age_type:"Kheera",weight_final:192,admin_charges:30000,assigned_customer:null,status:"available"},
+  {code:"182",purchase_date:"2026-05-01",description:"1 Waccha purchased from Biibi Shahnaz 180 Kg",age_type:"Dondha",weight_final:170,admin_charges:30000,assigned_customer:null,status:"available"},
+  {code:"183",purchase_date:"2026-05-01",description:"1 Waccha purchased from Waqar 160 Kg",age_type:"Dondha",weight_final:170,admin_charges:30000,assigned_customer:null,status:"available"},
   {code:"184",purchase_date:"2026-05-01",description:"1 Waccha purchased from Waseem Abbas 230 Kg",age_type:"Kheera",weight_final:231,admin_charges:30000,assigned_customer:null,status:"available"},
   {code:"185",purchase_date:"2026-05-03",description:"Batch of 4 Waccahs purchased from Tughran Basti",age_type:"Kheera",weight_final:205,admin_charges:30000,assigned_customer:null,status:"available"},
   {code:"186",purchase_date:"2026-05-03",description:"Batch of 4 Waccahs purchased from Tughran Basti",age_type:"Dondha",weight_final:245,admin_charges:30000,assigned_customer:null,status:"available"},
@@ -508,6 +508,16 @@ function load(){
     if(!DB.settings) DB.settings=Object.assign({},SEED_SETTINGS);
     if(!DB.settings.num_persons) DB.settings.num_persons=7;
     if(!DB.settings.admin_charges) DB.settings.admin_charges=DB.settings.expenses_default||30000;
+    // fix animals wrongly seeded as "sold" with no actual sale record
+    const soldCodes=["151","177","181","182","183"];
+    let fixed=false;
+    DB.animals.forEach(a=>{
+      if(soldCodes.includes(a.code)&&a.status==="sold"){
+        const hasSale=DB.sales&&DB.sales.some(s=>s.animal_code===a.code||s.animal_id===a.code);
+        if(!hasSale){a.status="available";fixed=true;}
+      }
+    });
+    if(fixed) save();
   } else {
     // First launch — load Excel data + photos
     DB.animals  = SEED_ANIMALS.map(a=>{
