@@ -191,6 +191,9 @@ input[readonly]{background:#f8fafc}
   </div>
   <div class="card">
     <div class="card-title">Animals Register</div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button class="btn btn-light btn-sm" onclick="exportAnimalsExcel()">&#8595; Export to Excel</button>
+    </div>
     <div class="tbl-wrap"><table>
       <thead id="animals-head"></thead>
       <tbody id="animals-body"></tbody>
@@ -217,6 +220,7 @@ input[readonly]{background:#f8fafc}
           <option value="asc">▲ Ascending</option>
           <option value="desc">▼ Descending</option>
         </select>
+        <button class="btn btn-light btn-sm" onclick="exportStockExcel()">&#8595; Excel</button>
         <button class="btn btn-light btn-sm" onclick="window.print()">&#128438; Print</button>
       </div>
     </div>
@@ -248,7 +252,10 @@ input[readonly]{background:#f8fafc}
     </div>
   </div>
   <div class="card">
-    <div class="card-title">All Customers</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+      <div class="card-title" style="margin:0">All Customers</div>
+      <button class="btn btn-light btn-sm" onclick="exportCustomersExcel()">&#8595; Export to Excel</button>
+    </div>
     <div class="tbl-wrap"><table>
       <thead id="customers-head"></thead>
       <tbody id="customers-body"></tbody>
@@ -298,7 +305,10 @@ input[readonly]{background:#f8fafc}
 <!-- ══════════ ALL SALES ══════════ -->
 <div class="page" id="page-sales">
   <div class="card">
-    <div class="card-title">All Sales</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+      <div class="card-title" style="margin:0">All Sales</div>
+      <button class="btn btn-light btn-sm" onclick="exportSalesExcel()">&#8595; Export to Excel</button>
+    </div>
     <div class="tbl-wrap"><table>
       <thead id="sales-head"></thead>
       <tbody id="sales-body"></tbody>
@@ -311,7 +321,10 @@ input[readonly]{background:#f8fafc}
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
       <div class="card-title" style="margin:0">Payment Receipts</div>
-      <button class="btn btn-success btn-sm" onclick="openPayment(0)">+ Record Payment</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-light btn-sm" onclick="exportPaymentsExcel()">&#8595; Export to Excel</button>
+        <button class="btn btn-success btn-sm" onclick="openPayment(0)">+ Record Payment</button>
+      </div>
     </div>
     <div class="tbl-wrap"><table>
       <thead id="payments-head"></thead>
@@ -1595,6 +1608,87 @@ function saveSettings(){
   DB.settings.rate_per_kg=parseFloat(document.getElementById('cfg-rate').value)||780;
   DB.settings.num_persons=parseInt(document.getElementById('cfg-persons').value)||7;
   save(); alert('Settings saved!');
+}
+
+// ══════════════════════════ EXCEL EXPORT ══════════════════════════
+function exportCSV(headers,rows,filename){
+  const BOM='﻿';
+  const esc=v=>{const s=String(v==null?'':v);return(s.includes(',')||s.includes('"')||s.includes('\n'))?'"'+s.replace(/"/g,'""')+'"':s;};
+  const csv=BOM+[headers,...rows].map(r=>r.map(esc).join(',')).join('\r\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download=filename+'_'+today()+'.csv';
+  a.click();
+}
+
+function exportAnimalsExcel(){
+  const np=DB.settings.num_persons||7;
+  const list=sortArr(animalComputedList(),SORT.animals.col,SORT.animals.dir);
+  const headers=['Code','Purchase Date','Age/Type','Description','Weight (kg)','Sale Price (Rs.)','Admin Charges (Rs.)','Total Cost (Rs.)','Beef Qty/Person (kg)','Beef Rate/Person (Rs./kg)','Status','Customer'];
+  const rows=list.map(a=>[
+    a.code,a.purchase_date||'',a.age_type||'',a.description||'',
+    a._w||'',a._w?a._sp.toFixed(0):'',a._adm.toFixed(0),a._w?a._tc.toFixed(0):'',
+    a._w?a._bq.toFixed(2):'',a._w?a._br.toFixed(0):'',
+    a.status==='available'?'Available':'Sold',
+    a._custId?cName(a._custId):''
+  ]);
+  exportCSV(headers,rows,'Animals_Register');
+}
+
+function exportStockExcel(){
+  const col=document.getElementById('stock-sort-col').value;
+  const dir=document.getElementById('stock-sort-dir').value;
+  const list=sortArr(animalComputedList(a=>a.status==='available'),col,dir);
+  const headers=['Code','Purchase Date','Age/Type','Weight (kg)','Sale Price (Rs.)','Admin Charges (Rs.)','Total Cost (Rs.)','Beef Qty/Person (kg)','Beef Rate/Person (Rs./kg)'];
+  const rows=list.map(a=>[
+    a.code,a.purchase_date||'',a.age_type||'',
+    a._w||'',a._w?a._sp.toFixed(0):'',a._adm.toFixed(0),a._w?a._tc.toFixed(0):'',
+    a._w?a._bq.toFixed(2):'',a._w?a._br.toFixed(0):''
+  ]);
+  exportCSV(headers,rows,'Available_Stock');
+}
+
+function exportSalesExcel(){
+  const np=DB.settings.num_persons||7;
+  const withC=[...DB.sales].map(s=>Object.assign({},s,{customerName:cName(s.customer_id),sp:s.weight_at_sale*s.rate_per_kg}));
+  const list=sortArr(withC,SORT.sales.col,SORT.sales.dir);
+  const headers=['Receipt No','Date','Animal Code','Age/Type','Customer','Weight (kg)','Rate/kg (Rs.)','Sale Price (Rs.)','Admin Charges (Rs.)','Total Amount (Rs.)','Beef Qty/Person (kg)','Beef Rate/Person (Rs./kg)','Notes'];
+  const rows=list.map(s=>{
+    const bq=(s.weight_at_sale/2)/np;
+    const br=bq>0?(s.amount/np)/bq:0;
+    return [s.receipt_no,s.sale_date,s.animal_code,aType(s.animal_code),s.customerName,
+      s.weight_at_sale,s.rate_per_kg,s.sp.toFixed(0),(s.admin_charges||0).toFixed(0),s.amount.toFixed(0),
+      bq.toFixed(2),br.toFixed(0),s.notes||''];
+  });
+  exportCSV(headers,rows,'Sales_Records');
+}
+
+function exportPaymentsExcel(){
+  const withC=[...DB.payments].map(p=>Object.assign({},p,{customerName:cName(p.customer_id)}));
+  const list=sortArr(withC,SORT.payments.col,SORT.payments.dir);
+  const headers=['Receipt No','Date','Customer','Method','Bank','Sender','Place','Amount Received (Rs.)','Discount (Rs.)','Notes'];
+  const rows=list.map(p=>[
+    p.receipt_no||'',p.pay_date,p.customerName,p.type||'Cash',
+    p.bank_name||'',p.sender_name||'',p.place||'',
+    (p.amount||0).toFixed(0),(p.discount||0).toFixed(0),p.notes||''
+  ]);
+  exportCSV(headers,rows,'Payments');
+}
+
+function exportCustomersExcel(){
+  const withTotals=DB.customers.map(c=>{
+    const {ts,tp,td,balance}=custTotals(c.id);
+    return Object.assign({},c,{ts,tp,td,balance});
+  });
+  const list=sortArr(withTotals,SORT.customers.col,SORT.customers.dir);
+  const headers=['Customer Name','Phone','Admin Charges (Rs.)','Address','Total Sales (Rs.)','Received (Rs.)','Discount (Rs.)','Balance Due (Rs.)'];
+  const rows=list.map(c=>[
+    c.name,c.phone||'',
+    c.admin_charges!=null?c.admin_charges.toFixed(0):'',
+    c.address||'',
+    c.ts.toFixed(0),c.tp.toFixed(0),c.td.toFixed(0),c.balance.toFixed(0)
+  ]);
+  exportCSV(headers,rows,'Customers');
 }
 
 // ══════════════════════════ BACKUP ══════════════════════════
