@@ -127,7 +127,8 @@ input[readonly]{background:#f8fafc}
 <nav>
   <span class="brand">&#127803; Animal Sales</span>
   <button onclick="show('dashboard')"  id="nav-dashboard"  class="active">Dashboard</button>
-  <button onclick="show('animals')"    id="nav-animals">Animals</button>
+  <button onclick="show('animals')"    id="nav-animals">Animals Register</button>
+  <button onclick="show('stock')"      id="nav-stock">Available Stock</button>
   <button onclick="show('customers')"  id="nav-customers">Customers</button>
   <button onclick="show('sale')"       id="nav-sale">+ New Sale</button>
   <button onclick="show('sales')"      id="nav-sales">Sales</button>
@@ -207,7 +208,10 @@ input[readonly]{background:#f8fafc}
       <tbody id="animals-body"></tbody>
     </table></div>
   </div>
-  <!-- Available Stock Report -->
+</div>
+
+<!-- ══════════ AVAILABLE STOCK ══════════ -->
+<div class="page" id="page-stock">
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px">
       <div class="card-title" style="margin:0">Available Stock Report</div>
@@ -232,7 +236,7 @@ input[readonly]{background:#f8fafc}
         <button class="btn btn-light btn-sm" onclick="window.print()">&#128438; Print</button>
       </div>
     </div>
-    <p style="font-size:.8rem;color:#888;margin-bottom:12px">Showing available animals only. Click any column header to sort.</p>
+    <p style="font-size:.8rem;color:#888;margin-bottom:12px">Available animals grouped by type. Click any column header to sort within each group.</p>
     <div class="tbl-wrap"><table>
       <thead id="stock-head"></thead>
       <tbody id="stock-body"></tbody>
@@ -730,7 +734,7 @@ function show(p){
   document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   document.getElementById('nav-'+p).classList.add('active');
-  const fn={dashboard:renderDashboard,animals:renderAnimals,customers:renderCustomers,
+  const fn={dashboard:renderDashboard,animals:renderAnimals,stock:renderStockReport,customers:renderCustomers,
             sale:initSaleForm,sales:renderSales,payments:renderPayments,settings:renderSettings};
   if(fn[p]) fn[p]();
 }
@@ -810,30 +814,86 @@ function showDashDetail(key){
   const np=DB.settings.num_persons||7;
   let html='';
   if(key==='all'||key==='available'||key==='sold'){
-    const list=key==='all'?DB.animals:DB.animals.filter(a=>a.status===key);
+    const rawList=key==='all'?DB.animals:DB.animals.filter(a=>a.status===key);
     const title={all:'All Animals',available:'Available Animals',sold:'Sold Animals'}[key];
-    html=`<h2 style="color:#1a3a5c;margin-bottom:14px">${title} <span style="font-size:.85rem;font-weight:400;color:#777">(${list.length})</span></h2>`;
-    if(!list.length){html+='<p style="color:#aaa;font-style:italic">No animals found.</p>';}
+    const hasSaleCol=(key==='sold'||key==='all');
+    html=`<h2 style="color:#1a3a5c;margin-bottom:14px">${title} <span style="font-size:.85rem;font-weight:400;color:#777">(${rawList.length})</span></h2>`;
+    if(!rawList.length){html+='<p style="color:#aaa;font-style:italic">No animals found.</p>';}
     else{
-      html+=`<div class="tbl-wrap"><table><thead><tr>
-        <th>Code</th><th>Age</th><th>Weight (kg)</th><th>Sale Price</th><th>Admin</th><th>Total Cost</th><th>Status</th><th>Customer</th>${key==='sold'?'<th>Sale</th>':''}
-      </tr></thead><tbody>`;
-      list.forEach(a=>{
-        const f=calcFields(a.weight_final||0,a.admin_charges||0);
+      // build computed list
+      const list=rawList.map(a=>{
         const sale=DB.sales.find(s=>s.animal_code===a.code);
-        const custId=a.assigned_customer||(sale?sale.customer_id:null);
-        html+=`<tr>
-          <td><strong>${a.code}</strong></td><td>${a.age_type||'-'}</td>
-          <td>${a.weight_final||'-'} kg</td>
-          <td>${a.weight_final?Rs(f.salePrice):'-'}</td>
-          <td>${a.admin_charges!=null?Rs(a.admin_charges):'-'}</td>
-          <td>${a.weight_final?Rs(f.totalCost):'-'}</td>
-          <td><span class="badge ${a.status}">${a.status==='available'?'Available':'Sold'}</span></td>
-          <td>${custId?cName(custId):'-'}</td>
-          ${key==='sold'&&sale?`<td><button class="btn btn-primary btn-sm" onclick="showReceipt('${sale.receipt_no}')">Receipt</button></td>`:(key==='sold'?'<td>-</td>':'')}
-        </tr>`;
+        const w=sale?sale.weight_at_sale:(a.weight_final||0);
+        const adm=sale?sale.admin_charges:(a.admin_charges||0);
+        const f=w?calcFields(w,adm):{salePrice:0,totalCost:0,beefQty:0,beefRate:0};
+        return Object.assign({},a,{_w:w,_adm:adm,_sp:f.salePrice,_tc:f.totalCost,_bq:f.beefQty,_br:f.beefRate,_sale:sale,_custId:sale?sale.customer_id:a.assigned_customer});
       });
-      html+='</tbody></table></div>';
+      const cols=9+(hasSaleCol?1:0);
+      const thead=`<thead><tr>
+        <th>Code</th><th>Age</th><th>Weight (kg)</th><th>Sale Price</th><th>Admin</th>
+        <th>Total Cost</th><th>Beef Qty/P</th><th>Beef Rate/P</th>
+        <th>Status</th>${hasSaleCol?'<th>Sale</th>':''}
+      </tr></thead>`;
+
+      function dashAnimalRow(a){
+        const isKheera=(a.age_type||'').toLowerCase()==='kheera';
+        const bg=isKheera?'background:#fffbeb;':'';
+        return `<tr style="${bg}">
+          <td><strong>${a.code}</strong></td>
+          <td>${isKheera?`<span style="background:#d97706;color:#fff;border-radius:4px;padding:1px 6px;font-size:.75rem">Kheera</span>`:(a.age_type||'-')}</td>
+          <td>${a._w||'-'} kg</td>
+          <td>${a._w?Rs(a._sp):'-'}</td>
+          <td>${Rs(a._adm)}</td>
+          <td>${a._w?Rs(a._tc):'-'}</td>
+          <td>${a._w?fmtN(a._bq,2)+' kg':'-'}</td>
+          <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
+          <td><span class="badge ${a.status}">${a.status==='available'?'Available':'Sold'}</span></td>
+          ${hasSaleCol?(a._sale?`<td><button class="btn btn-primary btn-sm" onclick="showReceipt('${a._sale.receipt_no}')">Receipt</button></td>`:'<td>-</td>'):''}
+        </tr>`;
+      }
+      function dashSubtotal(grpList,label,color){
+        if(!grpList.length) return '';
+        const tw=grpList.reduce((s,a)=>s+(a._w||0),0);
+        const tsp=grpList.reduce((s,a)=>s+a._sp,0);
+        const tadm=grpList.reduce((s,a)=>s+a._adm,0);
+        const ttc=grpList.reduce((s,a)=>s+a._tc,0);
+        const tbq=grpList.reduce((s,a)=>s+a._bq,0);
+        return `<tr style="background:${color};font-weight:700;font-size:.81rem;border-top:2px solid #cbd5e1">
+          <td colspan="2" style="color:#1a3a5c">${label} Subtotal (${grpList.length})</td>
+          <td>${tw.toFixed(1)} kg</td><td>${Rs(tsp)}</td><td>${Rs(tadm)}</td>
+          <td>${Rs(ttc)}</td><td>${tbq.toFixed(2)} kg</td><td>—</td><td></td>${hasSaleCol?'<td></td>':''}
+        </tr>`;
+      }
+      const dondha=list.filter(a=>(a.age_type||'').toLowerCase()==='dondha');
+      const kheera=list.filter(a=>(a.age_type||'').toLowerCase()==='kheera');
+      const others=list.filter(a=>{const t=(a.age_type||'').toLowerCase();return t!=='dondha'&&t!=='kheera';});
+      const gtw=list.reduce((s,a)=>s+(a._w||0),0);
+      const gtsp=list.reduce((s,a)=>s+a._sp,0);
+      const gtadm=list.reduce((s,a)=>s+a._adm,0);
+      const gttc=list.reduce((s,a)=>s+a._tc,0);
+      const gtbq=list.reduce((s,a)=>s+a._bq,0);
+      let tbody='';
+      if(dondha.length){
+        tbody+=`<tr style="background:#dbeafe;font-weight:700"><td colspan="${cols}" style="color:#1e40af;padding:8px 10px">&#9654; Dondha <span style="background:#1e40af;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${dondha.length}</span></td></tr>`;
+        tbody+=dondha.map(dashAnimalRow).join('');
+        tbody+=dashSubtotal(dondha,'Dondha','#e0f2fe');
+      }
+      if(kheera.length){
+        tbody+=`<tr style="background:#fef3c7;font-weight:700"><td colspan="${cols}" style="color:#92400e;padding:8px 10px">&#9654; Kheera <span style="background:#d97706;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${kheera.length}</span></td></tr>`;
+        tbody+=kheera.map(dashAnimalRow).join('');
+        tbody+=dashSubtotal(kheera,'Kheera','#fef3c7');
+      }
+      if(others.length){
+        tbody+=`<tr style="background:#f3f4f6;font-weight:700"><td colspan="${cols}" style="color:#374151;padding:8px 10px">&#9654; Other <span style="background:#6b7280;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${others.length}</span></td></tr>`;
+        tbody+=others.map(dashAnimalRow).join('');
+        tbody+=dashSubtotal(others,'Other','#f3f4f6');
+      }
+      tbody+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.85rem;border-top:3px solid #0f2540">
+        <td colspan="2">TOTAL — ${list.length} &nbsp;(D:${dondha.length} K:${kheera.length}${others.length?' O:'+others.length:''})</td>
+        <td>${gtw.toFixed(1)} kg</td><td>${Rs(gtsp)}</td><td>${Rs(gtadm)}</td>
+        <td>${Rs(gttc)}</td><td>${gtbq.toFixed(2)} kg</td><td>—</td><td></td>${hasSaleCol?'<td></td>':''}
+      </tr>`;
+      html+=`<div class="tbl-wrap"><table>${thead}<tbody>${tbody}</tbody></table></div>`;
     }
   } else if(key==='revenue'){
     const total=DB.sales.reduce((a,s)=>a+s.amount,0);
@@ -1120,7 +1180,6 @@ function renderAnimals(){
       <td>${a._sale?`<button class="btn btn-primary btn-sm" onclick="showReceipt('${a._sale.receipt_no}')">Receipt</button>`:''}</td>
     </tr>`;
   }).join('');
-  renderStockReport();
 }
 
 function renderStockReport(){
