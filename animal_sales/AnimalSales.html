@@ -204,6 +204,9 @@ input[readonly]{background:#f8fafc}
     <div class="form-grid">
       <div class="fg"><label>Customer Name *</label><input id="c-name" placeholder="e.g. Sajid Bhai"></div>
       <div class="fg"><label>Phone</label><input id="c-phone" placeholder="0300-0000000"></div>
+      <div class="fg"><label>Admin Charges (Rs.)</label>
+        <input id="c-admin" type="number" step="1" placeholder="e.g. 30000">
+        <span class="hint">Fixed admin charges applied to every sale for this customer.</span></div>
       <div class="fg full"><label>Address</label><input id="c-address" placeholder="Optional"></div>
     </div>
     <div class="form-actions">
@@ -214,7 +217,7 @@ input[readonly]{background:#f8fafc}
   <div class="card">
     <div class="card-title">All Customers</div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>Name</th><th>Phone</th><th>Address</th><th>Total Sales</th><th>Received</th><th>Discount</th><th>Balance</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Phone</th><th>Admin Charges</th><th>Address</th><th>Total Sales</th><th>Received</th><th>Discount</th><th>Balance</th><th></th></tr></thead>
       <tbody id="customers-body"></tbody>
     </table></div>
   </div>
@@ -231,7 +234,7 @@ input[readonly]{background:#f8fafc}
           <option value="">-- Select Animal --</option>
         </select></div>
       <div class="fg"><label>Customer *</label>
-        <select id="s-customer"><option value="">-- Select Customer --</option></select></div>
+        <select id="s-customer" onchange="customerSelected()"><option value="">-- Select Customer --</option></select></div>
       <div class="fg"><label>Sale Date *</label>
         <input id="s-date" type="date"></div>
       <div class="fg"><label>Weight at Sale (kg) *</label>
@@ -325,7 +328,7 @@ input[readonly]{background:#f8fafc}
       <div class="fg"><label>Animal Code *</label>
         <select id="es-animal" onchange="esCalc()"></select></div>
       <div class="fg"><label>Customer *</label>
-        <select id="es-customer"></select></div>
+        <select id="es-customer" onchange="esCustomerChanged()"></select></div>
       <div class="fg"><label>Sale Date *</label>
         <input id="es-date" type="date"></div>
       <div class="fg"><label>Weight at Sale (kg) *</label>
@@ -393,13 +396,31 @@ input[readonly]{background:#f8fafc}
       </div>
 
       <div class="fg" id="bank-name-row" style="display:none"><label>Bank Name</label>
-        <input id="p-bank" placeholder="e.g. Meezan Bank, HBL"></div>
+        <select id="p-bank" onchange="toggleBankOther()">
+          <option value="">-- Select Bank --</option>
+          <option>Meezan Bank</option>
+          <option>HBL (Habib Bank)</option>
+          <option>UBL (United Bank)</option>
+          <option>MCB Bank</option>
+          <option>Allied Bank</option>
+          <option>Bank Alfalah</option>
+          <option>Standard Chartered</option>
+          <option>Faysal Bank</option>
+          <option>Silk Bank</option>
+          <option>JS Bank</option>
+          <option>EasyPaisa</option>
+          <option>JazzCash</option>
+          <option>Sadapay</option>
+          <option value="Other">Other</option>
+        </select></div>
+      <div class="fg" id="bank-other-row" style="display:none"><label>Bank / Wallet Name</label>
+        <input id="p-bank-other" placeholder="Enter bank or wallet name"></div>
       <div class="fg" id="sender-row"><label>Sender Name</label>
         <input id="p-sender" placeholder="Name of person sending money"></div>
 
       <div class="fg"><label>Amount Received (Rs.) *</label>
         <input id="p-amount" type="number" step="1" placeholder="150000"></div>
-      <div class="fg"><label>Place of Receiving Cash</label>
+      <div class="fg" id="place-row"><label>Place of Receiving Cash</label>
         <input id="p-place" placeholder="e.g. Office, Home, Market"></div>
 
       <div class="fg"><label>Discount Allowed (Rs.)</label>
@@ -823,18 +844,22 @@ function renderAnimals(){
 function addCustomer(){
   const name=(document.getElementById('c-name').value||'').trim();
   if(!name){flash('cust-flash','Customer name is required.','err');return;}
-  DB.customers.push({id:Date.now(),name,phone:document.getElementById('c-phone').value||'',address:document.getElementById('c-address').value||''});
+  const adminVal=document.getElementById('c-admin').value;
+  const admin=adminVal!==''?parseFloat(adminVal):null;
+  DB.customers.push({id:Date.now(),name,phone:document.getElementById('c-phone').value||'',address:document.getElementById('c-address').value||'',admin_charges:admin});
   save(); flash('cust-flash',`${name} added.`); clearCustomerForm(); renderCustomers();
 }
-function clearCustomerForm(){['c-name','c-phone','c-address'].forEach(id=>document.getElementById(id).value='');}
+function clearCustomerForm(){['c-name','c-phone','c-admin','c-address'].forEach(id=>document.getElementById(id).value='');}
 
 function renderCustomers(){
   const tb=document.getElementById('customers-body');
-  if(!DB.customers.length){tb.innerHTML=`<tr><td colspan="8" class="empty">No customers yet.</td></tr>`;return;}
+  if(!DB.customers.length){tb.innerHTML=`<tr><td colspan="9" class="empty">No customers yet.</td></tr>`;return;}
   tb.innerHTML=DB.customers.map(c=>{
     const {ts,tp,td,balance}=custTotals(c.id);
     return `<tr>
-      <td><strong>${c.name}</strong></td><td>${c.phone||'-'}</td><td>${c.address||'-'}</td>
+      <td><strong>${c.name}</strong></td><td>${c.phone||'-'}</td>
+      <td>${c.admin_charges!=null?Rs(c.admin_charges):'<span style="color:#aaa">Global</span>'}</td>
+      <td>${c.address||'-'}</td>
       <td>${Rs(ts)}</td>
       <td style="color:#059669">${Rs(tp)}</td>
       <td style="color:#7c3aed">${Rs(td)}</td>
@@ -856,17 +881,26 @@ function initSaleForm(){
   });
   const csel=document.getElementById('s-customer');
   csel.innerHTML='<option value="">-- Select Customer --</option>';
-  DB.customers.forEach(c=>csel.innerHTML+=`<option value="${c.id}">${c.name}</option>`);
+  DB.customers.forEach(c=>csel.innerHTML+=`<option value="${c.id}" data-adm="${c.admin_charges!=null?c.admin_charges:''}">${c.name}</option>`);
   document.getElementById('s-date').value=today();
   document.getElementById('s-rate').value=DB.settings.rate_per_kg||780;
   document.getElementById('s-admin').value=DB.settings.admin_charges||30000;
   ['s-weight','s-saleprice','s-total','s-beefqty','s-beefrate','s-notes'].forEach(id=>document.getElementById(id).value='');
 }
 
+function customerSelected(){
+  const opt=document.getElementById('s-customer').options[document.getElementById('s-customer').selectedIndex];
+  if(opt.dataset.adm!==undefined&&opt.dataset.adm!==''){
+    document.getElementById('s-admin').value=opt.dataset.adm;
+  } else {
+    document.getElementById('s-admin').value=DB.settings.admin_charges||30000;
+  }
+  calcSaleTotal();
+}
+
 function animalSelected(){
   const opt=document.getElementById('s-animal').options[document.getElementById('s-animal').selectedIndex];
   if(opt.dataset.w) document.getElementById('s-weight').value=opt.dataset.w;
-  if(opt.dataset.adm) document.getElementById('s-admin').value=opt.dataset.adm;
   calcSaleTotal();
 }
 
@@ -955,7 +989,7 @@ function openSaleEdit(rno){
   csel.innerHTML='<option value="">-- Select Customer --</option>';
   DB.customers.forEach(c=>{
     const sel=c.id===s.customer_id?'selected':'';
-    csel.innerHTML+=`<option value="${c.id}" ${sel}>${c.name}</option>`;
+    csel.innerHTML+=`<option value="${c.id}" ${sel} data-adm="${c.admin_charges!=null?c.admin_charges:''}">${c.name}</option>`;
   });
 
   document.getElementById('es-date').value=s.sale_date||today();
@@ -974,6 +1008,16 @@ function esCalc(){
   const sp=w&&r?w*r:0;
   document.getElementById('es-saleprice').value=sp?Rs(sp):'';
   document.getElementById('es-total').value=sp?Rs(sp+adm):'';
+}
+
+function esCustomerChanged(){
+  const opt=document.getElementById('es-customer').options[document.getElementById('es-customer').selectedIndex];
+  if(opt&&opt.dataset.adm!==undefined&&opt.dataset.adm!==''){
+    document.getElementById('es-admin').value=opt.dataset.adm;
+  } else if(opt&&opt.value){
+    document.getElementById('es-admin').value=DB.settings.admin_charges||30000;
+  }
+  esCalc();
 }
 
 function saveSaleEdit(){
@@ -1128,7 +1172,8 @@ function openPayment(cid){
   document.getElementById('p-date').value=today();
   document.getElementById('p-amount').value='';
   document.getElementById('p-discount').value='0';
-  document.getElementById('p-bank').value='';
+  document.getElementById('p-bank').selectedIndex=0;
+  document.getElementById('p-bank-other').value='';
   document.getElementById('p-sender').value='';
   document.getElementById('p-place').value='';
   document.getElementById('p-notes').value='';
@@ -1140,6 +1185,13 @@ function setPayCustomer(){ /* selection handled by dropdown */ }
 function toggleBank(){
   const isBank=document.getElementById('pt-bank').checked;
   document.getElementById('bank-name-row').style.display=isBank?'flex':'none';
+  document.getElementById('bank-other-row').style.display='none';
+  document.getElementById('place-row').style.display=isBank?'none':'flex';
+  if(!isBank) document.getElementById('p-bank').selectedIndex=0;
+}
+function toggleBankOther(){
+  const isOther=document.getElementById('p-bank').value==='Other';
+  document.getElementById('bank-other-row').style.display=isOther?'flex':'none';
 }
 function savePayment(){
   const cid=parseInt(document.getElementById('p-cid').value);
@@ -1148,14 +1200,17 @@ function savePayment(){
   const discount=parseFloat(document.getElementById('p-discount').value)||0;
   if(amount<=0&&discount<=0){alert('Enter an amount or discount greater than zero.');return;}
   const rno=nextPayRcp();
-  const type=document.getElementById('pt-bank').checked?'Bank':'Cash';
+  const isBank=document.getElementById('pt-bank').checked;
+  const type=isBank?'Bank':'Cash';
+  const bankSel=document.getElementById('p-bank').value;
+  const bankName=isBank?(bankSel==='Other'?document.getElementById('p-bank-other').value||'Other':bankSel):'';
   DB.payments.push({
     id:Date.now(), receipt_no:rno, customer_id:cid,
     pay_date:document.getElementById('p-date').value,
     amount, type,
-    bank_name:document.getElementById('p-bank').value||'',
+    bank_name:bankName,
     sender_name:document.getElementById('p-sender').value||'',
-    place:document.getElementById('p-place').value||'',
+    place:isBank?'':document.getElementById('p-place').value||'',
     discount,
     notes:document.getElementById('p-notes').value||''
   });
