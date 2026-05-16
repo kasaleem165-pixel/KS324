@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Animal Sales Records</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#222;font-size:15px}
+
+/* NAV */
+nav{background:#1a3a5c;display:flex;align-items:center;flex-wrap:wrap;padding:0 16px}
+.brand{color:#fff;font-weight:700;font-size:1.1rem;padding:14px 16px 14px 0;white-space:nowrap}
+nav button{background:none;border:none;color:#b8d0e8;padding:14px 13px;cursor:pointer;font-size:.9rem;font-family:inherit}
+nav button:hover,nav button.active{color:#fff;background:rgba(255,255,255,.12)}
+
+/* LAYOUT */
+.page{display:none;max-width:1100px;margin:24px auto;padding:0 16px}
+.page.active{display:block}
+
+/* CARD */
+.card{background:#fff;border-radius:10px;box-shadow:0 1px 5px rgba(0,0,0,.09);padding:22px 24px;margin-bottom:20px}
+.card-title{font-size:1rem;font-weight:700;color:#1a3a5c;margin-bottom:16px}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:22px}
+.stat{background:#fff;border-radius:10px;box-shadow:0 1px 5px rgba(0,0,0,.09);padding:16px 18px;text-align:center}
+.stat .n{font-size:1.7rem;font-weight:700;color:#1a3a5c}
+.stat .l{font-size:.78rem;color:#777;margin-top:3px}
+.stat.g .n{color:#059669}.stat.r .n{color:#dc2626}.stat.a .n{color:#d97706}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th{background:#f1f5f9;padding:9px 11px;text-align:left;color:#555;font-weight:600;border-bottom:2px solid #e2e8f0;white-space:nowrap}
+td{padding:9px 11px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+tr:hover td{background:#fafbfd}
+.empty{text-align:center;color:#aaa;padding:28px;font-style:italic}
+
+/* BADGE */
+.badge{display:inline-block;padding:2px 9px;border-radius:12px;font-size:.76rem;font-weight:600}
+.badge.available{background:#d1fae5;color:#065f46}
+.badge.sold{background:#fee2e2;color:#991b1b}
+
+/* BUTTONS */
+.btn{display:inline-block;padding:8px 18px;border-radius:6px;font-size:.88rem;cursor:pointer;border:none;font-family:inherit;text-decoration:none}
+.btn-primary{background:#1a3a5c;color:#fff}.btn-primary:hover{background:#143050}
+.btn-success{background:#059669;color:#fff}.btn-success:hover{background:#047857}
+.btn-danger{background:#dc2626;color:#fff}.btn-danger:hover{background:#b91c1c}
+.btn-light{background:#e2e8f0;color:#444}.btn-light:hover{background:#cbd5e1}
+.btn-sm{padding:4px 11px;font-size:.8rem}
+
+/* FORM */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fg{display:flex;flex-direction:column;gap:5px}
+.fg.full{grid-column:1/-1}
+label{font-size:.83rem;color:#444;font-weight:500}
+input,select,textarea{padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:.9rem;font-family:inherit;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid #1a3a5c;border-color:#1a3a5c}
+.hint{font-size:.75rem;color:#999}
+.form-actions{display:flex;gap:10px;margin-top:18px}
+
+/* FLASH */
+.flash{padding:10px 14px;border-radius:6px;margin-bottom:14px;font-size:.88rem}
+.flash.ok{background:#d1fae5;color:#065f46;border:1px solid #6ee7b7}
+.flash.err{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;overflow-y:auto}
+.overlay.open{display:flex;align-items:flex-start;justify-content:center;padding:30px 16px}
+.modal{background:#fff;border-radius:12px;width:100%;max-width:660px;padding:28px;position:relative}
+.modal-close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#888}
+
+/* RECEIPT */
+.rcp-header{text-align:center;border-bottom:2px solid #1a3a5c;padding-bottom:12px;margin-bottom:16px}
+.rcp-header h2{font-size:1.3rem;color:#1a3a5c}
+.rcp-header p{color:#666;font-size:.85rem;margin-top:3px}
+.rcp-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;margin-bottom:16px;font-size:.88rem}
+.rcp-meta span{color:#777}
+.rcp-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:.9rem}
+.rcp-row.total{font-weight:700;font-size:1rem;border-top:2px solid #1a3a5c;border-bottom:none;margin-top:6px;padding-top:10px}
+.sig-row{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:30px;padding-top:14px;border-top:1px solid #e2e8f0}
+.sig-box{text-align:center;font-size:.8rem;color:#666}
+.sig-line{border-top:1px solid #555;margin-top:36px;padding-top:6px}
+
+/* LEDGER */
+.led-stat{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
+
+@media(max-width:600px){
+  .form-grid{grid-template-columns:1fr}
+  .led-stat{grid-template-columns:1fr 1fr}
+  nav button{padding:10px 9px;font-size:.82rem}
+}
+@media print{
+  body *{visibility:hidden}
+  .print-area,.print-area *{visibility:visible}
+  .print-area{position:fixed;top:0;left:0;width:100%;padding:30px}
+  .no-print{display:none!important}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <span class="brand">&#127803; Animal Sales</span>
+  <button onclick="show('dashboard')" id="nav-dashboard" class="active">Dashboard</button>
+  <button onclick="show('animals')"   id="nav-animals">Animals</button>
+  <button onclick="show('customers')" id="nav-customers">Customers</button>
+  <button onclick="show('sale')"      id="nav-sale">+ New Sale</button>
+  <button onclick="show('sales')"     id="nav-sales">All Sales</button>
+  <button onclick="show('settings')"  id="nav-settings">Settings</button>
+</nav>
+
+<!-- ═══════════════════════════ DASHBOARD ═══════════════════════════ -->
+<div class="page active" id="page-dashboard">
+  <div class="stats" id="dash-stats"></div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="card-title" style="margin:0">Recent Sales</div>
+      <button class="btn btn-success btn-sm" onclick="show('sale')">+ New Sale</button>
+    </div>
+    <div class="tbl-wrap"><table id="dash-table">
+      <thead><tr><th>Receipt</th><th>Animal Code</th><th>Customer</th><th>Date</th><th>Amount (Rs.)</th><th></th></tr></thead>
+      <tbody id="dash-body"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ ANIMALS ═══════════════════════════ -->
+<div class="page" id="page-animals">
+  <div class="card">
+    <div class="card-title">Add New Animal</div>
+    <div id="animal-flash"></div>
+    <div class="form-grid">
+      <div class="fg"><label>Animal Code (Unique ID) *</label>
+        <input id="a-code" placeholder="e.g. 151">
+        <span class="hint">Each animal must have a unique number. Cannot be changed later.</span></div>
+      <div class="fg"><label>S.No (Weight List)</label><input id="a-sno" type="number" placeholder="e.g. 36"></div>
+      <div class="fg"><label>Purchase Date</label><input id="a-date" type="date"></div>
+      <div class="fg"><label>Type / Age (e.g. Dondha)</label><input id="a-type" placeholder="Dondha"></div>
+      <div class="fg full"><label>Description</label>
+        <textarea id="a-desc" rows="2" placeholder="e.g. 1 Waccha purchased from Ludan Mandi"></textarea></div>
+      <div class="fg"><label>Initial Weight (kg)</label><input id="a-wi" type="number" step="0.1" placeholder="Weight when bought"></div>
+      <div class="fg"><label>Final / Current Weight (kg)</label><input id="a-wf" type="number" step="0.1" placeholder="Latest weight"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="addAnimal()">Add Animal</button>
+      <button class="btn btn-light" onclick="clearForm('animal')">Clear</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Animals Register</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Code</th><th>S.No</th><th>Date</th><th>Description</th><th>Type</th><th>Initial Wt</th><th>Final Wt</th><th>Change</th><th>Status</th><th>Customer</th><th></th></tr></thead>
+      <tbody id="animals-body"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ CUSTOMERS ═══════════════════════════ -->
+<div class="page" id="page-customers">
+  <div class="card">
+    <div class="card-title">Add New Customer</div>
+    <div id="cust-flash"></div>
+    <div class="form-grid">
+      <div class="fg"><label>Customer Name *</label><input id="c-name" placeholder="e.g. Sajid Bhai"></div>
+      <div class="fg"><label>Phone</label><input id="c-phone" placeholder="0300-0000000"></div>
+      <div class="fg full"><label>Address</label><input id="c-address" placeholder="Optional"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="addCustomer()">Add Customer</button>
+      <button class="btn btn-light" onclick="clearForm('customer')">Clear</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">All Customers</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Name</th><th>Phone</th><th>Address</th><th>Total Sales</th><th>Received</th><th>Balance</th><th></th></tr></thead>
+      <tbody id="customers-body"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ NEW SALE ═══════════════════════════ -->
+<div class="page" id="page-sale">
+  <div class="card" style="max-width:680px;margin-left:auto;margin-right:auto">
+    <div class="card-title">Record New Sale</div>
+    <div id="sale-flash"></div>
+    <div class="form-grid">
+      <div class="fg"><label>Animal Code *</label>
+        <select id="s-animal" onchange="animalSelected()">
+          <option value="">-- Select Animal --</option>
+        </select></div>
+      <div class="fg"><label>Customer *</label>
+        <select id="s-customer">
+          <option value="">-- Select Customer --</option>
+        </select></div>
+      <div class="fg"><label>Weight at Sale (kg) *</label>
+        <input id="s-weight" type="number" step="0.1" placeholder="Final measured weight" oninput="calcTotal()"></div>
+      <div class="fg"><label>Rate per kg (Rs.) *</label>
+        <input id="s-rate" type="number" step="1" oninput="calcTotal()"></div>
+      <div class="fg"><label>Expenses (Rs.)</label>
+        <input id="s-expenses" type="number" step="1" value="0" oninput="calcTotal()">
+        <span class="hint">Admin charges, transport, etc.</span></div>
+      <div class="fg"><label>Total Amount (Rs.)</label>
+        <input id="s-total" readonly style="background:#f8fafc;font-weight:700;font-size:1rem"></div>
+      <div class="fg full"><label>Notes</label>
+        <input id="s-notes" placeholder="Optional"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-success" onclick="recordSale()">Record Sale &amp; Generate Receipt</button>
+      <button class="btn btn-light" onclick="clearForm('sale')">Clear</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ ALL SALES ═══════════════════════════ -->
+<div class="page" id="page-sales">
+  <div class="card">
+    <div class="card-title">All Sales</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Receipt</th><th>Date</th><th>Animal Code</th><th>Type</th><th>Customer</th><th>Weight (kg)</th><th>Rate/kg</th><th>Amount (Rs.)</th><th></th></tr></thead>
+      <tbody id="sales-body"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ SETTINGS ═══════════════════════════ -->
+<div class="page" id="page-settings">
+  <div class="card" style="max-width:480px;margin-left:auto;margin-right:auto">
+    <div class="card-title">Default Settings</div>
+    <p style="color:#666;font-size:.85rem;margin-bottom:16px">These values are pre-filled when you record a new sale. You can change them per sale.</p>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="fg"><label>Default Rate per kg (Rs.)</label><input id="cfg-rate" type="number"></div>
+      <div class="fg"><label>Default Expenses per Animal (Rs.)</label><input id="cfg-exp" type="number"></div>
+      <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:6px">Save Settings</button>
+    </div>
+    <hr style="margin:24px 0;border-color:#f1f5f9">
+    <div class="card-title" style="color:#dc2626">Backup &amp; Restore</div>
+    <p style="color:#666;font-size:.85rem;margin-bottom:12px">Export your data as a backup file. Import it on another computer or to restore.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="exportData()">&#8595; Export Backup</button>
+      <label class="btn btn-light" style="cursor:pointer">&#8593; Import Backup<input type="file" accept=".json" style="display:none" onchange="importData(event)"></label>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ RECEIPT MODAL ═══════════════════════════ -->
+<div class="overlay" id="receipt-overlay">
+  <div class="modal">
+    <button class="modal-close no-print" onclick="closeModal('receipt-overlay')">&#10005;</button>
+    <div class="print-area" id="receipt-content"></div>
+    <div style="display:flex;gap:10px;margin-top:20px" class="no-print">
+      <button class="btn btn-primary" onclick="window.print()">&#128438; Print Receipt</button>
+      <button class="btn btn-light" onclick="closeModal('receipt-overlay')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ LEDGER MODAL ═══════════════════════════ -->
+<div class="overlay" id="ledger-overlay">
+  <div class="modal" style="max-width:800px">
+    <button class="modal-close no-print" onclick="closeModal('ledger-overlay')">&#10005;</button>
+    <div class="print-area" id="ledger-content"></div>
+    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap" class="no-print" id="ledger-actions"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ PAYMENT MODAL ═══════════════════════════ -->
+<div class="overlay" id="payment-overlay">
+  <div class="modal" style="max-width:420px">
+    <button class="modal-close" onclick="closeModal('payment-overlay')">&#10005;</button>
+    <div class="card-title">Record Payment</div>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
+      <div class="fg"><label>Customer</label><input id="p-cname" readonly style="background:#f8fafc"></div>
+      <input type="hidden" id="p-cid">
+      <div class="fg"><label>Date *</label><input id="p-date" type="date"></div>
+      <div class="fg"><label>Amount (Rs.) *</label><input id="p-amount" type="number" step="1" placeholder="150000"></div>
+      <div class="fg"><label>Method / Bank</label>
+        <select id="p-method">
+          <option>Cash</option><option>Meezan Bank</option><option>HBL</option>
+          <option>UBL</option><option>Bank Transfer</option>
+          <option>Easypaisa</option><option>JazzCash</option><option>Cheque</option>
+        </select></div>
+      <div class="fg"><label>Notes</label><input id="p-notes" placeholder="e.g. Received via bank transfer"></div>
+      <div style="display:flex;gap:10px;margin-top:6px">
+        <button class="btn btn-success" onclick="savePayment()">Save Payment</button>
+        <button class="btn btn-light" onclick="closeModal('payment-overlay')">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════ DATA LAYER ═══════════════
+const STORE = 'animal_sales_db';
+let DB = { animals:[], customers:[], sales:[], payments:[], settings:{ rate_per_kg:780, expenses_default:30000 } };
+
+function save(){ localStorage.setItem(STORE, JSON.stringify(DB)); }
+function load(){
+  const d = localStorage.getItem(STORE);
+  if(d) DB = JSON.parse(d);
+  // migrate older data
+  if(!DB.payments) DB.payments = [];
+  if(!DB.settings) DB.settings = { rate_per_kg:780, expenses_default:30000 };
+}
+
+// ═══════════════ NAVIGATION ═══════════════
+function show(page){
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.getElementById('nav-'+page).classList.add('active');
+  if(page==='dashboard')  renderDashboard();
+  if(page==='animals')    renderAnimals();
+  if(page==='customers')  renderCustomers();
+  if(page==='sale')       initSaleForm();
+  if(page==='sales')      renderSales();
+  if(page==='settings')   renderSettings();
+}
+
+// ═══════════════ HELPERS ═══════════════
+function fmtNum(n){ return Number(n).toLocaleString('en-PK'); }
+function fmtDate(d){ return d ? d.substring(0,10) : '-'; }
+function today(){ return new Date().toISOString().substring(0,10); }
+function nextReceipt(){
+  if(!DB.sales.length) return 'RCP-001';
+  const nums = DB.sales.map(s=>parseInt(s.receipt_no.split('-')[1]||0));
+  return 'RCP-'+ String(Math.max(...nums)+1).padStart(3,'0');
+}
+function flash(id,msg,type='ok'){
+  const el=document.getElementById(id);
+  el.innerHTML=`<div class="flash ${type}">${msg}</div>`;
+  setTimeout(()=>el.innerHTML='',3000);
+}
+function customerName(id){ const c=DB.customers.find(x=>x.id===id); return c?c.name:'-'; }
+function animalType(code){ const a=DB.animals.find(x=>x.code===code); return a?a.age_type||'-':'-'; }
+
+// ═══════════════ DASHBOARD ═══════════════
+function renderDashboard(){
+  const total=DB.animals.length, avail=DB.animals.filter(a=>a.status==='available').length;
+  const sold=DB.animals.filter(a=>a.status==='sold').length;
+  const revenue=DB.sales.reduce((s,x)=>s+x.amount,0);
+  const collected=DB.payments.reduce((s,x)=>s+x.amount,0);
+  const pending=revenue-collected;
+  document.getElementById('dash-stats').innerHTML=`
+    <div class="stat"><div class="n">${total}</div><div class="l">Total Animals</div></div>
+    <div class="stat g"><div class="n">${avail}</div><div class="l">Available</div></div>
+    <div class="stat r"><div class="n">${sold}</div><div class="l">Sold</div></div>
+    <div class="stat"><div class="n">Rs.${fmtNum(revenue)}</div><div class="l">Total Revenue</div></div>
+    <div class="stat g"><div class="n">Rs.${fmtNum(collected)}</div><div class="l">Collected</div></div>
+    <div class="stat a"><div class="n">Rs.${fmtNum(pending)}</div><div class="l">Pending</div></div>`;
+  const recent=[...DB.sales].reverse().slice(0,6);
+  const tb=document.getElementById('dash-body');
+  if(!recent.length){ tb.innerHTML=`<tr><td colspan="6" class="empty">No sales yet. Click "+ New Sale" to begin.</td></tr>`; return; }
+  tb.innerHTML=recent.map(s=>`<tr>
+    <td>${s.receipt_no}</td><td><strong>${s.animal_code}</strong></td>
+    <td>${customerName(s.customer_id)}</td><td>${fmtDate(s.sale_date)}</td>
+    <td><strong>${fmtNum(s.amount)}</strong></td>
+    <td><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Receipt</button></td>
+  </tr>`).join('');
+}
+
+// ═══════════════ ANIMALS ═══════════════
+function addAnimal(){
+  const code=(document.getElementById('a-code').value||'').trim();
+  if(!code){ flash('animal-flash','Animal Code is required.','err'); return; }
+  if(DB.animals.find(a=>a.code===code)){ flash('animal-flash',`Code "${code}" already exists.`,'err'); return; }
+  DB.animals.push({
+    code, sno_weight:document.getElementById('a-sno').value||null,
+    purchase_date:document.getElementById('a-date').value||null,
+    description:document.getElementById('a-desc').value||null,
+    age_type:document.getElementById('a-type').value||null,
+    weight_initial:parseFloat(document.getElementById('a-wi').value)||null,
+    weight_final:parseFloat(document.getElementById('a-wf').value)||null,
+    status:'available'
+  });
+  save(); flash('animal-flash',`Animal ${code} added successfully.`); clearForm('animal'); renderAnimals();
+}
+function renderAnimals(){
+  const tb=document.getElementById('animals-body');
+  if(!DB.animals.length){ tb.innerHTML=`<tr><td colspan="11" class="empty">No animals added yet.</td></tr>`; return; }
+  tb.innerHTML=[...DB.animals].reverse().map(a=>{
+    const sale=DB.sales.find(s=>s.animal_code===a.code);
+    const diff=a.weight_initial&&a.weight_final ? a.weight_final-a.weight_initial : null;
+    const chg=diff!==null ? `<span style="color:${diff>=0?'#059669':'#dc2626'}">${diff>=0?'+':''}${diff.toFixed(0)} kg</span>` : '-';
+    return `<tr>
+      <td><strong>${a.code}</strong></td>
+      <td>${a.sno_weight||'-'}</td>
+      <td>${fmtDate(a.purchase_date)}</td>
+      <td style="max-width:180px;font-size:.8rem">${a.description||'-'}</td>
+      <td>${a.age_type||'-'}</td>
+      <td>${a.weight_initial||'-'}</td>
+      <td>${a.weight_final||'-'}</td>
+      <td>${chg}</td>
+      <td><span class="badge ${a.status}">${a.status==='available'?'Available':'Sold'}</span></td>
+      <td>${sale?customerName(sale.customer_id):'-'}</td>
+      <td>${sale?`<button class="btn btn-primary btn-sm" onclick="showReceipt('${sale.receipt_no}')">Receipt</button>`:''}</td>
+    </tr>`;
+  }).join('');
+}
+function clearForm(f){
+  if(f==='animal'){['a-code','a-sno','a-date','a-type','a-desc','a-wi','a-wf'].forEach(id=>document.getElementById(id).value='');}
+  if(f==='customer'){['c-name','c-phone','c-address'].forEach(id=>document.getElementById(id).value='');}
+  if(f==='sale'){['s-animal','s-customer','s-weight','s-notes','s-total'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('s-rate').value=DB.settings.rate_per_kg;
+    document.getElementById('s-expenses').value=DB.settings.expenses_default;}
+}
+
+// ═══════════════ CUSTOMERS ═══════════════
+function addCustomer(){
+  const name=(document.getElementById('c-name').value||'').trim();
+  if(!name){ flash('cust-flash','Customer name is required.','err'); return; }
+  DB.customers.push({ id:Date.now(), name, phone:document.getElementById('c-phone').value||'', address:document.getElementById('c-address').value||'' });
+  save(); flash('cust-flash',`${name} added.`); clearForm('customer'); renderCustomers();
+}
+function renderCustomers(){
+  const tb=document.getElementById('customers-body');
+  if(!DB.customers.length){ tb.innerHTML=`<tr><td colspan="7" class="empty">No customers added yet.</td></tr>`; return; }
+  tb.innerHTML=DB.customers.map(c=>{
+    const ts=DB.sales.filter(s=>s.customer_id===c.id).reduce((a,s)=>a+s.amount,0);
+    const tp=DB.payments.filter(p=>p.customer_id===c.id).reduce((a,p)=>a+p.amount,0);
+    const bal=ts-tp;
+    return `<tr>
+      <td><strong>${c.name}</strong></td><td>${c.phone||'-'}</td><td>${c.address||'-'}</td>
+      <td>Rs.${fmtNum(ts)}</td>
+      <td style="color:#059669">Rs.${fmtNum(tp)}</td>
+      <td style="color:${bal>0?'#d97706':'#059669'};font-weight:600">Rs.${fmtNum(bal)}</td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="showLedger(${c.id})">Ledger</button>
+        <button class="btn btn-success btn-sm" onclick="openPayment(${c.id})">+ Pay</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════ NEW SALE ═══════════════
+function initSaleForm(){
+  const asel=document.getElementById('s-animal');
+  asel.innerHTML='<option value="">-- Select Animal --</option>';
+  DB.animals.filter(a=>a.status==='available').forEach(a=>{
+    asel.innerHTML+=`<option value="${a.code}" data-w="${a.weight_final||''}">`+
+      `Code: ${a.code} | ${a.age_type||''} | ${a.weight_final||'?'} kg</option>`;
+  });
+  const csel=document.getElementById('s-customer');
+  csel.innerHTML='<option value="">-- Select Customer --</option>';
+  DB.customers.forEach(c=>{ csel.innerHTML+=`<option value="${c.id}">${c.name}</option>`; });
+  document.getElementById('s-rate').value=DB.settings.rate_per_kg;
+  document.getElementById('s-expenses').value=DB.settings.expenses_default;
+  document.getElementById('s-total').value='';
+}
+function animalSelected(){
+  const sel=document.getElementById('s-animal');
+  const opt=sel.options[sel.selectedIndex];
+  if(opt.dataset.w) document.getElementById('s-weight').value=opt.dataset.w;
+  calcTotal();
+}
+function calcTotal(){
+  const w=parseFloat(document.getElementById('s-weight').value)||0;
+  const r=parseFloat(document.getElementById('s-rate').value)||0;
+  const e=parseFloat(document.getElementById('s-expenses').value)||0;
+  const t=(w*r)+e;
+  document.getElementById('s-total').value=t>0?'Rs. '+fmtNum(t):'';
+}
+function recordSale(){
+  const code=document.getElementById('s-animal').value;
+  const cid=parseInt(document.getElementById('s-customer').value);
+  const w=parseFloat(document.getElementById('s-weight').value);
+  const r=parseFloat(document.getElementById('s-rate').value);
+  if(!code){ flash('sale-flash','Please select an animal.','err'); return; }
+  if(!cid)  { flash('sale-flash','Please select a customer.','err'); return; }
+  if(!w||!r){ flash('sale-flash','Weight and Rate are required.','err'); return; }
+  const e=parseFloat(document.getElementById('s-expenses').value)||0;
+  const amount=(w*r)+e;
+  const receipt_no=nextReceipt();
+  DB.sales.push({ receipt_no, animal_code:code, customer_id:cid,
+    sale_date:today(), weight_at_sale:w, rate_per_kg:r, expenses:e, amount,
+    notes:document.getElementById('s-notes').value||'' });
+  const animal=DB.animals.find(a=>a.code===code);
+  if(animal){ animal.status='sold'; animal.weight_final=w; }
+  save();
+  clearForm('sale');
+  showReceipt(receipt_no);
+}
+
+// ═══════════════ ALL SALES ═══════════════
+function renderSales(){
+  const tb=document.getElementById('sales-body');
+  if(!DB.sales.length){ tb.innerHTML=`<tr><td colspan="9" class="empty">No sales recorded yet.</td></tr>`; return; }
+  tb.innerHTML=[...DB.sales].reverse().map(s=>`<tr>
+    <td>${s.receipt_no}</td><td>${fmtDate(s.sale_date)}</td>
+    <td><strong>${s.animal_code}</strong></td><td>${animalType(s.animal_code)}</td>
+    <td>${customerName(s.customer_id)}</td>
+    <td>${s.weight_at_sale}</td><td>${fmtNum(s.rate_per_kg)}</td>
+    <td><strong>${fmtNum(s.amount)}</strong></td>
+    <td><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Receipt</button></td>
+  </tr>`).join('');
+}
+
+// ═══════════════ RECEIPT ═══════════════
+function showReceipt(rno){
+  const s=DB.sales.find(x=>x.receipt_no===rno); if(!s) return;
+  const a=DB.animals.find(x=>x.code===s.animal_code)||{};
+  const c=DB.customers.find(x=>x.id===s.customer_id)||{};
+  const wgain=a.weight_initial ? (s.weight_at_sale-a.weight_initial).toFixed(0) : null;
+  document.getElementById('receipt-content').innerHTML=`
+    <div class="rcp-header">
+      <h2>SALE RECEIPT</h2>
+      <p>Animal Sales Record</p>
+    </div>
+    <div class="rcp-meta">
+      <div><span>Receipt No: </span><strong>${s.receipt_no}</strong></div>
+      <div><span>Sale Date: </span>${fmtDate(s.sale_date)}</div>
+      <div><span>Customer: </span><strong>${c.name||'-'}</strong></div>
+      ${c.phone?`<div><span>Phone: </span>${c.phone}</div>`:''}
+      ${c.address?`<div style="grid-column:1/-1"><span>Address: </span>${c.address}</div>`:''}
+    </div>
+    <p style="font-weight:600;color:#1a3a5c;margin-bottom:8px;font-size:.9rem">Animal Details</p>
+    <div class="rcp-row"><span>Animal Code (ID)</span><strong>${s.animal_code}</strong></div>
+    ${a.age_type?`<div class="rcp-row"><span>Type / Age</span><span>${a.age_type}</span></div>`:''}
+    ${a.description?`<div class="rcp-row"><span>Description</span><span style="text-align:right;max-width:60%">${a.description}</span></div>`:''}
+    ${a.purchase_date?`<div class="rcp-row"><span>Purchase Date</span><span>${fmtDate(a.purchase_date)}</span></div>`:''}
+    ${a.weight_initial?`<div class="rcp-row"><span>Initial Weight</span><span>${a.weight_initial} kg</span></div>`:''}
+    <div class="rcp-row"><span>Weight at Sale</span><span>${s.weight_at_sale} kg</span></div>
+    ${wgain!==null?`<div class="rcp-row"><span>Weight Gain</span><span>${wgain} kg</span></div>`:''}
+    <p style="font-weight:600;color:#1a3a5c;margin:14px 0 8px;font-size:.9rem">Amount Breakdown</p>
+    <div class="rcp-row"><span>${s.weight_at_sale} kg × Rs.${fmtNum(s.rate_per_kg)}/kg</span><span>Rs.${fmtNum(s.weight_at_sale*s.rate_per_kg)}</span></div>
+    ${s.expenses?`<div class="rcp-row"><span>Expenses</span><span>Rs.${fmtNum(s.expenses)}</span></div>`:''}
+    <div class="rcp-row total"><span>TOTAL AMOUNT</span><span>Rs.${fmtNum(s.amount)}</span></div>
+    ${s.notes?`<p style="margin-top:12px;font-size:.83rem;color:#555;background:#f8fafc;padding:8px 12px;border-radius:6px"><strong>Notes:</strong> ${s.notes}</p>`:''}
+    <div class="sig-row">
+      <div class="sig-box"><div class="sig-line">Customer Signature</div></div>
+      <div class="sig-box"><div class="sig-line">Seller Signature</div></div>
+    </div>`;
+  document.getElementById('receipt-overlay').classList.add('open');
+}
+
+// ═══════════════ LEDGER ═══════════════
+function showLedger(cid){
+  const c=DB.customers.find(x=>x.id===cid); if(!c) return;
+  const sales=DB.sales.filter(s=>s.customer_id===cid);
+  const pays=DB.payments.filter(p=>p.customer_id===cid);
+  const ts=sales.reduce((a,s)=>a+s.amount,0);
+  const tp=pays.reduce((a,p)=>a+p.amount,0);
+  const bal=ts-tp;
+  let html=`
+    <h2 style="color:#1a3a5c;margin-bottom:4px">${c.name}</h2>
+    ${c.phone?`<p style="color:#777;font-size:.85rem;margin-bottom:14px">${c.phone}</p>`:''}
+    <div class="led-stat">
+      <div class="stat"><div class="n" style="font-size:1.2rem">Rs.${fmtNum(ts)}</div><div class="l">Total Sales</div></div>
+      <div class="stat g"><div class="n" style="font-size:1.2rem">Rs.${fmtNum(tp)}</div><div class="l">Received</div></div>
+      <div class="stat ${bal>0?'a':'g'}"><div class="n" style="font-size:1.2rem">Rs.${fmtNum(bal)}</div><div class="l">${bal>0?'Balance Due':'Settled'}</div></div>
+    </div>
+    <p style="font-weight:700;color:#1a3a5c;margin-bottom:8px">Sales</p>`;
+  if(sales.length){
+    html+=`<div class="tbl-wrap"><table><thead><tr><th>Receipt</th><th>Date</th><th>Animal Code</th><th>Weight</th><th>Rate/kg</th><th>Expenses</th><th>Amount</th><th></th></tr></thead><tbody>`;
+    sales.forEach(s=>{ html+=`<tr><td>${s.receipt_no}</td><td>${fmtDate(s.sale_date)}</td><td><strong>${s.animal_code}</strong></td><td>${s.weight_at_sale} kg</td><td>${fmtNum(s.rate_per_kg)}</td><td>${s.expenses?fmtNum(s.expenses):'-'}</td><td><strong>${fmtNum(s.amount)}</strong></td><td><button class="btn btn-primary btn-sm" onclick="closeModal('ledger-overlay');showReceipt('${s.receipt_no}')">Receipt</button></td></tr>`; });
+    html+=`<tr style="font-weight:700;background:#f8fafc"><td colspan="6" style="text-align:right">Total</td><td>Rs.${fmtNum(ts)}</td><td></td></tr></tbody></table></div>`;
+  } else html+=`<p style="color:#aaa;font-style:italic;margin-bottom:14px">No sales yet.</p>`;
+
+  html+=`<p style="font-weight:700;color:#1a3a5c;margin:16px 0 8px">Payments Received</p>`;
+  if(pays.length){
+    html+=`<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Method</th><th>Notes</th><th>Amount</th></tr></thead><tbody>`;
+    pays.forEach(p=>{ html+=`<tr><td>${fmtDate(p.pay_date)}</td><td>${p.method}</td><td>${p.notes||'-'}</td><td style="color:#059669"><strong>${fmtNum(p.amount)}</strong></td></tr>`; });
+    html+=`<tr style="font-weight:700;background:#f8fafc"><td colspan="3" style="text-align:right">Total Received</td><td style="color:#059669">Rs.${fmtNum(tp)}</td></tr></tbody></table></div>`;
+  } else html+=`<p style="color:#aaa;font-style:italic">No payments recorded.</p>`;
+
+  html+=`<div style="margin-top:14px;padding:12px 16px;border-radius:8px;background:${bal>0?'#fff7ed':'#f0fdf4'};border:1px solid ${bal>0?'#fcd34d':'#6ee7b7'}">
+    <div style="display:flex;justify-content:space-between;font-weight:700;font-size:1rem">
+      <span>Net Balance (Sales − Payments)</span>
+      <span style="color:${bal>0?'#d97706':'#059669'}">Rs.${fmtNum(bal)} ${bal>0?'(Payable)':'(Settled)'}</span>
+    </div></div>`;
+
+  document.getElementById('ledger-content').innerHTML=html;
+  document.getElementById('ledger-actions').innerHTML=`
+    <button class="btn btn-success" onclick="closeModal('ledger-overlay');openPayment(${cid})">+ Record Payment</button>
+    <button class="btn btn-primary" onclick="window.print()">&#128438; Print Ledger</button>
+    <button class="btn btn-light" onclick="closeModal('ledger-overlay')">Close</button>`;
+  document.getElementById('ledger-overlay').classList.add('open');
+}
+
+// ═══════════════ PAYMENTS ═══════════════
+function openPayment(cid){
+  const c=DB.customers.find(x=>x.id===cid); if(!c) return;
+  document.getElementById('p-cid').value=cid;
+  document.getElementById('p-cname').value=c.name;
+  document.getElementById('p-date').value=today();
+  document.getElementById('p-amount').value='';
+  document.getElementById('p-notes').value='';
+  document.getElementById('payment-overlay').classList.add('open');
+}
+function savePayment(){
+  const cid=parseInt(document.getElementById('p-cid').value);
+  const amount=parseFloat(document.getElementById('p-amount').value);
+  if(!amount||amount<=0){ alert('Please enter a valid amount.'); return; }
+  DB.payments.push({ id:Date.now(), customer_id:cid,
+    pay_date:document.getElementById('p-date').value,
+    amount, method:document.getElementById('p-method').value,
+    notes:document.getElementById('p-notes').value||'' });
+  save(); closeModal('payment-overlay');
+  renderCustomers();
+  alert('Payment saved successfully!');
+}
+
+// ═══════════════ SETTINGS ═══════════════
+function renderSettings(){
+  document.getElementById('cfg-rate').value=DB.settings.rate_per_kg;
+  document.getElementById('cfg-exp').value=DB.settings.expenses_default;
+}
+function saveSettings(){
+  DB.settings.rate_per_kg=parseFloat(document.getElementById('cfg-rate').value)||780;
+  DB.settings.expenses_default=parseFloat(document.getElementById('cfg-exp').value)||0;
+  save(); alert('Settings saved!');
+}
+
+// ═══════════════ BACKUP ═══════════════
+function exportData(){
+  const blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='AnimalSales_Backup_'+today()+'.json'; a.click();
+}
+function importData(e){
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      DB=JSON.parse(ev.target.result);
+      save(); alert('Data imported successfully!'); renderDashboard();
+    }catch(err){ alert('Invalid backup file. Please use a file exported from this app.'); }
+  };
+  reader.readAsText(file);
+}
+
+// ═══════════════ MODAL ═══════════════
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.overlay').forEach(el=>{
+  el.addEventListener('click',e=>{ if(e.target===el) el.classList.remove('open'); });
+});
+
+// ═══════════════ INIT ═══════════════
+load();
+renderDashboard();
+</script>
+</body>
+</html>
