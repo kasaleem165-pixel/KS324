@@ -241,7 +241,9 @@ input[readonly]{background:#f8fafc}
       <div class="fg"><label>Admin Charges (Rs.)</label>
         <input id="s-admin" type="number" step="1" oninput="calcSaleTotal()">
         <span class="hint">Transport, qasai, other expenses</span></div>
-      <div class="fg"><label>Total Amount (Rs.)</label>
+      <div class="fg"><label>Sale Price (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Wt × Rate</span></label>
+        <input id="s-saleprice" readonly style="color:#1a3a5c"></div>
+      <div class="fg"><label>Total Amount (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Sale Price + Admin</span></label>
         <input id="s-total" readonly style="font-weight:700;font-size:1rem"></div>
       <div class="fg"><label>Beef Qty / person (kg)</label>
         <input id="s-beefqty" readonly></div>
@@ -263,7 +265,7 @@ input[readonly]{background:#f8fafc}
     <div class="card-title">All Sales</div>
     <div class="tbl-wrap"><table>
       <thead><tr><th>Receipt</th><th>Date</th><th>Animal Code</th><th>Age</th><th>Customer</th>
-        <th>Weight (kg)</th><th>Rate/kg</th><th>Admin Charges</th><th>Total (Rs.)</th><th>Beef Qty/person</th><th>Beef Rate/person</th><th>Actions</th>
+        <th>Weight (kg)</th><th>Rate/kg</th><th>Sale Price (Rs.)</th><th>Admin Charges</th><th>Total (Rs.)</th><th>Beef Qty/person</th><th>Beef Rate/person</th><th>Actions</th>
       </tr></thead>
       <tbody id="sales-body"></tbody>
     </table></div>
@@ -332,7 +334,9 @@ input[readonly]{background:#f8fafc}
         <input id="es-rate" type="number" step="1" oninput="esCalc()"></div>
       <div class="fg"><label>Admin Charges (Rs.)</label>
         <input id="es-admin" type="number" step="1" oninput="esCalc()"></div>
-      <div class="fg"><label>Total Amount (Rs.)</label>
+      <div class="fg"><label>Sale Price (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Wt × Rate</span></label>
+        <input id="es-saleprice" readonly style="color:#1a3a5c"></div>
+      <div class="fg"><label>Total Amount (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Sale Price + Admin</span></label>
         <input id="es-total" readonly style="font-weight:700"></div>
       <div class="fg full"><label>Notes</label>
         <input id="es-notes" placeholder="Optional"></div>
@@ -856,7 +860,7 @@ function initSaleForm(){
   document.getElementById('s-date').value=today();
   document.getElementById('s-rate').value=DB.settings.rate_per_kg||780;
   document.getElementById('s-admin').value=DB.settings.admin_charges||30000;
-  ['s-weight','s-total','s-beefqty','s-beefrate','s-notes'].forEach(id=>document.getElementById(id).value='');
+  ['s-weight','s-saleprice','s-total','s-beefqty','s-beefrate','s-notes'].forEach(id=>document.getElementById(id).value='');
 }
 
 function animalSelected(){
@@ -870,12 +874,13 @@ function calcSaleTotal(){
   const w=parseFloat(document.getElementById('s-weight').value)||0;
   const r=parseFloat(document.getElementById('s-rate').value)||0;
   const adm=parseFloat(document.getElementById('s-admin').value)||0;
-  if(!w){document.getElementById('s-total').value='';document.getElementById('s-beefqty').value='';document.getElementById('s-beefrate').value='';return;}
+  if(!w){['s-saleprice','s-total','s-beefqty','s-beefrate'].forEach(id=>document.getElementById(id).value='');return;}
   const np=DB.settings.num_persons||7;
   const salePrice=w*r;
   const total=salePrice+adm;
   const bq=(w/2)/np;
   const br=bq>0?(total/np)/bq:0;
+  document.getElementById('s-saleprice').value=Rs(salePrice);
   document.getElementById('s-total').value=Rs(total);
   document.getElementById('s-beefqty').value=fmtN(bq,2)+' kg';
   document.getElementById('s-beefrate').value=Rs(br)+'/kg';
@@ -909,9 +914,10 @@ function recordSale(){
 // ══════════════════════════ ALL SALES ══════════════════════════
 function renderSales(){
   const tb=document.getElementById('sales-body');
-  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="12" class="empty">No sales yet.</td></tr>`;return;}
+  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="13" class="empty">No sales yet.</td></tr>`;return;}
   const np=DB.settings.num_persons||7;
   tb.innerHTML=[...DB.sales].reverse().map(s=>{
+    const sp=s.weight_at_sale*s.rate_per_kg;
     const bq=(s.weight_at_sale/2)/np;
     const br=bq>0?(s.amount/np)/bq:0;
     return `<tr>
@@ -919,7 +925,7 @@ function renderSales(){
       <td><strong>${s.animal_code}</strong></td><td>${aType(s.animal_code)}</td>
       <td>${cName(s.customer_id)}</td>
       <td>${s.weight_at_sale} kg</td><td>${fmtN(s.rate_per_kg)}</td>
-      <td>${Rs(s.admin_charges||0)}</td>
+      <td>${Rs(sp)}</td><td>${Rs(s.admin_charges||0)}</td>
       <td><strong>${Rs(s.amount)}</strong></td>
       <td>${fmtN(bq,2)} kg</td><td>${Rs(br)}/kg</td>
       <td style="white-space:nowrap">
@@ -965,7 +971,9 @@ function esCalc(){
   const w=parseFloat(document.getElementById('es-weight').value)||0;
   const r=parseFloat(document.getElementById('es-rate').value)||0;
   const adm=parseFloat(document.getElementById('es-admin').value)||0;
-  document.getElementById('es-total').value=w&&r?Rs((w*r)+adm):'';
+  const sp=w&&r?w*r:0;
+  document.getElementById('es-saleprice').value=sp?Rs(sp):'';
+  document.getElementById('es-total').value=sp?Rs(sp+adm):'';
 }
 
 function saveSaleEdit(){
@@ -1054,7 +1062,7 @@ function showReceipt(rno){
     ${a.purchase_date?`<div class="rcp-row sub"><span>Transaction Date</span><span>${fmtD(a.purchase_date)}</span></div>`:''}
     <div class="rcp-row"><span>Weight at Sale</span><span>${s.weight_at_sale} kg</span></div>
     <p style="font-weight:600;color:#1a3a5c;margin:13px 0 8px;font-size:.88rem">Amount Breakdown</p>
-    <div class="rcp-row"><span>${s.weight_at_sale} kg × ${Rs(s.rate_per_kg)}/kg</span><span>${Rs(s.weight_at_sale*s.rate_per_kg)}</span></div>
+    <div class="rcp-row"><span>Sale Price &nbsp;<span style="font-weight:400;font-size:.82rem;color:#888">(${s.weight_at_sale} kg × ${Rs(s.rate_per_kg)}/kg)</span></span><span>${Rs(s.weight_at_sale*s.rate_per_kg)}</span></div>
     <div class="rcp-row"><span>Admin Charges</span><span>${Rs(s.admin_charges||0)}</span></div>
     <div class="rcp-row total"><span>TOTAL AMOUNT</span><span>${Rs(s.amount)}</span></div>
     <p style="font-weight:600;color:#1a3a5c;margin:13px 0 8px;font-size:.88rem">Beef Details (${np} Persons)</p>
@@ -1085,9 +1093,9 @@ function showLedger(cid){
     </div>
     <p style="font-weight:700;color:#1a3a5c;margin-bottom:7px">Sales</p>`;
   if(sales.length){
-    html+=`<div class="tbl-wrap"><table><thead><tr><th>Receipt</th><th>Date</th><th>Animal</th><th>Weight</th><th>Rate/kg</th><th>Admin</th><th>Amount</th><th></th></tr></thead><tbody>`;
-    sales.forEach(s=>{html+=`<tr><td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td><td><strong>${s.animal_code}</strong></td><td>${s.weight_at_sale} kg</td><td>${fmtN(s.rate_per_kg)}</td><td>${Rs(s.admin_charges||0)}</td><td><strong>${Rs(s.amount)}</strong></td><td><button class="btn btn-primary btn-sm" onclick="closeModal('ledger-overlay');showReceipt('${s.receipt_no}')">Receipt</button></td></tr>`;});
-    html+=`<tr style="font-weight:700;background:#f8fafc"><td colspan="6" style="text-align:right">Total</td><td>${Rs(ts)}</td><td></td></tr></tbody></table></div>`;
+    html+=`<div class="tbl-wrap"><table><thead><tr><th>Receipt</th><th>Date</th><th>Animal</th><th>Weight</th><th>Rate/kg</th><th>Sale Price</th><th>Admin</th><th>Amount</th><th></th></tr></thead><tbody>`;
+    sales.forEach(s=>{const sp=s.weight_at_sale*s.rate_per_kg;html+=`<tr><td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td><td><strong>${s.animal_code}</strong></td><td>${s.weight_at_sale} kg</td><td>${fmtN(s.rate_per_kg)}</td><td>${Rs(sp)}</td><td>${Rs(s.admin_charges||0)}</td><td><strong>${Rs(s.amount)}</strong></td><td><button class="btn btn-primary btn-sm" onclick="closeModal('ledger-overlay');showReceipt('${s.receipt_no}')">Receipt</button></td></tr>`;});
+    html+=`<tr style="font-weight:700;background:#f8fafc"><td colspan="7" style="text-align:right">Total</td><td>${Rs(ts)}</td><td></td></tr></tbody></table></div>`;
   } else html+=`<p style="color:#aaa;font-style:italic;margin-bottom:12px">No sales yet.</p>`;
 
   html+=`<p style="font-weight:700;color:#1a3a5c;margin:15px 0 7px">Payments &amp; Receipts</p>`;
