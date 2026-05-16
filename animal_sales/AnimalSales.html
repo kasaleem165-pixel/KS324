@@ -77,6 +77,25 @@ input[readonly]{background:#f8fafc}
 
 .led-stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}
 
+/* photos */
+.photo-upload-area{border:2px dashed #cbd5e1;border-radius:8px;padding:14px;text-align:center;cursor:pointer;transition:border-color .2s;margin-top:4px}
+.photo-upload-area:hover{border-color:#1a3a5c}
+.photo-upload-area input{display:none}
+.photo-previews{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.photo-thumb{position:relative;width:72px;height:72px;border-radius:6px;overflow:hidden;border:2px solid #e2e8f0;cursor:pointer}
+.photo-thumb img{width:100%;height:100%;object-fit:cover}
+.photo-thumb .del-btn{position:absolute;top:1px;right:1px;background:rgba(220,38,38,.85);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
+.tbl-thumb{width:40px;height:40px;border-radius:5px;object-fit:cover;cursor:pointer;border:1px solid #e2e8f0;vertical-align:middle}
+.no-photo{width:40px;height:40px;border-radius:5px;background:#f1f5f9;display:inline-flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:1.1rem;cursor:pointer;border:1px dashed #cbd5e1;vertical-align:middle}
+/* photo viewer modal */
+.pv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:14px}
+.pv-img{width:100%;border-radius:8px;object-fit:cover;cursor:pointer;transition:transform .15s}
+.pv-img:hover{transform:scale(1.03)}
+.pv-full{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:200;align-items:center;justify-content:center}
+.pv-full.open{display:flex}
+.pv-full img{max-width:92vw;max-height:90vh;border-radius:8px;object-fit:contain}
+.pv-full-close{position:absolute;top:16px;right:20px;color:#fff;font-size:2rem;cursor:pointer;background:none;border:none}
+
 /* radio toggle */
 .type-toggle{display:flex;gap:0;border:1px solid #cbd5e1;border-radius:6px;overflow:hidden}
 .type-toggle label{flex:1;text-align:center;padding:7px 10px;cursor:pointer;font-size:.86rem;color:#555;border:none;font-weight:400}
@@ -144,6 +163,15 @@ input[readonly]{background:#f8fafc}
       <div class="fg"><label>Customer (if already assigned)</label>
         <select id="a-cust"><option value="">-- None --</option></select></div>
     </div>
+    <!-- photo upload -->
+    <div style="margin-top:13px">
+      <label style="font-size:.81rem;color:#444;font-weight:500">Animal Photos (up to 4)</label>
+      <div class="photo-upload-area" onclick="document.getElementById('a-photos-input').click()">
+        <input type="file" id="a-photos-input" accept="image/*" multiple onchange="handlePhotoSelect(event)">
+        <div style="color:#94a3b8;font-size:.88rem">&#128247; Click to add photos &nbsp;|&nbsp; JPG, PNG accepted &nbsp;|&nbsp; Auto-compressed</div>
+      </div>
+      <div class="photo-previews" id="a-photo-previews"></div>
+    </div>
     <!-- live preview -->
     <div id="a-preview" style="display:none;margin-top:14px;padding:12px 16px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;font-size:.85rem">
       <strong style="color:#1a3a5c">Calculated Values Preview</strong>
@@ -158,7 +186,7 @@ input[readonly]{background:#f8fafc}
     <div class="card-title">Animals Register</div>
     <div class="tbl-wrap"><table>
       <thead><tr>
-        <th>Code</th><th>Date</th><th>Description</th><th>Age</th>
+        <th>Photo</th><th>Code</th><th>Date</th><th>Description</th><th>Age</th>
         <th>Wt Latest (kg)</th><th>Sale Price (Rs.)</th><th>Admin Charges</th>
         <th>Total Cost</th><th>Beef Qty/person (kg)</th><th>Beef Rate/person</th>
         <th>Status</th><th>Customer</th><th></th>
@@ -351,6 +379,26 @@ input[readonly]{background:#f8fafc}
   </div>
 </div>
 
+<!-- ══════════ PHOTO VIEWER MODAL ══════════ -->
+<div class="overlay" id="photo-overlay">
+  <div class="modal" style="max-width:780px">
+    <button class="modal-close" onclick="closeModal('photo-overlay')">&#10005;</button>
+    <div class="card-title" id="pv-title">Animal Photos</div>
+    <div class="pv-grid" id="pv-grid"></div>
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap" class="no-print">
+      <label class="btn btn-success btn-sm" style="cursor:pointer">+ Add Photo
+        <input type="file" accept="image/*" multiple style="display:none" onchange="addPhotoToAnimal(event)">
+      </label>
+      <button class="btn btn-light btn-sm" onclick="closeModal('photo-overlay')">Close</button>
+    </div>
+  </div>
+</div>
+<!-- full-screen image view -->
+<div class="pv-full" id="pv-full" onclick="document.getElementById('pv-full').classList.remove('open')">
+  <button class="pv-full-close" onclick="document.getElementById('pv-full').classList.remove('open')">&#10005;</button>
+  <img id="pv-full-img" src="" alt="">
+</div>
+
 <!-- ══════════ PAYMENT RECEIPT MODAL ══════════ -->
 <div class="overlay" id="payreceipt-overlay">
   <div class="modal">
@@ -530,6 +578,93 @@ function previewCalc(){
     <div><span style="color:#777">Beef Rate/person:</span> <strong>${Rs(f.beefRate)}/kg</strong></div>`;
 }
 
+// ── Photo helpers ──────────────────────────────────────────────
+let _formPhotos=[];   // base64 strings staged in add-animal form
+let _pvCode='';       // animal code currently open in photo viewer
+
+function compressImage(file){
+  return new Promise(resolve=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const MAX=600;
+      let w=img.width, h=img.height;
+      if(w>MAX||h>MAX){ const r=Math.min(MAX/w,MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
+      const canvas=document.createElement('canvas');
+      canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg',0.72));
+    };
+    img.src=url;
+  });
+}
+
+async function handlePhotoSelect(e){
+  const files=[...e.target.files];
+  const remaining=4-_formPhotos.length;
+  if(remaining<=0){alert('Maximum 4 photos per animal.');e.target.value='';return;}
+  for(const f of files.slice(0,remaining)){
+    const b64=await compressImage(f);
+    _formPhotos.push(b64);
+  }
+  renderFormPhotos();
+  e.target.value='';
+}
+
+function renderFormPhotos(){
+  const el=document.getElementById('a-photo-previews');
+  el.innerHTML=_formPhotos.map((b64,i)=>`
+    <div class="photo-thumb">
+      <img src="${b64}" onclick="openFullImg('${b64}')">
+      <button class="del-btn" onclick="_formPhotos.splice(${i},1);renderFormPhotos()">&#10005;</button>
+    </div>`).join('');
+}
+
+function openFullImg(src){
+  document.getElementById('pv-full-img').src=src;
+  document.getElementById('pv-full').classList.add('open');
+}
+
+function openPhotoViewer(code){
+  _pvCode=code;
+  const a=DB.animals.find(x=>x.code===code);
+  document.getElementById('pv-title').textContent=`Photos — Animal Code ${code}`;
+  renderPhotoViewer(a);
+  document.getElementById('photo-overlay').classList.add('open');
+}
+
+function renderPhotoViewer(a){
+  const photos=a&&a.photos&&a.photos.length?a.photos:[];
+  document.getElementById('pv-grid').innerHTML=photos.length
+    ? photos.map((b64,i)=>`
+        <div style="position:relative">
+          <img class="pv-img" src="${b64}" onclick="openFullImg('${b64}')">
+          <button class="del-btn" style="width:22px;height:22px;font-size:12px;top:5px;right:5px"
+            onclick="deleteAnimalPhoto('${a.code}',${i})">&#10005;</button>
+        </div>`).join('')
+    : '<p style="color:#aaa;font-style:italic;grid-column:1/-1">No photos yet. Click "+ Add Photo" below.</p>';
+}
+
+async function addPhotoToAnimal(e){
+  const a=DB.animals.find(x=>x.code===_pvCode); if(!a) return;
+  if(!a.photos) a.photos=[];
+  const remaining=4-a.photos.length;
+  if(remaining<=0){alert('Maximum 4 photos per animal.');e.target.value='';return;}
+  for(const f of [...e.target.files].slice(0,remaining)){
+    a.photos.push(await compressImage(f));
+  }
+  save(); renderPhotoViewer(a); renderAnimals(); e.target.value='';
+}
+
+function deleteAnimalPhoto(code,idx){
+  const a=DB.animals.find(x=>x.code===code); if(!a||!a.photos) return;
+  if(!confirm('Delete this photo?')) return;
+  a.photos.splice(idx,1);
+  save(); renderPhotoViewer(a); renderAnimals();
+}
+
+// ── Animal form ────────────────────────────────────────────────
 function addAnimal(){
   const code=(document.getElementById('a-code').value||'').trim();
   if(!code){flash('animal-flash','Animal Code is required.','err');return;}
@@ -542,7 +677,8 @@ function addAnimal(){
     description:document.getElementById('a-desc').value||null,
     age_type:document.getElementById('a-type').value||null,
     weight_final:wf, admin_charges:admin,
-    assigned_customer:custId, status:'available'
+    assigned_customer:custId, status:'available',
+    photos:[..._formPhotos]
   });
   save(); flash('animal-flash',`Animal ${code} added.`); clearAnimalForm(); renderAnimals();
 }
@@ -553,6 +689,8 @@ function clearAnimalForm(){
   });
   document.getElementById('a-admin').value=DB.settings.admin_charges||30000;
   document.getElementById('a-preview').style.display='none';
+  _formPhotos=[];
+  document.getElementById('a-photo-previews').innerHTML='';
   populateCustDropdown('a-cust');
 }
 
@@ -560,14 +698,19 @@ function renderAnimals(){
   populateCustDropdown('a-cust');
   document.getElementById('a-admin').value=DB.settings.admin_charges||30000;
   const tb=document.getElementById('animals-body');
-  if(!DB.animals.length){tb.innerHTML=`<tr><td colspan="13" class="empty">No animals yet. Add one above.</td></tr>`;return;}
+  if(!DB.animals.length){tb.innerHTML=`<tr><td colspan="14" class="empty">No animals yet. Add one above.</td></tr>`;return;}
   tb.innerHTML=[...DB.animals].reverse().map(a=>{
     const sale=DB.sales.find(s=>s.animal_code===a.code);
     const w=sale?sale.weight_at_sale:(a.weight_final||0);
     const adm=sale?sale.admin_charges:(a.admin_charges||DB.settings.admin_charges||0);
     const f=w?calcFields(w,adm):{salePrice:0,totalCost:0,beefQty:0,beefRate:0};
     const custId=sale?sale.customer_id:a.assigned_customer;
+    const firstPhoto=a.photos&&a.photos.length?a.photos[0]:null;
+    const photoCell=firstPhoto
+      ? `<img class="tbl-thumb" src="${firstPhoto}" onclick="openPhotoViewer('${a.code}')" title="Click to view/manage photos">`
+      : `<span class="no-photo" onclick="openPhotoViewer('${a.code}')" title="Click to add photos">&#128247;</span>`;
     return `<tr>
+      <td>${photoCell}</td>
       <td><strong>${a.code}</strong></td>
       <td>${fmtD(a.purchase_date)}</td>
       <td style="max-width:170px;font-size:.79rem">${a.description||'-'}</td>
