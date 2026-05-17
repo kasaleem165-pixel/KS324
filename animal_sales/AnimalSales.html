@@ -854,6 +854,15 @@ function renderDashboard(){
   </tr>`).join('');
 }
 
+function dashGrpToggle(id){
+  const el=document.getElementById(id);
+  if(!el) return;
+  const show=el.style.display==='none';
+  el.style.display=show?'':'none';
+  const arrow=document.getElementById(id+'-arrow');
+  if(arrow) arrow.innerHTML=show?'&#9660;':'&#9654;';
+}
+
 function showDashDetail(key){
   const np=DB.settings.num_persons||7;
   let html='';
@@ -864,7 +873,6 @@ function showDashDetail(key){
     html=`<h2 style="color:#1a3a5c;margin-bottom:14px">${title} <span style="font-size:.85rem;font-weight:400;color:#777">(${rawList.length})</span></h2>`;
     if(!rawList.length){html+='<p style="color:#aaa;font-style:italic">No animals found.</p>';}
     else{
-      // build computed list
       const list=rawList.map(a=>{
         const sale=DB.sales.find(s=>s.animal_code===a.code);
         const w=sale?sale.weight_at_sale:(a.weight_final||0);
@@ -885,7 +893,7 @@ function showDashDetail(key){
         return `<tr style="${bg}">
           <td><strong>${a.code}</strong></td>
           <td>${isKheera?`<span style="background:#d97706;color:#fff;border-radius:4px;padding:1px 6px;font-size:.75rem">Kheera</span>`:(a.age_type||'-')}</td>
-          <td>${a._w||'-'} kg</td>
+          <td>${a._w?fmtN(a._w,1)+' kg':'-'}</td>
           <td>${a._w?Rs(a._sp):'-'}</td>
           <td>${Rs(a._adm)}</td>
           <td>${a._w?Rs(a._tc):'-'}</td>
@@ -896,7 +904,7 @@ function showDashDetail(key){
           ${hasSaleCol?(a._sale?`<td><button class="btn btn-primary btn-sm" onclick="showReceipt('${a._sale.receipt_no}')">Receipt</button></td>`:'<td>-</td>'):''}
         </tr>`;
       }
-      function dashSubtotal(grpList,label,color){
+      function dashSubtotalRow(grpList,label,color){
         if(!grpList.length) return '';
         const tw=grpList.reduce((s,a)=>s+(a._w||0),0);
         const tsp=grpList.reduce((s,a)=>s+a._sp,0);
@@ -906,8 +914,8 @@ function showDashDetail(key){
         const tbq=grpList.reduce((s,a)=>s+a._bq,0);
         return `<tr style="background:${color};font-weight:700;font-size:.81rem;border-top:2px solid #cbd5e1">
           <td colspan="2" style="color:#1a3a5c">${label} Subtotal (${grpList.length})</td>
-          <td>${tw.toFixed(1)} kg</td><td>${Rs(tsp)}</td><td>${Rs(tadm)}</td>
-          <td>${Rs(ttc)}</td><td>${Rs(tspp)}</td><td>${tbq.toFixed(2)} kg</td><td>—</td><td></td>${hasSaleCol?'<td></td>':''}
+          <td>${fmtN(tw,1)} kg</td><td>${Rs(tsp)}</td><td>${Rs(tadm)}</td>
+          <td>${Rs(ttc)}</td><td>${Rs(tspp)}</td><td>${fmtN(tbq,2)} kg</td><td>—</td><td></td>${hasSaleCol?'<td></td>':''}
         </tr>`;
       }
       const dondha=list.filter(a=>(a.age_type||'').toLowerCase()==='dondha');
@@ -919,28 +927,88 @@ function showDashDetail(key){
       const gttc=list.reduce((s,a)=>s+a._tc,0);
       const gtspp=list.reduce((s,a)=>s+(a._spp||0),0);
       const gtbq=list.reduce((s,a)=>s+a._bq,0);
-      let tbody='';
-      if(dondha.length){
-        tbody+=`<tr style="background:#dbeafe;font-weight:700"><td colspan="${cols}" style="color:#1e40af;padding:8px 10px">&#9654; Dondha <span style="background:#1e40af;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${dondha.length}</span></td></tr>`;
-        tbody+=dondha.map(dashAnimalRow).join('');
-        tbody+=dashSubtotal(dondha,'Dondha','#e0f2fe');
+
+      if(key==='available'){
+        // ── Collapsible summary view for Available ──
+        let tbl=`<div class="tbl-wrap"><table>${thead}`;
+        function collapsibleGroup(grpList,label,grpId,hdrBg,hdrColor,dtlBg,subBg){
+          if(!grpList.length) return '';
+          const tw=grpList.reduce((s,a)=>s+(a._w||0),0);
+          const tsp=grpList.reduce((s,a)=>s+a._sp,0);
+          const tadm=grpList.reduce((s,a)=>s+a._adm,0);
+          const ttc=grpList.reduce((s,a)=>s+a._tc,0);
+          const tspp=grpList.reduce((s,a)=>s+(a._spp||0),0);
+          const tbq=grpList.reduce((s,a)=>s+a._bq,0);
+          let out=`<tbody>
+            <tr style="background:${hdrBg};font-weight:700;cursor:pointer" onclick="dashGrpToggle('${grpId}')">
+              <td colspan="${cols}" style="color:${hdrColor};padding:9px 12px;font-size:.87rem">
+                <span id="${grpId}-arrow">&#9654;</span> ${label}
+                <span style="background:${hdrColor};color:#fff;border-radius:10px;padding:1px 9px;font-size:.73rem;margin-left:6px">${grpList.length}</span>
+                <span style="font-size:.78rem;font-weight:400;margin-left:12px;opacity:.8">Wt: ${fmtN(tw,1)} kg &nbsp;|&nbsp; Total: ${Rs(ttc)} &nbsp;|&nbsp; Share/P: ${Rs(tspp)}</span>
+                <span style="float:right;font-size:.75rem;color:${hdrColor};opacity:.7">click to expand ▸</span>
+              </td>
+            </tr>
+          </tbody>`;
+          out+=`<tbody id="${grpId}" style="display:none">`;
+          grpList.forEach(a=>{
+            const isKheera=(a.age_type||'').toLowerCase()==='kheera';
+            const bg=dtlBg||'';
+            out+=`<tr style="${bg?'background:'+bg+';':''}">
+              <td><strong>${a.code}</strong></td>
+              <td>${isKheera?`<span style="background:#d97706;color:#fff;border-radius:4px;padding:1px 6px;font-size:.75rem">Kheera</span>`:(a.age_type||'-')}</td>
+              <td>${a._w?fmtN(a._w,1)+' kg':'-'}</td>
+              <td>${a._w?Rs(a._sp):'-'}</td>
+              <td>${Rs(a._adm)}</td>
+              <td>${a._w?Rs(a._tc):'-'}</td>
+              <td>${a._w?Rs(a._spp):'-'}</td>
+              <td>${a._w?fmtN(a._bq,2)+' kg':'-'}</td>
+              <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
+              <td><span class="badge available">Available</span></td>
+            </tr>`;
+          });
+          out+=`<tr style="background:${subBg};font-weight:700;font-size:.81rem;border-top:2px solid #cbd5e1">
+            <td colspan="2" style="color:#1a3a5c">${label} Subtotal</td>
+            <td>${fmtN(tw,1)} kg</td><td>${Rs(tsp)}</td><td>${Rs(tadm)}</td>
+            <td>${Rs(ttc)}</td><td>${Rs(tspp)}</td><td>${fmtN(tbq,2)} kg</td><td>—</td><td></td>
+          </tr>`;
+          out+=`</tbody>`;
+          return out;
+        }
+        tbl+=collapsibleGroup(dondha,'Dondha','dash-grp-dondha','#dbeafe','#1e40af','','#e0f2fe');
+        tbl+=collapsibleGroup(kheera,'Kheera','dash-grp-kheera','#fef3c7','#92400e','#fffbeb','#fef3c7');
+        tbl+=collapsibleGroup(others,'Other','dash-grp-others','#f3f4f6','#374151','','#f3f4f6');
+        tbl+=`<tbody><tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.85rem;border-top:3px solid #0f2540">
+          <td colspan="2">TOTAL — ${list.length} &nbsp;(D:${dondha.length} K:${kheera.length}${others.length?' O:'+others.length:''})</td>
+          <td>${fmtN(gtw,1)} kg</td><td>${Rs(gtsp)}</td><td>${Rs(gtadm)}</td>
+          <td>${Rs(gttc)}</td><td>${Rs(gtspp)}</td><td>${fmtN(gtbq,2)} kg</td><td>—</td><td></td>
+        </tr></tbody>`;
+        tbl+=`</table></div>`;
+        html+=tbl;
+      } else {
+        // ── Flat view for All / Sold ──
+        let tbody='';
+        if(dondha.length){
+          tbody+=`<tr style="background:#dbeafe;font-weight:700"><td colspan="${cols}" style="color:#1e40af;padding:8px 10px">&#9654; Dondha <span style="background:#1e40af;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${dondha.length}</span></td></tr>`;
+          tbody+=dondha.map(dashAnimalRow).join('');
+          tbody+=dashSubtotalRow(dondha,'Dondha','#e0f2fe');
+        }
+        if(kheera.length){
+          tbody+=`<tr style="background:#fef3c7;font-weight:700"><td colspan="${cols}" style="color:#92400e;padding:8px 10px">&#9654; Kheera <span style="background:#d97706;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${kheera.length}</span></td></tr>`;
+          tbody+=kheera.map(dashAnimalRow).join('');
+          tbody+=dashSubtotalRow(kheera,'Kheera','#fef3c7');
+        }
+        if(others.length){
+          tbody+=`<tr style="background:#f3f4f6;font-weight:700"><td colspan="${cols}" style="color:#374151;padding:8px 10px">&#9654; Other <span style="background:#6b7280;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${others.length}</span></td></tr>`;
+          tbody+=others.map(dashAnimalRow).join('');
+          tbody+=dashSubtotalRow(others,'Other','#f3f4f6');
+        }
+        tbody+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.85rem;border-top:3px solid #0f2540">
+          <td colspan="2">TOTAL — ${list.length} &nbsp;(D:${dondha.length} K:${kheera.length}${others.length?' O:'+others.length:''})</td>
+          <td>${fmtN(gtw,1)} kg</td><td>${Rs(gtsp)}</td><td>${Rs(gtadm)}</td>
+          <td>${Rs(gttc)}</td><td>${Rs(gtspp)}</td><td>${fmtN(gtbq,2)} kg</td><td>—</td><td></td>${hasSaleCol?'<td></td>':''}
+        </tr>`;
+        html+=`<div class="tbl-wrap"><table>${thead}<tbody>${tbody}</tbody></table></div>`;
       }
-      if(kheera.length){
-        tbody+=`<tr style="background:#fef3c7;font-weight:700"><td colspan="${cols}" style="color:#92400e;padding:8px 10px">&#9654; Kheera <span style="background:#d97706;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${kheera.length}</span></td></tr>`;
-        tbody+=kheera.map(dashAnimalRow).join('');
-        tbody+=dashSubtotal(kheera,'Kheera','#fef3c7');
-      }
-      if(others.length){
-        tbody+=`<tr style="background:#f3f4f6;font-weight:700"><td colspan="${cols}" style="color:#374151;padding:8px 10px">&#9654; Other <span style="background:#6b7280;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${others.length}</span></td></tr>`;
-        tbody+=others.map(dashAnimalRow).join('');
-        tbody+=dashSubtotal(others,'Other','#f3f4f6');
-      }
-      tbody+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.85rem;border-top:3px solid #0f2540">
-        <td colspan="2">TOTAL — ${list.length} &nbsp;(D:${dondha.length} K:${kheera.length}${others.length?' O:'+others.length:''})</td>
-        <td>${gtw.toFixed(1)} kg</td><td>${Rs(gtsp)}</td><td>${Rs(gtadm)}</td>
-        <td>${Rs(gttc)}</td><td>${Rs(gtspp)}</td><td>${gtbq.toFixed(2)} kg</td><td>—</td><td></td>${hasSaleCol?'<td></td>':''}
-      </tr>`;
-      html+=`<div class="tbl-wrap"><table>${thead}<tbody>${tbody}</tbody></table></div>`;
     }
   } else if(key==='revenue'){
     const total=DB.sales.reduce((a,s)=>a+s.amount,0);
@@ -957,7 +1025,7 @@ function showDashDetail(key){
         html+=`<tr>
           <td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td>
           <td><strong>${s.animal_code}</strong></td><td>${cName(s.customer_id)}</td>
-          <td>${s.weight_at_sale} kg</td><td>${fmtN(s.rate_per_kg)}</td>
+          <td>${fmtN(s.weight_at_sale,1)} kg</td><td>${fmtN(s.rate_per_kg)}</td>
           <td>${Rs(sp)}</td><td>${Rs(s.admin_charges||0)}</td>
           <td><strong>${Rs(s.amount)}</strong></td>
           <td><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Receipt</button></td>
@@ -1218,7 +1286,7 @@ function renderAnimals(){
       <td>${fmtD(a.purchase_date)}</td>
       <td style="max-width:170px;font-size:.79rem">${a.description||'-'}</td>
       <td>${a.age_type||'-'}</td>
-      <td>${a._w||'-'}</td>
+      <td>${a._w?fmtN(a._w,1):'-'}</td>
       <td>${a._w?Rs(a._sp):'-'}</td>
       <td>${Rs(a._adm)}</td>
       <td>${a._w?Rs(a._tc):'-'}</td>
@@ -1590,7 +1658,7 @@ function renderSales(){
       <td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td>
       <td><strong>${s.animal_code}</strong></td><td>${aType(s.animal_code)}</td>
       <td>${cName(s.customer_id)}</td>
-      <td>${s.weight_at_sale} kg</td><td>${fmtN(s.rate_per_kg)}</td>
+      <td>${fmtN(s.weight_at_sale,1)} kg</td><td>${fmtN(s.rate_per_kg)}</td>
       <td>${Rs(sp)}</td><td>${Rs(s.admin_charges||0)}</td>
       <td><strong>${Rs(s.amount)}</strong></td>
       <td><strong>${Rs(spp)}</strong></td>
@@ -1833,9 +1901,9 @@ function showReceipt(rno){
     ${a.age_type?`<div class="rcp-row"><span>Age / Type</span><span>${a.age_type}</span></div>`:''}
     ${a.description?`<div class="rcp-row sub"><span>Description</span><span style="text-align:right;max-width:55%">${a.description}</span></div>`:''}
     ${a.purchase_date?`<div class="rcp-row sub"><span>Transaction Date</span><span>${fmtD(a.purchase_date)}</span></div>`:''}
-    <div class="rcp-row"><span>Weight at Sale</span><span>${s.weight_at_sale} kg</span></div>
+    <div class="rcp-row"><span>Weight at Sale</span><span>${fmtN(s.weight_at_sale,1)} kg</span></div>
     <p style="font-weight:600;color:#1a3a5c;margin:13px 0 8px;font-size:.88rem">Amount Breakdown</p>
-    <div class="rcp-row"><span>Sale Price &nbsp;<span style="font-weight:400;font-size:.82rem;color:#888">(${s.weight_at_sale} kg × ${Rs(s.rate_per_kg)}/kg)</span></span><span>${Rs(s.weight_at_sale*s.rate_per_kg)}</span></div>
+    <div class="rcp-row"><span>Sale Price &nbsp;<span style="font-weight:400;font-size:.82rem;color:#888">(${fmtN(s.weight_at_sale,1)} kg × ${Rs(s.rate_per_kg)}/kg)</span></span><span>${Rs(s.weight_at_sale*s.rate_per_kg)}</span></div>
     <div class="rcp-row"><span>Admin Charges</span><span>${Rs(s.admin_charges||0)}</span></div>
     <div class="rcp-row total"><span>TOTAL AMOUNT</span><span>${Rs(s.amount)}</span></div>
     <p style="font-weight:600;color:#1a3a5c;margin:13px 0 8px;font-size:.88rem">Beef Details (${np} Persons)</p>
@@ -1868,7 +1936,7 @@ function showLedger(cid){
     <p style="font-weight:700;color:#1a3a5c;margin-bottom:7px">Sales</p>`;
   if(sales.length){
     html+=`<div class="tbl-wrap"><table><thead><tr><th>Receipt</th><th>Date</th><th>Animal</th><th>Weight</th><th>Rate/kg</th><th>Sale Price</th><th>Admin</th><th>Amount</th><th></th></tr></thead><tbody>`;
-    sales.forEach(s=>{const sp=s.weight_at_sale*s.rate_per_kg;html+=`<tr><td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td><td><strong>${s.animal_code}</strong></td><td>${s.weight_at_sale} kg</td><td>${fmtN(s.rate_per_kg)}</td><td>${Rs(sp)}</td><td>${Rs(s.admin_charges||0)}</td><td><strong>${Rs(s.amount)}</strong></td><td><button class="btn btn-primary btn-sm" onclick="closeModal('ledger-overlay');showReceipt('${s.receipt_no}')">Receipt</button></td></tr>`;});
+    sales.forEach(s=>{const sp=s.weight_at_sale*s.rate_per_kg;html+=`<tr><td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td><td><strong>${s.animal_code}</strong></td><td>${fmtN(s.weight_at_sale,1)} kg</td><td>${fmtN(s.rate_per_kg)}</td><td>${Rs(sp)}</td><td>${Rs(s.admin_charges||0)}</td><td><strong>${Rs(s.amount)}</strong></td><td><button class="btn btn-primary btn-sm" onclick="closeModal('ledger-overlay');showReceipt('${s.receipt_no}')">Receipt</button></td></tr>`;});
     html+=`<tr style="font-weight:700;background:#f8fafc"><td colspan="7" style="text-align:right">Total</td><td>${Rs(ts)}</td><td></td></tr></tbody></table></div>`;
   } else html+=`<p style="color:#aaa;font-style:italic;margin-bottom:12px">No sales yet.</p>`;
 
