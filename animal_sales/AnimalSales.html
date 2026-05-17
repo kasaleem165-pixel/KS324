@@ -450,6 +450,48 @@ input[readonly]{background:#f8fafc}
   </div>
 </div>
 
+<!-- ══════════ EDIT ANIMAL MODAL ══════════ -->
+<div class="overlay" id="editanimal-overlay">
+  <div class="modal" style="max-width:600px">
+    <button class="modal-close" onclick="closeModal('editanimal-overlay')">&#10005;</button>
+    <div class="card-title">Edit Animal Record</div>
+    <div id="editanimal-flash"></div>
+    <input type="hidden" id="ea-code">
+    <div class="form-grid" style="margin-top:14px">
+      <div class="fg"><label>Animal Code</label>
+        <input id="ea-code-display" readonly style="background:#f1f5f9;color:#64748b;font-weight:700"></div>
+      <div class="fg"><label>Transaction Date</label>
+        <input id="ea-date" type="date"></div>
+      <div class="fg"><label>Age / Type</label>
+        <select id="ea-type" onchange="eaToggleAgeOther()">
+          <option value="">-- Select Age --</option>
+          <option value="Dondha">Dondha</option>
+          <option value="Kheera">Kheera</option>
+          <option value="Other">Other (type below)</option>
+        </select></div>
+      <div class="fg" id="ea-type-other-row" style="display:none"><label>Age / Type (custom)</label>
+        <input id="ea-type-other" placeholder="Enter age or type"></div>
+      <div class="fg"><label>Weight Latest (kg)</label>
+        <input id="ea-wf" type="number" step="0.1" placeholder="Current / latest weight"></div>
+      <div class="fg"><label>Admin Charges (Rs.)</label>
+        <input id="ea-admin" type="number" step="1" placeholder="e.g. 30000"></div>
+      <div class="fg"><label>Status</label>
+        <select id="ea-status">
+          <option value="available">Available</option>
+          <option value="sold">Sold</option>
+        </select></div>
+      <div class="fg"><label>Customer (assigned)</label>
+        <select id="ea-cust"><option value="">-- None --</option></select></div>
+      <div class="fg full"><label>Description</label>
+        <textarea id="ea-desc" rows="2" placeholder="e.g. 1 Waccha purchased from Ludan Mandi"></textarea></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-success" onclick="saveAnimalEdit()">Save Changes</button>
+      <button class="btn btn-light" onclick="closeModal('editanimal-overlay')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════ EDIT CUSTOMER MODAL ══════════ -->
 <div class="overlay" id="editcust-overlay">
   <div class="modal" style="max-width:500px">
@@ -1185,7 +1227,10 @@ function renderAnimals(){
       <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
       <td><span class="badge ${a.status}">${a.status==='available'?'Available':'Sold'}</span></td>
       <td>${a._custId?cName(a._custId):'-'}</td>
-      <td>${a._sale?`<button class="btn btn-primary btn-sm" onclick="showReceipt('${a._sale.receipt_no}')">Receipt</button>`:''}</td>
+      <td style="white-space:nowrap">
+        ${a._sale?`<button class="btn btn-primary btn-sm" onclick="showReceipt('${a._sale.receipt_no}')">Receipt</button> `:''}
+        <button class="btn btn-light btn-sm" onclick="openAnimalEdit('${a.code}')">&#9998; Edit</button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -1346,6 +1391,64 @@ function renderCustomers(){
       </td>
     </tr>`;
   }).join('');
+}
+
+// ══════════════════════════ EDIT ANIMAL ══════════════════════════
+function openAnimalEdit(code){
+  const a=DB.animals.find(x=>x.code===code); if(!a) return;
+  document.getElementById('ea-code').value=code;
+  document.getElementById('ea-code-display').value=code;
+  document.getElementById('ea-date').value=a.purchase_date||'';
+  document.getElementById('ea-wf').value=a.weight_final||'';
+  document.getElementById('ea-admin').value=a.admin_charges!=null?a.admin_charges:'';
+  document.getElementById('ea-status').value=a.status||'available';
+  document.getElementById('ea-desc').value=a.description||'';
+  // Age/Type combo
+  const knownTypes=['Dondha','Kheera'];
+  const at=a.age_type||'';
+  if(knownTypes.includes(at)){
+    document.getElementById('ea-type').value=at;
+    document.getElementById('ea-type-other-row').style.display='none';
+    document.getElementById('ea-type-other').value='';
+  } else if(at){
+    document.getElementById('ea-type').value='Other';
+    document.getElementById('ea-type-other-row').style.display='flex';
+    document.getElementById('ea-type-other').value=at;
+  } else {
+    document.getElementById('ea-type').value='';
+    document.getElementById('ea-type-other-row').style.display='none';
+    document.getElementById('ea-type-other').value='';
+  }
+  populateCustDropdown('ea-cust', a.assigned_customer||'');
+  document.getElementById('editanimal-flash').innerHTML='';
+  document.getElementById('editanimal-overlay').classList.add('open');
+}
+function eaToggleAgeOther(){
+  const v=document.getElementById('ea-type').value;
+  document.getElementById('ea-type-other-row').style.display=v==='Other'?'flex':'none';
+  if(v!=='Other') document.getElementById('ea-type-other').value='';
+}
+function saveAnimalEdit(){
+  const code=document.getElementById('ea-code').value;
+  const a=DB.animals.find(x=>x.code===code); if(!a){flash('editanimal-flash','Animal not found.','err');return;}
+  const wVal=document.getElementById('ea-wf').value;
+  const w=wVal!==''?parseFloat(wVal):null;
+  if(w!==null&&w<=0){flash('editanimal-flash','Weight must be a positive number.','err');return;}
+  const adminVal=document.getElementById('ea-admin').value;
+  const typeVal=document.getElementById('ea-type').value;
+  const ageType=typeVal==='Other'?(document.getElementById('ea-type-other').value.trim()||null):typeVal||null;
+  a.purchase_date=document.getElementById('ea-date').value||null;
+  a.age_type=ageType;
+  a.weight_final=w;
+  a.admin_charges=adminVal!==''?parseFloat(adminVal):0;
+  a.status=document.getElementById('ea-status').value;
+  a.description=document.getElementById('ea-desc').value.trim()||'';
+  const custVal=document.getElementById('ea-cust').value;
+  a.assigned_customer=custVal?parseInt(custVal):null;
+  save();
+  closeModal('editanimal-overlay');
+  renderAnimals();
+  flash('animal-flash',`Animal ${code} updated successfully.`);
 }
 
 function openCustomerEdit(cid){
