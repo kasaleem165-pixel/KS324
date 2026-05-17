@@ -1235,6 +1235,17 @@ function renderAnimals(){
   }).join('');
 }
 
+function deleteAnimal(code){
+  if(!confirm(`Delete animal ${code} from records? This cannot be undone.`)) return;
+  const hasSale=DB.sales.find(s=>s.animal_code===code);
+  if(hasSale){alert(`Animal ${code} has a sale record (${hasSale.receipt_no}). Delete the sale first.`);return;}
+  DB.animals=DB.animals.filter(a=>a.code!==code);
+  save();
+  renderStockReport();
+  renderAnimals();
+  renderDashboard();
+}
+
 function renderStockReport(){
   const colEl=document.getElementById('stock-sort-col');
   const dirEl=document.getElementById('stock-sort-dir');
@@ -1255,12 +1266,13 @@ function renderStockReport(){
     th('Share / Person','stock','_spp')+
     th('Beef Qty / Person','stock','_bq')+
     th('Beef Rate / Person','stock','_br')+
-    '</tr>';
+    '<th>Actions</th>'
+    + '</tr>';
   thead.innerHTML=theadRow;
 
   const tb=document.getElementById('stock-body');
   const available=animalComputedList(a=>a.status==='available');
-  if(!available.length){tb.innerHTML=`<tr><td colspan="10" class="empty">No available animals.</td></tr>`;return;}
+  if(!available.length){tb.innerHTML=`<tr><td colspan="11" class="empty">No available animals.</td></tr>`;return;}
 
   const dondha=sortArr(available.filter(a=>(a.age_type||'').toLowerCase()==='dondha'),col,dir);
   const kheera=sortArr(available.filter(a=>(a.age_type||'').toLowerCase()==='kheera'),col,dir);
@@ -1276,9 +1288,9 @@ function renderStockReport(){
     const tbq=list.reduce((s,a)=>s+a._bq,0);
     return `<tr style="background:${color};font-weight:700;font-size:.82rem;border-top:2px solid #cbd5e1">
       <td colspan="3" style="color:#1a3a5c">${label} — Subtotal (${list.length} animals)</td>
-      <td>${tw.toFixed(1)} kg</td>
+      <td>${fmtN(tw,1)} kg</td>
       <td>${Rs(tsp)}</td><td>${Rs(tadm)}</td><td>${Rs(ttc)}</td>
-      <td>${Rs(tspp)}</td><td>${tbq.toFixed(2)} kg</td><td>—</td>
+      <td>${Rs(tspp)}</td><td>${fmtN(tbq,2)} kg</td><td>—</td><td></td>
     </tr>`;
   }
 
@@ -1287,13 +1299,17 @@ function renderStockReport(){
       <td><strong>${a.code}</strong></td>
       <td>${fmtD(a.purchase_date)}</td>
       <td>${a.age_type||'-'}</td>
-      <td><strong>${a._w||'-'}</strong></td>
+      <td><strong>${a._w?fmtN(a._w,1):'-'}</strong></td>
       <td>${a._w?Rs(a._sp):'-'}</td>
       <td>${Rs(a._adm)}</td>
       <td>${a._w?Rs(a._tc):'-'}</td>
       <td>${a._w?Rs(a._spp):'-'}</td>
       <td>${a._w?fmtN(a._bq,2)+' kg':'-'}</td>
       <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-light btn-sm" onclick="openAnimalEdit('${a.code}')">&#9998; Edit</button>
+        <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="deleteAnimal('${a.code}')">&#128465; Del</button>
+      </td>
     </tr>`).join('');
   }
 
@@ -1302,7 +1318,7 @@ function renderStockReport(){
   // ── Dondha section ──
   if(dondha.length){
     html+=`<tr style="background:#dbeafe;font-weight:700">
-      <td colspan="10" style="color:#1e40af;padding:9px 10px;font-size:.85rem">
+      <td colspan="11" style="color:#1e40af;padding:9px 10px;font-size:.85rem">
         &#9654; Dondha &nbsp;<span style="background:#1e40af;color:#fff;border-radius:10px;padding:1px 8px;font-size:.75rem">${dondha.length}</span>
       </td></tr>`;
     html+=animalRows(dondha,'');
@@ -1312,7 +1328,7 @@ function renderStockReport(){
   // ── Kheera section ──
   if(kheera.length){
     html+=`<tr style="background:#fef3c7;font-weight:700">
-      <td colspan="10" style="color:#92400e;padding:9px 10px;font-size:.85rem">
+      <td colspan="11" style="color:#92400e;padding:9px 10px;font-size:.85rem">
         &#9654; Kheera &nbsp;<span style="background:#d97706;color:#fff;border-radius:10px;padding:1px 8px;font-size:.75rem">${kheera.length}</span>
       </td></tr>`;
     html+=animalRows(kheera,'#fffbeb');
@@ -1322,7 +1338,7 @@ function renderStockReport(){
   // ── Others section ──
   if(others.length){
     html+=`<tr style="background:#f3f4f6;font-weight:700">
-      <td colspan="10" style="color:#374151;padding:9px 10px;font-size:.85rem">
+      <td colspan="11" style="color:#374151;padding:9px 10px;font-size:.85rem">
         &#9654; Other &nbsp;<span style="background:#6b7280;color:#fff;border-radius:10px;padding:1px 8px;font-size:.75rem">${others.length}</span>
       </td></tr>`;
     html+=animalRows(others,'');
@@ -1340,9 +1356,9 @@ function renderStockReport(){
   html+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.88rem;border-top:3px solid #0f2540">
     <td colspan="3">GRAND TOTAL — ${all.length} animals
       &nbsp;(Dondha: ${dondha.length} &nbsp;|&nbsp; Kheera: ${kheera.length}${others.length?' &nbsp;|&nbsp; Other: '+others.length:''})</td>
-    <td>${gtw.toFixed(1)} kg</td>
+    <td>${fmtN(gtw,1)} kg</td>
     <td>${Rs(gtsp)}</td><td>${Rs(gtadm)}</td><td>${Rs(gttc)}</td>
-    <td>${Rs(gtspp)}</td><td>${gtbq.toFixed(2)} kg</td><td>—</td>
+    <td>${Rs(gtspp)}</td><td>${fmtN(gtbq,2)} kg</td><td>—</td><td></td>
   </tr>`;
 
   tb.innerHTML=html;
