@@ -31,62 +31,91 @@ def load_data():
 
 def remove_old_text(img_bgr):
     """
-    Detect and inpaint the casual text boxes:
-      - Pure-red weight box (hue 0-10 or 170-180, high saturation)
-      - Pure-black code box (all channels < 40, upper 55% of image)
-      - Pure-white weight box (all channels > 230)
+    Remove casual text boxes (red, black, white, yellow) from the upper zone.
+    Bottom 22% is fully covered by the opaque overlay — skip it entirely.
+
+    Strategy: detect each box's pixels, expand each blob's BOUNDING BOX fully
+    to guarantee no hollow gaps, then inpaint with a tight radius so the fill
+    stays sharp without smearing.
     """
     h, w = img_bgr.shape[:2]
+    overlay_start = int(h * 0.78)
     hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
-    b, g, r = img_bgr[:,:,0], img_bgr[:,:,1], img_bgr[:,:,2]
+
+    upper = np.zeros((h, w), np.uint8)
+    upper[:overlay_start, :] = 255
 
     # — Red boxes —
     red1 = cv2.inRange(hsv, np.array([0, 180, 120]),   np.array([10, 255, 255]))
     red2 = cv2.inRange(hsv, np.array([168, 180, 120]), np.array([180, 255, 255]))
-    red_mask = cv2.bitwise_or(red1, red2)
+    red_mask = cv2.bitwise_and(cv2.bitwise_or(red1, red2), upper)
 
-    # — White boxes (bright, low-saturation) —
-    white_mask = np.all(img_bgr > 220, axis=2).astype(np.uint8) * 255
-    # keep only large connected white blobs (text box sized)
-    white_mask = _filter_blobs(white_mask, min_area=1500)
+    # — White boxes —
+    white_raw = np.all(img_bgr > 220, axis=2).astype(np.uint8) * 255
+    white_mask = cv2.bitwise_and(_filter_blobs(white_raw, min_area=1500), upper)
 
-    # — Black boxes in upper 55% only (avoid dark animals at bottom) —
-    dark_mask_raw = np.all(img_bgr < 35, axis=2).astype(np.uint8) * 255
-    region_mask = np.zeros((h, w), np.uint8)
-    region_mask[:int(h * 0.55), :] = 255
-    black_mask = cv2.bitwise_and(dark_mask_raw, region_mask)
-    black_mask = _filter_blobs(black_mask, min_area=400)
+    # — Black boxes in upper 55% —
+    dark_raw = np.all(img_bgr < 35, axis=2).astype(np.uint8) * 255
+    upper55 = np.zeros((h, w), np.uint8)
+    upper55[:int(h * 0.55), :] = 255
+    black_mask = _filter_blobs(cv2.bitwise_and(dark_raw, upper55), min_area=400)
 
-    # — Yellow floating text (hue 20-35, high sat/val) in upper 78% —
+    # — Yellow floating text —
     yellow_raw = cv2.inRange(hsv, np.array([18, 160, 160]), np.array([38, 255, 255]))
-    upper_mask = np.zeros((h, w), np.uint8)
-    upper_mask[:int(h * 0.78), :] = 255
-    yellow_mask = cv2.bitwise_and(yellow_raw, upper_mask)
-    yellow_mask = _filter_blobs(yellow_mask, min_area=200)
+    yellow_mask = cv2.bitwise_and(_filter_blobs(yellow_raw, min_area=200), upper)
 
     combined = cv2.bitwise_or(red_mask,
                cv2.bitwise_or(white_mask,
                cv2.bitwise_or(black_mask, yellow_mask)))
 
-    # Dilate to fully cover text pixels
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (14, 14))
-    combined = cv2.dilate(combined, kernel, iterations=1)
-
     if combined.max() == 0:
-        return img_bgr  # nothing to remove
+        return img_bgr
 
-    inpainted = cv2.inpaint(img_bgr, combined, inpaintRadius=7, flags=cv2.INPAINT_TELEA)
+    # Expand each blob to its full bounding box so there are zero gaps inside
+    combined = _blobs_to_bboxes(combined, pad=6)
+
+    # Tight inpaint radius — fills cleanly without smearing surrounding detail
+    inpainted = cv2.inpaint(img_bgr, combined, inpaintRadius=4, flags=cv2.INPAINT_TELEA)
     return inpainted
 
 
-def _filter_blobs(mask, min_area=400):
-    """Keep only blobs larger than min_area pixels."""
+def _blobs_to_bboxes(mask, pad=6):
+    """Replace each connected blob with its full padded bounding box rectangle.
+    Skips any blob whose bounding box exceeds 8% of the image — not a text box."""
+    num, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    out = np.zeros_like(mask)
+    h, w = mask.shape
+    max_px = int(h * w * 0.08)
+    for i in range(1, num):
+        bw = stats[i, cv2.CC_STAT_WIDTH]
+        bh = stats[i, cv2.CC_STAT_HEIGHT]
+        if bw * bh > max_px:
+            continue  # too large — not a text box
+        x  = max(0, stats[i, cv2.CC_STAT_LEFT]  - pad)
+        y  = max(0, stats[i, cv2.CC_STAT_TOP]   - pad)
+        x2 = min(w, stats[i, cv2.CC_STAT_LEFT]  + bw + pad)
+        y2 = min(h, stats[i, cv2.CC_STAT_TOP]   + bh + pad)
+        out[y:y2, x:x2] = 255
+    return out
+
+
+def _filter_blobs(mask, min_area=400, max_area=12000):
+    """Keep only blobs between min_area and max_area pixels.
+    max_area prevents large animal bodies from being treated as text boxes."""
     num, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
     clean = np.zeros_like(mask)
     for i in range(1, num):
-        if stats[i, cv2.CC_STAT_AREA] >= min_area:
-            clean[labels == i] = 255
+        area = stats[i, cv2.CC_STAT_AREA]
+        bw   = stats[i, cv2.CC_STAT_WIDTH]
+        bh   = stats[i, cv2.CC_STAT_HEIGHT]
+        if min_area <= area <= max_area:
+            # Also reject blobs whose bounding box aspect ratio is extreme (not box-like)
+            aspect = max(bw, bh) / max(min(bw, bh), 1)
+            if aspect < 10:
+                clean[labels == i] = 255
     return clean
+
+
 
 
 def draw_overlay(pil_img, code, weight):
@@ -122,9 +151,9 @@ def draw_overlay(pil_img, code, weight):
     draw.line([(cx, 12), (cx, bar_h - 12)], fill=(*GOLD[:3], 160), width=2)
 
     # ── Fonts ────────────────────────────────────────────────────────────────
-    label_sz = max(int(bar_h * 0.22), 14)
-    value_sz = max(int(bar_h * 0.48), 30)
-    date_sz  = max(int(bar_h * 0.18), 12)
+    label_sz = max(int(bar_h * 0.18), 12)
+    value_sz = max(int(bar_h * 0.36), 22)
+    date_sz  = max(int(bar_h * 0.15), 10)
     try:
         f_label = ImageFont.truetype(FONT_REG,  label_sz)
         f_value = ImageFont.truetype(FONT_BOLD, value_sz)
