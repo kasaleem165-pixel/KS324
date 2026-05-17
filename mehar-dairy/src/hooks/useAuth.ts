@@ -18,12 +18,14 @@ export function useAuth(): AuthState {
   })
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    supabase.auth.getSession().then(async ({ data: { session } }: any) => {
       const isAdmin = session ? await checkAdmin(session.user.id) : false
       setState({ user: session?.user ?? null, session, isAdmin, loading: false })
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
       const isAdmin = session ? await checkAdmin(session.user.id) : false
       setState({ user: session?.user ?? null, session, isAdmin, loading: false })
     })

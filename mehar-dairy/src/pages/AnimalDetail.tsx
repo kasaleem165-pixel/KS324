@@ -38,7 +38,7 @@ export function AnimalDetail() {
 
   useEffect(() => {
     if (!id) return
-    supabase.from('animals').select('*').eq('id', id).single().then(({ data }) => {
+    supabase.from('animals').select('*').eq('id', id).single().then(({ data }: { data: Animal | null }) => {
       setAnimal(data)
       setLoading(false)
     })

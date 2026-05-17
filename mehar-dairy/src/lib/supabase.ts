@@ -1,11 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
+import { mockSupabase } from './mockSupabase'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Check your .env file.')
-}
+export const IS_DEMO_MODE = !supabaseUrl || supabaseUrl === 'https://your-project.supabase.co'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const supabase = createClient<any>(supabaseUrl, supabaseAnonKey)
+export const supabase: any = IS_DEMO_MODE
+  ? mockSupabase
+  : createClient(supabaseUrl!, supabaseAnonKey!)

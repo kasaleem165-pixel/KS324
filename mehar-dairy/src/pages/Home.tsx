@@ -45,7 +45,7 @@ export function Home() {
       .eq('status', 'available')
       .order('created_at', { ascending: false })
       .limit(6)
-      .then(({ data }) => {
+      .then(({ data }: { data: Animal[] | null }) => {
         setFeatured(data ?? [])
         setLoading(false)
       })

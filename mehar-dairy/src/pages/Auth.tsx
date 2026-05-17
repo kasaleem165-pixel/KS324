@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { supabase } from '@/lib/supabase'
+import { supabase, IS_DEMO_MODE } from '@/lib/supabase'
 import { siteConfig } from '@/config/site'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
@@ -45,6 +45,21 @@ export function Auth() {
           </h1>
           <p className="text-gray-500 text-sm">{siteConfig.name}</p>
         </div>
+
+        {IS_DEMO_MODE && (
+          <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+            <p className="font-semibold mb-1.5">Demo Mode — use these credentials:</p>
+            <button
+              type="button"
+              onClick={() => { setEmail('admin@demo.com'); setPassword('admin123') }}
+              className="flex flex-col gap-0.5 text-left hover:opacity-75 transition-opacity"
+            >
+              <span>Email: <code className="font-mono bg-amber-100 px-1 rounded">admin@demo.com</code></span>
+              <span>Password: <code className="font-mono bg-amber-100 px-1 rounded">admin123</code></span>
+              <span className="text-xs text-amber-600 mt-1">Click here to auto-fill ↑</span>
+            </button>
+          </div>
+        )}
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
           <div className="flex rounded-xl overflow-hidden border border-gray-200 mb-6">

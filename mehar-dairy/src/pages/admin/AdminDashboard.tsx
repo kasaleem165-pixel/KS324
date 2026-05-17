@@ -29,8 +29,8 @@ export function AdminDashboard() {
         supabase.from('bookings').select('status'),
       ])
 
-      const animals = animalsRes.data ?? []
-      const bookings = bookingsRes.data ?? []
+      const animals: Array<{ price: number; status: string }> = animalsRes.data ?? []
+      const bookings: Array<{ status: string }> = bookingsRes.data ?? []
 
       setStats({
         totalAnimals: animals.length,
