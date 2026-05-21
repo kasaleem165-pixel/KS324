@@ -132,6 +132,7 @@ input[readonly]{background:#f8fafc}
   <button onclick="show('customers')"  id="nav-customers">Customers</button>
   <button onclick="show('sale')"       id="nav-sale">+ New Sale</button>
   <button onclick="show('sales')"      id="nav-sales">Sales</button>
+  <button onclick="show('saleledger')" id="nav-saleledger">Sale Ledger</button>
   <button onclick="show('payments')"   id="nav-payments">Payments</button>
   <button onclick="show('settings')"   id="nav-settings">Settings</button>
 </nav>
@@ -294,12 +295,13 @@ input[readonly]{background:#f8fafc}
         <input id="s-weight" type="number" step="0.1" placeholder="Final measured weight" oninput="calcSaleTotal()"></div>
       <div class="fg"><label>Rate per kg (Rs.) *</label>
         <input id="s-rate" type="number" step="1" oninput="calcSaleTotal()"></div>
-      <div class="fg"><label>Admin Charges (Rs.)</label>
-        <input id="s-admin" type="number" step="1" oninput="calcSaleTotal()">
-        <span class="hint">Transport, qasai, other expenses</span></div>
+      <div class="fg"><label>Admin Charges (Rs.) <span style="font-weight:400;font-size:.76rem;color:#999">internal — beef calc only</span></label>
+        <input id="s-admin" type="number" step="1" oninput="calcSaleTotal()" placeholder="e.g. 30000"></div>
+      <div class="fg"><label>Carriage Charges (Rs.) <span style="font-weight:400;font-size:.76rem;color:#888">shown on receipt</span></label>
+        <input id="s-carriage" type="number" step="1" oninput="calcSaleTotal()" placeholder="e.g. 5000"></div>
       <div class="fg"><label>Sale Price (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Wt × Rate</span></label>
         <input id="s-saleprice" readonly style="color:#1a3a5c"></div>
-      <div class="fg"><label>Total Amount (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Sale Price + Admin</span></label>
+      <div class="fg"><label>Total Amount (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Sale Price + Carriage</span></label>
         <input id="s-total" readonly style="font-weight:700;font-size:1rem"></div>
       <div class="fg"><label>Beef Qty / person (kg)</label>
         <input id="s-beefqty" readonly></div>
@@ -325,6 +327,21 @@ input[readonly]{background:#f8fafc}
     <div class="tbl-wrap"><table>
       <thead id="sales-head"></thead>
       <tbody id="sales-body"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ══════════ SALE LEDGER ══════════ -->
+<div class="page" id="page-saleledger">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+      <div class="card-title" style="margin:0">Sale Ledger</div>
+      <button class="btn btn-light btn-sm" onclick="exportSaleLedgerExcel()">&#8595; Export to Excel</button>
+    </div>
+    <div id="saleledger-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px"></div>
+    <div class="tbl-wrap"><table>
+      <thead id="saleledger-head"></thead>
+      <tbody id="saleledger-body"></tbody>
     </table></div>
   </div>
 </div>
@@ -415,9 +432,11 @@ input[readonly]{background:#f8fafc}
         <input id="es-rate" type="number" step="1" oninput="esCalc()"></div>
       <div class="fg"><label>Admin Charges (Rs.)</label>
         <input id="es-admin" type="number" step="1" oninput="esCalc()"></div>
+      <div class="fg"><label>Carriage Charges (Rs.) <span style="font-weight:400;font-size:.76rem;color:#888">shown on receipt</span></label>
+        <input id="es-carriage" type="number" step="1" oninput="esCalc()" placeholder="e.g. 5000"></div>
       <div class="fg"><label>Sale Price (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Wt × Rate</span></label>
         <input id="es-saleprice" readonly style="color:#1a3a5c"></div>
-      <div class="fg"><label>Total Amount (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Sale Price + Admin</span></label>
+      <div class="fg"><label>Total Amount (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Sale Price + Carriage</span></label>
         <input id="es-total" readonly style="font-weight:700"></div>
       <div class="fg full"><label>Notes</label>
         <input id="es-notes" placeholder="Optional"></div>
@@ -749,6 +768,7 @@ function load(){
     if(!DB.settings) DB.settings=Object.assign({},SEED_SETTINGS);
     if(!DB.settings.num_persons) DB.settings.num_persons=7;
     if(!DB.settings.admin_charges) DB.settings.admin_charges=DB.settings.expenses_default||30000;
+    DB.sales.forEach(s=>{if(!s.hasOwnProperty('carriage_charges'))s.carriage_charges=0;});
     // fix animals wrongly seeded as "sold" with no actual sale record
     const soldCodes=["151","177","181","182","183"];
     let fixed=false;
@@ -778,7 +798,7 @@ function show(p){
   document.getElementById('page-'+p).classList.add('active');
   document.getElementById('nav-'+p).classList.add('active');
   const fn={dashboard:renderDashboard,animals:renderAnimals,stock:renderStockReport,customers:renderCustomers,
-            sale:initSaleForm,sales:renderSales,payments:renderPayments,settings:renderSettings};
+            sale:initSaleForm,sales:renderSales,saleledger:renderSaleLedger,payments:renderPayments,settings:renderSettings};
   if(fn[p]) fn[p]();
 }
 
@@ -885,7 +905,8 @@ function showDashDetail(key){
       </tr></thead><tbody>`;
       soldSales.forEach((s,i)=>{
         const sp=s.weight_at_sale*s.rate_per_kg;
-        const spp=s.amount/np;
+        const tc=sp+(s.admin_charges||0);
+        const spp=tc/np;
         const bq=(s.weight_at_sale/2)/np;
         const br=bq>0?spp/bq:0;
         html+=`<tr>
@@ -1617,7 +1638,7 @@ function initSaleForm(){
   document.getElementById('s-date').value=today();
   document.getElementById('s-rate').value=DB.settings.rate_per_kg||780;
   document.getElementById('s-admin').value='';
-  ['s-weight','s-saleprice','s-total','s-beefqty','s-beefrate','s-notes'].forEach(id=>document.getElementById(id).value='');
+  ['s-weight','s-carriage','s-saleprice','s-total','s-beefqty','s-beefrate','s-notes'].forEach(id=>document.getElementById(id).value='');
 }
 
 function customerSelected(){
@@ -1636,12 +1657,14 @@ function calcSaleTotal(){
   const w=parseFloat(document.getElementById('s-weight').value)||0;
   const r=parseFloat(document.getElementById('s-rate').value)||0;
   const adm=parseFloat(document.getElementById('s-admin').value)||0;
+  const car=parseFloat(document.getElementById('s-carriage').value)||0;
   if(!w){['s-saleprice','s-total','s-beefqty','s-beefrate'].forEach(id=>document.getElementById(id).value='');return;}
   const np=DB.settings.num_persons||7;
   const salePrice=w*r;
-  const total=salePrice+adm;
+  const total=salePrice+car;
+  const tc=salePrice+adm;
   const bq=(w/2)/np;
-  const br=bq>0?(total/np)/bq:0;
+  const br=bq>0?(tc/np)/bq:0;
   document.getElementById('s-saleprice').value=Rs(salePrice);
   document.getElementById('s-total').value=Rs(total);
   document.getElementById('s-beefqty').value=fmtN(bq,2)+' kg';
@@ -1654,6 +1677,7 @@ function recordSale(){
   const w=parseFloat(document.getElementById('s-weight').value);
   const r=parseFloat(document.getElementById('s-rate').value);
   const adm=parseFloat(document.getElementById('s-admin').value)||0;
+  const car=parseFloat(document.getElementById('s-carriage').value)||0;
   const errors=[];
   if(!code) errors.push('Animal Code is required.');
   if(!cid||isNaN(cid)) errors.push('Customer is required.');
@@ -1663,10 +1687,10 @@ function recordSale(){
   const dateVal=document.getElementById('s-date').value;
   if(!dateVal) errors.push('Sale Date is required.');
   if(errors.length){flash('sale-flash',errors.join(' '),'err');return;}
-  const amount=(w*r)+adm;
+  const amount=(w*r)+car;
   const rno=nextRcp();
   DB.sales.push({receipt_no:rno,animal_code:code,customer_id:cid,sale_date:dateVal,
-    weight_at_sale:w,rate_per_kg:r,admin_charges:adm,amount,
+    weight_at_sale:w,rate_per_kg:r,admin_charges:adm,carriage_charges:car,amount,
     notes:document.getElementById('s-notes').value.trim()||''});
   const animal=DB.animals.find(a=>a.code===code);
   if(animal){animal.status='sold';animal.weight_final=w;}
@@ -1676,32 +1700,33 @@ function recordSale(){
 // ══════════════════════════ ALL SALES ══════════════════════════
 function renderSales(){
   const head=document.getElementById('sales-head');
-  head.innerHTML='<tr>'+'<th>S#</th>'+th('Receipt','sales','receipt_no')+th('Date','sales','sale_date')+th('Code','sales','animal_code')+'<th>Age</th>'+th('Customer','sales','customerName')+th('Wt(kg)','sales','weight_at_sale')+th('Rate/kg','sales','rate_per_kg')+th('Sale Pr.','sales','sp')+th('Admin','sales','admin_charges')+th('Total','sales','amount')+th('Share/P','sales','spp')+'<th>Bq/P</th><th>Br/P</th><th></th></tr>';
+  head.innerHTML='<tr>'+'<th>S#</th>'+th('Receipt','sales','receipt_no')+th('Date','sales','sale_date')+th('Code','sales','animal_code')+'<th>Age</th>'+th('Customer','sales','customerName')+th('Wt(kg)','sales','weight_at_sale')+th('Rate/kg','sales','rate_per_kg')+th('Sale Pr.','sales','sp')+th('Carriage','sales','carriage_charges')+th('Admin','sales','admin_charges')+th('Total','sales','amount')+th('Share/P','sales','spp')+'<th>Bq/P</th><th>Br/P</th><th></th></tr>';
   const tb=document.getElementById('sales-body');
-  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="15" class="empty">No sales yet.</td></tr>`;return;}
+  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="16" class="empty">No sales yet.</td></tr>`;return;}
   const np=DB.settings.num_persons||7;
   // Attach computed fields for sorting
-  const withComputed=DB.sales.map(s=>{const sp=s.weight_at_sale*s.rate_per_kg;const spp=s.amount/np;return Object.assign({},s,{customerName:cName(s.customer_id),sp,spp});});
+  const withComputed=DB.sales.map(s=>{const sp=s.weight_at_sale*s.rate_per_kg;const spp=(sp+(s.admin_charges||0))/(DB.settings.num_persons||7);return Object.assign({},s,{customerName:cName(s.customer_id),sp,spp});});
   const col=SORT.sales.col;
   const dir=SORT.sales.dir;
   let list;
-  if(['weight_at_sale','rate_per_kg','sp','admin_charges','amount','spp'].includes(col)){
+  if(['weight_at_sale','rate_per_kg','sp','carriage_charges','admin_charges','amount','spp'].includes(col)){
     list=[...withComputed].sort((a,b)=>dir==='asc'?(a[col]||0)-(b[col]||0):(b[col]||0)-(a[col]||0));
   } else {
     list=sortArr(withComputed,col,dir);
   }
   tb.innerHTML=list.map((s,i)=>{
     const sp=s.weight_at_sale*s.rate_per_kg;
-    const spp=s.amount/np;
+    const tc=sp+(s.admin_charges||0);
+    const spp=tc/np;
     const bq=(s.weight_at_sale/2)/np;
-    const br=bq>0?(s.amount/np)/bq:0;
+    const br=bq>0?spp/bq:0;
     return `<tr>
       <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
       <td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td>
       <td><strong>${s.animal_code}</strong></td><td>${aType(s.animal_code)}</td>
       <td>${cName(s.customer_id)}</td>
       <td>${fmtN(s.weight_at_sale,1)} kg</td><td>${fmtN(s.rate_per_kg)}</td>
-      <td>${Rs(sp)}</td><td>${Rs(s.admin_charges||0)}</td>
+      <td>${Rs(sp)}</td><td>${Rs(s.carriage_charges||0)}</td><td>${Rs(s.admin_charges||0)}</td>
       <td><strong>${Rs(s.amount)}</strong></td>
       <td><strong>${Rs(spp)}</strong></td>
       <td>${fmtN(bq,2)} kg</td><td>${Rs(br)}/kg</td>
@@ -1721,6 +1746,112 @@ function deleteSale(rno){
   if(animal) animal.status='available';
   DB.sales=DB.sales.filter(s=>s.receipt_no!==rno);
   save(); renderSales(); renderDashboard(); renderAnimals();
+}
+
+// ══════════════════════════ SALE LEDGER ══════════════════════════
+function renderSaleLedger(){
+  const np=DB.settings.num_persons||7;
+  // Summary cards
+  const totalSalePrice=DB.sales.reduce((s,x)=>s+(x.weight_at_sale*x.rate_per_kg),0);
+  const totalCarriage=DB.sales.reduce((s,x)=>s+(x.carriage_charges||0),0);
+  const totalAmount=DB.sales.reduce((s,x)=>s+x.amount,0);
+  const totalPaid=DB.payments.reduce((s,p)=>s+(p.amount||0),0);
+  const totalDiscount=DB.payments.reduce((s,p)=>s+(p.discount||0),0);
+  const totalBalance=totalAmount-totalPaid-totalDiscount;
+  document.getElementById('saleledger-summary').innerHTML=`
+    <div class="stat"><div class="n" style="font-size:.95rem">${Rs(totalSalePrice)}</div><div class="l">Sale Price Total</div></div>
+    <div class="stat"><div class="n" style="font-size:.95rem">${Rs(totalCarriage)}</div><div class="l">Carriage Total</div></div>
+    <div class="stat"><div class="n" style="font-size:.95rem">${Rs(totalAmount)}</div><div class="l">Total Billed</div></div>
+    <div class="stat g"><div class="n" style="font-size:.95rem">${Rs(totalPaid)}</div><div class="l">Total Received</div></div>
+    <div class="stat" style="border:1px solid #ede9fe"><div class="n" style="font-size:.95rem;color:#7c3aed">${Rs(totalDiscount)}</div><div class="l">Total Discount</div></div>
+    <div class="stat ${totalBalance>0?'a':'g'}"><div class="n" style="font-size:.95rem">${Rs(totalBalance)}</div><div class="l">${totalBalance>0?'Balance Due':'Settled'}</div></div>`;
+
+  // Build grouped-by-customer ledger
+  const head=document.getElementById('saleledger-head');
+  head.innerHTML='<tr><th>S#</th><th>Receipt</th><th>Date</th><th>Animal</th><th>Age</th><th>Wt(kg)</th><th>Rate/kg</th><th>Sale Price</th><th>Carriage</th><th>Total Sale</th><th>Received</th><th>Discount</th><th>Balance</th></tr>';
+  const tb=document.getElementById('saleledger-body');
+  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="13" class="empty">No sales yet.</td></tr>`;return;}
+
+  let html='';
+  let sno=0;
+  // Group sales by customer
+  const custIds=[...new Set(DB.sales.map(s=>s.customer_id))];
+  custIds.forEach(cid=>{
+    const c=DB.customers.find(x=>x.id===cid)||{name:'Unknown'};
+    const custSales=DB.sales.filter(s=>s.customer_id===cid).sort((a,b)=>a.receipt_no>b.receipt_no?1:-1);
+    const custPaid=DB.payments.filter(p=>p.customer_id===cid).reduce((s,p)=>s+(p.amount||0),0);
+    const custDisc=DB.payments.filter(p=>p.customer_id===cid).reduce((s,p)=>s+(p.discount||0),0);
+    const custTotal=custSales.reduce((s,x)=>s+x.amount,0);
+    const custBal=custTotal-custPaid-custDisc;
+    // Customer header row
+    html+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700">
+      <td colspan="13" style="padding:7px 10px">&#9654; ${c.name}
+        <span style="font-weight:400;font-size:.78rem;margin-left:12px;opacity:.85">
+          ${custSales.length} sale${custSales.length>1?'s':''} &nbsp;|&nbsp; Billed: ${Rs(custTotal)} &nbsp;|&nbsp; Received: ${Rs(custPaid)} &nbsp;|&nbsp; Balance: ${Rs(custBal)}
+        </span>
+      </td>
+    </tr>`;
+    // Each sale row
+    custSales.forEach(s=>{
+      sno++;
+      const sp=s.weight_at_sale*s.rate_per_kg;
+      const car=s.carriage_charges||0;
+      html+=`<tr>
+        <td style="color:#94a3b8;font-size:.75rem">${sno}</td>
+        <td>${s.receipt_no}</td>
+        <td>${fmtD(s.sale_date)}</td>
+        <td><strong>${s.animal_code}</strong></td>
+        <td>${aType(s.animal_code)}</td>
+        <td>${fmtN(s.weight_at_sale,1)}</td>
+        <td>${fmtN(s.rate_per_kg)}</td>
+        <td>${Rs(sp)}</td>
+        <td>${car>0?Rs(car):'-'}</td>
+        <td><strong>${Rs(s.amount)}</strong></td>
+        <td></td><td></td><td></td>
+      </tr>`;
+    });
+    // Customer subtotal row with payments
+    html+=`<tr style="background:#f0f9ff;font-weight:700;font-size:.82rem;border-top:2px solid #bae6fd">
+      <td colspan="7" style="color:#1a3a5c">Subtotal — ${c.name}</td>
+      <td>${Rs(custSales.reduce((s,x)=>s+(x.weight_at_sale*x.rate_per_kg),0))}</td>
+      <td>${Rs(custSales.reduce((s,x)=>s+(x.carriage_charges||0),0))}</td>
+      <td>${Rs(custTotal)}</td>
+      <td style="color:#059669">${Rs(custPaid)}</td>
+      <td style="color:#7c3aed">${Rs(custDisc)}</td>
+      <td style="color:${custBal>0?'#d97706':'#059669'};font-weight:700">${Rs(custBal)}</td>
+    </tr>`;
+  });
+  // Grand total
+  html+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.85rem;border-top:3px solid #0f2540">
+    <td colspan="7">GRAND TOTAL</td>
+    <td>${Rs(totalSalePrice)}</td>
+    <td>${Rs(totalCarriage)}</td>
+    <td>${Rs(totalAmount)}</td>
+    <td>${Rs(totalPaid)}</td>
+    <td>${Rs(totalDiscount)}</td>
+    <td>${Rs(totalBalance)}</td>
+  </tr>`;
+  tb.innerHTML=html;
+}
+
+function exportSaleLedgerExcel(){
+  const np=DB.settings.num_persons||7;
+  const headers=['Customer','Receipt No','Date','Animal Code','Age/Type','Weight(kg)','Rate/kg','Sale Price(Rs.)','Carriage(Rs.)','Total Sale(Rs.)'];
+  const rows=[];
+  const custIds=[...new Set(DB.sales.map(s=>s.customer_id))];
+  custIds.forEach(cid=>{
+    const c=DB.customers.find(x=>x.id===cid)||{name:'Unknown'};
+    DB.sales.filter(s=>s.customer_id===cid).sort((a,b)=>a.receipt_no>b.receipt_no?1:-1).forEach(s=>{
+      const sp=s.weight_at_sale*s.rate_per_kg;
+      rows.push([c.name,s.receipt_no,s.sale_date,s.animal_code,aType(s.animal_code),
+        s.weight_at_sale,s.rate_per_kg,sp.toFixed(0),(s.carriage_charges||0).toFixed(0),s.amount.toFixed(0)]);
+    });
+    const custPaid=DB.payments.filter(p=>p.customer_id===cid).reduce((s,p)=>s+(p.amount||0),0);
+    const custDisc=DB.payments.filter(p=>p.customer_id===cid).reduce((s,p)=>s+(p.discount||0),0);
+    const custTotal=DB.sales.filter(s=>s.customer_id===cid).reduce((s,x)=>s+x.amount,0);
+    rows.push([`--- ${c.name} Subtotal ---`,'','','','','','','','',custTotal.toFixed(0),'Received:'+custPaid.toFixed(0),'Disc:'+custDisc.toFixed(0),'Bal:'+(custTotal-custPaid-custDisc).toFixed(0)]);
+  });
+  exportCSV(headers,rows,'Sale_Ledger');
 }
 
 // ══════════════════════════ EDIT SALE ══════════════════════════
@@ -1749,6 +1880,7 @@ function openSaleEdit(rno){
   document.getElementById('es-weight').value=s.weight_at_sale||'';
   document.getElementById('es-rate').value=s.rate_per_kg||'';
   document.getElementById('es-admin').value=s.admin_charges!=null?s.admin_charges:'';
+  document.getElementById('es-carriage').value=s.carriage_charges||0;
   document.getElementById('es-notes').value=s.notes||'';
   esCalc();
   document.getElementById('editsale-overlay').classList.add('open');
@@ -1758,9 +1890,12 @@ function esCalc(){
   const w=parseFloat(document.getElementById('es-weight').value)||0;
   const r=parseFloat(document.getElementById('es-rate').value)||0;
   const adm=parseFloat(document.getElementById('es-admin').value)||0;
-  const sp=w&&r?w*r:0;
+  const car=parseFloat(document.getElementById('es-carriage').value)||0;
+  const sp=w*r;
+  const total=sp+car;
+  const tc=sp+adm;
   document.getElementById('es-saleprice').value=sp?Rs(sp):'';
-  document.getElementById('es-total').value=sp?Rs(sp+adm):'';
+  document.getElementById('es-total').value=total?Rs(total):'';
 }
 
 function esCustomerChanged(){
@@ -1780,6 +1915,7 @@ function saveSaleEdit(){
   const w=parseFloat(document.getElementById('es-weight').value);
   const r=parseFloat(document.getElementById('es-rate').value);
   const adm=parseFloat(document.getElementById('es-admin').value)||0;
+  const car=parseFloat(document.getElementById('es-carriage').value)||0;
   const errors=[];
   if(!code) errors.push('Animal Code is required.');
   if(!cid||isNaN(cid)) errors.push('Customer is required.');
@@ -1806,7 +1942,8 @@ function saveSaleEdit(){
   s.weight_at_sale=w;
   s.rate_per_kg=r;
   s.admin_charges=adm;
-  s.amount=(w*r)+adm;
+  s.carriage_charges=car;
+  s.amount=(w*r)+car;
   s.notes=document.getElementById('es-notes').value.trim()||'';
 
   save();
@@ -1938,8 +2075,10 @@ function showReceipt(rno){
   const a=DB.animals.find(x=>x.code===s.animal_code)||{};
   const c=DB.customers.find(x=>x.id===s.customer_id)||{};
   const np=DB.settings.num_persons||7;
+  const sp=s.weight_at_sale*s.rate_per_kg;
+  const tc=sp+(s.admin_charges||0);
   const bq=(s.weight_at_sale/2)/np;
-  const br=bq>0?(s.amount/np)/bq:0;
+  const br=bq>0?(tc/np)/bq:0;
   document.getElementById('receipt-content').innerHTML=`
     <div class="rcp-header"><h2>SALE RECEIPT</h2><p>Animal Sales Record</p></div>
     <div class="rcp-meta">
@@ -1957,10 +2096,10 @@ function showReceipt(rno){
     <div class="rcp-row"><span>Weight at Sale</span><span>${fmtN(s.weight_at_sale,1)} kg</span></div>
     <p style="font-weight:600;color:#1a3a5c;margin:13px 0 8px;font-size:.88rem">Amount Breakdown</p>
     <div class="rcp-row"><span>Sale Price &nbsp;<span style="font-weight:400;font-size:.82rem;color:#888">(${fmtN(s.weight_at_sale,1)} kg × ${Rs(s.rate_per_kg)}/kg)</span></span><span>${Rs(s.weight_at_sale*s.rate_per_kg)}</span></div>
-    <div class="rcp-row"><span>Admin Charges</span><span>${Rs(s.admin_charges||0)}</span></div>
+    ${(s.carriage_charges||0)>0?`<div class="rcp-row"><span>Carriage Charges</span><span>${Rs(s.carriage_charges)}</span></div>`:''}
     <div class="rcp-row total"><span>TOTAL AMOUNT</span><span>${Rs(s.amount)}</span></div>
     <p style="font-weight:600;color:#1a3a5c;margin:13px 0 8px;font-size:.88rem">Beef Details (${np} Persons)</p>
-    <div class="rcp-row"><span>Share per Person</span><strong>${Rs(s.amount/np)}</strong></div>
+    <div class="rcp-row"><span>Share per Person</span><strong>${Rs(tc/np)}</strong></div>
     <div class="rcp-row"><span>Beef Qty per Person</span><span>${fmtN(bq,2)} kg</span></div>
     <div class="rcp-row"><span>Beef Rate per Person</span><span>${Rs(br)}/kg</span></div>
     ${s.notes?`<p style="margin-top:11px;font-size:.81rem;color:#555;background:#f8fafc;padding:7px 11px;border-radius:6px"><strong>Notes:</strong> ${s.notes}</p>`:''}
@@ -2195,8 +2334,9 @@ function exportSalesExcel(){
   const headers=['Receipt No','Date','Animal Code','Age/Type','Customer','Weight (kg)','Rate/kg (Rs.)','Sale Price (Rs.)','Admin Charges (Rs.)','Total Amount (Rs.)','Share/Person (Rs.)','Beef Qty/Person (kg)','Beef Rate/Person (Rs./kg)','Notes'];
   const rows=list.map(s=>{
     const bq=(s.weight_at_sale/2)/np;
-    const br=bq>0?(s.amount/np)/bq:0;
-    const spp=s.amount/np;
+    const tc=(s.weight_at_sale*s.rate_per_kg)+(s.admin_charges||0);
+    const br=bq>0?(tc/np)/bq:0;
+    const spp=tc/np;
     return [s.receipt_no,s.sale_date,s.animal_code,aType(s.animal_code),s.customerName,
       s.weight_at_sale,s.rate_per_kg,s.sp.toFixed(0),(s.admin_charges||0).toFixed(0),s.amount.toFixed(0),
       spp.toFixed(0),bq.toFixed(2),br.toFixed(0),s.notes||''];
