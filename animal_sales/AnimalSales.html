@@ -785,7 +785,7 @@ function show(p){
 // ══════════════════════════ HELPERS ══════════════════════════
 function Rs(n){return 'Rs.'+Number(n||0).toLocaleString('en-PK',{maximumFractionDigits:0});}
 function fmtN(n,d=0){return Number(n||0).toLocaleString('en-PK',{maximumFractionDigits:d});}
-function fmtD(d){return d?d.substring(0,10):'-';}
+function fmtD(d){if(!d)return '-';const dt=new Date(d+'T00:00:00');const m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return String(dt.getDate()).padStart(2,'0')+'-'+m[dt.getMonth()]+'-'+dt.getFullYear();}
 function today(){return new Date().toISOString().substring(0,10);}
 function cName(id){const c=DB.customers.find(x=>x.id===id);return c?c.name:'-';}
 function aType(code){const a=DB.animals.find(x=>x.code===code);return a?a.age_type||'-':'-';}
@@ -912,13 +912,19 @@ function showDashDetail(key){
         return Object.assign({},a,{_w:w,_adm:adm,_sp:f.salePrice,_tc:f.totalCost,_spp:f.sharePerPerson,_bq:f.beefQty,_br:f.beefRate,_sale:sale,_custId:sale?sale.customer_id:a.assigned_customer});
       });
       const cols=10;
+      const colsAll=11;
       const thead=`<thead><tr>
         <th>Code</th><th>Age</th><th>Wt(kg)</th><th>Sale Pr.</th><th>Admin</th>
         <th>Total Cost</th><th>Share/P</th><th>Bq/P</th><th>Br/P</th>
         <th>Status</th>
       </tr></thead>`;
+      const theadAll=`<thead><tr>
+        <th>Code</th><th>Age</th><th>Wt(kg)</th><th>Sale Pr.</th><th>Admin</th>
+        <th>Total Cost</th><th>Share/P</th><th>Bq/P</th><th>Br/P</th>
+        <th>Status</th><th></th>
+      </tr></thead>`;
 
-      function dashAnimalRow(a){
+      function dashAnimalRow(a,showDel){
         const isKheera=(a.age_type||'').toLowerCase()==='kheera';
         const bg=isKheera?'background:#fffbeb;':'';
         return `<tr style="${bg}">
@@ -932,9 +938,10 @@ function showDashDetail(key){
           <td>${a._w?fmtN(a._bq,2)+' kg':'-'}</td>
           <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
           <td><span class="badge ${a.status}">${a.status==='available'?'Available':'Sold'}</span></td>
+          ${showDel?`<td><button class="btn btn-danger btn-sm" onclick="deleteAnimal('${a.code}');closeModal('dash-detail-overlay')">&#128465; Del</button></td>`:''}
         </tr>`;
       }
-      function dashSubtotalRow(grpList,label,color){
+      function dashSubtotalRow(grpList,label,color,extraCell){
         if(!grpList.length) return '';
         const tw=grpList.reduce((s,a)=>s+(a._w||0),0);
         const tsp=grpList.reduce((s,a)=>s+a._sp,0);
@@ -946,6 +953,7 @@ function showDashDetail(key){
           <td colspan="2" style="color:#1a3a5c">${label} Subtotal (${grpList.length})</td>
           <td>${fmtN(tw,1)} kg</td><td>${Rs(tsp)}</td><td>${Rs(tadm)}</td>
           <td>${Rs(ttc)}</td><td>${Rs(tspp)}</td><td>${fmtN(tbq,2)} kg</td><td>—</td><td></td>
+          ${extraCell?'<td></td>':''}
         </tr>`;
       }
       const dondha=list.filter(a=>(a.age_type||'').toLowerCase()==='dondha');
@@ -1014,29 +1022,29 @@ function showDashDetail(key){
         tbl+=`</table></div>`;
         html+=tbl;
       } else {
-        // Flat view for All
+        // Flat view for All (with Delete buttons)
         let tbody='';
         if(dondha.length){
-          tbody+=`<tr style="background:#dbeafe;font-weight:700"><td colspan="${cols}" style="color:#1e40af;padding:8px 10px">&#9654; Dondha <span style="background:#1e40af;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${dondha.length}</span></td></tr>`;
-          tbody+=dondha.map(dashAnimalRow).join('');
-          tbody+=dashSubtotalRow(dondha,'Dondha','#e0f2fe');
+          tbody+=`<tr style="background:#dbeafe;font-weight:700"><td colspan="${colsAll}" style="color:#1e40af;padding:8px 10px">&#9654; Dondha <span style="background:#1e40af;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${dondha.length}</span></td></tr>`;
+          tbody+=dondha.map(a=>dashAnimalRow(a,true)).join('');
+          tbody+=dashSubtotalRow(dondha,'Dondha','#e0f2fe',true);
         }
         if(kheera.length){
-          tbody+=`<tr style="background:#fef3c7;font-weight:700"><td colspan="${cols}" style="color:#92400e;padding:8px 10px">&#9654; Kheera <span style="background:#d97706;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${kheera.length}</span></td></tr>`;
-          tbody+=kheera.map(dashAnimalRow).join('');
-          tbody+=dashSubtotalRow(kheera,'Kheera','#fef3c7');
+          tbody+=`<tr style="background:#fef3c7;font-weight:700"><td colspan="${colsAll}" style="color:#92400e;padding:8px 10px">&#9654; Kheera <span style="background:#d97706;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${kheera.length}</span></td></tr>`;
+          tbody+=kheera.map(a=>dashAnimalRow(a,true)).join('');
+          tbody+=dashSubtotalRow(kheera,'Kheera','#fef3c7',true);
         }
         if(others.length){
-          tbody+=`<tr style="background:#f3f4f6;font-weight:700"><td colspan="${cols}" style="color:#374151;padding:8px 10px">&#9654; Other <span style="background:#6b7280;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${others.length}</span></td></tr>`;
-          tbody+=others.map(dashAnimalRow).join('');
-          tbody+=dashSubtotalRow(others,'Other','#f3f4f6');
+          tbody+=`<tr style="background:#f3f4f6;font-weight:700"><td colspan="${colsAll}" style="color:#374151;padding:8px 10px">&#9654; Other <span style="background:#6b7280;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${others.length}</span></td></tr>`;
+          tbody+=others.map(a=>dashAnimalRow(a,true)).join('');
+          tbody+=dashSubtotalRow(others,'Other','#f3f4f6',true);
         }
         tbody+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.85rem;border-top:3px solid #0f2540">
           <td colspan="2">TOTAL — ${list.length} &nbsp;(D:${dondha.length} K:${kheera.length}${others.length?' O:'+others.length:''})</td>
           <td>${fmtN(gtw,1)} kg</td><td>${Rs(gtsp)}</td><td>${Rs(gtadm)}</td>
-          <td>${Rs(gttc)}</td><td>${Rs(gtspp)}</td><td>${fmtN(gtbq,2)} kg</td><td>—</td><td></td>
+          <td>${Rs(gttc)}</td><td>${Rs(gtspp)}</td><td>${fmtN(gtbq,2)} kg</td><td>—</td><td></td><td></td>
         </tr>`;
-        html+=`<div class="tbl-wrap"><table>${thead}<tbody>${tbody}</tbody></table></div>`;
+        html+=`<div class="tbl-wrap"><table>${theadAll}<tbody>${tbody}</tbody></table></div>`;
       }
     }
   } else if(key==='revenue'){
@@ -1328,6 +1336,7 @@ function renderAnimals(){
       <td style="white-space:nowrap">
         ${a._sale?`<button class="btn btn-primary btn-sm" onclick="showReceipt('${a._sale.receipt_no}')">Receipt</button> `:''}
         <button class="btn btn-light btn-sm" onclick="openAnimalEdit('${a.code}')">&#9998; Edit</button>
+        <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="deleteAnimal('${a.code}')">&#128465; Del</button>
       </td>
     </tr>`;
   }).join('');
