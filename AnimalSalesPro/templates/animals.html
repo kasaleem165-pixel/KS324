@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+    <h2 style="margin:0;">Animals Register</h2>
+    <a href="/animals/add" class="btn btn-primary">+ Add Animal</a>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Code</th>
+      <th>S.No</th>
+      <th>Type</th>
+      <th>Stage</th>
+      <th>Breed</th>
+      <th>Gender</th>
+      <th>Purchase Date</th>
+      <th>Purchase Amt</th>
+      <th>Initial Wt (kg)</th>
+      <th>Final Wt (kg)</th>
+      <th>Wt Change</th>
+      <th>Status</th>
+      <th>Customer</th>
+      <th></th>
+    </tr></thead>
+    <tbody>
+    {% for a in animals %}
+    <tr>
+      <td><strong>{{ a.code }}</strong></td>
+      <td>{{ a.sno_weight or '-' }}</td>
+      <td>{{ a.animal_type or (a.age_type or '-') }}</td>
+      <td>{{ a.stage or '-' }}</td>
+      <td>{{ a.breed or '-' }}</td>
+      <td>{{ a.gender or '-' }}</td>
+      <td>{{ (a.purchase_date or '-')[:10] }}</td>
+      <td>{{ 'Rs. {:,.0f}'.format(a.purchase_amount) if a.purchase_amount else '-' }}</td>
+      <td>{{ a.weight_initial or '-' }}</td>
+      <td>{{ a.weight_final or '-' }}</td>
+      <td>
+        {% if a.weight_initial and a.weight_final %}
+          {% set diff = a.weight_final - a.weight_initial %}
+          <span style="color:{{ '#059669' if diff >= 0 else '#dc2626' }};">
+            {{ '+' if diff >= 0 else '' }}{{ "%.0f"|format(diff) }} kg
+          </span>
+        {% else %}-{% endif %}
+      </td>
+      <td><span class="badge {{ a.status }}">{{ a.status.title() }}</span></td>
+      <td>{{ a.customer_name or '-' }}</td>
+      <td>
+        {% if a.status == 'available' %}
+          <a href="/animals/{{ a.code }}/edit" class="btn btn-primary btn-sm">Edit</a>
+        {% elif a.receipt_no %}
+          <a href="/receipt/{{ a.receipt_no }}" class="btn btn-primary btn-sm">Receipt</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

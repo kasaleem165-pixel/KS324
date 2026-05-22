@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width:760px; margin:0 auto;">
+  <h2>{{ 'Edit Animal' if animal else 'Add New Animal' }}</h2>
+  <form method="POST">
+
+    <h3 style="font-size:.95rem; color:#1a3a5c; margin:0 0 12px;">Identity</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Animal Code (Unique ID) *</label>
+        <input name="code" required value="{{ animal.code if animal else '' }}"
+               {{ 'readonly style=background:#f1f5f9' if animal else '' }}
+               placeholder="e.g. 118">
+        <span class="hint">Each animal must have a unique code.</span>
+      </div>
+      <div class="form-group">
+        <label>S.No (Weight List)</label>
+        <input name="sno_weight" type="number" value="{{ animal.sno_weight if animal else '' }}" placeholder="e.g. 37">
+      </div>
+
+      <div class="form-group">
+        <label>Animal Type</label>
+        <select name="animal_type">
+          <option value="">-- select --</option>
+          {% for t in ['Cow','Buffalo','Waccha','Sheep','Goat','Other'] %}
+            <option value="{{ t }}" {{ 'selected' if animal and animal.animal_type == t else '' }}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Stage</label>
+        <select name="stage">
+          <option value="">-- select --</option>
+          {% for s in ['Calf','Heifer','Adult','Waccha','Other'] %}
+            <option value="{{ s }}" {{ 'selected' if animal and animal.stage == s else '' }}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Breed</label>
+        <input name="breed" value="{{ animal.breed if animal else '' }}" placeholder="e.g. Nili Ravi, Cholistani, Crossed">
+      </div>
+      <div class="form-group">
+        <label>Gender</label>
+        <select name="gender">
+          <option value="">-- select --</option>
+          <option value="Male"   {{ 'selected' if animal and animal.gender == 'Male'   else '' }}>Male</option>
+          <option value="Female" {{ 'selected' if animal and animal.gender == 'Female' else '' }}>Female</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Date of Birth</label>
+        <input name="dob" type="date" value="{{ (animal.dob or '')[:10] if animal else '' }}">
+      </div>
+      <div class="form-group">
+        <label>Type / Age Label</label>
+        <input name="age_type" value="{{ animal.age_type if animal else '' }}" placeholder="e.g. Dondha">
+      </div>
+
+      <div class="form-group full">
+        <label>Description / Remarks</label>
+        <textarea name="description" rows="2" placeholder="e.g. Batch of 8 Wacchas purchased from Ludan Mandi">{{ animal.description if animal else '' }}</textarea>
+      </div>
+    </div>
+
+    <h3 style="font-size:.95rem; color:#1a3a5c; margin:20px 0 12px;">Purchase Details</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Purchase Date</label>
+        <input name="purchase_date" type="date"
+               value="{{ (animal.purchase_date or '')[:10] if animal else '' }}">
+      </div>
+      <div class="form-group">
+        <label>Purchase Amount (Rs.)</label>
+        <input name="purchase_amount" type="number" step="0.01"
+               value="{{ animal.purchase_amount if animal else '' }}" placeholder="Cost price">
+      </div>
+      <div class="form-group">
+        <label>Animal Source</label>
+        <input name="animal_source" value="{{ animal.animal_source if animal else '' }}"
+               placeholder="e.g. Purchased, Born on farm">
+      </div>
+      <div class="form-group">
+        <label>Voucher No</label>
+        <input name="voucher_no" value="{{ animal.voucher_no if animal else '' }}"
+               placeholder="e.g. QB-001">
+      </div>
+      <div class="form-group">
+        <label>Voucher Date</label>
+        <input name="voucher_date" type="date"
+               value="{{ (animal.voucher_date or '')[:10] if animal else '' }}">
+      </div>
+      <div class="form-group">
+        <label>Voucher Type</label>
+        <select name="voucher_type">
+          <option value="">-- select --</option>
+          {% for vt in ['CP','BP','Other'] %}
+            <option value="{{ vt }}" {{ 'selected' if animal and animal.voucher_type == vt else '' }}>{{ vt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <h3 style="font-size:.95rem; color:#1a3a5c; margin:20px 0 12px;">Weight</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Initial Weight (kg)</label>
+        <input name="weight_initial" type="number" step="0.1"
+               value="{{ animal.weight_initial if animal else '' }}" placeholder="Weight at purchase">
+      </div>
+      <div class="form-group">
+        <label>Final / Current Weight (kg)</label>
+        <input name="weight_final" type="number" step="0.1"
+               value="{{ animal.weight_final if animal else '' }}" placeholder="Latest measured weight">
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:20px;">
+      <button type="submit" class="btn btn-primary">{{ 'Update' if animal else 'Add Animal' }}</button>
+      <a href="/animals" class="btn" style="background:#e2e8f0; color:#444;">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

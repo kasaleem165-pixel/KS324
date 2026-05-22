@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="stat-grid">
+  <div class="stat-box">
+    <div class="num">{{ total_animals }}</div>
+    <div class="lbl">Total Animals</div>
+  </div>
+  <div class="stat-box green">
+    <div class="num">{{ available }}</div>
+    <div class="lbl">Available</div>
+  </div>
+  <div class="stat-box red">
+    <div class="num">{{ sold }}</div>
+    <div class="lbl">Sold</div>
+  </div>
+  <div class="stat-box">
+    <div class="num">Rs. {{ "{:,.0f}".format(revenue) }}</div>
+    <div class="lbl">Total Revenue</div>
+  </div>
+  <div class="stat-box green">
+    <div class="num">Rs. {{ "{:,.0f}".format(collected) }}</div>
+    <div class="lbl">Collected</div>
+  </div>
+  <div class="stat-box amber">
+    <div class="num">Rs. {{ "{:,.0f}".format(pending) }}</div>
+    <div class="lbl">Pending Payment</div>
+  </div>
+</div>
+
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+    <h2 style="margin:0;">Recent Sales</h2>
+    <div style="display:flex;gap:10px;">
+      <a href="/animals/add" class="btn btn-primary btn-sm">+ Add Animal</a>
+      <a href="/sales/new"   class="btn btn-success btn-sm">+ New Sale</a>
+    </div>
+  </div>
+  {% if recent_sales %}
+  <table>
+    <thead><tr>
+      <th>Receipt</th><th>Animal Code</th><th>Customer</th><th>Date</th><th>Amount (Rs.)</th><th></th>
+    </tr></thead>
+    <tbody>
+    {% for s in recent_sales %}
+    <tr>
+      <td>{{ s.receipt_no }}</td>
+      <td>{{ s.animal_code }}</td>
+      <td>{{ s.name }}</td>
+      <td>{{ s.sale_date[:10] }}</td>
+      <td>{{ "{:,.0f}".format(s.amount) }}</td>
+      <td><a href="/receipt/{{ s.receipt_no }}" class="btn btn-primary btn-sm">View Receipt</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#888; text-align:center; padding:24px 0;">No sales yet. <a href="/sales/new">Record your first sale</a>.</p>
+  {% endif %}
+</div>
+{% endblock %}
