@@ -165,18 +165,18 @@ input[readonly]{background:#f8fafc}
     <div id="animal-flash"></div>
     <div class="form-grid">
       <div class="fg"><label>Animal Code (Unique ID) *</label>
-        <input id="a-code" placeholder="e.g. 151">
-        <span class="hint">Each animal must have a unique number.</span></div>
+        <input id="a-code" list="a-code-list" placeholder="e.g. 151" autocomplete="off">
+        <datalist id="a-code-list"></datalist>
+        <span class="hint">Type or pick from list. <a href="#" onclick="show('settings');return false;" style="color:#1a3a5c">Manage list →</a></span></div>
       <div class="fg"><label>Transaction Date</label><input id="a-date" type="date"></div>
-      <div class="fg"><label>Age / Type</label>
-        <select id="a-type" onchange="toggleAgeOther()">
-          <option value="">-- Select Age --</option>
-          <option value="Dondha">Dondha</option>
-          <option value="Kheera">Kheera</option>
-          <option value="Other">Other (type below)</option>
-        </select></div>
-      <div class="fg" id="a-type-other-row" style="display:none"><label>Age / Type (custom)</label>
-        <input id="a-type-other" placeholder="Enter age or type"></div>
+      <div class="fg"><label>Type</label>
+        <input id="a-animaltype" list="a-type-list" placeholder="e.g. Waccha, Cow…" autocomplete="off">
+        <datalist id="a-type-list"></datalist>
+        <span class="hint"><a href="#" onclick="show('settings');return false;" style="color:#1a3a5c">Manage list →</a></span></div>
+      <div class="fg"><label>Age</label>
+        <input id="a-age" list="a-age-list" placeholder="e.g. Dondha, Kheera…" autocomplete="off">
+        <datalist id="a-age-list"></datalist>
+        <span class="hint"><a href="#" onclick="show('settings');return false;" style="color:#1a3a5c">Manage list →</a></span></div>
       <div class="fg"><label>Weight Latest (kg)</label><input id="a-wf" type="number" step="0.1" placeholder="Current / latest weight" oninput="previewCalc()"></div>
       <div class="fg full"><label>Description</label>
         <textarea id="a-desc" rows="2" placeholder="e.g. 1 Waccha purchased from Ludan Mandi"></textarea></div>
@@ -281,18 +281,36 @@ input[readonly]{background:#f8fafc}
         <select id="s-customer" onchange="customerSelected()"><option value="">-- Select Customer --</option></select></div>
       <div class="fg"><label>Sale Date *</label>
         <input id="s-date" type="date"></div>
-      <div class="fg"><label>Weight at Sale (kg) *</label>
+    </div>
+    <!-- Sale mode toggle -->
+    <div style="margin:12px 0;padding:11px 14px;background:#f1f5f9;border-radius:8px;display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:.85rem;font-weight:600;color:#555">Sale Mode:</span>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.9rem">
+        <input type="radio" name="s-mode" value="weight" checked onchange="toggleSaleMode()"> Weight × Rate
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.9rem">
+        <input type="radio" name="s-mode" value="lumpsum" onchange="toggleSaleMode()"> Lump Sum Amount
+      </label>
+    </div>
+    <div class="form-grid">
+      <!-- Weight × Rate fields -->
+      <div class="fg" id="s-weight-row"><label>Weight at Sale (kg) *</label>
         <input id="s-weight" type="number" step="0.1" placeholder="Final measured weight" oninput="calcSaleTotal()"></div>
-      <div class="fg"><label>Rate per kg (Rs.) *</label>
+      <div class="fg" id="s-rate-row"><label>Rate per kg (Rs.) *</label>
         <input id="s-rate" type="number" step="1" oninput="calcSaleTotal()"></div>
       <div class="fg"><label>Admin Charges (Rs.) <span style="font-weight:400;font-size:.76rem;color:#999">internal — beef calc only</span></label>
         <input id="s-admin" type="number" step="1" oninput="calcSaleTotal()" placeholder="e.g. 30000"></div>
       <div class="fg"><label>Carriage Charges (Rs.) <span style="font-weight:400;font-size:.76rem;color:#888">shown on receipt</span></label>
         <input id="s-carriage" type="number" step="1" oninput="calcSaleTotal()" placeholder="e.g. 5000"></div>
-      <div class="fg"><label>Sale Price (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Wt × Rate</span></label>
+      <div class="fg" id="s-saleprice-row"><label>Sale Price (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Wt × Rate</span></label>
         <input id="s-saleprice" readonly style="color:#1a3a5c"></div>
-      <div class="fg"><label>Total Amount (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Sale Price + Carriage</span></label>
+      <div class="fg" id="s-total-row"><label>Total Amount (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Sale Price + Carriage</span></label>
         <input id="s-total" readonly style="font-weight:700;font-size:1rem"></div>
+      <!-- Lump Sum field (hidden by default) -->
+      <div class="fg" id="s-lumpsum-row" style="display:none"><label>Weight at Sale (kg) <span style="font-weight:400;color:#aaa">(optional)</span></label>
+        <input id="s-weight-lump" type="number" step="0.1" placeholder="For records only"></div>
+      <div class="fg" id="s-lumpamt-row" style="display:none"><label>Sale Amount (Rs.) *</label>
+        <input id="s-lumpamt" type="number" step="1" placeholder="Total agreed sale price" style="font-weight:700;font-size:1rem"></div>
       <div class="fg"><label>Beef Qty / person (kg)</label>
         <input id="s-beefqty" readonly></div>
       <div class="fg"><label>Beef Rate / person (Rs./kg)</label>
@@ -373,6 +391,36 @@ input[readonly]{background:#f8fafc}
         <input type="file" accept=".json" style="display:none" onchange="importData(event)">
       </label>
     </div>
+  </div>
+  <div class="card" style="max-width:520px;margin-left:auto;margin-right:auto;margin-top:20px">
+    <div class="card-title">Animal Type List</div>
+    <p style="color:#666;font-size:.83rem;margin-bottom:14px">These appear as options in the Type combo box when adding an animal.</p>
+    <div id="typelist-flash"></div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input id="tl-item" placeholder="e.g. Waccha, Cow…" style="flex:1">
+      <button class="btn btn-primary" onclick="addTypeItem()">+ Add</button>
+    </div>
+    <div id="typelist-body"></div>
+  </div>
+  <div class="card" style="max-width:520px;margin-left:auto;margin-right:auto;margin-top:20px">
+    <div class="card-title">Age List</div>
+    <p style="color:#666;font-size:.83rem;margin-bottom:14px">These appear as options in the Age combo box when adding an animal.</p>
+    <div id="agelist-flash"></div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input id="al-item" placeholder="e.g. Dondha, Kheera, Adult…" style="flex:1">
+      <button class="btn btn-primary" onclick="addAgeItem()">+ Add</button>
+    </div>
+    <div id="agelist-body"></div>
+  </div>
+  <div class="card" style="max-width:520px;margin-left:auto;margin-right:auto;margin-top:20px">
+    <div class="card-title">Animal Code List</div>
+    <p style="color:#666;font-size:.83rem;margin-bottom:14px">Pre-defined codes appear in the Animal Code combo box when adding a new animal.</p>
+    <div id="codelist-flash"></div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input id="cl-item" placeholder="e.g. 193, 194…" style="flex:1">
+      <button class="btn btn-primary" onclick="addCodeItem()">+ Add</button>
+    </div>
+    <div id="codelist-body"></div>
   </div>
   <div class="card" style="max-width:520px;margin-left:auto;margin-right:auto;margin-top:20px">
     <div class="card-title">Bank Accounts</div>
@@ -792,6 +840,9 @@ function load(){
     if(!DB.settings.num_persons) DB.settings.num_persons=7;
     if(!DB.settings.admin_charges) DB.settings.admin_charges=DB.settings.expenses_default||30000;
     DB.sales.forEach(s=>{if(!s.hasOwnProperty('carriage_charges'))s.carriage_charges=0;});
+    if(!DB.settings.typeList) DB.settings.typeList=['Waccha','Wacchi','Katta','Katti','Cow','Buffalo'];
+    if(!DB.settings.ageList)  DB.settings.ageList=['Dondha','Kheera','Calf','Young','Adult'];
+    if(!DB.settings.codeList) DB.settings.codeList=[];
     // fix animals wrongly seeded as "sold" with no actual sale record
     const soldCodes=["151","177","181","182","183"];
     let fixed=false;
@@ -820,7 +871,7 @@ function show(p){
   document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   document.getElementById('nav-'+p).classList.add('active');
-  const fn={dashboard:renderDashboard,animals:renderAnimals,customers:renderCustomers,
+  const fn={dashboard:renderDashboard,animals:()=>{renderAnimals();populateAnimalFormLists();},customers:renderCustomers,
             sale:initSaleForm,sales:renderSales,saleledger:renderSaleLedger,payments:renderPayments,budgeting:renderBudgeting,settings:renderSettings};
   if(fn[p]) fn[p]();
 }
@@ -831,7 +882,12 @@ function fmtN(n,d=0){return Number(n||0).toLocaleString('en-PK',{maximumFraction
 function fmtD(d){if(!d)return '-';const dt=new Date(d+'T00:00:00');const m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return String(dt.getDate()).padStart(2,'0')+'-'+m[dt.getMonth()]+'-'+dt.getFullYear();}
 function today(){return new Date().toISOString().substring(0,10);}
 function cName(id){const c=DB.customers.find(x=>x.id===id);return c?c.name:'-';}
-function aType(code){const a=DB.animals.find(x=>x.code===code);return a?a.age_type||'-':'-';}
+function aType(code){
+  const a=DB.animals.find(x=>x.code===code);
+  if(!a) return '-';
+  const parts=[a.animal_type,a.age_type].filter(x=>x&&x.trim());
+  return parts.length?parts.join(' / '):'-';
+}
 function flash(id,msg,type='ok'){
   const el=document.getElementById(id);
   el.innerHTML=`<div class="flash ${type}">${msg}</div>`;
@@ -1245,15 +1301,15 @@ function deleteAnimalPhoto(code,idx){
   save(); renderPhotoViewer(a); renderAnimals();
 }
 
-function toggleAgeOther(){
-  const v=document.getElementById('a-type').value;
-  document.getElementById('a-type-other-row').style.display=v==='Other'?'flex':'none';
-  if(v!=='Other') document.getElementById('a-type-other').value='';
-}
-function getAgeValue(){
-  const v=document.getElementById('a-type').value;
-  if(v==='Other') return document.getElementById('a-type-other').value.trim()||null;
-  return v||null;
+function populateAnimalFormLists(){
+  const typeList=DB.settings.typeList||[];
+  const ageList=DB.settings.ageList||[];
+  const codeList=DB.settings.codeList||[];
+  const usedCodes=new Set(DB.animals.map(a=>a.code));
+  const dl=id=>document.getElementById(id);
+  if(dl('a-type-list')) dl('a-type-list').innerHTML=typeList.map(v=>`<option value="${v}">`).join('');
+  if(dl('a-age-list'))  dl('a-age-list').innerHTML=ageList.map(v=>`<option value="${v}">`).join('');
+  if(dl('a-code-list')) dl('a-code-list').innerHTML=codeList.filter(v=>!usedCodes.has(v)).map(v=>`<option value="${v}">`).join('');
 }
 
 // ── Animal form ────────────────────────────────────────────────
@@ -1267,7 +1323,8 @@ function addAnimal(){
   DB.animals.push({
     code, purchase_date:document.getElementById('a-date').value||null,
     description:document.getElementById('a-desc').value||null,
-    age_type:getAgeValue(),
+    animal_type:document.getElementById('a-animaltype').value.trim()||null,
+    age_type:document.getElementById('a-age').value.trim()||null,
     weight_final:wf, admin_charges:admin,
     assigned_customer:custId, status:'available',
     photos:[..._formPhotos]
@@ -1276,17 +1333,15 @@ function addAnimal(){
 }
 
 function clearAnimalForm(){
-  ['a-code','a-date','a-desc','a-wf','a-preview-vals'].forEach(id=>{
+  ['a-code','a-date','a-desc','a-wf','a-animaltype','a-age','a-preview-vals'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
-  document.getElementById('a-type').value='';
-  document.getElementById('a-type-other').value='';
-  document.getElementById('a-type-other-row').style.display='none';
   document.getElementById('a-admin').value=DB.settings.admin_charges||30000;
   document.getElementById('a-preview').style.display='none';
   _formPhotos=[];
   document.getElementById('a-photo-previews').innerHTML='';
   populateCustDropdown('a-cust');
+  populateAnimalFormLists();
 }
 
 function animalComputedList(filterFn){
@@ -1583,7 +1638,18 @@ function animalSelected(){
   calcSaleTotal();
 }
 
+function toggleSaleMode(){
+  const isLump=document.querySelector('[name="s-mode"]:checked').value==='lumpsum';
+  ['s-weight-row','s-rate-row','s-saleprice-row','s-total-row'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.style.display=isLump?'none':'';
+  });
+  ['s-lumpsum-row','s-lumpamt-row'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.style.display=isLump?'':'none';
+  });
+}
 function calcSaleTotal(){
+  const isLump=document.querySelector('[name="s-mode"]:checked')&&document.querySelector('[name="s-mode"]:checked').value==='lumpsum';
+  if(isLump) return;
   const w=parseFloat(document.getElementById('s-weight').value)||0;
   const r=parseFloat(document.getElementById('s-rate').value)||0;
   const adm=parseFloat(document.getElementById('s-admin').value)||0;
@@ -1604,26 +1670,35 @@ function calcSaleTotal(){
 function recordSale(){
   const code=document.getElementById('s-animal').value;
   const cid=parseInt(document.getElementById('s-customer').value);
-  const w=parseFloat(document.getElementById('s-weight').value);
-  const r=parseFloat(document.getElementById('s-rate').value);
+  const isLump=document.querySelector('[name="s-mode"]:checked')&&document.querySelector('[name="s-mode"]:checked').value==='lumpsum';
   const adm=parseFloat(document.getElementById('s-admin').value)||0;
   const car=parseFloat(document.getElementById('s-carriage').value)||0;
+  const dateVal=document.getElementById('s-date').value;
   const errors=[];
   if(!code) errors.push('Animal Code is required.');
   if(!cid||isNaN(cid)) errors.push('Customer is required.');
-  if(!w||w<=0) errors.push('Weight at Sale must be a positive number.');
-  if(!r||r<=0) errors.push('Rate per kg must be a positive number.');
-  if(adm<0) errors.push('Admin Charges cannot be negative.');
-  const dateVal=document.getElementById('s-date').value;
   if(!dateVal) errors.push('Sale Date is required.');
+  let w,r,amount;
+  if(isLump){
+    w=parseFloat(document.getElementById('s-weight-lump').value)||0;
+    r=0;
+    amount=parseFloat(document.getElementById('s-lumpamt').value);
+    if(!amount||amount<=0) errors.push('Sale Amount is required for lump sum.');
+  } else {
+    w=parseFloat(document.getElementById('s-weight').value);
+    r=parseFloat(document.getElementById('s-rate').value);
+    if(!w||w<=0) errors.push('Weight at Sale must be a positive number.');
+    if(!r||r<=0) errors.push('Rate per kg must be a positive number.');
+    amount=(w*r)+car;
+  }
   if(errors.length){flash('sale-flash',errors.join(' '),'err');return;}
-  const amount=(w*r)+car;
   const rno=nextRcp();
   DB.sales.push({receipt_no:rno,animal_code:code,customer_id:cid,sale_date:dateVal,
     weight_at_sale:w,rate_per_kg:r,admin_charges:adm,carriage_charges:car,amount,
+    is_lumpsum:isLump,
     notes:document.getElementById('s-notes').value.trim()||''});
   const animal=DB.animals.find(a=>a.code===code);
-  if(animal){animal.status='sold';animal.weight_final=w;}
+  if(animal){animal.status='sold';if(w) animal.weight_final=w;}
   save(); initSaleForm(); showReceipt(rno);
 }
 
@@ -1692,9 +1767,9 @@ function renderSaleLedger(){
 
   // Build grouped-by-customer ledger
   const head=document.getElementById('saleledger-head');
-  head.innerHTML='<tr><th>S#</th><th>Receipt</th><th>Date</th><th>Animal</th><th>Age</th><th>Wt(kg)</th><th>Rate/kg</th><th>Sale Price</th><th>Carriage</th><th>Total Sale</th><th>Received</th><th>Discount</th><th>Balance</th></tr>';
+  head.innerHTML='<tr><th>S#</th><th>Receipt</th><th>Date</th><th>Animal</th><th>Age</th><th>Wt(kg)</th><th>Rate/kg</th><th>Sale Price</th><th>Total Sale</th><th>Received</th><th>Discount</th><th>Balance</th></tr>';
   const tb=document.getElementById('saleledger-body');
-  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="13" class="empty">No sales yet.</td></tr>`;return;}
+  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="12" class="empty">No sales yet.</td></tr>`;return;}
 
   let html='';
   let sno=0;
@@ -1709,7 +1784,7 @@ function renderSaleLedger(){
     const custBal=custTotal-custPaid-custDisc;
     // Customer header row
     html+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700">
-      <td colspan="13" style="padding:7px 10px">&#9654; ${c.name}
+      <td colspan="12" style="padding:7px 10px">&#9654; ${c.name}
         <span style="font-weight:400;font-size:.78rem;margin-left:12px;opacity:.85">
           ${custSales.length} sale${custSales.length>1?'s':''} &nbsp;|&nbsp; Billed: ${Rs(custTotal)} &nbsp;|&nbsp; Received: ${Rs(custPaid)} &nbsp;|&nbsp; Balance: ${Rs(custBal)}
         </span>
@@ -1729,7 +1804,6 @@ function renderSaleLedger(){
         <td>${fmtN(s.weight_at_sale,1)}</td>
         <td>${fmtN(s.rate_per_kg)}</td>
         <td>${Rs(sp)}</td>
-        <td>${car>0?Rs(car):'-'}</td>
         <td><strong>${Rs(s.amount)}</strong></td>
         <td></td><td></td><td></td>
       </tr>`;
@@ -1738,7 +1812,6 @@ function renderSaleLedger(){
     html+=`<tr style="background:#f0f9ff;font-weight:700;font-size:.82rem;border-top:2px solid #bae6fd">
       <td colspan="7" style="color:#1a3a5c">Subtotal — ${c.name}</td>
       <td>${Rs(custSales.reduce((s,x)=>s+(x.weight_at_sale*x.rate_per_kg),0))}</td>
-      <td>${Rs(custSales.reduce((s,x)=>s+(x.carriage_charges||0),0))}</td>
       <td>${Rs(custTotal)}</td>
       <td style="color:#059669">${Rs(custPaid)}</td>
       <td style="color:#7c3aed">${Rs(custDisc)}</td>
@@ -1749,7 +1822,6 @@ function renderSaleLedger(){
   html+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.85rem;border-top:3px solid #0f2540">
     <td colspan="7">GRAND TOTAL</td>
     <td>${Rs(totalSalePrice)}</td>
-    <td>${Rs(totalCarriage)}</td>
     <td>${Rs(totalAmount)}</td>
     <td>${Rs(totalPaid)}</td>
     <td>${Rs(totalDiscount)}</td>
@@ -2220,7 +2292,59 @@ function showPayReceipt(rno){
 function renderSettings(){
   document.getElementById('cfg-rate').value=DB.settings.rate_per_kg||780;
   document.getElementById('cfg-persons').value=DB.settings.num_persons||7;
-  renderBanks();
+  renderTypeList(); renderAgeList(); renderCodeList(); renderBanks();
+}
+function renderTypeList(){
+  const items=DB.settings.typeList||[];
+  document.getElementById('typelist-body').innerHTML=items.length
+    ?`<div style="display:flex;flex-wrap:wrap;gap:6px">${items.map((v,i)=>`<span style="background:#e2e8f0;padding:4px 10px;border-radius:20px;font-size:.85rem;display:flex;align-items:center;gap:6px">${v}<button onclick="deleteTypeItem(${i})" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:.9rem;padding:0">✕</button></span>`).join('')}</div>`
+    :'<p style="color:#aaa;font-size:.85rem">No items yet.</p>';
+}
+function addTypeItem(){
+  const v=(document.getElementById('tl-item').value||'').trim();
+  if(!v){flash('typelist-flash','Enter an item.','err');return;}
+  if(!DB.settings.typeList) DB.settings.typeList=[];
+  if(DB.settings.typeList.includes(v)){flash('typelist-flash',`"${v}" already in list.`,'err');return;}
+  DB.settings.typeList.push(v); document.getElementById('tl-item').value='';
+  save(); flash('typelist-flash',`"${v}" added.`); renderTypeList();
+}
+function deleteTypeItem(i){
+  DB.settings.typeList.splice(i,1); save(); renderTypeList();
+}
+function renderAgeList(){
+  const items=DB.settings.ageList||[];
+  document.getElementById('agelist-body').innerHTML=items.length
+    ?`<div style="display:flex;flex-wrap:wrap;gap:6px">${items.map((v,i)=>`<span style="background:#e2e8f0;padding:4px 10px;border-radius:20px;font-size:.85rem;display:flex;align-items:center;gap:6px">${v}<button onclick="deleteAgeItem(${i})" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:.9rem;padding:0">✕</button></span>`).join('')}</div>`
+    :'<p style="color:#aaa;font-size:.85rem">No items yet.</p>';
+}
+function addAgeItem(){
+  const v=(document.getElementById('al-item').value||'').trim();
+  if(!v){flash('agelist-flash','Enter an item.','err');return;}
+  if(!DB.settings.ageList) DB.settings.ageList=[];
+  if(DB.settings.ageList.includes(v)){flash('agelist-flash',`"${v}" already in list.`,'err');return;}
+  DB.settings.ageList.push(v); document.getElementById('al-item').value='';
+  save(); flash('agelist-flash',`"${v}" added.`); renderAgeList();
+}
+function deleteAgeItem(i){
+  DB.settings.ageList.splice(i,1); save(); renderAgeList();
+}
+function renderCodeList(){
+  const items=DB.settings.codeList||[];
+  const usedCodes=new Set(DB.animals.map(a=>a.code));
+  document.getElementById('codelist-body').innerHTML=items.length
+    ?`<div style="display:flex;flex-wrap:wrap;gap:6px">${items.map((v,i)=>`<span style="background:${usedCodes.has(v)?'#d1fae5':'#e2e8f0'};padding:4px 10px;border-radius:20px;font-size:.85rem;display:flex;align-items:center;gap:6px">${v}${usedCodes.has(v)?' ✓':''}<button onclick="deleteCodeItem(${i})" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:.9rem;padding:0">✕</button></span>`).join('')}</div>`
+    :'<p style="color:#aaa;font-size:.85rem">No codes yet. Add animal codes you plan to use.</p>';
+}
+function addCodeItem(){
+  const v=(document.getElementById('cl-item').value||'').trim();
+  if(!v){flash('codelist-flash','Enter a code.','err');return;}
+  if(!DB.settings.codeList) DB.settings.codeList=[];
+  if(DB.settings.codeList.includes(v)){flash('codelist-flash',`"${v}" already in list.`,'err');return;}
+  DB.settings.codeList.push(v); document.getElementById('cl-item').value='';
+  save(); flash('codelist-flash',`"${v}" added.`); renderCodeList();
+}
+function deleteCodeItem(i){
+  DB.settings.codeList.splice(i,1); save(); renderCodeList();
 }
 
 function populateBankDropdown(){
