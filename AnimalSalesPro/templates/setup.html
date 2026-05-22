@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="font-size:1.3rem; color:#1a3a5c; margin-bottom:20px;">Setup — Combo List Items</h1>
+<p style="color:#666; margin-bottom:24px; font-size:.92rem;">
+  Manage the dropdown options that appear in the Animal forms. Add or remove items for each list below.
+</p>
+
+{% set all_lists = [
+    ('animal_code', 'Animal Codes',  'Tag numbers / codes for new animals (e.g. C-001, B-002, 118)'),
+    ('animal_type', 'Animal Type',   'Type options shown on the Add Animal form (e.g. Cow, Waccha)'),
+    ('age',         'Age',           'Age options shown on the Add Animal form (e.g. Calf, Adult)'),
+] %}
+
+{% for list_key, list_title, list_desc in all_lists %}
+<div class="card" style="margin-bottom:22px;">
+  <h2>{{ list_title }}</h2>
+  <p style="color:#888; font-size:.85rem; margin-bottom:14px;">{{ list_desc }}</p>
+
+  <!-- Existing items -->
+  {% if lists.get(list_key) %}
+  <table style="margin-bottom:14px;">
+    <thead><tr>
+      <th style="width:60%;">Item</th>
+      <th>Remove</th>
+    </tr></thead>
+    <tbody>
+    {% for item in lists.get(list_key, []) %}
+    <tr>
+      <td>{{ item.item_value }}</td>
+      <td>
+        <form method="POST" action="/setup/delete/{{ item.id }}"
+              onsubmit="return confirm('Remove \'{{ item.item_value }}\' from this list?')">
+          <button type="submit" class="btn btn-sm"
+                  style="background:#fee2e2; color:#991b1b; border:none; cursor:pointer;">
+            Remove
+          </button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#aaa; font-size:.88rem; margin-bottom:14px;">No items yet. Add one below.</p>
+  {% endif %}
+
+  <!-- Add new item -->
+  <form method="POST" action="/setup/add" style="display:flex; gap:10px; align-items:flex-end;">
+    <input type="hidden" name="list_name" value="{{ list_key }}">
+    <div style="flex:1;">
+      <label style="font-size:.82rem; color:#666; display:block; margin-bottom:4px;">Add new item</label>
+      <input name="item_value" required placeholder="Type new item and click Add"
+             style="width:100%;">
+    </div>
+    <button type="submit" class="btn btn-primary" style="white-space:nowrap;">+ Add</button>
+  </form>
+</div>
+{% endfor %}
+
+{% endblock %}

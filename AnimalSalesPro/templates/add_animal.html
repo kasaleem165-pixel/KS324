@@ -6,27 +6,63 @@
 
     <h3 style="font-size:.95rem; color:#1a3a5c; margin:0 0 12px;">Identity</h3>
     <div class="form-grid">
+
+      <!-- Animal Code: combo box from setup list -->
       <div class="form-group">
         <label>Animal Code (Unique ID) *</label>
-        <input name="code" required value="{{ animal.code if animal else '' }}"
-               {{ 'readonly style=background:#f1f5f9' if animal else '' }}
-               placeholder="e.g. 118">
-        <span class="hint">Each animal must have a unique code.</span>
-      </div>
-      <div class="form-group">
-        <label>S.No (Weight List)</label>
-        <input name="sno_weight" type="number" value="{{ animal.sno_weight if animal else '' }}" placeholder="e.g. 37">
+        {% if animal %}
+          <input name="code" required value="{{ animal.code }}"
+                 readonly style="background:#f1f5f9;">
+        {% else %}
+          <input name="code" required list="code-options"
+                 value="" placeholder="Type or select code"
+                 autocomplete="off">
+          <datalist id="code-options">
+            {% for item in code_list %}
+              <option value="{{ item.item_value }}">
+            {% endfor %}
+          </datalist>
+          <span class="hint">
+            Pick from list or type a new code &mdash;
+            <a href="/setup" style="color:#1a3a5c;">Manage list &rarr;</a>
+          </span>
+        {% endif %}
       </div>
 
       <div class="form-group">
-        <label>Animal Type</label>
-        <select name="animal_type">
-          <option value="">-- select --</option>
-          {% for t in ['Cow','Buffalo','Waccha','Sheep','Goat','Other'] %}
-            <option value="{{ t }}" {{ 'selected' if animal and animal.animal_type == t else '' }}>{{ t }}</option>
-          {% endfor %}
-        </select>
+        <label>S.No (Weight List)</label>
+        <input name="sno_weight" type="number"
+               value="{{ animal.sno_weight if animal else '' }}" placeholder="e.g. 37">
       </div>
+
+      <!-- Type: separate combo box from setup list -->
+      <div class="form-group">
+        <label>Type</label>
+        <input name="animal_type" list="type-options"
+               value="{{ animal.animal_type if animal else '' }}"
+               placeholder="e.g. Cow, Waccha…" autocomplete="off">
+        <datalist id="type-options">
+          {% for item in type_list %}
+            <option value="{{ item.item_value }}">
+          {% endfor %}
+        </datalist>
+        <span class="hint"><a href="/setup" style="color:#1a3a5c;">Manage list &rarr;</a></span>
+      </div>
+
+      <!-- Age: separate combo box from setup list -->
+      <div class="form-group">
+        <label>Age</label>
+        <input name="age_type" list="age-options"
+               value="{{ animal.age_type if animal else '' }}"
+               placeholder="e.g. Calf, Adult…" autocomplete="off">
+        <datalist id="age-options">
+          {% for item in age_list %}
+            <option value="{{ item.item_value }}">
+          {% endfor %}
+        </datalist>
+        <span class="hint"><a href="/setup" style="color:#1a3a5c;">Manage list &rarr;</a></span>
+      </div>
+
       <div class="form-group">
         <label>Stage</label>
         <select name="stage">
@@ -39,8 +75,10 @@
 
       <div class="form-group">
         <label>Breed</label>
-        <input name="breed" value="{{ animal.breed if animal else '' }}" placeholder="e.g. Nili Ravi, Cholistani, Crossed">
+        <input name="breed" value="{{ animal.breed if animal else '' }}"
+               placeholder="e.g. Nili Ravi, Cholistani, Crossed">
       </div>
+
       <div class="form-group">
         <label>Gender</label>
         <select name="gender">
@@ -52,16 +90,14 @@
 
       <div class="form-group">
         <label>Date of Birth</label>
-        <input name="dob" type="date" value="{{ (animal.dob or '')[:10] if animal else '' }}">
-      </div>
-      <div class="form-group">
-        <label>Type / Age Label</label>
-        <input name="age_type" value="{{ animal.age_type if animal else '' }}" placeholder="e.g. Dondha">
+        <input name="dob" type="date"
+               value="{{ (animal.dob or '')[:10] if animal else '' }}">
       </div>
 
       <div class="form-group full">
         <label>Description / Remarks</label>
-        <textarea name="description" rows="2" placeholder="e.g. Batch of 8 Wacchas purchased from Ludan Mandi">{{ animal.description if animal else '' }}</textarea>
+        <textarea name="description" rows="2"
+                  placeholder="e.g. Batch of 8 Wacchas purchased from Ludan Mandi">{{ animal.description if animal else '' }}</textarea>
       </div>
     </div>
 

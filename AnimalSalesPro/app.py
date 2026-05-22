@@ -76,8 +76,29 @@ def init_db():
                 value   TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS setup_lists (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                list_name   TEXT NOT NULL,
+                item_value  TEXT NOT NULL,
+                sort_order  INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(list_name, item_value)
+            );
+
             INSERT OR IGNORE INTO settings VALUES ('rate_per_kg', '780');
             INSERT OR IGNORE INTO settings VALUES ('expenses_default', '30000');
+
+            INSERT OR IGNORE INTO setup_lists (list_name, item_value, sort_order) VALUES
+                ('animal_type', 'Waccha',  1),
+                ('animal_type', 'Wacchi',  2),
+                ('animal_type', 'Katta',   3),
+                ('animal_type', 'Cow',     4),
+                ('animal_type', 'Buffalo', 5);
+
+            INSERT OR IGNORE INTO setup_lists (list_name, item_value, sort_order) VALUES
+                ('age', 'Calf',   1),
+                ('age', 'Young',  2),
+                ('age', 'Adult',  3),
+                ('age', 'Old',    4);
         """)
 
 
@@ -99,12 +120,39 @@ def migrate_db():
         for col, typ in new_cols:
             if col not in existing:
                 conn.execute(f"ALTER TABLE animals ADD COLUMN {col} {typ}")
+        # setup_lists table may not exist in older DBs
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS setup_lists (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                list_name   TEXT NOT NULL,
+                item_value  TEXT NOT NULL,
+                sort_order  INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(list_name, item_value)
+            )
+        """)
+        for row in [
+            ('animal_type','Waccha',1),('animal_type','Wacchi',2),
+            ('animal_type','Katta',3),('animal_type','Cow',4),('animal_type','Buffalo',5),
+            ('age','Calf',1),('age','Young',2),('age','Adult',3),('age','Old',4),
+        ]:
+            conn.execute(
+                "INSERT OR IGNORE INTO setup_lists (list_name,item_value,sort_order) VALUES (?,?,?)", row
+            )
 
 
 def get_setting(key):
     with get_db() as conn:
         row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
     return float(row["value"]) if row else 0
+
+
+def get_list(list_name):
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, item_value FROM setup_lists WHERE list_name=? ORDER BY sort_order, item_value",
+            (list_name,)
+        ).fetchall()
+    return rows
 
 
 def next_receipt_no():
@@ -189,7 +237,14 @@ def add_animal():
             return redirect(url_for("animals"))
         except sqlite3.IntegrityError:
             flash(f"Animal Code '{code}' already exists.", "error")
-    return render_template("add_animal.html")
+    # codes already in the system (for datalist)
+    with get_db() as conn:
+        used_codes = {r[0] for r in conn.execute("SELECT code FROM animals")}
+    code_list  = [r for r in get_list("animal_code") if r["item_value"] not in used_codes]
+    type_list  = get_list("animal_type")
+    age_list   = get_list("age")
+    return render_template("add_animal.html",
+        code_list=code_list, type_list=type_list, age_list=age_list)
 
 
 @app.route("/animals/<code>/edit", methods=["GET", "POST"])
@@ -227,7 +282,10 @@ def edit_animal(code):
                   code))
         flash(f"Animal {code} updated.", "success")
         return redirect(url_for("animals"))
-    return render_template("add_animal.html", animal=animal)
+    type_list = get_list("animal_type")
+    age_list  = get_list("age")
+    return render_template("add_animal.html", animal=animal,
+        code_list=[], type_list=type_list, age_list=age_list)
 
 
 # ── Customers ─────────────────────────────────────────────────────────────────
@@ -260,7 +318,7 @@ def customer_ledger(cid):
         if not customer:
             abort(404)
         sales_rows = conn.execute("""
-            SELECT s.*, a.age_type, a.weight_initial
+            SELECT s.*, a.age_type, a.animal_type, a.weight_initial
             FROM sales s JOIN animals a ON a.code = s.animal_code
             WHERE s.customer_id=? ORDER BY s.sale_date
         """, (cid,)).fetchall()
@@ -304,7 +362,7 @@ def add_payment(cid):
 def sales():
     with get_db() as conn:
         rows = conn.execute("""
-            SELECT s.*, a.age_type, a.weight_initial, c.name AS customer_name
+            SELECT s.*, a.age_type, a.animal_type, a.weight_initial, c.name AS customer_name
             FROM sales s
             JOIN animals a ON a.code = s.animal_code
             JOIN customers c ON c.id = s.customer_id
@@ -386,6 +444,49 @@ def settings():
     rate     = get_setting("rate_per_kg")
     expenses = get_setting("expenses_default")
     return render_template("settings.html", rate=rate, expenses=expenses)
+
+
+# ── Setup Lists ───────────────────────────────────────────────────────────────
+
+@app.route("/setup")
+def setup():
+    with get_db() as conn:
+        all_items = conn.execute(
+            "SELECT * FROM setup_lists ORDER BY list_name, sort_order, item_value"
+        ).fetchall()
+    lists = {}
+    for row in all_items:
+        lists.setdefault(row["list_name"], []).append(row)
+    return render_template("setup.html", lists=lists)
+
+
+@app.route("/setup/add", methods=["POST"])
+def setup_add():
+    list_name  = request.form["list_name"].strip()
+    item_value = request.form["item_value"].strip()
+    if list_name and item_value:
+        with get_db() as conn:
+            try:
+                max_order = conn.execute(
+                    "SELECT COALESCE(MAX(sort_order),0) FROM setup_lists WHERE list_name=?",
+                    (list_name,)
+                ).fetchone()[0]
+                conn.execute(
+                    "INSERT INTO setup_lists (list_name, item_value, sort_order) VALUES (?,?,?)",
+                    (list_name, item_value, max_order + 1)
+                )
+                flash(f"'{item_value}' added to {list_name} list.", "success")
+            except sqlite3.IntegrityError:
+                flash(f"'{item_value}' already exists in that list.", "error")
+    return redirect(url_for("setup"))
+
+
+@app.route("/setup/delete/<int:item_id>", methods=["POST"])
+def setup_delete(item_id):
+    with get_db() as conn:
+        conn.execute("DELETE FROM setup_lists WHERE id=?", (item_id,))
+    flash("Item removed.", "success")
+    return redirect(url_for("setup"))
 
 
 if __name__ == "__main__":
