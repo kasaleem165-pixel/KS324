@@ -2,7 +2,8 @@
 {% block content %}
 <div class="card" style="max-width:680px; margin:0 auto;">
   <h2>Record New Sale</h2>
-  <form method="POST">
+  <form method="POST" id="saleForm">
+
     <div class="form-grid">
       <div class="form-group">
         <label>Animal Code *</label>
@@ -11,8 +12,8 @@
           {% for a in animals %}
           <option value="{{ a.code }}"
                   data-weight="{{ a.weight_final or '' }}"
-                  data-type="{{ a.age_type or '' }}">
-            Code: {{ a.code }} | {{ a.age_type or '' }} | {{ a.weight_final or '?' }} kg
+                  data-type="{{ a.animal_type or a.age_type or '' }}">
+            {{ a.code }}{% if a.animal_type or a.age_type %} | {{ a.animal_type or a.age_type }}{% endif %}{% if a.weight_final %} | {{ a.weight_final }} kg{% endif %}
           </option>
           {% endfor %}
         </select>
@@ -20,6 +21,7 @@
         <span class="hint" style="color:#dc2626;">No available animals. <a href="/animals/add">Add animals first</a>.</span>
         {% endif %}
       </div>
+
       <div class="form-group">
         <label>Customer *</label>
         <select name="customer_id" required>
@@ -32,53 +34,110 @@
         <span class="hint" style="color:#dc2626;">No customers. <a href="/customers/add">Add customer first</a>.</span>
         {% endif %}
       </div>
+    </div>
+
+    <!-- Sale Type Toggle -->
+    <div style="margin:18px 0 14px; padding:12px 16px; background:#f1f5f9; border-radius:8px; display:flex; gap:24px; align-items:center;">
+      <span style="font-size:.88rem; color:#555; font-weight:600;">Sale Mode:</span>
+      <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:.92rem;">
+        <input type="radio" name="sale_type" value="weight" checked onchange="toggleSaleMode()">
+        Weight × Rate
+      </label>
+      <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:.92rem;">
+        <input type="radio" name="sale_type" value="lumpsum" onchange="toggleSaleMode()">
+        Lump Sum Amount
+      </label>
+    </div>
+
+    <!-- Weight × Rate fields -->
+    <div id="weightSection" class="form-grid">
       <div class="form-group">
         <label>Weight at Sale (kg) *</label>
-        <input name="weight_at_sale" id="weightField" type="number" step="0.1" required
-               placeholder="Final measured weight">
+        <input name="weight_at_sale" id="weightField" type="number" step="0.1"
+               placeholder="Final measured weight" oninput="calcTotal()">
       </div>
       <div class="form-group">
         <label>Rate per kg (Rs.) *</label>
-        <input name="rate_per_kg" type="number" step="1" required
+        <input name="rate_per_kg" id="rateField" type="number" step="1"
                value="{{ default_rate }}" oninput="calcTotal()">
       </div>
       <div class="form-group">
         <label>Expenses (Rs.)</label>
-        <input name="expenses" type="number" step="1" value="{{ default_expenses }}" oninput="calcTotal()">
+        <input name="expenses" id="expensesField" type="number" step="1"
+               value="{{ default_expenses }}" oninput="calcTotal()">
         <span class="hint">Admin charges, transport, etc.</span>
       </div>
       <div class="form-group">
         <label>Total Amount (Rs.)</label>
         <input id="totalDisplay" readonly style="background:#f8fafc; font-weight:700; font-size:1rem;" placeholder="Auto-calculated">
       </div>
+    </div>
+
+    <!-- Lump Sum field -->
+    <div id="lumpsumSection" style="display:none;" class="form-grid">
+      <div class="form-group">
+        <label>Weight at Sale (kg) <span style="color:#aaa; font-weight:400;">(optional)</span></label>
+        <input name="weight_at_sale" id="weightFieldLump" type="number" step="0.1"
+               placeholder="Optional — for records only">
+      </div>
+      <div class="form-group">
+        <label>Sale Amount (Rs.) *</label>
+        <input name="lumpsum_amount" id="lumpsumField" type="number" step="1"
+               placeholder="Total agreed sale price"
+               style="font-weight:700; font-size:1rem;">
+      </div>
+    </div>
+
+    <div class="form-grid" style="margin-top:4px;">
       <div class="form-group full">
         <label>Notes</label>
         <textarea name="notes" rows="2" placeholder="Optional notes"></textarea>
       </div>
     </div>
+
     <div style="display:flex; gap:12px; margin-top:20px;">
-      <button type="submit" class="btn btn-success" {{ 'disabled' if not animals or not customers else '' }}>
+      <button type="submit" class="btn btn-success"
+              {{ 'disabled' if not animals or not customers else '' }}>
         Record Sale &amp; Generate Receipt
       </button>
       <a href="/sales" class="btn" style="background:#e2e8f0; color:#444;">Cancel</a>
     </div>
   </form>
 </div>
+
 <script>
   function updateWeight() {
     const sel = document.getElementById('animalSelect');
     const opt = sel.options[sel.selectedIndex];
     const w = opt.dataset.weight;
-    if (w) document.getElementById('weightField').value = w;
+    if (w) {
+      document.getElementById('weightField').value = w;
+      const wl = document.getElementById('weightFieldLump');
+      if (wl) wl.value = w;
+    }
     calcTotal();
   }
+
   function calcTotal() {
-    const weight   = parseFloat(document.querySelector('[name=weight_at_sale]').value) || 0;
-    const rate     = parseFloat(document.querySelector('[name=rate_per_kg]').value)    || 0;
-    const expenses = parseFloat(document.querySelector('[name=expenses]').value)       || 0;
+    const weight   = parseFloat(document.getElementById('weightField').value) || 0;
+    const rate     = parseFloat(document.getElementById('rateField').value)   || 0;
+    const expenses = parseFloat(document.getElementById('expensesField').value) || 0;
     const total    = (weight * rate) + expenses;
     document.getElementById('totalDisplay').value = total > 0 ? 'Rs. ' + total.toLocaleString() : '';
   }
-  document.querySelector('[name=weight_at_sale]').addEventListener('input', calcTotal);
+
+  function toggleSaleMode() {
+    const isLump = document.querySelector('[name=sale_type]:checked').value === 'lumpsum';
+    document.getElementById('weightSection').style.display  = isLump ? 'none' : 'grid';
+    document.getElementById('lumpsumSection').style.display = isLump ? 'grid' : 'none';
+    // swap required attributes
+    document.getElementById('weightField').required = !isLump;
+    document.getElementById('rateField').required   = !isLump;
+    const lf = document.getElementById('lumpsumField');
+    if (lf) lf.required = isLump;
+  }
+
+  document.getElementById('weightField').addEventListener('input', calcTotal);
+  calcTotal();
 </script>
 {% endblock %}

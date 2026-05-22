@@ -91,8 +91,9 @@ def init_db():
                 ('animal_type', 'Waccha',  1),
                 ('animal_type', 'Wacchi',  2),
                 ('animal_type', 'Katta',   3),
-                ('animal_type', 'Cow',     4),
-                ('animal_type', 'Buffalo', 5);
+                ('animal_type', 'Katti',   4),
+                ('animal_type', 'Cow',     5),
+                ('animal_type', 'Buffalo', 6);
 
             INSERT OR IGNORE INTO setup_lists (list_name, item_value, sort_order) VALUES
                 ('age', 'Calf',   1),
@@ -132,7 +133,8 @@ def migrate_db():
         """)
         for row in [
             ('animal_type','Waccha',1),('animal_type','Wacchi',2),
-            ('animal_type','Katta',3),('animal_type','Cow',4),('animal_type','Buffalo',5),
+            ('animal_type','Katta',3),('animal_type','Katti',4),
+            ('animal_type','Cow',5),('animal_type','Buffalo',6),
             ('age','Calf',1),('age','Young',2),('age','Adult',3),('age','Old',4),
         ]:
             conn.execute(
@@ -384,10 +386,16 @@ def new_sale():
     if request.method == "POST":
         animal_code = request.form["animal_code"]
         customer_id = int(request.form["customer_id"])
-        weight      = float(request.form["weight_at_sale"])
-        rate        = float(request.form["rate_per_kg"])
+        sale_type   = request.form.get("sale_type", "weight")
         expenses    = float(request.form.get("expenses", 0) or 0)
-        amount      = (weight * rate) + expenses
+        if sale_type == "lumpsum":
+            amount  = float(request.form["lumpsum_amount"])
+            weight  = float(request.form.get("weight_at_sale") or 0)
+            rate    = 0
+        else:
+            weight  = float(request.form["weight_at_sale"])
+            rate    = float(request.form["rate_per_kg"])
+            amount  = (weight * rate) + expenses
         receipt_no  = next_receipt_no()
         sale_date   = datetime.now().strftime("%Y-%m-%d %H:%M")
 
