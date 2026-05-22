@@ -31,6 +31,8 @@ th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
 th.sortable:hover{background:#e2e8f0}
 th.sort-asc::after{content:' ▲';font-size:.7rem;color:#1a3a5c}
 th.sort-desc::after{content:' ▼';font-size:.7rem;color:#1a3a5c}
+tr.clickable-row{cursor:pointer}
+tr.clickable-row:hover td{background:#f0f7ff}
 
 .tbl-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:.79rem}
@@ -126,15 +128,15 @@ input[readonly]{background:#f8fafc}
 
 <nav>
   <span class="brand">&#127803; Animal Sales</span>
-  <button onclick="show('dashboard')"  id="nav-dashboard"  class="active">Dashboard</button>
-  <button onclick="show('animals')"    id="nav-animals">Animals Register</button>
-  <button onclick="show('stock')"      id="nav-stock">Available Stock</button>
-  <button onclick="show('customers')"  id="nav-customers">Customers</button>
-  <button onclick="show('sale')"       id="nav-sale">+ New Sale</button>
-  <button onclick="show('sales')"      id="nav-sales">Sales</button>
-  <button onclick="show('saleledger')" id="nav-saleledger">Sale Ledger</button>
-  <button onclick="show('payments')"   id="nav-payments">Payments</button>
-  <button onclick="show('settings')"   id="nav-settings">Settings</button>
+  <button onclick="show('dashboard')"   id="nav-dashboard"  class="active">Dashboard</button>
+  <button onclick="show('animals')"     id="nav-animals">Animals</button>
+  <button onclick="show('customers')"   id="nav-customers">Customers</button>
+  <button onclick="show('sale')"        id="nav-sale">+ New Sale</button>
+  <button onclick="show('sales')"       id="nav-sales">Sales</button>
+  <button onclick="show('saleledger')"  id="nav-saleledger">Sale Ledger</button>
+  <button onclick="show('payments')"    id="nav-payments">Payments</button>
+  <button onclick="show('budgeting')"   id="nav-budgeting">Budgeting</button>
+  <button onclick="show('settings')"    id="nav-settings">Settings</button>
 </nav>
 
 <!-- ══════════ DASHBOARD ══════════ -->
@@ -154,8 +156,12 @@ input[readonly]{background:#f8fafc}
 
 <!-- ══════════ ANIMALS ══════════ -->
 <div class="page" id="page-animals">
-  <div class="card">
-    <div class="card-title">Add New Animal</div>
+  <div class="card" id="add-animal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="card-title" style="margin:0">Add New Animal</div>
+      <button class="btn btn-light btn-sm" onclick="toggleAddAnimalForm()">&#8963; Toggle Form</button>
+    </div>
+    <div id="add-animal-form-body">
     <div id="animal-flash"></div>
     <div class="form-grid">
       <div class="fg"><label>Animal Code (Unique ID) *</label>
@@ -174,13 +180,11 @@ input[readonly]{background:#f8fafc}
       <div class="fg"><label>Weight Latest (kg)</label><input id="a-wf" type="number" step="0.1" placeholder="Current / latest weight" oninput="previewCalc()"></div>
       <div class="fg full"><label>Description</label>
         <textarea id="a-desc" rows="2" placeholder="e.g. 1 Waccha purchased from Ludan Mandi"></textarea></div>
-      <div class="fg"><label>Admin Charges (Rs.)</label>
-        <input id="a-admin" type="number" step="1" placeholder="e.g. 30000">
-        <span class="hint">Expenses for this animal (transport, qasai, etc.)</span></div>
+      <div class="fg"><label>Admin Charges (Rs.) <span style="font-weight:400;font-size:.74rem;color:#aaa">internal — for budgeting only</span></label>
+        <input id="a-admin" type="number" step="1" placeholder="e.g. 30000"></div>
       <div class="fg"><label>Customer (if already assigned)</label>
         <select id="a-cust"><option value="">-- None --</option></select></div>
     </div>
-    <!-- photo upload -->
     <div style="margin-top:13px">
       <label style="font-size:.81rem;color:#444;font-weight:500">Animal Photos (up to 4)</label>
       <div class="photo-upload-area" onclick="document.getElementById('a-photos-input').click()">
@@ -198,50 +202,36 @@ input[readonly]{background:#f8fafc}
       <button class="btn btn-primary" onclick="addAnimal()">Add Animal</button>
       <button class="btn btn-light" onclick="clearAnimalForm()">Clear</button>
     </div>
-  </div>
-  <div class="card">
-    <div class="card-title">Animals Register</div>
-    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-      <button class="btn btn-light btn-sm" onclick="exportAnimalsExcel()">&#8595; Export to Excel</button>
     </div>
-    <div class="tbl-wrap"><table>
-      <thead id="animals-head"></thead>
-      <tbody id="animals-body"></tbody>
-    </table></div>
   </div>
-</div>
-
-<!-- ══════════ AVAILABLE STOCK ══════════ -->
-<div class="page" id="page-stock">
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px">
-      <div class="card-title" style="margin:0">Available Stock Report</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <label style="font-size:.82rem;color:#555;font-weight:500">Sort by:</label>
-        <select id="stock-sort-col" onchange="renderStockReport()" style="font-size:.83rem;padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;gap:6px">
+        <button id="af-all"       class="btn btn-primary btn-sm"  onclick="setAnimalFilter('all')">All Animals</button>
+        <button id="af-available" class="btn btn-light btn-sm"    onclick="setAnimalFilter('available')">Available Stock</button>
+        <button id="af-sold"      class="btn btn-light btn-sm"    onclick="setAnimalFilter('sold')">Sold</button>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center" id="stock-sort-bar" style="display:none">
+        <label style="font-size:.8rem;color:#555">Sort:</label>
+        <select id="stock-sort-col" onchange="renderAnimals()" style="font-size:.8rem;padding:4px 6px;border:1px solid #e2e8f0;border-radius:6px">
           <option value="code">Code</option>
           <option value="purchase_date">Date</option>
-          <option value="age_type">Age / Type</option>
-          <option value="_w">Weight (kg)</option>
+          <option value="age_type">Age</option>
+          <option value="_w">Weight</option>
           <option value="_sp">Sale Price</option>
-          <option value="admin_charges">Admin Charges</option>
-          <option value="_tc">Total Cost</option>
-          <option value="_spp">Share / Person</option>
-          <option value="_bq">Beef Qty / Person</option>
-          <option value="_br">Beef Rate / Person</option>
         </select>
-        <select id="stock-sort-dir" onchange="renderStockReport()" style="font-size:.83rem;padding:5px 8px;border:1px solid #e2e8f0;border-radius:6px">
-          <option value="asc">▲ Ascending</option>
-          <option value="desc">▼ Descending</option>
+        <select id="stock-sort-dir" onchange="renderAnimals()" style="font-size:.8rem;padding:4px 6px;border:1px solid #e2e8f0;border-radius:6px">
+          <option value="asc">▲ Asc</option>
+          <option value="desc">▼ Desc</option>
         </select>
         <button class="btn btn-light btn-sm" onclick="exportStockExcel()">&#8595; Excel</button>
         <button class="btn btn-light btn-sm" onclick="window.print()">&#128438; Print</button>
       </div>
+      <button class="btn btn-light btn-sm" id="animals-excel-btn" onclick="exportAnimalsExcel()">&#8595; Excel</button>
     </div>
-    <p style="font-size:.8rem;color:#888;margin-bottom:12px">Available animals grouped by type. Click any column header to sort within each group.</p>
     <div class="tbl-wrap"><table>
-      <thead id="stock-head"></thead>
-      <tbody id="stock-body"></tbody>
+      <thead id="animals-head"></thead>
+      <tbody id="animals-body"></tbody>
     </table></div>
   </div>
 </div>
@@ -400,6 +390,22 @@ input[readonly]{background:#f8fafc}
     <div class="tbl-wrap" style="margin-top:14px"><table>
       <thead><tr><th>Bank Name</th><th>Account Title</th><th>Account No.</th><th></th></tr></thead>
       <tbody id="banks-body"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ══════════ BUDGETING ══════════ -->
+<div class="page" id="page-budgeting">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+      <div class="card-title" style="margin:0">Budgeting &amp; Cost Estimation</div>
+      <button class="btn btn-light btn-sm" onclick="exportBudgetExcel()">&#8595; Export to Excel</button>
+    </div>
+    <p style="color:#666;font-size:.82rem;margin-bottom:12px">Internal cost estimates per animal — based on Admin Charges + Sale Price. Not shown on any receipt or customer report.</p>
+    <div id="budget-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px"></div>
+    <div class="tbl-wrap"><table>
+      <thead id="budget-head"></thead>
+      <tbody id="budget-body"></tbody>
     </table></div>
   </div>
 </div>
@@ -671,7 +677,24 @@ const STORE='animal_sales_db';
 let DB={animals:[],customers:[],sales:[],payments:[],banks:[],settings:{rate_per_kg:780,admin_charges:30000,num_persons:7}};
 
 const SORT={animals:{col:'code',dir:'asc'},customers:{col:'name',dir:'asc'},sales:{col:'receipt_no',dir:'desc'},payments:{col:'receipt_no',dir:'desc'},stock:{col:'code',dir:'asc'}};
-function sortToggle(tbl,col){if(SORT[tbl].col===col){SORT[tbl].dir=SORT[tbl].dir==='asc'?'desc':'asc';}else{SORT[tbl].col=col;SORT[tbl].dir='asc';}const fn={animals:renderAnimals,customers:renderCustomers,sales:renderSales,payments:renderPayments,stock:renderStockReport}[tbl];if(fn)fn();}
+function sortToggle(tbl,col){if(SORT[tbl].col===col){SORT[tbl].dir=SORT[tbl].dir==='asc'?'desc':'asc';}else{SORT[tbl].col=col;SORT[tbl].dir='asc';}const fn={animals:renderAnimals,customers:renderCustomers,sales:renderSales,payments:renderPayments}[tbl];if(fn)fn();}
+let _animalFilter='all';
+function setAnimalFilter(f){
+  _animalFilter=f;
+  ['all','available','sold'].forEach(x=>{
+    const b=document.getElementById('af-'+x);
+    if(b){b.className='btn btn-'+(x===f?'primary':'light')+' btn-sm';}
+  });
+  const bar=document.getElementById('stock-sort-bar');
+  const excelBtn=document.getElementById('animals-excel-btn');
+  if(bar) bar.style.display=f==='available'?'flex':'none';
+  if(excelBtn) excelBtn.style.display=f==='available'?'none':'block';
+  renderAnimals();
+}
+function toggleAddAnimalForm(){
+  const body=document.getElementById('add-animal-form-body');
+  if(body) body.style.display=body.style.display==='none'?'':'none';
+}
 function sortArr(arr,col,dir){return [...arr].sort((a,b)=>{let av=a[col]??'',bv=b[col]??'';if(typeof av==='number'&&typeof bv==='number')return dir==='asc'?av-bv:bv-av;return dir==='asc'?String(av).localeCompare(String(bv)):String(bv).localeCompare(String(av));});}
 function th(label,tbl,col){return `<th class="sortable${SORT[tbl].col===col?' sort-'+SORT[tbl].dir:''}" onclick="sortToggle('${tbl}','${col}')">${label}</th>`;}
 
@@ -797,8 +820,8 @@ function show(p){
   document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   document.getElementById('nav-'+p).classList.add('active');
-  const fn={dashboard:renderDashboard,animals:renderAnimals,stock:renderStockReport,customers:renderCustomers,
-            sale:initSaleForm,sales:renderSales,saleledger:renderSaleLedger,payments:renderPayments,settings:renderSettings};
+  const fn={dashboard:renderDashboard,animals:renderAnimals,customers:renderCustomers,
+            sale:initSaleForm,sales:renderSales,saleledger:renderSaleLedger,payments:renderPayments,budgeting:renderBudgeting,settings:renderSettings};
   if(fn[p]) fn[p]();
 }
 
@@ -893,7 +916,6 @@ function showDashDetail(key){
     if(!rawList.length){html+='<p style="color:#aaa;font-style:italic">No animals found.</p>';}
     else if(key==='sold'){
       // ── Sales-centric table (same format as All Sales tab) ──
-      const np=DB.settings.num_persons||7;
       const soldSales=rawList.map(a=>{
         const s=DB.sales.find(x=>x.animal_code===a.code);
         return s?Object.assign({},s,{_animal:a}):null;
@@ -901,25 +923,19 @@ function showDashDetail(key){
       html+=`<div class="tbl-wrap"><table><thead><tr>
         <th>S#</th><th>Receipt</th><th>Date</th><th>Code</th><th>Age</th>
         <th>Customer</th><th>Wt(kg)</th><th>Rate/kg</th><th>Sale Pr.</th>
-        <th>Admin</th><th>Total</th><th>Share/P</th><th>Bq/P</th><th>Br/P</th><th></th>
+        <th>Carriage</th><th>Total</th><th></th>
       </tr></thead><tbody>`;
       soldSales.forEach((s,i)=>{
         const sp=s.weight_at_sale*s.rate_per_kg;
-        const tc=sp+(s.admin_charges||0);
-        const spp=tc/np;
-        const bq=(s.weight_at_sale/2)/np;
-        const br=bq>0?spp/bq:0;
-        html+=`<tr>
+        html+=`<tr class="clickable-row" onclick="showReceipt('${s.receipt_no}')">
           <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
           <td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td>
           <td><strong>${s.animal_code}</strong></td><td>${aType(s.animal_code)}</td>
           <td>${cName(s.customer_id)}</td>
           <td>${fmtN(s.weight_at_sale,1)}</td><td>${fmtN(s.rate_per_kg)}</td>
-          <td>${Rs(sp)}</td><td>${Rs(s.admin_charges||0)}</td>
+          <td>${Rs(sp)}</td><td>${s.carriage_charges>0?Rs(s.carriage_charges):'-'}</td>
           <td><strong>${Rs(s.amount)}</strong></td>
-          <td><strong>${Rs(spp)}</strong></td>
-          <td>${fmtN(bq,2)} kg</td><td>${Rs(br)}/kg</td>
-          <td><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Receipt</button></td>
+          <td onclick="event.stopPropagation()"><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Receipt</button></td>
         </tr>`;
       });
       html+=`</tbody></table></div>`;
@@ -932,48 +948,35 @@ function showDashDetail(key){
         const f=w?calcFields(w,adm):{salePrice:0,totalCost:0,sharePerPerson:0,beefQty:0,beefRate:0};
         return Object.assign({},a,{_w:w,_adm:adm,_sp:f.salePrice,_tc:f.totalCost,_spp:f.sharePerPerson,_bq:f.beefQty,_br:f.beefRate,_sale:sale,_custId:sale?sale.customer_id:a.assigned_customer});
       });
-      const cols=10;
-      const colsAll=11;
+      const cols=6;
+      const colsAll=7;
       const thead=`<thead><tr>
-        <th>Code</th><th>Age</th><th>Wt(kg)</th><th>Sale Pr.</th><th>Admin</th>
-        <th>Total Cost</th><th>Share/P</th><th>Bq/P</th><th>Br/P</th>
-        <th>Status</th>
+        <th>Code</th><th>Age</th><th>Wt(kg)</th><th>Sale Price(est.)</th><th>Status</th><th>Customer</th>
       </tr></thead>`;
       const theadAll=`<thead><tr>
-        <th>Code</th><th>Age</th><th>Wt(kg)</th><th>Sale Pr.</th><th>Admin</th>
-        <th>Total Cost</th><th>Share/P</th><th>Bq/P</th><th>Br/P</th>
-        <th>Status</th><th></th>
+        <th>Code</th><th>Age</th><th>Wt(kg)</th><th>Sale Price(est.)</th><th>Status</th><th>Customer</th><th></th>
       </tr></thead>`;
 
       function dashAnimalRow(a,showDel){
         const isKheera=(a.age_type||'').toLowerCase()==='kheera';
         const bg=isKheera?'background:#fffbeb;':'';
-        return `<tr style="${bg}">
+        return `<tr style="${bg}" class="clickable-row" onclick="showAnimalDetail('${a.code}');closeModal('dashdetail-overlay')">
           <td><strong>${a.code}</strong></td>
           <td>${isKheera?`<span style="background:#d97706;color:#fff;border-radius:4px;padding:1px 6px;font-size:.75rem">Kheera</span>`:(a.age_type||'-')}</td>
           <td>${a._w?fmtN(a._w,1)+' kg':'-'}</td>
           <td>${a._w?Rs(a._sp):'-'}</td>
-          <td>${Rs(a._adm)}</td>
-          <td>${a._w?Rs(a._tc):'-'}</td>
-          <td>${a._w?Rs(a._spp):'-'}</td>
-          <td>${a._w?fmtN(a._bq,2)+' kg':'-'}</td>
-          <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
           <td><span class="badge ${a.status}">${a.status==='available'?'Available':'Sold'}</span></td>
-          ${showDel?`<td><button class="btn btn-danger btn-sm" onclick="deleteAnimal('${a.code}');closeModal('dash-detail-overlay')">&#128465; Del</button></td>`:''}
+          <td>${a._custId?cName(a._custId):'-'}</td>
+          ${showDel?`<td onclick="event.stopPropagation()"><button class="btn btn-danger btn-sm" onclick="deleteAnimal('${a.code}');closeModal('dashdetail-overlay')">&#128465;</button></td>`:''}
         </tr>`;
       }
       function dashSubtotalRow(grpList,label,color,extraCell){
         if(!grpList.length) return '';
         const tw=grpList.reduce((s,a)=>s+(a._w||0),0);
         const tsp=grpList.reduce((s,a)=>s+a._sp,0);
-        const tadm=grpList.reduce((s,a)=>s+a._adm,0);
-        const ttc=grpList.reduce((s,a)=>s+a._tc,0);
-        const tspp=grpList.reduce((s,a)=>s+(a._spp||0),0);
-        const tbq=grpList.reduce((s,a)=>s+a._bq,0);
         return `<tr style="background:${color};font-weight:700;font-size:.81rem;border-top:2px solid #cbd5e1">
           <td colspan="2" style="color:#1a3a5c">${label} Subtotal (${grpList.length})</td>
-          <td>${fmtN(tw,1)} kg</td><td>${Rs(tsp)}</td><td>${Rs(tadm)}</td>
-          <td>${Rs(ttc)}</td><td>${Rs(tspp)}</td><td>${fmtN(tbq,2)} kg</td><td>—</td><td></td>
+          <td>${fmtN(tw,1)} kg</td><td>${Rs(tsp)}</td><td></td><td></td>
           ${extraCell?'<td></td>':''}
         </tr>`;
       }
@@ -982,10 +985,6 @@ function showDashDetail(key){
       const others=list.filter(a=>{const t=(a.age_type||'').toLowerCase();return t!=='dondha'&&t!=='kheera';});
       const gtw=list.reduce((s,a)=>s+(a._w||0),0);
       const gtsp=list.reduce((s,a)=>s+a._sp,0);
-      const gtadm=list.reduce((s,a)=>s+a._adm,0);
-      const gttc=list.reduce((s,a)=>s+a._tc,0);
-      const gtspp=list.reduce((s,a)=>s+(a._spp||0),0);
-      const gtbq=list.reduce((s,a)=>s+a._bq,0);
 
       if(key==='available'){
         // Collapsible groups
@@ -994,16 +993,12 @@ function showDashDetail(key){
           if(!grpList.length) return '';
           const tw=grpList.reduce((s,a)=>s+(a._w||0),0);
           const tsp=grpList.reduce((s,a)=>s+a._sp,0);
-          const tadm=grpList.reduce((s,a)=>s+a._adm,0);
-          const ttc=grpList.reduce((s,a)=>s+a._tc,0);
-          const tspp=grpList.reduce((s,a)=>s+(a._spp||0),0);
-          const tbq=grpList.reduce((s,a)=>s+a._bq,0);
           let out=`<tbody>
             <tr style="background:${hdrBg};font-weight:700;cursor:pointer" onclick="dashGrpToggle('${grpId}')">
               <td colspan="${cols}" style="color:${hdrColor};padding:9px 12px;font-size:.87rem">
                 <span id="${grpId}-arrow">&#9654;</span> ${label}
                 <span style="background:${hdrColor};color:#fff;border-radius:10px;padding:1px 9px;font-size:.73rem;margin-left:6px">${grpList.length}</span>
-                <span style="font-size:.78rem;font-weight:400;margin-left:12px;opacity:.8">Wt: ${fmtN(tw,1)} kg &nbsp;|&nbsp; Total: ${Rs(ttc)} &nbsp;|&nbsp; Share/P: ${Rs(tspp)}</span>
+                <span style="font-size:.78rem;font-weight:400;margin-left:12px;opacity:.8">Count: ${grpList.length} &nbsp;|&nbsp; Total Wt: ${fmtN(tw,1)} kg &nbsp;|&nbsp; Sale Price: ${Rs(tsp)}</span>
                 <span style="float:right;font-size:.75rem;color:${hdrColor};opacity:.7">click to expand ▸</span>
               </td>
             </tr>
@@ -1011,23 +1006,18 @@ function showDashDetail(key){
           out+=`<tbody id="${grpId}" style="display:none">`;
           grpList.forEach(a=>{
             const isKheera=(a.age_type||'').toLowerCase()==='kheera';
-            out+=`<tr style="${dtlBg?'background:'+dtlBg+';':''}">
+            out+=`<tr class="clickable-row" style="${dtlBg?'background:'+dtlBg+';':''}" onclick="showAnimalDetail('${a.code}');closeModal('dashdetail-overlay')">
               <td><strong>${a.code}</strong></td>
               <td>${isKheera?`<span style="background:#d97706;color:#fff;border-radius:4px;padding:1px 6px;font-size:.75rem">Kheera</span>`:(a.age_type||'-')}</td>
               <td>${a._w?fmtN(a._w,1)+' kg':'-'}</td>
               <td>${a._w?Rs(a._sp):'-'}</td>
-              <td>${Rs(a._adm)}</td>
-              <td>${a._w?Rs(a._tc):'-'}</td>
-              <td>${a._w?Rs(a._spp):'-'}</td>
-              <td>${a._w?fmtN(a._bq,2)+' kg':'-'}</td>
-              <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
               <td><span class="badge available">Available</span></td>
+              <td>${a._custId?cName(a._custId):'-'}</td>
             </tr>`;
           });
           out+=`<tr style="background:${subBg};font-weight:700;font-size:.81rem;border-top:2px solid #cbd5e1">
             <td colspan="2" style="color:#1a3a5c">${label} Subtotal</td>
-            <td>${fmtN(tw,1)} kg</td><td>${Rs(tsp)}</td><td>${Rs(tadm)}</td>
-            <td>${Rs(ttc)}</td><td>${Rs(tspp)}</td><td>${fmtN(tbq,2)} kg</td><td>—</td><td></td>
+            <td>${fmtN(tw,1)} kg</td><td>${Rs(tsp)}</td><td></td><td></td>
           </tr>`;
           out+=`</tbody>`;
           return out;
@@ -1037,8 +1027,7 @@ function showDashDetail(key){
         tbl+=collapsibleGroup(others,'Other','dash-grp-others','#f3f4f6','#374151','','#f3f4f6');
         tbl+=`<tbody><tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.85rem;border-top:3px solid #0f2540">
           <td colspan="2">TOTAL — ${list.length} &nbsp;(D:${dondha.length} K:${kheera.length}${others.length?' O:'+others.length:''})</td>
-          <td>${fmtN(gtw,1)} kg</td><td>${Rs(gtsp)}</td><td>${Rs(gtadm)}</td>
-          <td>${Rs(gttc)}</td><td>${Rs(gtspp)}</td><td>${fmtN(gtbq,2)} kg</td><td>—</td><td></td>
+          <td>${fmtN(gtw,1)} kg</td><td>${Rs(gtsp)}</td><td></td><td></td>
         </tr></tbody>`;
         tbl+=`</table></div>`;
         html+=tbl;
@@ -1062,8 +1051,7 @@ function showDashDetail(key){
         }
         tbody+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.85rem;border-top:3px solid #0f2540">
           <td colspan="2">TOTAL — ${list.length} &nbsp;(D:${dondha.length} K:${kheera.length}${others.length?' O:'+others.length:''})</td>
-          <td>${fmtN(gtw,1)} kg</td><td>${Rs(gtsp)}</td><td>${Rs(gtadm)}</td>
-          <td>${Rs(gttc)}</td><td>${Rs(gtspp)}</td><td>${fmtN(gtbq,2)} kg</td><td>—</td><td></td><td></td>
+          <td>${fmtN(gtw,1)} kg</td><td>${Rs(gtsp)}</td><td></td><td></td><td></td>
         </tr>`;
         html+=`<div class="tbl-wrap"><table>${theadAll}<tbody>${tbody}</tbody></table></div>`;
       }
@@ -1076,17 +1064,17 @@ function showDashDetail(key){
     else{
       html+=`<div class="tbl-wrap"><table><thead><tr>
         <th>Receipt</th><th>Date</th><th>Animal</th><th>Customer</th>
-        <th>Weight</th><th>Rate/kg</th><th>Sale Price</th><th>Admin</th><th>Total</th><th></th>
+        <th>Weight</th><th>Rate/kg</th><th>Sale Price</th><th>Carriage</th><th>Total</th><th></th>
       </tr></thead><tbody>`;
       [...DB.sales].reverse().forEach(s=>{
         const sp=s.weight_at_sale*s.rate_per_kg;
-        html+=`<tr>
+        html+=`<tr class="clickable-row" onclick="showReceipt('${s.receipt_no}')">
           <td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td>
           <td><strong>${s.animal_code}</strong></td><td>${cName(s.customer_id)}</td>
           <td>${fmtN(s.weight_at_sale,1)} kg</td><td>${fmtN(s.rate_per_kg)}</td>
-          <td>${Rs(sp)}</td><td>${Rs(s.admin_charges||0)}</td>
+          <td>${Rs(sp)}</td><td>${s.carriage_charges>0?Rs(s.carriage_charges):'-'}</td>
           <td><strong>${Rs(s.amount)}</strong></td>
-          <td><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Receipt</button></td>
+          <td onclick="event.stopPropagation()"><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Receipt</button></td>
         </tr>`;
       });
       html+=`</tbody></table></div>`;
@@ -1315,49 +1303,111 @@ function animalComputedList(filterFn){
 function renderAnimals(){
   populateCustDropdown('a-cust');
   document.getElementById('a-admin').value=DB.settings.admin_charges||30000;
+  const filter=_animalFilter||'all';
   const head=document.getElementById('animals-head');
+  const tb=document.getElementById('animals-body');
+
+  if(filter==='available'){
+    // ── Grouped Dondha/Kheera stock view ──
+    const colEl=document.getElementById('stock-sort-col');
+    const dirEl=document.getElementById('stock-sort-dir');
+    const col=colEl?colEl.value:'code';
+    const dir=dirEl?dirEl.value:'asc';
+    head.innerHTML='<tr><th>S#</th>'+th('Code','stock','code')+th('Date','stock','purchase_date')+th('Age','stock','age_type')+th('Weight(kg)','stock','_w')+th('Sale Price(est.)','stock','_sp')+'<th>Description</th><th>Actions</th></tr>';
+    const available=animalComputedList(a=>a.status==='available');
+    if(!available.length){tb.innerHTML=`<tr><td colspan="8" class="empty">No available animals.</td></tr>`;return;}
+    const dondha=sortArr(available.filter(a=>(a.age_type||'').toLowerCase()==='dondha'),col,dir);
+    const kheera=sortArr(available.filter(a=>(a.age_type||'').toLowerCase()==='kheera'),col,dir);
+    const others=sortArr(available.filter(a=>{const t=(a.age_type||'').toLowerCase();return t!=='dondha'&&t!=='kheera';}),col,dir);
+    function stockRow(a,i,bgColor){
+      const isK=(a.age_type||'').toLowerCase()==='kheera';
+      return `<tr class="clickable-row" style="${bgColor?'background:'+bgColor+';':''}" onclick="showAnimalDetail('${a.code}')">
+        <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
+        <td><strong>${a.code}</strong></td>
+        <td>${fmtD(a.purchase_date)}</td>
+        <td>${isK?`<span style="background:#d97706;color:#fff;border-radius:4px;padding:1px 6px;font-size:.75rem">Kheera</span>`:(a.age_type||'-')}</td>
+        <td><strong>${a._w?fmtN(a._w,1):'-'}</strong></td>
+        <td>${a._w?Rs(a._sp):'-'}</td>
+        <td style="max-width:160px;font-size:.78rem">${a.description||'-'}</td>
+        <td style="white-space:nowrap" onclick="event.stopPropagation()">
+          <button class="btn btn-light btn-sm" onclick="openAnimalEdit('${a.code}')">&#9998;</button>
+          <button class="btn btn-danger btn-sm" style="margin-left:3px" onclick="deleteAnimal('${a.code}')">&#128465;</button>
+        </td>
+      </tr>`;
+    }
+    function sumRowStock(list,label,color){
+      if(!list.length) return '';
+      const tw=list.reduce((s,a)=>s+(a._w||0),0);
+      const tsp=list.reduce((s,a)=>s+a._sp,0);
+      return `<tr style="background:${color};font-weight:700;font-size:.82rem;border-top:2px solid #cbd5e1">
+        <td colspan="4" style="color:#1a3a5c">${label} — ${list.length} animals</td>
+        <td>${fmtN(tw,1)} kg</td><td>${Rs(tsp)}</td><td colspan="2"></td>
+      </tr>`;
+    }
+    let html='',sno=0;
+    if(dondha.length){
+      html+=`<tr style="background:#dbeafe;font-weight:700"><td colspan="8" style="color:#1e40af;padding:8px 10px">&#9654; Dondha <span style="background:#1e40af;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${dondha.length}</span></td></tr>`;
+      html+=dondha.map((a,i)=>stockRow(a,sno+i+1,'')).join(''); sno+=dondha.length;
+      html+=sumRowStock(dondha,'Dondha','#e0f2fe');
+    }
+    if(kheera.length){
+      html+=`<tr style="background:#fef3c7;font-weight:700"><td colspan="8" style="color:#92400e;padding:8px 10px">&#9654; Kheera <span style="background:#d97706;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${kheera.length}</span></td></tr>`;
+      html+=kheera.map((a,i)=>stockRow(a,sno+i+1,'#fffbeb')).join(''); sno+=kheera.length;
+      html+=sumRowStock(kheera,'Kheera','#fef3c7');
+    }
+    if(others.length){
+      html+=`<tr style="background:#f3f4f6;font-weight:700"><td colspan="8" style="color:#374151;padding:8px 10px">&#9654; Other <span style="background:#6b7280;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${others.length}</span></td></tr>`;
+      html+=others.map((a,i)=>stockRow(a,sno+i+1,'')).join(''); sno+=others.length;
+      html+=sumRowStock(others,'Other','#f3f4f6');
+    }
+    const all=available;
+    const gtw=all.reduce((s,a)=>s+(a._w||0),0);
+    const gtsp=all.reduce((s,a)=>s+a._sp,0);
+    html+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.87rem;border-top:3px solid #0f2540">
+      <td colspan="4">GRAND TOTAL — ${all.length} (D:${dondha.length} K:${kheera.length}${others.length?' O:'+others.length:''})</td>
+      <td>${fmtN(gtw,1)} kg</td><td>${Rs(gtsp)}</td><td colspan="2"></td>
+    </tr>`;
+    tb.innerHTML=html;
+    return;
+  }
+
+  // ── All / Sold flat sortable table ──
   head.innerHTML='<tr><th>S#</th><th>Photo</th>'+
     th('Code','animals','code')+
     th('Date','animals','purchase_date')+
-    '<th>Description</th>'+
     th('Age','animals','age_type')+
-    th('Weight (kg)','animals','_w')+
-    th('Sale Price (Rs.)','animals','_sp')+
-    th('Admin Charges','animals','_adm')+
-    th('Total Cost','animals','_tc')+
-    th('Share/Person','animals','_spp')+
-    th('Beef Qty/person','animals','_bq')+
-    th('Beef Rate/person','animals','_br')+
+    th('Weight(kg)','animals','_w')+
+    th('Sale Price','animals','_sp')+
+    th('Carriage','animals','_adm')+
+    th('Total','animals','_tc')+
     th('Status','animals','status')+
-    '<th>Customer</th><th></th></tr>';
-  const tb=document.getElementById('animals-body');
-  if(!DB.animals.length){tb.innerHTML=`<tr><td colspan="16" class="empty">No animals yet. Add one above.</td></tr>`;return;}
-  const list=sortArr(animalComputedList(),SORT.animals.col,SORT.animals.dir);
+    '<th>Customer</th><th>Actions</th></tr>';
+  const rawList=filter==='sold'?DB.animals.filter(a=>a.status==='sold'):DB.animals;
+  if(!rawList.length){tb.innerHTML=`<tr><td colspan="12" class="empty">No animals yet. Add one above.</td></tr>`;return;}
+  const list=sortArr(animalComputedList(a=>filter==='sold'?a.status==='sold':true),SORT.animals.col,SORT.animals.dir);
   tb.innerHTML=list.map((a,i)=>{
     const firstPhoto=a.photos&&a.photos.length?a.photos[0]:null;
     const photoCell=firstPhoto
-      ?`<img class="tbl-thumb" src="${firstPhoto}" onclick="openPhotoViewer('${a.code}')" title="Click to view/manage photos">`
-      :`<span class="no-photo" onclick="openPhotoViewer('${a.code}')" title="Click to add photos">&#128247;</span>`;
-    return `<tr>
+      ?`<img class="tbl-thumb" src="${firstPhoto}" onclick="openPhotoViewer('${a.code}');event.stopPropagation()" title="Photos">`
+      :`<span class="no-photo" onclick="openPhotoViewer('${a.code}');event.stopPropagation()" title="Add photos">&#128247;</span>`;
+    const carriage=a._sale?(a._sale.carriage_charges||0):0;
+    const total=a._sale?a._sale.amount:0;
+    return `<tr class="clickable-row" onclick="showAnimalDetail('${a.code}')">
       <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
       <td>${photoCell}</td>
       <td><strong>${a.code}</strong></td>
       <td>${fmtD(a.purchase_date)}</td>
-      <td style="max-width:170px;font-size:.79rem">${a.description||'-'}</td>
       <td>${a.age_type||'-'}</td>
       <td>${a._w?fmtN(a._w,1):'-'}</td>
       <td>${a._w?Rs(a._sp):'-'}</td>
-      <td>${Rs(a._adm)}</td>
-      <td>${a._w?Rs(a._tc):'-'}</td>
-      <td>${a._w?Rs(a._spp):'-'}</td>
-      <td>${a._w?fmtN(a._bq,2)+' kg':'-'}</td>
-      <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
+      <td>${carriage>0?Rs(carriage):'-'}</td>
+      <td>${total>0?Rs(total):'-'}</td>
       <td><span class="badge ${a.status}">${a.status==='available'?'Available':'Sold'}</span></td>
       <td>${a._custId?cName(a._custId):'-'}</td>
-      <td style="white-space:nowrap">
-        ${a._sale?`<button class="btn btn-primary btn-sm" onclick="showReceipt('${a._sale.receipt_no}')">Receipt</button> `:''}
-        <button class="btn btn-light btn-sm" onclick="openAnimalEdit('${a.code}')">&#9998; Edit</button>
-        <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="deleteAnimal('${a.code}')">&#128465; Del</button>
+      <td style="white-space:nowrap" onclick="event.stopPropagation()">
+        ${a._sale?`<button class="btn btn-primary btn-sm" onclick="showReceipt('${a._sale.receipt_no}')">&#128196;</button> `:''}
+        <button class="btn btn-light btn-sm" onclick="openAnimalEdit('${a.code}')">&#9998;</button>
+        <button class="btn btn-danger btn-sm" style="margin-left:3px" onclick="deleteAnimal('${a.code}')">&#128465;</button>
       </td>
     </tr>`;
   }).join('');
@@ -1369,128 +1419,8 @@ function deleteAnimal(code){
   if(hasSale){alert(`Animal ${code} has a sale record (${hasSale.receipt_no}). Delete the sale first.`);return;}
   DB.animals=DB.animals.filter(a=>a.code!==code);
   save();
-  renderStockReport();
   renderAnimals();
   renderDashboard();
-}
-
-function renderStockReport(){
-  const colEl=document.getElementById('stock-sort-col');
-  const dirEl=document.getElementById('stock-sort-dir');
-  if(!colEl) return;
-  const col=colEl.value;
-  const dir=dirEl.value;
-  SORT.stock.col=col; SORT.stock.dir=dir;
-
-  const thead=document.getElementById('stock-head');
-  const theadRow='<tr>'+'<th>S#</th>'+
-    th('Code','stock','code')+
-    th('Date','stock','purchase_date')+
-    th('Age / Type','stock','age_type')+
-    th('Weight (kg)','stock','_w')+
-    th('Sale Price','stock','_sp')+
-    th('Admin Charges','stock','_adm')+
-    th('Total Cost','stock','_tc')+
-    th('Share / Person','stock','_spp')+
-    th('Beef Qty / Person','stock','_bq')+
-    th('Beef Rate / Person','stock','_br')+
-    '<th>Actions</th>'
-    + '</tr>';
-  thead.innerHTML=theadRow;
-
-  const tb=document.getElementById('stock-body');
-  const available=animalComputedList(a=>a.status==='available');
-  if(!available.length){tb.innerHTML=`<tr><td colspan="12" class="empty">No available animals.</td></tr>`;return;}
-
-  const dondha=sortArr(available.filter(a=>(a.age_type||'').toLowerCase()==='dondha'),col,dir);
-  const kheera=sortArr(available.filter(a=>(a.age_type||'').toLowerCase()==='kheera'),col,dir);
-  const others=sortArr(available.filter(a=>{const t=(a.age_type||'').toLowerCase();return t!=='dondha'&&t!=='kheera';}),col,dir);
-
-  function sumRow(list,label,color){
-    if(!list.length) return '';
-    const tw=list.reduce((s,a)=>s+(a._w||0),0);
-    const tsp=list.reduce((s,a)=>s+a._sp,0);
-    const tadm=list.reduce((s,a)=>s+a._adm,0);
-    const ttc=list.reduce((s,a)=>s+a._tc,0);
-    const tspp=list.reduce((s,a)=>s+(a._spp||0),0);
-    const tbq=list.reduce((s,a)=>s+a._bq,0);
-    return `<tr style="background:${color};font-weight:700;font-size:.82rem;border-top:2px solid #cbd5e1">
-      <td colspan="4" style="color:#1a3a5c">${label} — Subtotal (${list.length} animals)</td>
-      <td>${fmtN(tw,1)} kg</td>
-      <td>${Rs(tsp)}</td><td>${Rs(tadm)}</td><td>${Rs(ttc)}</td>
-      <td>${Rs(tspp)}</td><td>${fmtN(tbq,2)} kg</td><td>—</td><td></td>
-    </tr>`;
-  }
-
-  function animalRows(list,bgColor,startIdx){
-    return list.map((a,i)=>`<tr style="${bgColor?'background:'+bgColor+';':''}" >
-      <td style="color:#94a3b8;font-size:.75rem">${startIdx+i+1}</td>
-      <td><strong>${a.code}</strong></td>
-      <td>${fmtD(a.purchase_date)}</td>
-      <td>${a.age_type||'-'}</td>
-      <td><strong>${a._w?fmtN(a._w,1):'-'}</strong></td>
-      <td>${a._w?Rs(a._sp):'-'}</td>
-      <td>${Rs(a._adm)}</td>
-      <td>${a._w?Rs(a._tc):'-'}</td>
-      <td>${a._w?Rs(a._spp):'-'}</td>
-      <td>${a._w?fmtN(a._bq,2)+' kg':'-'}</td>
-      <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
-      <td style="white-space:nowrap">
-        <button class="btn btn-light btn-sm" onclick="openAnimalEdit('${a.code}')">&#9998; Edit</button>
-        <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="deleteAnimal('${a.code}')">&#128465; Del</button>
-      </td>
-    </tr>`).join('');
-  }
-
-  let html='';
-
-  // ── Dondha section ──
-  if(dondha.length){
-    html+=`<tr style="background:#dbeafe;font-weight:700">
-      <td colspan="12" style="color:#1e40af;padding:9px 10px;font-size:.85rem">
-        &#9654; Dondha &nbsp;<span style="background:#1e40af;color:#fff;border-radius:10px;padding:1px 8px;font-size:.75rem">${dondha.length}</span>
-      </td></tr>`;
-    html+=animalRows(dondha,'',0);
-    html+=sumRow(dondha,'Dondha','#e0f2fe');
-  }
-
-  // ── Kheera section ──
-  if(kheera.length){
-    html+=`<tr style="background:#fef3c7;font-weight:700">
-      <td colspan="12" style="color:#92400e;padding:9px 10px;font-size:.85rem">
-        &#9654; Kheera &nbsp;<span style="background:#d97706;color:#fff;border-radius:10px;padding:1px 8px;font-size:.75rem">${kheera.length}</span>
-      </td></tr>`;
-    html+=animalRows(kheera,'#fffbeb',dondha.length);
-    html+=sumRow(kheera,'Kheera','#fef3c7');
-  }
-
-  // ── Others section ──
-  if(others.length){
-    html+=`<tr style="background:#f3f4f6;font-weight:700">
-      <td colspan="12" style="color:#374151;padding:9px 10px;font-size:.85rem">
-        &#9654; Other &nbsp;<span style="background:#6b7280;color:#fff;border-radius:10px;padding:1px 8px;font-size:.75rem">${others.length}</span>
-      </td></tr>`;
-    html+=animalRows(others,'',dondha.length+kheera.length);
-    html+=sumRow(others,'Other','#f3f4f6');
-  }
-
-  // ── Grand Total ──
-  const all=available;
-  const gtw=all.reduce((s,a)=>s+(a._w||0),0);
-  const gtsp=all.reduce((s,a)=>s+a._sp,0);
-  const gtadm=all.reduce((s,a)=>s+a._adm,0);
-  const gttc=all.reduce((s,a)=>s+a._tc,0);
-  const gtspp=all.reduce((s,a)=>s+(a._spp||0),0);
-  const gtbq=all.reduce((s,a)=>s+a._bq,0);
-  html+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.88rem;border-top:3px solid #0f2540">
-    <td colspan="4">GRAND TOTAL — ${all.length} animals
-      &nbsp;(Dondha: ${dondha.length} &nbsp;|&nbsp; Kheera: ${kheera.length}${others.length?' &nbsp;|&nbsp; Other: '+others.length:''})</td>
-    <td>${fmtN(gtw,1)} kg</td>
-    <td>${Rs(gtsp)}</td><td>${Rs(gtadm)}</td><td>${Rs(gttc)}</td>
-    <td>${Rs(gtspp)}</td><td>${fmtN(gtbq,2)} kg</td><td>—</td><td></td>
-  </tr>`;
-
-  tb.innerHTML=html;
 }
 
 // ══════════════════════════ CUSTOMERS ══════════════════════════
@@ -1521,7 +1451,7 @@ function renderCustomers(){
   }
   tb.innerHTML=list.map((c,i)=>{
     const {ts,tp,td,balance}=custTotals(c.id);
-    return `<tr>
+    return `<tr class="clickable-row" onclick="showLedger(${c.id})">
       <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
       <td><strong>${c.name}</strong></td><td>${c.phone||'-'}</td>
       <td>${c.admin_charges!=null?Rs(c.admin_charges):'<span style="color:#aaa">Global</span>'}</td>
@@ -1530,7 +1460,7 @@ function renderCustomers(){
       <td style="color:#059669">${Rs(tp)}</td>
       <td style="color:#7c3aed">${Rs(td)}</td>
       <td style="color:${balance>0?'#d97706':'#059669'};font-weight:600">${Rs(balance)}</td>
-      <td style="display:flex;gap:5px;flex-wrap:wrap">
+      <td style="display:flex;gap:5px;flex-wrap:wrap" onclick="event.stopPropagation()">
         <button class="btn btn-primary btn-sm" onclick="showLedger(${c.id})">Ledger</button>
         <button class="btn btn-success btn-sm" onclick="openPayment(${c.id})">+ Pay</button>
         <button class="btn btn-light btn-sm" onclick="openCustomerEdit(${c.id})">&#9998; Edit</button>
@@ -1700,37 +1630,31 @@ function recordSale(){
 // ══════════════════════════ ALL SALES ══════════════════════════
 function renderSales(){
   const head=document.getElementById('sales-head');
-  head.innerHTML='<tr>'+'<th>S#</th>'+th('Receipt','sales','receipt_no')+th('Date','sales','sale_date')+th('Code','sales','animal_code')+'<th>Age</th>'+th('Customer','sales','customerName')+th('Wt(kg)','sales','weight_at_sale')+th('Rate/kg','sales','rate_per_kg')+th('Sale Pr.','sales','sp')+th('Carriage','sales','carriage_charges')+th('Admin','sales','admin_charges')+th('Total','sales','amount')+th('Share/P','sales','spp')+'<th>Bq/P</th><th>Br/P</th><th></th></tr>';
+  head.innerHTML='<tr>'+'<th>S#</th>'+th('Receipt','sales','receipt_no')+th('Date','sales','sale_date')+th('Code','sales','animal_code')+'<th>Age</th>'+th('Customer','sales','customerName')+th('Wt(kg)','sales','weight_at_sale')+th('Rate/kg','sales','rate_per_kg')+th('Sale Pr.','sales','sp')+th('Carriage','sales','carriage_charges')+th('Total','sales','amount')+'<th></th></tr>';
   const tb=document.getElementById('sales-body');
-  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="16" class="empty">No sales yet.</td></tr>`;return;}
+  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="11" class="empty">No sales yet.</td></tr>`;return;}
   const np=DB.settings.num_persons||7;
   // Attach computed fields for sorting
-  const withComputed=DB.sales.map(s=>{const sp=s.weight_at_sale*s.rate_per_kg;const spp=(sp+(s.admin_charges||0))/(DB.settings.num_persons||7);return Object.assign({},s,{customerName:cName(s.customer_id),sp,spp});});
+  const withComputed=DB.sales.map(s=>{const sp=s.weight_at_sale*s.rate_per_kg;return Object.assign({},s,{customerName:cName(s.customer_id),sp});});
   const col=SORT.sales.col;
   const dir=SORT.sales.dir;
   let list;
-  if(['weight_at_sale','rate_per_kg','sp','carriage_charges','admin_charges','amount','spp'].includes(col)){
+  if(['weight_at_sale','rate_per_kg','sp','carriage_charges','amount'].includes(col)){
     list=[...withComputed].sort((a,b)=>dir==='asc'?(a[col]||0)-(b[col]||0):(b[col]||0)-(a[col]||0));
   } else {
     list=sortArr(withComputed,col,dir);
   }
   tb.innerHTML=list.map((s,i)=>{
     const sp=s.weight_at_sale*s.rate_per_kg;
-    const tc=sp+(s.admin_charges||0);
-    const spp=tc/np;
-    const bq=(s.weight_at_sale/2)/np;
-    const br=bq>0?spp/bq:0;
-    return `<tr>
+    return `<tr class="clickable-row" onclick="showReceipt('${s.receipt_no}')">
       <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
       <td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td>
       <td><strong>${s.animal_code}</strong></td><td>${aType(s.animal_code)}</td>
       <td>${cName(s.customer_id)}</td>
       <td>${fmtN(s.weight_at_sale,1)} kg</td><td>${fmtN(s.rate_per_kg)}</td>
-      <td>${Rs(sp)}</td><td>${Rs(s.carriage_charges||0)}</td><td>${Rs(s.admin_charges||0)}</td>
+      <td>${Rs(sp)}</td><td>${s.carriage_charges>0?Rs(s.carriage_charges):'-'}</td>
       <td><strong>${Rs(s.amount)}</strong></td>
-      <td><strong>${Rs(spp)}</strong></td>
-      <td>${fmtN(bq,2)} kg</td><td>${Rs(br)}/kg</td>
-      <td style="white-space:nowrap">
+      <td style="white-space:nowrap" onclick="event.stopPropagation()">
         <button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Receipt</button>
         <button class="btn btn-light btn-sm" style="margin-left:4px" onclick="openSaleEdit('${s.receipt_no}')">&#9998; Edit</button>
         <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="deleteSale('${s.receipt_no}')">&#128465; Del</button>
@@ -1796,7 +1720,7 @@ function renderSaleLedger(){
       sno++;
       const sp=s.weight_at_sale*s.rate_per_kg;
       const car=s.carriage_charges||0;
-      html+=`<tr>
+      html+=`<tr class="clickable-row" onclick="showReceipt('${s.receipt_no}')">
         <td style="color:#94a3b8;font-size:.75rem">${sno}</td>
         <td>${s.receipt_no}</td>
         <td>${fmtD(s.sale_date)}</td>
@@ -1968,7 +1892,7 @@ function renderPayments(){
   } else {
     list=sortArr(withComputed,col,dir);
   }
-  tb.innerHTML=list.map((p,i)=>`<tr>
+  tb.innerHTML=list.map((p,i)=>`<tr class="clickable-row" onclick="showPaymentDetail('${p.receipt_no||''}')">
     <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
     <td>${p.receipt_no||'-'}</td>
     <td>${fmtD(p.pay_date)}</td>
@@ -1979,7 +1903,7 @@ function renderPayments(){
     <td>${p.place||'-'}</td>
     <td style="color:#059669"><strong>${Rs(p.amount)}</strong></td>
     <td style="color:#7c3aed">${p.discount?Rs(p.discount):'-'}</td>
-    <td style="white-space:nowrap">
+    <td style="white-space:nowrap" onclick="event.stopPropagation()">
       <button class="btn btn-primary btn-sm" onclick="showPayReceipt('${p.receipt_no}')">Receipt</button>
       <button class="btn btn-light btn-sm" style="margin-left:4px" onclick="openPaymentEdit('${p.receipt_no}')">&#9998; Edit</button>
     </td>
@@ -2069,16 +1993,50 @@ function savePaymentEdit(){
   flash('','','');
 }
 
+// ══════════════════════════ ANIMAL DETAIL MODAL ══════════════════════════
+function showAnimalDetail(code){
+  const a=DB.animals.find(x=>x.code===code); if(!a) return;
+  const sale=DB.sales.find(s=>s.animal_code===code);
+  const c=sale?DB.customers.find(x=>x.id===sale.customer_id):
+               (a.assigned_customer?DB.customers.find(x=>x.id===a.assigned_customer):null);
+  const sp=sale?sale.weight_at_sale*sale.rate_per_kg:0;
+  const car=sale?(sale.carriage_charges||0):0;
+  const html=`
+    <h2 style="color:#1a3a5c;margin-bottom:4px">Animal Code: <strong>${a.code}</strong>
+      <span class="badge ${a.status}" style="font-size:.8rem;margin-left:10px">${a.status==='available'?'Available':'Sold'}</span>
+    </h2>
+    <p style="color:#777;font-size:.82rem;margin-bottom:14px">${a.description||''}</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;font-size:.86rem;margin-bottom:14px">
+      <div><span style="color:#777">Age / Type:</span> <strong>${a.age_type||'-'}</strong></div>
+      <div><span style="color:#777">Transaction Date:</span> ${fmtD(a.purchase_date)}</div>
+      <div><span style="color:#777">Weight (latest):</span> <strong>${a.weight_final?fmtN(a.weight_final,1)+' kg':'-'}</strong></div>
+      <div><span style="color:#777">Customer:</span> ${c?c.name:'-'}</div>
+    </div>
+    ${sale?`
+    <p style="font-weight:600;color:#1a3a5c;margin-bottom:8px">Sale Details</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 20px;font-size:.86rem;margin-bottom:12px">
+      <div><span style="color:#777">Receipt:</span> ${sale.receipt_no}</div>
+      <div><span style="color:#777">Sale Date:</span> ${fmtD(sale.sale_date)}</div>
+      <div><span style="color:#777">Weight at Sale:</span> ${fmtN(sale.weight_at_sale,1)} kg</div>
+      <div><span style="color:#777">Rate/kg:</span> ${Rs(sale.rate_per_kg)}</div>
+      <div><span style="color:#777">Sale Price:</span> ${Rs(sp)}</div>
+      <div><span style="color:#777">Carriage:</span> ${car>0?Rs(car):'-'}</div>
+      <div><span style="color:#777">Total Amount:</span> <strong>${Rs(sale.amount)}</strong></div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="showReceipt('${sale.receipt_no}')">&#128196; View Receipt</button>
+    `:'<p style="color:#aaa;font-style:italic;font-size:.84rem">Not yet sold.</p>'}
+    ${a.photos&&a.photos.length?`<div class="pv-grid" style="margin-top:12px">${a.photos.map(p=>`<img src="${p}" style="width:100%;border-radius:8px;object-fit:cover;max-height:150px">`).join('')}</div>`:''}
+  `;
+  document.getElementById('dashdetail-content').innerHTML=html;
+  document.getElementById('dashdetail-overlay').classList.add('open');
+}
+
 // ══════════════════════════ SALE RECEIPT MODAL ══════════════════════════
 function showReceipt(rno){
   const s=DB.sales.find(x=>x.receipt_no===rno); if(!s) return;
   const a=DB.animals.find(x=>x.code===s.animal_code)||{};
   const c=DB.customers.find(x=>x.id===s.customer_id)||{};
-  const np=DB.settings.num_persons||7;
   const sp=s.weight_at_sale*s.rate_per_kg;
-  const tc=sp+(s.admin_charges||0);
-  const bq=(s.weight_at_sale/2)/np;
-  const br=bq>0?(tc/np)/bq:0;
   document.getElementById('receipt-content').innerHTML=`
     <div class="rcp-header"><h2>SALE RECEIPT</h2><p>Animal Sales Record</p></div>
     <div class="rcp-meta">
@@ -2098,10 +2056,7 @@ function showReceipt(rno){
     <div class="rcp-row"><span>Sale Price &nbsp;<span style="font-weight:400;font-size:.82rem;color:#888">(${fmtN(s.weight_at_sale,1)} kg × ${Rs(s.rate_per_kg)}/kg)</span></span><span>${Rs(s.weight_at_sale*s.rate_per_kg)}</span></div>
     ${(s.carriage_charges||0)>0?`<div class="rcp-row"><span>Carriage Charges</span><span>${Rs(s.carriage_charges)}</span></div>`:''}
     <div class="rcp-row total"><span>TOTAL AMOUNT</span><span>${Rs(s.amount)}</span></div>
-    <p style="font-weight:600;color:#1a3a5c;margin:13px 0 8px;font-size:.88rem">Beef Details (${np} Persons)</p>
-    <div class="rcp-row"><span>Share per Person</span><strong>${Rs(tc/np)}</strong></div>
-    <div class="rcp-row"><span>Beef Qty per Person</span><span>${fmtN(bq,2)} kg</span></div>
-    <div class="rcp-row"><span>Beef Rate per Person</span><span>${Rs(br)}/kg</span></div>
+
     ${s.notes?`<p style="margin-top:11px;font-size:.81rem;color:#555;background:#f8fafc;padding:7px 11px;border-radius:6px"><strong>Notes:</strong> ${s.notes}</p>`:''}
     <div class="sig-row">
       <div class="sig-box"><div class="sig-line">Customer Signature</div></div>
@@ -2127,8 +2082,8 @@ function showLedger(cid){
     </div>
     <p style="font-weight:700;color:#1a3a5c;margin-bottom:7px">Sales</p>`;
   if(sales.length){
-    html+=`<div class="tbl-wrap"><table><thead><tr><th>Receipt</th><th>Date</th><th>Animal</th><th>Weight</th><th>Rate/kg</th><th>Sale Price</th><th>Admin</th><th>Amount</th><th></th></tr></thead><tbody>`;
-    sales.forEach(s=>{const sp=s.weight_at_sale*s.rate_per_kg;html+=`<tr><td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td><td><strong>${s.animal_code}</strong></td><td>${fmtN(s.weight_at_sale,1)} kg</td><td>${fmtN(s.rate_per_kg)}</td><td>${Rs(sp)}</td><td>${Rs(s.admin_charges||0)}</td><td><strong>${Rs(s.amount)}</strong></td><td><button class="btn btn-primary btn-sm" onclick="closeModal('ledger-overlay');showReceipt('${s.receipt_no}')">Receipt</button></td></tr>`;});
+    html+=`<div class="tbl-wrap"><table><thead><tr><th>Receipt</th><th>Date</th><th>Animal</th><th>Weight</th><th>Rate/kg</th><th>Sale Price</th><th>Carriage</th><th>Total</th><th></th></tr></thead><tbody>`;
+    sales.forEach(s=>{const sp=s.weight_at_sale*s.rate_per_kg;html+=`<tr class="clickable-row" onclick="closeModal('ledger-overlay');showReceipt('${s.receipt_no}')"><td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td><td><strong>${s.animal_code}</strong></td><td>${fmtN(s.weight_at_sale,1)} kg</td><td>${fmtN(s.rate_per_kg)}</td><td>${Rs(sp)}</td><td>${s.carriage_charges>0?Rs(s.carriage_charges):'-'}</td><td><strong>${Rs(s.amount)}</strong></td><td onclick="event.stopPropagation()"><button class="btn btn-primary btn-sm" onclick="closeModal('ledger-overlay');showReceipt('${s.receipt_no}')">Receipt</button></td></tr>`;});
     html+=`<tr style="font-weight:700;background:#f8fafc"><td colspan="7" style="text-align:right">Total</td><td>${Rs(ts)}</td><td></td></tr></tbody></table></div>`;
   } else html+=`<p style="color:#aaa;font-style:italic;margin-bottom:12px">No sales yet.</p>`;
 
@@ -2151,6 +2106,26 @@ function showLedger(cid){
     <button class="btn btn-primary" onclick="window.print()">&#128438; Print Ledger</button>
     <button class="btn btn-light" onclick="closeModal('ledger-overlay')">Close</button>`;
   document.getElementById('ledger-overlay').classList.add('open');
+}
+
+function showPaymentDetail(rno){
+  const p=DB.payments.find(x=>x.receipt_no===rno); if(!p) return;
+  const c=DB.customers.find(x=>x.id===p.customer_id)||{name:'Unknown'};
+  const html=`
+    <h2 style="color:#1a3a5c;margin-bottom:12px">Payment Detail — ${rno}</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;font-size:.86rem">
+      <div><span style="color:#777">Customer:</span> <strong>${c.name}</strong></div>
+      <div><span style="color:#777">Date:</span> ${fmtD(p.pay_date)}</div>
+      <div><span style="color:#777">Method:</span> ${p.type||'Cash'}</div>
+      ${p.bank_name?`<div><span style="color:#777">Bank:</span> ${p.bank_name}</div>`:''}
+      ${p.sender_name?`<div><span style="color:#777">Sender:</span> ${p.sender_name}</div>`:''}
+      ${p.place?`<div><span style="color:#777">Place:</span> ${p.place}</div>`:''}
+      <div><span style="color:#777">Amount Received:</span> <strong style="color:#059669">${Rs(p.amount||0)}</strong></div>
+      ${(p.discount||0)>0?`<div><span style="color:#777">Discount:</span> <strong style="color:#7c3aed">${Rs(p.discount)}</strong></div>`:''}
+      ${p.notes?`<div style="grid-column:1/-1"><span style="color:#777">Notes:</span> ${p.notes}</div>`:''}
+    </div>`;
+  document.getElementById('dashdetail-content').innerHTML=html;
+  document.getElementById('dashdetail-overlay').classList.add('open');
 }
 
 // ══════════════════════════ PAYMENT MODAL ══════════════════════════
@@ -2289,6 +2264,97 @@ function saveSettings(){
   save(); alert('Settings saved!');
 }
 
+// ══════════════════════════ BUDGETING ══════════════════════════
+function renderBudgeting(){
+  const np=DB.settings.num_persons||7;
+  const rate=DB.settings.rate_per_kg||780;
+  const list=animalComputedList();
+  const totAdm=list.reduce((s,a)=>s+a._adm,0);
+  const totTc=list.reduce((s,a)=>s+a._tc,0);
+  document.getElementById('budget-summary').innerHTML=`
+    <div class="stat"><div class="n" style="font-size:.9rem">${DB.animals.length}</div><div class="l">Total Animals</div></div>
+    <div class="stat"><div class="n" style="font-size:.9rem">${fmtN(rate)}</div><div class="l">Rate/kg (Rs.)</div></div>
+    <div class="stat"><div class="n" style="font-size:.9rem">${np}</div><div class="l">No. of Persons</div></div>
+    <div class="stat"><div class="n" style="font-size:.9rem">${Rs(totAdm)}</div><div class="l">Total Admin (est.)</div></div>
+    <div class="stat"><div class="n" style="font-size:.9rem">${Rs(totTc)}</div><div class="l">Total Cost (est.)</div></div>`;
+  const head=document.getElementById('budget-head');
+  head.innerHTML='<tr><th>S#</th>'+th('Code','animals','code')+th('Date','animals','purchase_date')+th('Age','animals','age_type')+th('Weight(kg)','animals','_w')+th('Admin Charges','animals','_adm')+th('Sale Price(est.)','animals','_sp')+th('Total Cost(est.)','animals','_tc')+th('Share/Person(est.)','animals','_spp')+th('Beef Qty/P(est.)','animals','_bq')+th('Beef Rate/P(est.)','animals','_br')+th('Status','animals','status')+'</tr>';
+  const tb=document.getElementById('budget-body');
+  if(!list.length){tb.innerHTML=`<tr><td colspan="12" class="empty">No animals.</td></tr>`;return;}
+  const sorted=sortArr(list,SORT.animals.col,SORT.animals.dir);
+  const dondha=sorted.filter(a=>(a.age_type||'').toLowerCase()==='dondha');
+  const kheera=sorted.filter(a=>(a.age_type||'').toLowerCase()==='kheera');
+  const others=sorted.filter(a=>{const t=(a.age_type||'').toLowerCase();return t!=='dondha'&&t!=='kheera';});
+  function budgetRow(a,i){
+    return `<tr class="clickable-row" onclick="showAnimalDetail('${a.code}')">
+      <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
+      <td><strong>${a.code}</strong></td>
+      <td>${fmtD(a.purchase_date)}</td>
+      <td>${a.age_type||'-'}</td>
+      <td>${a._w?fmtN(a._w,1):'-'}</td>
+      <td>${Rs(a._adm)}</td>
+      <td>${a._w?Rs(a._sp):'-'}</td>
+      <td>${a._w?Rs(a._tc):'-'}</td>
+      <td>${a._w?Rs(a._spp):'-'}</td>
+      <td>${a._w?fmtN(a._bq,2)+' kg':'-'}</td>
+      <td>${a._w?Rs(a._br)+'/kg':'-'}</td>
+      <td><span class="badge ${a.status}">${a.status==='available'?'Available':'Sold'}</span></td>
+    </tr>`;
+  }
+  function budgetSubtotal(grpList,label,color){
+    if(!grpList.length) return '';
+    const tw=grpList.reduce((s,a)=>s+(a._w||0),0);
+    const tadm=grpList.reduce((s,a)=>s+a._adm,0);
+    const tsp=grpList.reduce((s,a)=>s+a._sp,0);
+    const ttc=grpList.reduce((s,a)=>s+a._tc,0);
+    const tspp=grpList.reduce((s,a)=>s+(a._spp||0),0);
+    const tbq=grpList.reduce((s,a)=>s+a._bq,0);
+    return `<tr style="background:${color};font-weight:700;font-size:.81rem;border-top:2px solid #cbd5e1">
+      <td colspan="4" style="color:#1a3a5c">${label} Subtotal (${grpList.length})</td>
+      <td>${fmtN(tw,1)} kg</td><td>${Rs(tadm)}</td><td>${Rs(tsp)}</td>
+      <td>${Rs(ttc)}</td><td>${Rs(tspp)}</td><td>${fmtN(tbq,2)} kg</td><td>—</td><td></td>
+    </tr>`;
+  }
+  let html='',sno=0;
+  if(dondha.length){
+    html+=`<tr style="background:#dbeafe;font-weight:700"><td colspan="12" style="color:#1e40af;padding:8px 10px">&#9654; Dondha <span style="background:#1e40af;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${dondha.length}</span></td></tr>`;
+    html+=dondha.map((a,i)=>budgetRow(a,sno+i+1)).join(''); sno+=dondha.length;
+    html+=budgetSubtotal(dondha,'Dondha','#e0f2fe');
+  }
+  if(kheera.length){
+    html+=`<tr style="background:#fef3c7;font-weight:700"><td colspan="12" style="color:#92400e;padding:8px 10px">&#9654; Kheera <span style="background:#d97706;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${kheera.length}</span></td></tr>`;
+    html+=kheera.map((a,i)=>budgetRow(a,sno+i+1)).join(''); sno+=kheera.length;
+    html+=budgetSubtotal(kheera,'Kheera','#fef3c7');
+  }
+  if(others.length){
+    html+=`<tr style="background:#f3f4f6;font-weight:700"><td colspan="12" style="color:#374151;padding:8px 10px">&#9654; Other <span style="background:#6b7280;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${others.length}</span></td></tr>`;
+    html+=others.map((a,i)=>budgetRow(a,sno+i+1)).join(''); sno+=others.length;
+    html+=budgetSubtotal(others,'Other','#f3f4f6');
+  }
+  const gtadm=list.reduce((s,a)=>s+a._adm,0);
+  const gtsp=list.reduce((s,a)=>s+a._sp,0);
+  const gttc=list.reduce((s,a)=>s+a._tc,0);
+  const gtspp=list.reduce((s,a)=>s+(a._spp||0),0);
+  const gtbq=list.reduce((s,a)=>s+a._bq,0);
+  const gtw=list.reduce((s,a)=>s+(a._w||0),0);
+  html+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.87rem;border-top:3px solid #0f2540">
+    <td colspan="4">GRAND TOTAL — ${list.length}</td>
+    <td>${fmtN(gtw,1)} kg</td><td>${Rs(gtadm)}</td><td>${Rs(gtsp)}</td>
+    <td>${Rs(gttc)}</td><td>${Rs(gtspp)}</td><td>${fmtN(gtbq,2)} kg</td><td>—</td><td></td>
+  </tr>`;
+  tb.innerHTML=html;
+}
+
+function exportBudgetExcel(){
+  const list=sortArr(animalComputedList(),SORT.animals.col,SORT.animals.dir);
+  const headers=['Code','Date','Age/Type','Weight(kg)','Admin Charges(Rs.)','Sale Price est.(Rs.)','Total Cost est.(Rs.)','Share/Person est.(Rs.)','Beef Qty/P(kg)','Beef Rate/P(Rs./kg)','Status'];
+  const rows=list.map(a=>[a.code,a.purchase_date||'',a.age_type||'',
+    a._w||'',a._adm.toFixed(0),a._w?a._sp.toFixed(0):'',a._w?a._tc.toFixed(0):'',
+    a._w?a._spp.toFixed(0):'',a._w?a._bq.toFixed(2):'',a._w?a._br.toFixed(0):'',
+    a.status==='available'?'Available':'Sold']);
+  exportCSV(headers,rows,'Budgeting');
+}
+
 // ══════════════════════════ EXCEL EXPORT ══════════════════════════
 function exportCSV(headers,rows,filename){
   const BOM='﻿';
@@ -2301,13 +2367,11 @@ function exportCSV(headers,rows,filename){
 }
 
 function exportAnimalsExcel(){
-  const np=DB.settings.num_persons||7;
   const list=sortArr(animalComputedList(),SORT.animals.col,SORT.animals.dir);
-  const headers=['Code','Purchase Date','Age/Type','Description','Weight (kg)','Sale Price (Rs.)','Admin Charges (Rs.)','Total Cost (Rs.)','Share/Person (Rs.)','Beef Qty/Person (kg)','Beef Rate/Person (Rs./kg)','Status','Customer'];
+  const headers=['Code','Purchase Date','Age/Type','Description','Weight (kg)','Sale Price est. (Rs.)','Status','Customer'];
   const rows=list.map(a=>[
     a.code,a.purchase_date||'',a.age_type||'',a.description||'',
-    a._w||'',a._w?a._sp.toFixed(0):'',a._adm.toFixed(0),a._w?a._tc.toFixed(0):'',
-    a._w?a._spp.toFixed(0):'',a._w?a._bq.toFixed(2):'',a._w?a._br.toFixed(0):'',
+    a._w||'',a._w?a._sp.toFixed(0):'',
     a.status==='available'?'Available':'Sold',
     a._custId?cName(a._custId):''
   ]);
@@ -2315,32 +2379,26 @@ function exportAnimalsExcel(){
 }
 
 function exportStockExcel(){
-  const col=document.getElementById('stock-sort-col').value;
-  const dir=document.getElementById('stock-sort-dir').value;
+  const col=document.getElementById('stock-sort-col')?document.getElementById('stock-sort-col').value:'code';
+  const dir=document.getElementById('stock-sort-dir')?document.getElementById('stock-sort-dir').value:'asc';
   const list=sortArr(animalComputedList(a=>a.status==='available'),col,dir);
-  const headers=['Code','Purchase Date','Age/Type','Weight (kg)','Sale Price (Rs.)','Admin Charges (Rs.)','Total Cost (Rs.)','Share/Person (Rs.)','Beef Qty/Person (kg)','Beef Rate/Person (Rs./kg)'];
+  const headers=['Code','Purchase Date','Age/Type','Description','Weight (kg)','Sale Price est. (Rs.)'];
   const rows=list.map(a=>[
-    a.code,a.purchase_date||'',a.age_type||'',
-    a._w||'',a._w?a._sp.toFixed(0):'',a._adm.toFixed(0),a._w?a._tc.toFixed(0):'',
-    a._w?a._spp.toFixed(0):'',a._w?a._bq.toFixed(2):'',a._w?a._br.toFixed(0):''
+    a.code,a.purchase_date||'',a.age_type||'',a.description||'',
+    a._w||'',a._w?a._sp.toFixed(0):''
   ]);
   exportCSV(headers,rows,'Available_Stock');
 }
 
 function exportSalesExcel(){
-  const np=DB.settings.num_persons||7;
   const withC=[...DB.sales].map(s=>Object.assign({},s,{customerName:cName(s.customer_id),sp:s.weight_at_sale*s.rate_per_kg}));
   const list=sortArr(withC,SORT.sales.col,SORT.sales.dir);
-  const headers=['Receipt No','Date','Animal Code','Age/Type','Customer','Weight (kg)','Rate/kg (Rs.)','Sale Price (Rs.)','Admin Charges (Rs.)','Total Amount (Rs.)','Share/Person (Rs.)','Beef Qty/Person (kg)','Beef Rate/Person (Rs./kg)','Notes'];
-  const rows=list.map(s=>{
-    const bq=(s.weight_at_sale/2)/np;
-    const tc=(s.weight_at_sale*s.rate_per_kg)+(s.admin_charges||0);
-    const br=bq>0?(tc/np)/bq:0;
-    const spp=tc/np;
-    return [s.receipt_no,s.sale_date,s.animal_code,aType(s.animal_code),s.customerName,
-      s.weight_at_sale,s.rate_per_kg,s.sp.toFixed(0),(s.admin_charges||0).toFixed(0),s.amount.toFixed(0),
-      spp.toFixed(0),bq.toFixed(2),br.toFixed(0),s.notes||''];
-  });
+  const headers=['Receipt No','Date','Animal Code','Age/Type','Customer','Weight (kg)','Rate/kg (Rs.)','Sale Price (Rs.)','Carriage (Rs.)','Total Amount (Rs.)','Notes'];
+  const rows=list.map(s=>[
+    s.receipt_no,s.sale_date,s.animal_code,aType(s.animal_code),s.customerName,
+    s.weight_at_sale,s.rate_per_kg,s.sp.toFixed(0),(s.carriage_charges||0).toFixed(0),
+    s.amount.toFixed(0),s.notes||''
+  ]);
   exportCSV(headers,rows,'Sales_Records');
 }
 
