@@ -26,7 +26,17 @@ def init_db():
                 age_type        TEXT,
                 weight_initial  REAL,
                 weight_final    REAL,
-                status          TEXT NOT NULL DEFAULT 'available'
+                status          TEXT NOT NULL DEFAULT 'available',
+                animal_type     TEXT,
+                stage           TEXT,
+                breed           TEXT,
+                gender          TEXT,
+                dob             TEXT,
+                purchase_amount REAL,
+                animal_source   TEXT,
+                voucher_no      TEXT,
+                voucher_date    TEXT,
+                voucher_type    TEXT
             );
 
             CREATE TABLE IF NOT EXISTS customers (
@@ -69,6 +79,26 @@ def init_db():
             INSERT OR IGNORE INTO settings VALUES ('rate_per_kg', '780');
             INSERT OR IGNORE INTO settings VALUES ('expenses_default', '30000');
         """)
+
+
+def migrate_db():
+    new_cols = [
+        ("animal_type",     "TEXT"),
+        ("stage",           "TEXT"),
+        ("breed",           "TEXT"),
+        ("gender",          "TEXT"),
+        ("dob",             "TEXT"),
+        ("purchase_amount", "REAL"),
+        ("animal_source",   "TEXT"),
+        ("voucher_no",      "TEXT"),
+        ("voucher_date",    "TEXT"),
+        ("voucher_type",    "TEXT"),
+    ]
+    with get_db() as conn:
+        existing = {row[1] for row in conn.execute("PRAGMA table_info(animals)")}
+        for col, typ in new_cols:
+            if col not in existing:
+                conn.execute(f"ALTER TABLE animals ADD COLUMN {col} {typ}")
 
 
 def get_setting(key):
@@ -132,16 +162,29 @@ def add_animal():
         try:
             wi = float(request.form["weight_initial"]) if request.form["weight_initial"] else None
             wf = float(request.form["weight_final"])   if request.form["weight_final"]   else None
+            pa = float(request.form["purchase_amount"]) if request.form.get("purchase_amount") else None
             with get_db() as conn:
                 conn.execute("""
                     INSERT INTO animals
-                        (code, sno_weight, purchase_date, description, age_type, weight_initial, weight_final)
-                    VALUES (?,?,?,?,?,?,?)
+                        (code, sno_weight, purchase_date, description, age_type, weight_initial, weight_final,
+                         animal_type, stage, breed, gender, dob, purchase_amount,
+                         animal_source, voucher_no, voucher_date, voucher_type)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """, (code, request.form.get("sno_weight") or None,
                       request.form.get("purchase_date") or None,
                       request.form.get("description") or None,
                       request.form.get("age_type") or None,
-                      wi, wf))
+                      wi, wf,
+                      request.form.get("animal_type") or None,
+                      request.form.get("stage") or None,
+                      request.form.get("breed") or None,
+                      request.form.get("gender") or None,
+                      request.form.get("dob") or None,
+                      pa,
+                      request.form.get("animal_source") or None,
+                      request.form.get("voucher_no") or None,
+                      request.form.get("voucher_date") or None,
+                      request.form.get("voucher_type") or None))
             flash(f"Animal Code {code} added successfully.", "success")
             return redirect(url_for("animals"))
         except sqlite3.IntegrityError:
@@ -158,16 +201,30 @@ def edit_animal(code):
     if request.method == "POST":
         wi = float(request.form["weight_initial"]) if request.form["weight_initial"] else None
         wf = float(request.form["weight_final"])   if request.form["weight_final"]   else None
+        pa = float(request.form["purchase_amount"]) if request.form.get("purchase_amount") else None
         with get_db() as conn:
             conn.execute("""
                 UPDATE animals SET sno_weight=?, purchase_date=?, description=?,
-                    age_type=?, weight_initial=?, weight_final=?
+                    age_type=?, weight_initial=?, weight_final=?,
+                    animal_type=?, stage=?, breed=?, gender=?, dob=?,
+                    purchase_amount=?, animal_source=?, voucher_no=?, voucher_date=?, voucher_type=?
                 WHERE code=?
             """, (request.form.get("sno_weight") or None,
                   request.form.get("purchase_date") or None,
                   request.form.get("description") or None,
                   request.form.get("age_type") or None,
-                  wi, wf, code))
+                  wi, wf,
+                  request.form.get("animal_type") or None,
+                  request.form.get("stage") or None,
+                  request.form.get("breed") or None,
+                  request.form.get("gender") or None,
+                  request.form.get("dob") or None,
+                  pa,
+                  request.form.get("animal_source") or None,
+                  request.form.get("voucher_no") or None,
+                  request.form.get("voucher_date") or None,
+                  request.form.get("voucher_type") or None,
+                  code))
         flash(f"Animal {code} updated.", "success")
         return redirect(url_for("animals"))
     return render_template("add_animal.html", animal=animal)
@@ -300,7 +357,10 @@ def receipt(receipt_no):
     with get_db() as conn:
         row = conn.execute("""
             SELECT s.*, a.age_type, a.weight_initial, a.description AS animal_desc,
-                   a.purchase_date, c.name AS customer_name, c.phone, c.address
+                   a.purchase_date, a.purchase_amount, a.animal_source,
+                   a.animal_type, a.stage, a.breed, a.gender, a.dob,
+                   a.voucher_no, a.voucher_date, a.voucher_type,
+                   c.name AS customer_name, c.phone, c.address
             FROM sales s
             JOIN animals a ON a.code = s.animal_code
             JOIN customers c ON c.id = s.customer_id
@@ -330,4 +390,5 @@ def settings():
 
 if __name__ == "__main__":
     init_db()
+    migrate_db()
     app.run(debug=True, port=5000)
