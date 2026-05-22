@@ -1432,16 +1432,22 @@ function confirmClearData() {
 }
 
 // ============================================================
-// SEED DEFAULT DATA
+// FIRST-RUN CLEAN SLATE
 // ============================================================
-function seedDefaultData() {
-  // Completely blank — all data entered by user
+function ensureCleanSlate() {
+  // If this version flag is not set, wipe all old stored data and start fresh
+  if(!localStorage.getItem('fms_clean_v3')) {
+    ['fms_animals','fms_feed','fms_transactions','fms_weights',
+     'fms_transitionRules','fms_transitionLog','fms_setup','fms_feedCategories'].forEach(k => localStorage.removeItem(k));
+    localStorage.setItem('fms_clean_v3', '1');
+  }
 }
 
 // ============================================================
 // INIT
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
+  ensureCleanSlate();
   document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-PK', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
   const setup = DB.getObj('setup', { farmName:'Kamran Saleem' });
   document.getElementById('farmOwner').textContent = setup.farmName || 'Kamran Saleem';
