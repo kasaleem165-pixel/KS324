@@ -1368,16 +1368,21 @@ function renderAnimals(){
     const dirEl=document.getElementById('stock-sort-dir');
     const col=colEl?colEl.value:'code';
     const dir=dirEl?dirEl.value:'asc';
-    head.innerHTML='<tr><th>S#</th>'+th('Code','stock','code')+th('Date','stock','purchase_date')+th('Age','stock','age_type')+th('Weight(kg)','stock','_w')+th('Sale Price(est.)','stock','_sp')+'<th>Description</th><th>Actions</th></tr>';
+    head.innerHTML='<tr><th>S#</th><th>Photo</th>'+th('Code','stock','code')+th('Date','stock','purchase_date')+th('Age','stock','age_type')+th('Weight(kg)','stock','_w')+th('Sale Price(est.)','stock','_sp')+'<th>Description</th><th>Actions</th></tr>';
     const available=animalComputedList(a=>a.status==='available');
-    if(!available.length){tb.innerHTML=`<tr><td colspan="8" class="empty">No available animals.</td></tr>`;return;}
+    if(!available.length){tb.innerHTML=`<tr><td colspan="9" class="empty">No available animals.</td></tr>`;return;}
     const dondha=sortArr(available.filter(a=>(a.age_type||'').toLowerCase()==='dondha'),col,dir);
     const kheera=sortArr(available.filter(a=>(a.age_type||'').toLowerCase()==='kheera'),col,dir);
     const others=sortArr(available.filter(a=>{const t=(a.age_type||'').toLowerCase();return t!=='dondha'&&t!=='kheera';}),col,dir);
     function stockRow(a,i,bgColor){
       const isK=(a.age_type||'').toLowerCase()==='kheera';
+      const firstPhoto=a.photos&&a.photos.length?a.photos[0]:null;
+      const photoCell=firstPhoto
+        ?`<img class="tbl-thumb" src="${firstPhoto}" onclick="showAnimalDetail('${a.code}');event.stopPropagation()" title="Click to view details & photos" style="cursor:pointer">`
+        :`<span class="no-photo" onclick="showAnimalDetail('${a.code}');event.stopPropagation()" title="No photo — click to add">&#128247;</span>`;
       return `<tr class="clickable-row" style="${bgColor?'background:'+bgColor+';':''}" onclick="showAnimalDetail('${a.code}')">
         <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
+        <td>${photoCell}</td>
         <td><strong>${a.code}</strong></td>
         <td>${fmtD(a.purchase_date)}</td>
         <td>${isK?`<span style="background:#d97706;color:#fff;border-radius:4px;padding:1px 6px;font-size:.75rem">Kheera</span>`:(a.age_type||'-')}</td>
@@ -1395,23 +1400,23 @@ function renderAnimals(){
       const tw=list.reduce((s,a)=>s+(a._w||0),0);
       const tsp=list.reduce((s,a)=>s+a._sp,0);
       return `<tr style="background:${color};font-weight:700;font-size:.82rem;border-top:2px solid #cbd5e1">
-        <td colspan="4" style="color:#1a3a5c">${label} — ${list.length} animals</td>
+        <td colspan="5" style="color:#1a3a5c">${label} — ${list.length} animals</td>
         <td>${fmtN(tw,1)} kg</td><td>${Rs(tsp)}</td><td colspan="2"></td>
       </tr>`;
     }
     let html='',sno=0;
     if(dondha.length){
-      html+=`<tr style="background:#dbeafe;font-weight:700"><td colspan="8" style="color:#1e40af;padding:8px 10px">&#9654; Dondha <span style="background:#1e40af;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${dondha.length}</span></td></tr>`;
+      html+=`<tr style="background:#dbeafe;font-weight:700"><td colspan="9" style="color:#1e40af;padding:8px 10px">&#9654; Dondha <span style="background:#1e40af;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${dondha.length}</span></td></tr>`;
       html+=dondha.map((a,i)=>stockRow(a,sno+i+1,'')).join(''); sno+=dondha.length;
       html+=sumRowStock(dondha,'Dondha','#e0f2fe');
     }
     if(kheera.length){
-      html+=`<tr style="background:#fef3c7;font-weight:700"><td colspan="8" style="color:#92400e;padding:8px 10px">&#9654; Kheera <span style="background:#d97706;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${kheera.length}</span></td></tr>`;
+      html+=`<tr style="background:#fef3c7;font-weight:700"><td colspan="9" style="color:#92400e;padding:8px 10px">&#9654; Kheera <span style="background:#d97706;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${kheera.length}</span></td></tr>`;
       html+=kheera.map((a,i)=>stockRow(a,sno+i+1,'#fffbeb')).join(''); sno+=kheera.length;
       html+=sumRowStock(kheera,'Kheera','#fef3c7');
     }
     if(others.length){
-      html+=`<tr style="background:#f3f4f6;font-weight:700"><td colspan="8" style="color:#374151;padding:8px 10px">&#9654; Other <span style="background:#6b7280;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${others.length}</span></td></tr>`;
+      html+=`<tr style="background:#f3f4f6;font-weight:700"><td colspan="9" style="color:#374151;padding:8px 10px">&#9654; Other <span style="background:#6b7280;color:#fff;border-radius:10px;padding:1px 8px;font-size:.73rem">${others.length}</span></td></tr>`;
       html+=others.map((a,i)=>stockRow(a,sno+i+1,'')).join(''); sno+=others.length;
       html+=sumRowStock(others,'Other','#f3f4f6');
     }
@@ -1419,7 +1424,7 @@ function renderAnimals(){
     const gtw=all.reduce((s,a)=>s+(a._w||0),0);
     const gtsp=all.reduce((s,a)=>s+a._sp,0);
     html+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.87rem;border-top:3px solid #0f2540">
-      <td colspan="4">GRAND TOTAL — ${all.length} (D:${dondha.length} K:${kheera.length}${others.length?' O:'+others.length:''})</td>
+      <td colspan="5">GRAND TOTAL — ${all.length} (D:${dondha.length} K:${kheera.length}${others.length?' O:'+others.length:''})</td>
       <td>${fmtN(gtw,1)} kg</td><td>${Rs(gtsp)}</td><td colspan="2"></td>
     </tr>`;
     tb.innerHTML=html;
@@ -2072,13 +2077,32 @@ function showAnimalDetail(code){
                (a.assigned_customer?DB.customers.find(x=>x.id===a.assigned_customer):null);
   const sp=sale?sale.weight_at_sale*sale.rate_per_kg:0;
   const car=sale?(sale.carriage_charges||0):0;
+  const photoHtml=a.photos&&a.photos.length
+    ?`<div style="margin-bottom:16px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${a.photos.map((p,pi)=>`
+            <img src="${p}" onclick="openFullImg('${p}')"
+              style="height:160px;width:auto;max-width:100%;border-radius:8px;object-fit:cover;
+                     cursor:zoom-in;box-shadow:0 2px 8px rgba(0,0,0,.18);border:2px solid #e2e8f0"
+              title="Click to enlarge">`).join('')}
+        </div>
+        <p style="color:#aaa;font-size:.74rem;margin-top:5px">&#128247; ${a.photos.length} photo${a.photos.length>1?'s':''} — click any to enlarge &nbsp;|&nbsp;
+          <a href="#" onclick="openPhotoViewer('${a.code}');return false;" style="color:#1a3a5c">Manage photos</a>
+        </p>
+      </div>`
+    :`<div style="margin-bottom:16px;padding:14px;background:#f8fafc;border-radius:8px;text-align:center;color:#aaa;font-size:.85rem">
+        &#128247; No photos yet &nbsp;&mdash;&nbsp;
+        <a href="#" onclick="openPhotoViewer('${a.code}');return false;" style="color:#1a3a5c">Add photos</a>
+      </div>`;
   const html=`
     <h2 style="color:#1a3a5c;margin-bottom:4px">Animal Code: <strong>${a.code}</strong>
       <span class="badge ${a.status}" style="font-size:.8rem;margin-left:10px">${a.status==='available'?'Available':'Sold'}</span>
     </h2>
-    <p style="color:#777;font-size:.82rem;margin-bottom:14px">${a.description||''}</p>
+    <p style="color:#777;font-size:.82rem;margin-bottom:12px">${a.description||''}</p>
+    ${photoHtml}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;font-size:.86rem;margin-bottom:14px">
-      <div><span style="color:#777">Age / Type:</span> <strong>${a.age_type||'-'}</strong></div>
+      ${a.animal_type?`<div><span style="color:#777">Type:</span> <strong>${a.animal_type}</strong></div>`:''}
+      <div><span style="color:#777">Age:</span> <strong>${a.age_type||'-'}</strong></div>
       <div><span style="color:#777">Transaction Date:</span> ${fmtD(a.purchase_date)}</div>
       <div><span style="color:#777">Weight (latest):</span> <strong>${a.weight_final?fmtN(a.weight_final,1)+' kg':'-'}</strong></div>
       <div><span style="color:#777">Customer:</span> ${c?c.name:'-'}</div>
@@ -2096,7 +2120,6 @@ function showAnimalDetail(code){
     </div>
     <button class="btn btn-primary btn-sm" onclick="showReceipt('${sale.receipt_no}')">&#128196; View Receipt</button>
     `:'<p style="color:#aaa;font-style:italic;font-size:.84rem">Not yet sold.</p>'}
-    ${a.photos&&a.photos.length?`<div class="pv-grid" style="margin-top:12px">${a.photos.map(p=>`<img src="${p}" style="width:100%;border-radius:8px;object-fit:cover;max-height:150px">`).join('')}</div>`:''}
   `;
   document.getElementById('dashdetail-content').innerHTML=html;
   document.getElementById('dashdetail-overlay').classList.add('open');
