@@ -983,14 +983,20 @@ function showDashDetail(key){
         return s?Object.assign({},s,{_animal:a}):null;
       }).filter(Boolean).sort((a,b)=>a.receipt_no>b.receipt_no?-1:1);
       html+=`<div class="tbl-wrap"><table><thead><tr>
-        <th>S#</th><th>Receipt</th><th>Date</th><th>Code</th><th>Age</th>
+        <th>S#</th><th>Photo</th><th>Receipt</th><th>Date</th><th>Code</th><th>Age</th>
         <th>Customer</th><th>Wt(kg)</th><th>Rate/kg</th><th>Sale Pr.</th>
         <th>Carriage</th><th>Total</th><th></th>
       </tr></thead><tbody>`;
       soldSales.forEach((s,i)=>{
         const sp=s.weight_at_sale*s.rate_per_kg;
+        const _sa=s._animal||{};
+        const _sfp=_sa.photos&&_sa.photos.length?_sa.photos[0]:null;
+        const _spc=_sfp
+          ?`<img class="tbl-thumb" src="${_sfp}" onclick="showAnimalDetail('${s.animal_code}');closeModal('dashdetail-overlay');event.stopPropagation()" style="cursor:pointer" title="View animal">`
+          :`<span class="no-photo" title="No photo">&#128247;</span>`;
         html+=`<tr class="clickable-row" onclick="showReceipt('${s.receipt_no}')">
           <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
+          <td>${_spc}</td>
           <td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td>
           <td><strong>${s.animal_code}</strong></td><td>${aType(s.animal_code)}</td>
           <td>${cName(s.customer_id)}</td>
@@ -1010,19 +1016,24 @@ function showDashDetail(key){
         const f=w?calcFields(w,adm):{salePrice:0,totalCost:0,sharePerPerson:0,beefQty:0,beefRate:0};
         return Object.assign({},a,{_w:w,_adm:adm,_sp:f.salePrice,_tc:f.totalCost,_spp:f.sharePerPerson,_bq:f.beefQty,_br:f.beefRate,_sale:sale,_custId:sale?sale.customer_id:a.assigned_customer});
       });
-      const cols=6;
-      const colsAll=7;
+      const cols=7;
+      const colsAll=8;
       const thead=`<thead><tr>
-        <th>Code</th><th>Age</th><th>Wt(kg)</th><th>Sale Price(est.)</th><th>Status</th><th>Customer</th>
+        <th>Photo</th><th>Code</th><th>Age</th><th>Wt(kg)</th><th>Sale Price(est.)</th><th>Status</th><th>Customer</th>
       </tr></thead>`;
       const theadAll=`<thead><tr>
-        <th>Code</th><th>Age</th><th>Wt(kg)</th><th>Sale Price(est.)</th><th>Status</th><th>Customer</th><th></th>
+        <th>Photo</th><th>Code</th><th>Age</th><th>Wt(kg)</th><th>Sale Price(est.)</th><th>Status</th><th>Customer</th><th></th>
       </tr></thead>`;
 
       function dashAnimalRow(a,showDel){
         const isKheera=(a.age_type||'').toLowerCase()==='kheera';
         const bg=isKheera?'background:#fffbeb;':'';
+        const _dfp=a.photos&&a.photos.length?a.photos[0]:null;
+        const _dpc=_dfp
+          ?`<img class="tbl-thumb" src="${_dfp}" onclick="showAnimalDetail('${a.code}');closeModal('dashdetail-overlay');event.stopPropagation()" style="cursor:pointer" title="View photos">`
+          :`<span class="no-photo" title="No photo">&#128247;</span>`;
         return `<tr style="${bg}" class="clickable-row" onclick="showAnimalDetail('${a.code}');closeModal('dashdetail-overlay')">
+          <td>${_dpc}</td>
           <td><strong>${a.code}</strong></td>
           <td>${isKheera?`<span style="background:#d97706;color:#fff;border-radius:4px;padding:1px 6px;font-size:.75rem">Kheera</span>`:(a.age_type||'-')}</td>
           <td>${a._w?fmtN(a._w,1)+' kg':'-'}</td>
@@ -1037,7 +1048,7 @@ function showDashDetail(key){
         const tw=grpList.reduce((s,a)=>s+(a._w||0),0);
         const tsp=grpList.reduce((s,a)=>s+a._sp,0);
         return `<tr style="background:${color};font-weight:700;font-size:.81rem;border-top:2px solid #cbd5e1">
-          <td colspan="2" style="color:#1a3a5c">${label} Subtotal (${grpList.length})</td>
+          <td colspan="3" style="color:#1a3a5c">${label} Subtotal (${grpList.length})</td>
           <td>${fmtN(tw,1)} kg</td><td>${Rs(tsp)}</td><td></td><td></td>
           ${extraCell?'<td></td>':''}
         </tr>`;
@@ -1068,7 +1079,12 @@ function showDashDetail(key){
           out+=`<tbody id="${grpId}" style="display:none">`;
           grpList.forEach(a=>{
             const isKheera=(a.age_type||'').toLowerCase()==='kheera';
+            const _cfp=a.photos&&a.photos.length?a.photos[0]:null;
+            const _cpc=_cfp
+              ?`<img class="tbl-thumb" src="${_cfp}" onclick="showAnimalDetail('${a.code}');closeModal('dashdetail-overlay');event.stopPropagation()" style="cursor:pointer" title="View photos">`
+              :`<span class="no-photo" title="No photo">&#128247;</span>`;
             out+=`<tr class="clickable-row" style="${dtlBg?'background:'+dtlBg+';':''}" onclick="showAnimalDetail('${a.code}');closeModal('dashdetail-overlay')">
+              <td>${_cpc}</td>
               <td><strong>${a.code}</strong></td>
               <td>${isKheera?`<span style="background:#d97706;color:#fff;border-radius:4px;padding:1px 6px;font-size:.75rem">Kheera</span>`:(a.age_type||'-')}</td>
               <td>${a._w?fmtN(a._w,1)+' kg':'-'}</td>
@@ -1078,7 +1094,7 @@ function showDashDetail(key){
             </tr>`;
           });
           out+=`<tr style="background:${subBg};font-weight:700;font-size:.81rem;border-top:2px solid #cbd5e1">
-            <td colspan="2" style="color:#1a3a5c">${label} Subtotal</td>
+            <td colspan="3" style="color:#1a3a5c">${label} Subtotal</td>
             <td>${fmtN(tw,1)} kg</td><td>${Rs(tsp)}</td><td></td><td></td>
           </tr>`;
           out+=`</tbody>`;
@@ -1088,7 +1104,7 @@ function showDashDetail(key){
         tbl+=collapsibleGroup(kheera,'Kheera','dash-grp-kheera','#fef3c7','#92400e','#fffbeb','#fef3c7');
         tbl+=collapsibleGroup(others,'Other','dash-grp-others','#f3f4f6','#374151','','#f3f4f6');
         tbl+=`<tbody><tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.85rem;border-top:3px solid #0f2540">
-          <td colspan="2">TOTAL — ${list.length} &nbsp;(D:${dondha.length} K:${kheera.length}${others.length?' O:'+others.length:''})</td>
+          <td colspan="3">TOTAL — ${list.length} &nbsp;(D:${dondha.length} K:${kheera.length}${others.length?' O:'+others.length:''})</td>
           <td>${fmtN(gtw,1)} kg</td><td>${Rs(gtsp)}</td><td></td><td></td>
         </tr></tbody>`;
         tbl+=`</table></div>`;
@@ -1112,7 +1128,7 @@ function showDashDetail(key){
           tbody+=dashSubtotalRow(others,'Other','#f3f4f6',true);
         }
         tbody+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.85rem;border-top:3px solid #0f2540">
-          <td colspan="2">TOTAL — ${list.length} &nbsp;(D:${dondha.length} K:${kheera.length}${others.length?' O:'+others.length:''})</td>
+          <td colspan="3">TOTAL — ${list.length} &nbsp;(D:${dondha.length} K:${kheera.length}${others.length?' O:'+others.length:''})</td>
           <td>${fmtN(gtw,1)} kg</td><td>${Rs(gtsp)}</td><td></td><td></td><td></td>
         </tr>`;
         html+=`<div class="tbl-wrap"><table>${theadAll}<tbody>${tbody}</tbody></table></div>`;
