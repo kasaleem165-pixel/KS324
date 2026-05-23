@@ -843,6 +843,12 @@ function load(){
     if(!DB.settings.typeList) DB.settings.typeList=['Waccha','Wacchi','Katta','Katti','Cow','Buffalo'];
     if(!DB.settings.ageList)  DB.settings.ageList=['Dondha','Kheera','Calf','Young','Adult'];
     if(!DB.settings.codeList) DB.settings.codeList=[];
+    // Backfill seed photos into existing animals that have no photos yet
+    DB.animals.forEach(a=>{
+      if((!a.photos||!a.photos.length)&&SEED_PHOTOS[a.code]){
+        a.photos=[SEED_PHOTOS[a.code]];
+      }
+    });
     // fix animals wrongly seeded as "sold" with no actual sale record
     const soldCodes=["151","177","181","182","183"];
     let fixed=false;
@@ -1261,6 +1267,10 @@ function renderFormPhotos(){
 function openFullImg(src){
   document.getElementById('pv-full-img').src=src;
   document.getElementById('pv-full').classList.add('open');
+}
+function openAnimalPhoto(code,idx){
+  const a=DB.animals.find(x=>x.code===code);
+  if(a&&a.photos&&a.photos[idx]) openFullImg(a.photos[idx]);
 }
 
 function openPhotoViewer(code){
@@ -2081,8 +2091,9 @@ function showAnimalDetail(code){
     ?`<div style="margin-bottom:16px">
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           ${a.photos.map((p,pi)=>`
-            <img src="${p}" onclick="openFullImg('${p}')"
-              style="height:160px;width:auto;max-width:100%;border-radius:8px;object-fit:cover;
+            <img src="${p}"
+              onclick="openAnimalPhoto('${a.code}',${pi})"
+              style="height:160px;width:auto;max-width:48%;border-radius:8px;object-fit:cover;
                      cursor:zoom-in;box-shadow:0 2px 8px rgba(0,0,0,.18);border:2px solid #e2e8f0"
               title="Click to enlarge">`).join('')}
         </div>
