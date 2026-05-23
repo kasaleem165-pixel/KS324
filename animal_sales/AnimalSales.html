@@ -1719,9 +1719,9 @@ function recordSale(){
 // ══════════════════════════ ALL SALES ══════════════════════════
 function renderSales(){
   const head=document.getElementById('sales-head');
-  head.innerHTML='<tr>'+'<th>S#</th>'+th('Receipt','sales','receipt_no')+th('Date','sales','sale_date')+th('Code','sales','animal_code')+'<th>Age</th>'+th('Customer','sales','customerName')+th('Wt(kg)','sales','weight_at_sale')+th('Rate/kg','sales','rate_per_kg')+th('Sale Pr.','sales','sp')+th('Carriage','sales','carriage_charges')+th('Total','sales','amount')+'<th></th></tr>';
+  head.innerHTML='<tr>'+'<th>S#</th><th>Photo</th>'+th('Receipt','sales','receipt_no')+th('Date','sales','sale_date')+th('Code','sales','animal_code')+'<th>Age</th>'+th('Customer','sales','customerName')+th('Wt(kg)','sales','weight_at_sale')+th('Rate/kg','sales','rate_per_kg')+th('Sale Pr.','sales','sp')+th('Carriage','sales','carriage_charges')+th('Total','sales','amount')+'<th></th></tr>';
   const tb=document.getElementById('sales-body');
-  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="11" class="empty">No sales yet.</td></tr>`;return;}
+  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="12" class="empty">No sales yet.</td></tr>`;return;}
   const np=DB.settings.num_persons||7;
   // Attach computed fields for sorting
   const withComputed=DB.sales.map(s=>{const sp=s.weight_at_sale*s.rate_per_kg;return Object.assign({},s,{customerName:cName(s.customer_id),sp});});
@@ -1735,8 +1735,14 @@ function renderSales(){
   }
   tb.innerHTML=list.map((s,i)=>{
     const sp=s.weight_at_sale*s.rate_per_kg;
+    const _a=DB.animals.find(x=>x.code===s.animal_code)||{};
+    const _fp=_a.photos&&_a.photos.length?_a.photos[0]:null;
+    const photoCell=_fp
+      ?`<img class="tbl-thumb" src="${_fp}" onclick="showAnimalDetail('${s.animal_code}');event.stopPropagation()" title="View animal photos" style="cursor:pointer">`
+      :`<span class="no-photo" onclick="showAnimalDetail('${s.animal_code}');event.stopPropagation()" style="cursor:pointer" title="No photo">&#128247;</span>`;
     return `<tr class="clickable-row" onclick="showReceipt('${s.receipt_no}')">
       <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
+      <td>${photoCell}</td>
       <td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td>
       <td><strong>${s.animal_code}</strong></td><td>${aType(s.animal_code)}</td>
       <td>${cName(s.customer_id)}</td>
@@ -1781,9 +1787,9 @@ function renderSaleLedger(){
 
   // Build grouped-by-customer ledger
   const head=document.getElementById('saleledger-head');
-  head.innerHTML='<tr><th>S#</th><th>Receipt</th><th>Date</th><th>Animal</th><th>Age</th><th>Wt(kg)</th><th>Rate/kg</th><th>Sale Price</th><th>Total Sale</th><th>Received</th><th>Discount</th><th>Balance</th></tr>';
+  head.innerHTML='<tr><th>S#</th><th>Photo</th><th>Receipt</th><th>Date</th><th>Animal</th><th>Age</th><th>Wt(kg)</th><th>Rate/kg</th><th>Sale Price</th><th>Total Sale</th><th>Received</th><th>Discount</th><th>Balance</th></tr>';
   const tb=document.getElementById('saleledger-body');
-  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="12" class="empty">No sales yet.</td></tr>`;return;}
+  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="13" class="empty">No sales yet.</td></tr>`;return;}
 
   let html='';
   let sno=0;
@@ -1798,7 +1804,7 @@ function renderSaleLedger(){
     const custBal=custTotal-custPaid-custDisc;
     // Customer header row
     html+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700">
-      <td colspan="12" style="padding:7px 10px">&#9654; ${c.name}
+      <td colspan="13" style="padding:7px 10px">&#9654; ${c.name}
         <span style="font-weight:400;font-size:.78rem;margin-left:12px;opacity:.85">
           ${custSales.length} sale${custSales.length>1?'s':''} &nbsp;|&nbsp; Billed: ${Rs(custTotal)} &nbsp;|&nbsp; Received: ${Rs(custPaid)} &nbsp;|&nbsp; Balance: ${Rs(custBal)}
         </span>
@@ -1809,8 +1815,14 @@ function renderSaleLedger(){
       sno++;
       const sp=s.weight_at_sale*s.rate_per_kg;
       const car=s.carriage_charges||0;
+      const _la=DB.animals.find(x=>x.code===s.animal_code)||{};
+      const _lfp=_la.photos&&_la.photos.length?_la.photos[0]:null;
+      const _lpc=_lfp
+        ?`<img class="tbl-thumb" src="${_lfp}" onclick="showAnimalDetail('${s.animal_code}');event.stopPropagation()" title="View animal" style="cursor:pointer">`
+        :`<span class="no-photo" onclick="showAnimalDetail('${s.animal_code}');event.stopPropagation()" style="cursor:pointer" title="No photo">&#128247;</span>`;
       html+=`<tr class="clickable-row" onclick="showReceipt('${s.receipt_no}')">
         <td style="color:#94a3b8;font-size:.75rem">${sno}</td>
+        <td>${_lpc}</td>
         <td>${s.receipt_no}</td>
         <td>${fmtD(s.sale_date)}</td>
         <td><strong>${s.animal_code}</strong></td>
@@ -1824,7 +1836,7 @@ function renderSaleLedger(){
     });
     // Customer subtotal row with payments
     html+=`<tr style="background:#f0f9ff;font-weight:700;font-size:.82rem;border-top:2px solid #bae6fd">
-      <td colspan="7" style="color:#1a3a5c">Subtotal — ${c.name}</td>
+      <td colspan="8" style="color:#1a3a5c">Subtotal — ${c.name}</td>
       <td>${Rs(custSales.reduce((s,x)=>s+(x.weight_at_sale*x.rate_per_kg),0))}</td>
       <td>${Rs(custTotal)}</td>
       <td style="color:#059669">${Rs(custPaid)}</td>
@@ -1834,7 +1846,7 @@ function renderSaleLedger(){
   });
   // Grand total
   html+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.85rem;border-top:3px solid #0f2540">
-    <td colspan="7">GRAND TOTAL</td>
+    <td colspan="8">GRAND TOTAL</td>
     <td>${Rs(totalSalePrice)}</td>
     <td>${Rs(totalAmount)}</td>
     <td>${Rs(totalPaid)}</td>
@@ -2142,8 +2154,12 @@ function showReceipt(rno){
   const a=DB.animals.find(x=>x.code===s.animal_code)||{};
   const c=DB.customers.find(x=>x.id===s.customer_id)||{};
   const sp=s.weight_at_sale*s.rate_per_kg;
+  const rcpPhoto=a.photos&&a.photos.length
+    ?`<div style="text-align:center;margin-bottom:14px"><img src="${a.photos[0]}" onclick="openAnimalPhoto('${s.animal_code}',0)" style="max-height:160px;max-width:100%;border-radius:10px;border:2px solid #cbd5e1;cursor:pointer;object-fit:cover" title="Click to enlarge"></div>`
+    :'';
   document.getElementById('receipt-content').innerHTML=`
     <div class="rcp-header"><h2>SALE RECEIPT</h2><p>Animal Sales Record</p></div>
+    ${rcpPhoto}
     <div class="rcp-meta">
       <div><span>Receipt No: </span><strong>${s.receipt_no}</strong></div>
       <div><span>Date: </span>${fmtD(s.sale_date)}</div>
