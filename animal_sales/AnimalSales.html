@@ -907,6 +907,19 @@ function load(){
       });
       DB.settings._tc20260526b=true;
     }
+    // Replace all truck carriage with flat Rs. 4,000 per animal
+    if(!DB.settings._tc4000){
+      DB.sales.forEach(s=>{
+        const oldCar=s.carriage_charges||0;
+        s.carriage_charges=4000;
+        if(s.is_lumpsum){
+          s.amount=(s.amount-oldCar)+4000;
+        } else {
+          s.amount=(s.weight_at_sale*s.rate_per_kg)+4000;
+        }
+      });
+      DB.settings._tc4000=true;
+    }
     // Backfill seed photos into existing animals that have no photos yet
     DB.animals.forEach(a=>{
       if((!a.photos||!a.photos.length)&&SEED_PHOTOS[a.code]){
