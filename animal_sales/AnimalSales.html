@@ -880,6 +880,20 @@ function load(){
       });
       DB.settings._wt20260526=true;
     }
+    // One-time truck carriage update from For_Claude_to_update_Truck_Carriage.xlsx
+    if(!DB.settings._tc20260526){
+      const tc={'118':5064,'141':4051,'144':5017,'146':4830,'149':3740,'150':3817,'151':4908,
+        '152':3849,'154':4051,'155':3350,'157':3428,'158':2649,'159':3895,'160':3817,'162':4363,
+        '163':4098,'164':6497,'165':4098,'166':4674,'167':4332,'168':4285,'176':4051,'177':2602,
+        '178':3116,'182':2493,'183':2649,'186':3817,'187':3740,'188':3895,'191':4004,'192':3817};
+      DB.sales.forEach(s=>{
+        if(tc[s.animal_code]!=null){
+          s.carriage_charges=tc[s.animal_code];
+          if(!s.is_lumpsum) s.amount=(s.weight_at_sale*s.rate_per_kg)+s.carriage_charges;
+        }
+      });
+      DB.settings._tc20260526=true;
+    }
     // Backfill seed photos into existing animals that have no photos yet
     DB.animals.forEach(a=>{
       if((!a.photos||!a.photos.length)&&SEED_PHOTOS[a.code]){
