@@ -227,6 +227,7 @@ input[readonly]{background:#f8fafc}
       </div>
       <button class="btn btn-light btn-sm" id="animals-excel-btn" onclick="exportAnimalsExcel()">&#8595; Excel</button>
     </div>
+    <div style="margin-bottom:10px"><input id="animals-search" type="text" placeholder="&#128269; Search by code, description, type, age…" style="width:100%;padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:.88rem" oninput="renderAnimals()"></div>
     <div class="tbl-wrap"><table>
       <thead id="animals-head"></thead>
       <tbody id="animals-body"></tbody>
@@ -255,6 +256,7 @@ input[readonly]{background:#f8fafc}
       <div class="card-title" style="margin:0">All Customers</div>
       <button class="btn btn-light btn-sm" onclick="exportCustomersExcel()">&#8595; Export to Excel</button>
     </div>
+    <div style="margin-bottom:10px"><input id="cust-search" type="text" placeholder="&#128269; Search customers by name, phone, address…" style="width:100%;padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:.88rem" oninput="renderCustomers()"></div>
     <div class="tbl-wrap"><table>
       <thead id="customers-head"></thead>
       <tbody id="customers-body"></tbody>
@@ -327,6 +329,7 @@ input[readonly]{background:#f8fafc}
       <div class="card-title" style="margin:0">All Sales</div>
       <button class="btn btn-light btn-sm" onclick="exportSalesExcel()">&#8595; Export to Excel</button>
     </div>
+    <div style="margin-bottom:10px"><input id="sales-search" type="text" placeholder="&#128269; Search by receipt, code, customer, date…" style="width:100%;padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:.88rem" oninput="renderSales()"></div>
     <div class="tbl-wrap"><table>
       <thead id="sales-head"></thead>
       <tbody id="sales-body"></tbody>
@@ -359,6 +362,7 @@ input[readonly]{background:#f8fafc}
         <button class="btn btn-success btn-sm" onclick="openPayment(0)">+ Record Collection</button>
       </div>
     </div>
+    <div style="margin-bottom:10px"><input id="payments-search" type="text" placeholder="&#128269; Search by receipt, customer, bank, type…" style="width:100%;padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:.88rem" oninput="renderPayments()"></div>
     <div class="tbl-wrap"><table>
       <thead id="payments-head"></thead>
       <tbody id="payments-body"></tbody>
@@ -1520,6 +1524,7 @@ function renderAnimals(){
   const head=document.getElementById('animals-head');
   const tb=document.getElementById('animals-body');
 
+  const animQ=(document.getElementById('animals-search')||{value:''}).value.trim().toLowerCase();
   if(filter==='available'){
     // ── Grouped Dondha/Kheera stock view ──
     const colEl=document.getElementById('stock-sort-col');
@@ -1527,7 +1532,8 @@ function renderAnimals(){
     const col=colEl?colEl.value:'code';
     const dir=dirEl?dirEl.value:'asc';
     head.innerHTML='<tr><th>S#</th><th>Photo</th>'+th('Code','stock','code')+th('Date','stock','purchase_date')+th('Age','stock','age_type')+th('Weight(kg)','stock','_w')+th('Sale Price(est.)','stock','_sp')+'<th>Description</th><th>Actions</th></tr>';
-    const available=animalComputedList(a=>a.status==='available');
+    let available=animalComputedList(a=>a.status==='available');
+    available=available.filter(a=>!animQ||[a.code,a.description||'',a.animal_type||'',a.age_type||''].join(' ').toLowerCase().includes(animQ));
     if(!available.length){tb.innerHTML=`<tr><td colspan="9" class="empty">No available animals.</td></tr>`;return;}
     const dondha=sortArr(available.filter(a=>(a.age_type||'').toLowerCase()==='dondha'),col,dir);
     const kheera=sortArr(available.filter(a=>(a.age_type||'').toLowerCase()==='kheera'),col,dir);
@@ -1602,7 +1608,7 @@ function renderAnimals(){
     '<th>Customer</th><th>Actions</th></tr>';
   const rawList=filter==='sold'?DB.animals.filter(a=>a.status==='sold'):DB.animals;
   if(!rawList.length){tb.innerHTML=`<tr><td colspan="12" class="empty">No animals yet. Add one above.</td></tr>`;return;}
-  const list=sortArr(animalComputedList(a=>filter==='sold'?a.status==='sold':true),SORT.animals.col,SORT.animals.dir);
+  const list=sortArr(animalComputedList(a=>filter==='sold'?a.status==='sold':true),SORT.animals.col,SORT.animals.dir).filter(a=>!animQ||[a.code,a.description||'',a.animal_type||'',a.age_type||''].join(' ').toLowerCase().includes(animQ));
   tb.innerHTML=list.map((a,i)=>{
     const firstPhoto=a.photos&&a.photos.length?a.photos[0]:null;
     const photoCell=firstPhoto
@@ -1655,6 +1661,7 @@ function renderCustomers(){
   head.innerHTML='<tr>'+'<th>S#</th>'+th('Name','customers','name')+th('Phone','customers','phone')+'<th>Address</th>'+th('Total Sales','customers','ts')+th('Received','customers','tp')+th('Discount','customers','td')+th('Balance','customers','balance')+'<th></th></tr>';
   const tb=document.getElementById('customers-body');
   if(!DB.customers.length){tb.innerHTML=`<tr><td colspan="9" class="empty">No customers yet.</td></tr>`;return;}
+  const custQ=(document.getElementById('cust-search')||{value:''}).value.trim().toLowerCase();
   // Attach computed totals for sorting
   const withTotals=DB.customers.map(c=>{const t=custTotals(c.id);return Object.assign({},c,{ts:t.ts,tp:t.tp,td:t.td,balance:t.balance});});
   const col=SORT.customers.col;
@@ -1665,6 +1672,7 @@ function renderCustomers(){
   } else {
     list=sortArr(withTotals,col,dir);
   }
+  list=list.filter(c=>!custQ||[c.name,c.phone||'',c.address||''].join(' ').toLowerCase().includes(custQ));
   tb.innerHTML=list.map((c,i)=>{
     const {ts,tp,td,balance}=custTotals(c.id);
     return `<tr class="clickable-row" onclick="showLedger(${c.id})">
@@ -1871,6 +1879,7 @@ function renderSales(){
   head.innerHTML='<tr>'+'<th>S#</th><th>Photo</th>'+th('Receipt','sales','receipt_no')+th('Date','sales','sale_date')+th('Code','sales','animal_code')+'<th>Age</th>'+th('Customer','sales','customerName')+th('Wt(kg)','sales','weight_at_sale')+th('Rate/kg','sales','rate_per_kg')+th('Sale Pr.','sales','sp')+th('Carriage','sales','carriage_charges')+th('Total','sales','amount')+'<th></th></tr>';
   const tb=document.getElementById('sales-body');
   if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="12" class="empty">No sales yet.</td></tr>`;return;}
+  const salesQ=(document.getElementById('sales-search')||{value:''}).value.trim().toLowerCase();
   const np=DB.settings.num_persons||7;
   // Attach computed fields for sorting
   const withComputed=DB.sales.map(s=>{const sp=s.weight_at_sale*s.rate_per_kg;return Object.assign({},s,{customerName:cName(s.customer_id),sp});});
@@ -1882,6 +1891,7 @@ function renderSales(){
   } else {
     list=sortArr(withComputed,col,dir);
   }
+  list=list.filter(s=>!salesQ||[s.receipt_no,s.animal_code,s.customerName,s.sale_date].join(' ').toLowerCase().includes(salesQ));
   tb.innerHTML=list.map((s,i)=>{
     const sp=s.weight_at_sale*s.rate_per_kg;
     const _a=DB.animals.find(x=>x.code===s.animal_code)||{};
@@ -2042,7 +2052,7 @@ function openSaleEdit(rno){
   // Populate customer dropdown
   const csel=document.getElementById('es-customer');
   csel.innerHTML='<option value="">-- Select Customer --</option>';
-  DB.customers.forEach(c=>{
+  [...DB.customers].sort((a,b)=>a.name.localeCompare(b.name)).forEach(c=>{
     const sel=c.id===s.customer_id?'selected':'';
     csel.innerHTML+=`<option value="${c.id}" ${sel}>${c.name}</option>`;
   });
@@ -2159,6 +2169,7 @@ function renderPayments(){
   head.innerHTML='<tr>'+'<th>S#</th>'+th('Receipt','payments','receipt_no')+th('Date','payments','pay_date')+th('Customer','payments','customerName')+th('Type','payments','type')+th('Bank','payments','bank_name')+'<th>Sender</th><th>Place</th>'+th('Amount','payments','amount')+th('Discount','payments','discount')+'<th></th></tr>';
   const tb=document.getElementById('payments-body');
   if(!DB.payments.length){tb.innerHTML=`<tr><td colspan="11" class="empty">No payments recorded yet.</td></tr>`;return;}
+  const payQ=(document.getElementById('payments-search')||{value:''}).value.trim().toLowerCase();
   // Attach computed fields for sorting
   const withComputed=DB.payments.map(p=>Object.assign({},p,{customerName:cName(p.customer_id)}));
   const col=SORT.payments.col;
@@ -2169,6 +2180,7 @@ function renderPayments(){
   } else {
     list=sortArr(withComputed,col,dir);
   }
+  list=list.filter(p=>!payQ||[p.receipt_no,p.customerName,p.type||'',p.bank_name||'',p.sender_name||''].join(' ').toLowerCase().includes(payQ));
   tb.innerHTML=list.map((p,i)=>`<tr class="clickable-row" onclick="showPaymentDetail('${p.receipt_no||''}')">
     <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
     <td>${p.receipt_no||'-'}</td>
@@ -2433,7 +2445,7 @@ function openPayment(cid){
   // populate customer dropdown
   const sel=document.getElementById('p-cid');
   sel.innerHTML='<option value="">-- Select Customer --</option>';
-  DB.customers.forEach(c=>sel.innerHTML+=`<option value="${c.id}"${c.id===cid?' selected':''}>${c.name}</option>`);
+  [...DB.customers].sort((a,b)=>a.name.localeCompare(b.name)).forEach(c=>sel.innerHTML+=`<option value="${c.id}"${c.id===cid?' selected':''}>${c.name}</option>`);
   setPayCustomer();
   document.getElementById('p-date').value=today();
   document.getElementById('p-amount').value='';
