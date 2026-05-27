@@ -134,7 +134,7 @@ input[readonly]{background:#f8fafc}
   <button onclick="show('sale')"        id="nav-sale">+ New Sale</button>
   <button onclick="show('sales')"       id="nav-sales">Sales</button>
   <button onclick="show('saleledger')"  id="nav-saleledger">Sale Ledger</button>
-  <button onclick="show('payments')"    id="nav-payments">Payments</button>
+  <button onclick="show('payments')"    id="nav-payments">Sales Collection</button>
   <button onclick="show('budgeting')"   id="nav-budgeting">Budgeting</button>
   <button onclick="show('settings')"    id="nav-settings">Settings</button>
 </nav>
@@ -181,7 +181,7 @@ input[readonly]{background:#f8fafc}
       <div class="fg full"><label>Description</label>
         <textarea id="a-desc" rows="2" placeholder="e.g. 1 Waccha purchased from Ludan Mandi"></textarea></div>
       <div class="fg"><label>Admin Charges (Rs.) <span style="font-weight:400;font-size:.74rem;color:#aaa">internal — for budgeting only</span></label>
-        <input id="a-admin" type="number" step="1" placeholder="e.g. 30000"></div>
+        <input id="a-admin" type="number" step="1" value="0"></div>
       <div class="fg"><label>Customer (if already assigned)</label>
         <select id="a-cust"><option value="">-- None --</option></select></div>
     </div>
@@ -245,9 +245,6 @@ input[readonly]{background:#f8fafc}
     <div class="form-grid">
       <div class="fg"><label>Customer Name *</label><input id="c-name" placeholder="e.g. Sajid Bhai"></div>
       <div class="fg"><label>Phone</label><input id="c-phone" placeholder="0300-0000000"></div>
-      <div class="fg"><label>Admin Charges (Rs.) *</label>
-        <input id="c-admin" type="number" step="1" placeholder="e.g. 30000">
-        <span class="hint">Fixed per sale — transport, qasai, other expenses.</span></div>
       <div class="fg full"><label>Address</label><input id="c-address" placeholder="Optional"></div>
     </div>
     <div class="form-actions">
@@ -362,10 +359,10 @@ input[readonly]{background:#f8fafc}
 <div class="page" id="page-payments">
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
-      <div class="card-title" style="margin:0">Payment Receipts</div>
+      <div class="card-title" style="margin:0">Sales Collection</div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-light btn-sm" onclick="exportPaymentsExcel()">&#8595; Export to Excel</button>
-        <button class="btn btn-success btn-sm" onclick="openPayment(0)">+ Record Payment</button>
+        <button class="btn btn-success btn-sm" onclick="openPayment(0)">+ Record Collection</button>
       </div>
     </div>
     <div class="tbl-wrap"><table>
@@ -448,12 +445,55 @@ input[readonly]{background:#f8fafc}
 
 <!-- ══════════ BUDGETING ══════════ -->
 <div class="page" id="page-budgeting">
+  <!-- Budget Entry Form -->
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-title">Record Budget Entry</div>
+    <div id="budget-flash"></div>
+    <div class="form-grid" style="margin-top:12px">
+      <div class="fg"><label>Date *</label>
+        <input id="bg-date" type="date"></div>
+      <div class="fg"><label>Budget Head *</label>
+        <select id="bg-head">
+          <option value="">-- Select Head --</option>
+          <option>Animal Purchase</option>
+          <option>Feed / Fodder</option>
+          <option>Veterinary / Medical</option>
+          <option>Transport / Truck</option>
+          <option>Qasai / Labor</option>
+          <option>Commission / Adda</option>
+          <option>Administrative</option>
+          <option>Miscellaneous</option>
+        </select></div>
+      <div class="fg"><label>Amount (Rs.) *</label>
+        <input id="bg-amount" type="number" step="1" placeholder="e.g. 50000"></div>
+      <div class="fg full"><label>Notes</label>
+        <input id="bg-notes" placeholder="Optional description"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="addBudgetEntry()">Add Entry</button>
+      <button class="btn btn-light" onclick="clearBudgetForm()">Clear</button>
+    </div>
+  </div>
+
+  <!-- Budget Records Table -->
+  <div class="card" style="margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+      <div class="card-title" style="margin:0">Budget Records</div>
+    </div>
+    <div id="budget-records-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px"></div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>S#</th><th>Date</th><th>Head</th><th>Amount</th><th>Notes</th><th></th></tr></thead>
+      <tbody id="budget-records-body"></tbody>
+    </table></div>
+  </div>
+
+  <!-- Cost Estimation Table (existing) -->
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
-      <div class="card-title" style="margin:0">Budgeting &amp; Cost Estimation</div>
+      <div class="card-title" style="margin:0">Cost Estimation (per Animal)</div>
       <button class="btn btn-light btn-sm" onclick="exportBudgetExcel()">&#8595; Export to Excel</button>
     </div>
-    <p style="color:#666;font-size:.82rem;margin-bottom:12px">Internal cost estimates per animal — based on Admin Charges + Sale Price. Not shown on any receipt or customer report.</p>
+    <p style="color:#666;font-size:.82rem;margin-bottom:12px">Internal cost estimates per animal — based on Admin Charges + Sale Price.</p>
     <div id="budget-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px"></div>
     <div class="tbl-wrap"><table>
       <thead id="budget-head"></thead>
@@ -624,7 +664,11 @@ input[readonly]{background:#f8fafc}
 <div class="overlay" id="payment-overlay">
   <div class="modal" style="max-width:540px">
     <button class="modal-close" onclick="closeModal('payment-overlay')">&#10005;</button>
-    <div class="card-title">Record Payment Receipt</div>
+    <div class="card-title">Record Sales Collection</div>
+    <div id="p-balance-bar" style="display:none;margin:10px 0 4px;padding:10px 14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:.88rem">
+      <span style="color:#92400e;font-weight:600">Outstanding Balance: </span>
+      <span id="p-balance-val" style="font-size:1.05rem;font-weight:700;color:#d97706"></span>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
 
       <div class="fg"><label>Customer *</label>
@@ -752,7 +796,7 @@ input[readonly]{background:#f8fafc}
 <script>
 // ══════════════════════════ DATA LAYER ══════════════════════════
 const STORE='animal_sales_db';
-let DB={animals:[],customers:[],sales:[],payments:[],banks:[],settings:{rate_per_kg:780,admin_charges:30000,num_persons:7}};
+let DB={animals:[],customers:[],sales:[],payments:[],banks:[],budget:[],settings:{rate_per_kg:780,admin_charges:30000,num_persons:7}};
 
 const SORT={animals:{col:'code',dir:'asc'},customers:{col:'name',dir:'asc'},sales:{col:'receipt_no',dir:'desc'},payments:{col:'receipt_no',dir:'desc'},stock:{col:'code',dir:'asc'}};
 function sortToggle(tbl,col){if(SORT[tbl].col===col){SORT[tbl].dir=SORT[tbl].dir==='asc'?'desc':'asc';}else{SORT[tbl].col=col;SORT[tbl].dir='asc';}const fn={animals:renderAnimals,customers:renderCustomers,sales:renderSales,payments:renderPayments}[tbl];if(fn)fn();}
@@ -870,6 +914,7 @@ function load(){
     if(!DB.settings.num_persons) DB.settings.num_persons=7;
     if(!DB.settings.admin_charges) DB.settings.admin_charges=DB.settings.expenses_default||30000;
     DB.sales.forEach(s=>{if(!s.hasOwnProperty('carriage_charges'))s.carriage_charges=0;});
+    if(!DB.budget) DB.budget=[];
     if(!DB.settings.typeList) DB.settings.typeList=['Waccha','Wacchi','Katta','Katti','Cow','Buffalo'];
     if(!DB.settings.ageList)  DB.settings.ageList=['Dondha','Kheera','Calf','Young','Adult'];
     if(!DB.settings.codeList) DB.settings.codeList=[];
@@ -1590,12 +1635,10 @@ function deleteAnimal(code){
 function addCustomer(){
   const name=(document.getElementById('c-name').value||'').trim();
   if(!name){flash('cust-flash','Customer name is required.','err');return;}
-  const adminVal=document.getElementById('c-admin').value;
-  const admin=adminVal!==''?parseFloat(adminVal):null;
-  DB.customers.push({id:Date.now(),name,phone:document.getElementById('c-phone').value||'',address:document.getElementById('c-address').value||'',admin_charges:admin});
+  DB.customers.push({id:Date.now(),name,phone:document.getElementById('c-phone').value||'',address:document.getElementById('c-address').value||''});
   save(); flash('cust-flash',`${name} added.`); clearCustomerForm(); renderCustomers();
 }
-function clearCustomerForm(){['c-name','c-phone','c-admin','c-address'].forEach(id=>document.getElementById(id).value='');}
+function clearCustomerForm(){['c-name','c-phone','c-address'].forEach(id=>document.getElementById(id).value='');}
 
 function renderCustomers(){
   const head=document.getElementById('customers-head');
@@ -2387,6 +2430,7 @@ function openPayment(cid){
   const sel=document.getElementById('p-cid');
   sel.innerHTML='<option value="">-- Select Customer --</option>';
   DB.customers.forEach(c=>sel.innerHTML+=`<option value="${c.id}"${c.id===cid?' selected':''}>${c.name}</option>`);
+  setPayCustomer();
   document.getElementById('p-date').value=today();
   document.getElementById('p-amount').value='';
   document.getElementById('p-discount').value='0';
@@ -2399,7 +2443,21 @@ function openPayment(cid){
   toggleBank();
   document.getElementById('payment-overlay').classList.add('open');
 }
-function setPayCustomer(){ /* selection handled by dropdown */ }
+function setPayCustomer(){
+  const cid=parseInt(document.getElementById('p-cid').value);
+  const bar=document.getElementById('p-balance-bar');
+  if(cid&&!isNaN(cid)){
+    const {balance}=custTotals(cid);
+    document.getElementById('p-balance-val').textContent='Rs. '+balance.toLocaleString();
+    bar.style.display='block';
+    bar.style.background=balance>0?'#fff7ed':'#f0fdf4';
+    bar.style.borderColor=balance>0?'#fed7aa':'#6ee7b7';
+    document.querySelector('#p-balance-bar span:first-child').style.color=balance>0?'#92400e':'#065f46';
+    document.getElementById('p-balance-val').style.color=balance>0?'#d97706':'#059669';
+  } else {
+    bar.style.display='none';
+  }
+}
 function toggleBank(){
   const isBank=document.getElementById('pt-bank').checked;
   document.getElementById('bank-name-row').style.display=isBank?'flex':'none';
@@ -2570,12 +2628,61 @@ function saveSettings(){
 }
 
 // ══════════════════════════ BUDGETING ══════════════════════════
+function addBudgetEntry(){
+  const date=document.getElementById('bg-date').value;
+  const head=document.getElementById('bg-head').value;
+  const amount=parseFloat(document.getElementById('bg-amount').value);
+  const errors=[];
+  if(!date) errors.push('Date is required.');
+  if(!head) errors.push('Budget Head is required.');
+  if(!amount||amount<=0) errors.push('Amount must be a positive number.');
+  if(errors.length){flash('budget-flash',errors.join(' '),'err');return;}
+  DB.budget.push({id:Date.now(),date,head,amount,notes:document.getElementById('bg-notes').value.trim()||''});
+  save(); clearBudgetForm(); renderBudgeting();
+  flash('budget-flash','Entry added.','ok');
+}
+function clearBudgetForm(){
+  document.getElementById('bg-date').value=today();
+  document.getElementById('bg-head').value='';
+  document.getElementById('bg-amount').value='';
+  document.getElementById('bg-notes').value='';
+}
+function deleteBudgetEntry(id){
+  if(!confirm('Delete this budget entry?')) return;
+  DB.budget=DB.budget.filter(e=>e.id!==id);
+  save(); renderBudgeting();
+}
+function renderBudgetRecords(){
+  const entries=[...DB.budget].sort((a,b)=>a.date>b.date?-1:1);
+  const tb=document.getElementById('budget-records-body');
+  if(!entries.length){tb.innerHTML='<tr><td colspan="6" class="empty">No budget entries yet.</td></tr>';
+    document.getElementById('budget-records-summary').innerHTML='';return;}
+  // Summary by head
+  const byHead={};
+  entries.forEach(e=>{byHead[e.head]=(byHead[e.head]||0)+e.amount;});
+  const grandTotal=entries.reduce((s,e)=>s+e.amount,0);
+  document.getElementById('budget-records-summary').innerHTML=
+    Object.entries(byHead).map(([h,v])=>`<div class="stat"><div class="n" style="font-size:.85rem">${Rs(v)}</div><div class="l" style="font-size:.72rem">${h}</div></div>`).join('')+
+    `<div class="stat" style="border:2px solid #1a3a5c"><div class="n" style="font-size:.95rem;color:#1a3a5c">${Rs(grandTotal)}</div><div class="l">Total Budget</div></div>`;
+  tb.innerHTML=entries.map((e,i)=>`<tr>
+    <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
+    <td>${fmtD(e.date)}</td>
+    <td><strong>${e.head}</strong></td>
+    <td>${Rs(e.amount)}</td>
+    <td style="font-size:.82rem;color:#555">${e.notes||'-'}</td>
+    <td><button class="btn btn-danger btn-sm" onclick="deleteBudgetEntry(${e.id})">&#128465;</button></td>
+  </tr>`).join('');
+}
 function renderBudgeting(){
   const np=DB.settings.num_persons||7;
   const rate=DB.settings.rate_per_kg||780;
   const list=animalComputedList();
   const totAdm=list.reduce((s,a)=>s+a._adm,0);
   const totTc=list.reduce((s,a)=>s+a._tc,0);
+  // Set default date for entry form
+  const bgDate=document.getElementById('bg-date');
+  if(bgDate&&!bgDate.value) bgDate.value=today();
+  renderBudgetRecords();
   document.getElementById('budget-summary').innerHTML=`
     <div class="stat"><div class="n" style="font-size:.9rem">${DB.animals.length}</div><div class="l">Total Animals</div></div>
     <div class="stat"><div class="n" style="font-size:.9rem">${fmtN(rate)}</div><div class="l">Rate/kg (Rs.)</div></div>
