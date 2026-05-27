@@ -452,6 +452,14 @@ input[readonly]{background:#f8fafc}
     <div class="form-grid" style="margin-top:12px">
       <div class="fg"><label>Date *</label>
         <input id="bg-date" type="date"></div>
+      <div class="fg"><label>Animal Code *</label>
+        <select id="bg-animal" onchange="bgAnimalSelected()">
+          <option value="">-- Select Animal --</option>
+        </select></div>
+      <div class="fg"><label>Age</label>
+        <input id="bg-age" readonly placeholder="Auto-filled" style="background:#f8fafc;color:#555"></div>
+      <div class="fg"><label>Weight (kg)</label>
+        <input id="bg-weight" readonly placeholder="Auto-filled" style="background:#f8fafc;color:#555"></div>
       <div class="fg"><label>Budget Head *</label>
         <select id="bg-head">
           <option value="">-- Select Head --</option>
@@ -482,7 +490,7 @@ input[readonly]{background:#f8fafc}
     </div>
     <div id="budget-records-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px"></div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>S#</th><th>Date</th><th>Head</th><th>Amount</th><th>Notes</th><th></th></tr></thead>
+      <thead><tr><th>S#</th><th>Date</th><th>Animal Code</th><th>Age</th><th>Weight (kg)</th><th>Head</th><th>Amount</th><th>Notes</th><th></th></tr></thead>
       <tbody id="budget-records-body"></tbody>
     </table></div>
   </div>
@@ -915,6 +923,13 @@ function load(){
     if(!DB.settings.admin_charges) DB.settings.admin_charges=DB.settings.expenses_default||30000;
     DB.sales.forEach(s=>{if(!s.hasOwnProperty('carriage_charges'))s.carriage_charges=0;});
     if(!DB.budget) DB.budget=[];
+    // Backfill animal_age/animal_weight on old budget entries
+    DB.budget.forEach(e=>{
+      if(e.animal_code&&!e.animal_age){
+        const a=DB.animals.find(x=>x.code===e.animal_code);
+        if(a){e.animal_age=a.age_type||'';e.animal_weight=a.weight_final||a.weight||0;}
+      }
+    });
     if(!DB.settings.typeList) DB.settings.typeList=['Waccha','Wacchi','Katta','Katti','Cow','Buffalo'];
     if(!DB.settings.ageList)  DB.settings.ageList=['Dondha','Kheera','Calf','Young','Adult'];
     if(!DB.settings.codeList) DB.settings.codeList=[];
@@ -2631,21 +2646,36 @@ function saveSettings(){
 }
 
 // ══════════════════════════ BUDGETING ══════════════════════════
+function bgAnimalSelected(){
+  const code=document.getElementById('bg-animal').value;
+  const a=DB.animals.find(x=>x.code===code);
+  document.getElementById('bg-age').value=a?(a.age_type||'-'):'' ;
+  document.getElementById('bg-weight').value=a&&(a.weight_final||a.weight)?(a.weight_final||a.weight):'';
+}
 function addBudgetEntry(){
   const date=document.getElementById('bg-date').value;
+  const animal_code=document.getElementById('bg-animal').value;
   const head=document.getElementById('bg-head').value;
   const amount=parseFloat(document.getElementById('bg-amount').value);
   const errors=[];
   if(!date) errors.push('Date is required.');
+  if(!animal_code) errors.push('Animal Code is required.');
   if(!head) errors.push('Budget Head is required.');
   if(!amount||amount<=0) errors.push('Amount must be a positive number.');
   if(errors.length){flash('budget-flash',errors.join(' '),'err');return;}
-  DB.budget.push({id:Date.now(),date,head,amount,notes:document.getElementById('bg-notes').value.trim()||''});
+  const a=DB.animals.find(x=>x.code===animal_code);
+  DB.budget.push({id:Date.now(),date,animal_code,
+    animal_age:a?(a.age_type||''):'' ,
+    animal_weight:a?(a.weight_final||a.weight||0):0,
+    head,amount,notes:document.getElementById('bg-notes').value.trim()||''});
   save(); clearBudgetForm(); renderBudgeting();
   flash('budget-flash','Entry added.','ok');
 }
 function clearBudgetForm(){
   document.getElementById('bg-date').value=today();
+  document.getElementById('bg-animal').value='';
+  document.getElementById('bg-age').value='';
+  document.getElementById('bg-weight').value='';
   document.getElementById('bg-head').value='';
   document.getElementById('bg-amount').value='';
   document.getElementById('bg-notes').value='';
@@ -2658,23 +2688,33 @@ function deleteBudgetEntry(id){
 function renderBudgetRecords(){
   const entries=[...DB.budget].sort((a,b)=>a.date>b.date?-1:1);
   const tb=document.getElementById('budget-records-body');
-  if(!entries.length){tb.innerHTML='<tr><td colspan="6" class="empty">No budget entries yet.</td></tr>';
+  if(!entries.length){tb.innerHTML='<tr><td colspan="9" class="empty">No budget entries yet.</td></tr>';
     document.getElementById('budget-records-summary').innerHTML='';return;}
   // Summary by head
   const byHead={};
   entries.forEach(e=>{byHead[e.head]=(byHead[e.head]||0)+e.amount;});
+  // Summary by animal
+  const byAnimal={};
+  entries.forEach(e=>{byAnimal[e.animal_code||'-']=(byAnimal[e.animal_code||'-']||0)+e.amount;});
   const grandTotal=entries.reduce((s,e)=>s+e.amount,0);
   document.getElementById('budget-records-summary').innerHTML=
     Object.entries(byHead).map(([h,v])=>`<div class="stat"><div class="n" style="font-size:.85rem">${Rs(v)}</div><div class="l" style="font-size:.72rem">${h}</div></div>`).join('')+
     `<div class="stat" style="border:2px solid #1a3a5c"><div class="n" style="font-size:.95rem;color:#1a3a5c">${Rs(grandTotal)}</div><div class="l">Total Budget</div></div>`;
-  tb.innerHTML=entries.map((e,i)=>`<tr>
+  tb.innerHTML=entries.map((e,i)=>{
+    const a=DB.animals.find(x=>x.code===e.animal_code);
+    const age=e.animal_age||(a?a.age_type:'')||'-';
+    const wt=e.animal_weight||(a?(a.weight_final||a.weight):0)||0;
+    return `<tr>
     <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
     <td>${fmtD(e.date)}</td>
+    <td><strong>${e.animal_code||'-'}</strong></td>
+    <td>${age}</td>
+    <td>${wt?fmtN(wt,1)+' kg':'-'}</td>
     <td><strong>${e.head}</strong></td>
     <td>${Rs(e.amount)}</td>
     <td style="font-size:.82rem;color:#555">${e.notes||'-'}</td>
     <td><button class="btn btn-danger btn-sm" onclick="deleteBudgetEntry(${e.id})">&#128465;</button></td>
-  </tr>`).join('');
+  </tr>`;}).join('');
 }
 function renderBudgeting(){
   const np=DB.settings.num_persons||7;
@@ -2685,6 +2725,14 @@ function renderBudgeting(){
   // Set default date for entry form
   const bgDate=document.getElementById('bg-date');
   if(bgDate&&!bgDate.value) bgDate.value=today();
+  // Populate animal dropdown
+  const bgAsel=document.getElementById('bg-animal');
+  const curAval=bgAsel.value;
+  bgAsel.innerHTML='<option value="">-- Select Animal --</option>';
+  DB.animals.forEach(a=>{
+    const w=a.weight_final||a.weight||0;
+    bgAsel.innerHTML+=`<option value="${a.code}"${a.code===curAval?' selected':''}>Code: ${a.code} | ${a.age_type||'?'} | ${w?w+' kg':'?'}</option>`;
+  });
   renderBudgetRecords();
   document.getElementById('budget-summary').innerHTML=`
     <div class="stat"><div class="n" style="font-size:.9rem">${DB.animals.length}</div><div class="l">Total Animals</div></div>
