@@ -347,6 +347,13 @@ input[readonly]{background:#f8fafc}
         <button class="btn btn-light btn-sm" onclick="exportSalesExcel()">&#8595; Export to Excel</button>
       </div>
       <div style="margin-bottom:10px"><input id="sales-search" type="text" placeholder="&#128269; Search by receipt, code, customer, date…" style="width:100%;padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:.88rem" oninput="renderSales()"></div>
+      <div style="margin-bottom:12px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;display:flex;flex-wrap:wrap;gap:18px;align-items:center">
+        <span style="font-size:.84rem;font-weight:600;color:#555">Show Total As:</span>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.88rem"><input type="radio" name="sales-mode" value="all" checked onchange="renderSales()"> Full Recorded Amount</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.88rem"><input type="radio" name="sales-mode" value="sp"  onchange="renderSales()"> Sale Price Only</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.88rem"><input type="radio" name="sales-mode" value="spc" onchange="renderSales()"> Sale Price + Carriage</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.88rem"><input type="radio" name="sales-mode" value="spa" onchange="renderSales()"> Sale Price + Admin Charges</label>
+      </div>
       <div class="tbl-wrap"><table>
         <thead id="sales-head"></thead>
         <tbody id="sales-body"></tbody>
@@ -2000,23 +2007,35 @@ function recordSale(){
 
 // ══════════════════════════ ALL SALES ══════════════════════════
 function renderSales(){
+  // Determine selected display mode
+  const modeEl=document.querySelector('[name="sales-mode"]:checked');
+  const mode=modeEl?modeEl.value:'all';
+  const modeLabel={all:'Total (Recorded)',sp:'Sale Price Only',spc:'Sale Price + Carriage',spa:'Sale Price + Admin'}[mode];
+  function displayAmt(s){
+    const sp=s.is_lumpsum?(s.amount-(s.carriage_charges||0)):s.weight_at_sale*s.rate_per_kg;
+    if(mode==='all')  return s.amount||0;
+    if(mode==='sp')   return sp;
+    if(mode==='spc')  return sp+(s.carriage_charges||0);
+    if(mode==='spa')  return sp+(s.admin_charges||0);
+    return s.amount||0;
+  }
   const head=document.getElementById('sales-head');
-  head.innerHTML='<tr>'+'<th>S#</th><th>Photo</th>'+th('Receipt','sales','receipt_no')+th('Date','sales','sale_date')+th('Code','sales','animal_code')+'<th>Age</th>'+th('Customer','sales','customerName')+th('Wt(kg)','sales','weight_at_sale')+th('Rate/kg','sales','rate_per_kg')+th('Sale Pr.','sales','sp')+th('Carriage','sales','carriage_charges')+th('Total','sales','amount')+'<th></th></tr>';
+  head.innerHTML='<tr>'+'<th>S#</th><th>Photo</th>'+th('Receipt','sales','receipt_no')+th('Date','sales','sale_date')+th('Code','sales','animal_code')+'<th>Age</th>'+th('Customer','sales','customerName')+th('Wt(kg)','sales','weight_at_sale')+th('Rate/kg','sales','rate_per_kg')+th('Sale Pr.','sales','sp')+th('Carriage','sales','carriage_charges')+th('Admin','sales','admin_charges')+`<th>${modeLabel}</th>`+'<th></th></tr>';
   const tb=document.getElementById('sales-body');
-  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="12" class="empty">No sales yet.</td></tr>`;return;}
+  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="13" class="empty">No sales yet.</td></tr>`;return;}
   const salesQ=(document.getElementById('sales-search')||{value:''}).value.trim().toLowerCase();
-  const np=DB.settings.num_persons||7;
   // Attach computed fields for sorting
   const withComputed=DB.sales.map(s=>{const sp=s.weight_at_sale*s.rate_per_kg;return Object.assign({},s,{customerName:cName(s.customer_id),sp});});
   const col=SORT.sales.col;
   const dir=SORT.sales.dir;
   let list;
-  if(['weight_at_sale','rate_per_kg','sp','carriage_charges','amount'].includes(col)){
+  if(['weight_at_sale','rate_per_kg','sp','carriage_charges','amount','admin_charges'].includes(col)){
     list=[...withComputed].sort((a,b)=>dir==='asc'?(a[col]||0)-(b[col]||0):(b[col]||0)-(a[col]||0));
   } else {
     list=sortArr(withComputed,col,dir);
   }
   list=list.filter(s=>!salesQ||[s.receipt_no,s.animal_code,s.customerName,s.sale_date].join(' ').toLowerCase().includes(salesQ));
+  const grandTotal=list.reduce((sum,s)=>sum+displayAmt(s),0);
   tb.innerHTML=list.map((s,i)=>{
     const sp=s.weight_at_sale*s.rate_per_kg;
     const _a=DB.animals.find(x=>x.code===s.animal_code)||{};
@@ -2032,14 +2051,15 @@ function renderSales(){
       <td>${cName(s.customer_id)}</td>
       <td>${fmtN(s.weight_at_sale,1)} kg</td><td>${fmtN(s.rate_per_kg)}</td>
       <td>${Rs(sp)}</td><td>${s.carriage_charges>0?Rs(s.carriage_charges):'-'}</td>
-      <td><strong>${Rs(s.amount)}</strong></td>
+      <td>${s.admin_charges>0?Rs(s.admin_charges):'-'}</td>
+      <td><strong>${Rs(displayAmt(s))}</strong></td>
       <td style="white-space:nowrap" onclick="event.stopPropagation()">
         <button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Receipt</button>
         <button class="btn btn-light btn-sm" style="margin-left:4px" onclick="openSaleEdit('${s.receipt_no}')">&#9998; Edit</button>
         <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="deleteSale('${s.receipt_no}')">&#128465; Del</button>
       </td>
     </tr>`;
-  }).join('');
+  }).join('')+`<tr style="font-weight:700;background:#e0f2fe"><td colspan="12" style="text-align:right;color:#1a3a5c">${modeLabel} — Total (${list.length})</td><td>${Rs(grandTotal)}</td><td></td></tr>`;
 }
 
 function deleteSale(rno){
