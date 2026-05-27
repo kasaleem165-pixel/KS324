@@ -280,8 +280,9 @@ input[readonly]{background:#f8fafc}
       <div class="fg"><label>Sale Date *</label>
         <input id="s-date" type="date"></div>
       <div class="fg"><label>Location</label>
-        <input id="s-location" list="s-location-list" placeholder="e.g. Lahore, Multan…" autocomplete="off">
-        <datalist id="s-location-list"></datalist></div>
+        <select id="s-location">
+          <option value="">-- Select Location --</option>
+        </select></div>
     </div>
     <!-- Sale mode toggle -->
     <div style="margin:12px 0;padding:11px 14px;background:#f1f5f9;border-radius:8px;display:flex;gap:22px;align-items:center;flex-wrap:wrap">
@@ -579,8 +580,9 @@ input[readonly]{background:#f8fafc}
       <div class="fg"><label>Sale Date *</label>
         <input id="es-date" type="date"></div>
       <div class="fg"><label>Location</label>
-        <input id="es-location" list="es-location-list" placeholder="e.g. Lahore, Multan…" autocomplete="off">
-        <datalist id="es-location-list"></datalist></div>
+        <select id="es-location">
+          <option value="">-- Select Location --</option>
+        </select></div>
     </div>
 
     <!-- Sale Mode Toggle -->
@@ -684,6 +686,15 @@ input[readonly]{background:#f8fafc}
         <select id="ea-cust"><option value="">-- None --</option></select></div>
       <div class="fg full"><label>Description</label>
         <textarea id="ea-desc" rows="2" placeholder="e.g. 1 Waccha purchased from Ludan Mandi"></textarea></div>
+    </div>
+    <div style="margin-top:16px;border-top:1px solid #f1f5f9;padding-top:14px">
+      <label style="font-size:.81rem;color:#444;font-weight:500">Animal Photos (up to 4)</label>
+      <div id="ea-photo-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px;min-height:40px"></div>
+      <div style="margin-top:8px">
+        <label id="ea-add-photo-btn" class="btn btn-light btn-sm" style="cursor:pointer">&#128247; Add Photo
+          <input type="file" id="ea-photos-input" accept="image/*" multiple style="display:none" onchange="eaHandlePhotoSelect(event)">
+        </label>
+      </div>
     </div>
     <div class="form-actions">
       <button class="btn btn-success" onclick="saveAnimalEdit()">Save Changes</button>
@@ -1518,6 +1529,36 @@ function deleteAnimalPhoto(code,idx){
   save(); renderPhotoViewer(a); renderAnimals();
 }
 
+function eaRenderPhotos(code){
+  const a=DB.animals.find(x=>x.code===code); if(!a) return;
+  const photos=a.photos||[];
+  const grid=document.getElementById('ea-photo-grid');
+  if(!grid) return;
+  grid.innerHTML=photos.length
+    ?photos.map((b64,i)=>`<div style="position:relative">
+        <img src="${b64}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;cursor:zoom-in" onclick="openAnimalPhoto('${code}',${i})">
+        <button class="del-btn" style="width:22px;height:22px;font-size:12px;top:4px;right:4px" onclick="eaDeletePhoto('${code}',${i})">&#10005;</button>
+      </div>`).join('')
+    :`<p style="color:#aaa;font-style:italic;font-size:.83rem">No photos yet.</p>`;
+}
+async function eaHandlePhotoSelect(e){
+  const code=document.getElementById('ea-code').value; if(!code) return;
+  const a=DB.animals.find(x=>x.code===code); if(!a) return;
+  if(!a.photos) a.photos=[];
+  const remaining=4-a.photos.length;
+  if(remaining<=0){alert('Maximum 4 photos per animal.');e.target.value='';return;}
+  for(const f of [...e.target.files].slice(0,remaining)){
+    a.photos.push(await compressImage(f));
+  }
+  save(); eaRenderPhotos(code); renderAnimals(); e.target.value='';
+}
+function eaDeletePhoto(code,idx){
+  const a=DB.animals.find(x=>x.code===code); if(!a||!a.photos) return;
+  if(!confirm('Delete this photo?')) return;
+  a.photos.splice(idx,1);
+  save(); eaRenderPhotos(code); renderAnimals();
+}
+
 function populateAnimalFormLists(){
   const typeList=DB.settings.typeList||[];
   const ageList=DB.settings.ageList||[];
@@ -1773,6 +1814,7 @@ function openAnimalEdit(code){
   }
   populateCustDropdown('ea-cust', a.assigned_customer||'');
   document.getElementById('editanimal-flash').innerHTML='';
+  eaRenderPhotos(code);
   document.getElementById('editanimal-overlay').classList.add('open');
 }
 function eaToggleAgeOther(){
@@ -1844,9 +1886,9 @@ function initSaleForm(){
   document.getElementById('s-date').value=today();
   document.getElementById('s-rate').value=DB.settings.rate_per_kg||780;
   document.getElementById('s-admin').value='';
-  ['s-weight','s-carriage','s-saleprice','s-total','s-notes','s-location'].forEach(id=>document.getElementById(id).value='');
-  const locDl=document.getElementById('s-location-list');
-  if(locDl) locDl.innerHTML=(DB.settings.locationList||[]).sort().map(v=>`<option value="${v}">`).join('');
+  ['s-weight','s-carriage','s-saleprice','s-total','s-notes'].forEach(id=>document.getElementById(id).value='');
+  const locSel=document.getElementById('s-location');
+  if(locSel){locSel.innerHTML='<option value="">-- Select Location --</option>'+(DB.settings.locationList||[]).slice().sort().map(v=>`<option value="${v}">${v}</option>`).join('');}
 }
 
 function customerSelected(){
@@ -2113,9 +2155,8 @@ function openSaleEdit(rno){
   });
 
   document.getElementById('es-date').value=s.sale_date||today();
-  document.getElementById('es-location').value=s.location||'';
-  const esLocDl=document.getElementById('es-location-list');
-  if(esLocDl) esLocDl.innerHTML=(DB.settings.locationList||[]).sort().map(v=>`<option value="${v}">`).join('');
+  const esLocSel=document.getElementById('es-location');
+  if(esLocSel){esLocSel.innerHTML='<option value="">-- Select Location --</option>'+(DB.settings.locationList||[]).slice().sort().map(v=>`<option value="${v}">${v}</option>`).join('');esLocSel.value=s.location||'';}
   document.getElementById('es-notes').value=s.notes||'';
 
   // Set sale mode
