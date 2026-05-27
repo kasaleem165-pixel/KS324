@@ -180,8 +180,6 @@ input[readonly]{background:#f8fafc}
       <div class="fg"><label>Weight Latest (kg)</label><input id="a-wf" type="number" step="0.1" placeholder="Current / latest weight" oninput="previewCalc()"></div>
       <div class="fg full"><label>Description</label>
         <textarea id="a-desc" rows="2" placeholder="e.g. 1 Waccha purchased from Ludan Mandi"></textarea></div>
-      <div class="fg"><label>Admin Charges (Rs.) <span style="font-weight:400;font-size:.74rem;color:#aaa">internal — for budgeting only</span></label>
-        <input id="a-admin" type="number" step="1" value="0"></div>
       <div class="fg"><label>Customer (if already assigned)</label>
         <select id="a-cust"><option value="">-- None --</option></select></div>
     </div>
@@ -312,10 +310,6 @@ input[readonly]{background:#f8fafc}
         <input id="s-lumpcar" type="number" step="1" placeholder="e.g. 4000" oninput="calcSaleTotal()"></div>
       <div class="fg" id="s-lumptotal-row" style="display:none"><label>Total Amount (Rs.)</label>
         <input id="s-lumptotal" readonly style="font-weight:700;font-size:1rem;background:#f8fafc" placeholder="Auto-calculated"></div>
-      <div class="fg"><label>Beef Qty / person (kg)</label>
-        <input id="s-beefqty" readonly></div>
-      <div class="fg"><label>Beef Rate / person (Rs./kg)</label>
-        <input id="s-beefrate" readonly></div>
       <div class="fg full"><label>Notes</label>
         <input id="s-notes" placeholder="Optional"></div>
     </div>
@@ -1359,12 +1353,12 @@ function showDashDetail(key){
 function populateCustDropdown(selId, selectedVal=''){
   const sel=document.getElementById(selId);
   sel.innerHTML='<option value="">-- None --</option>';
-  DB.customers.forEach(c=>sel.innerHTML+=`<option value="${c.id}"${c.id==selectedVal?' selected':''}>${c.name}</option>`);
+  [...DB.customers].sort((a,b)=>a.name.localeCompare(b.name)).forEach(c=>sel.innerHTML+=`<option value="${c.id}"${c.id==selectedVal?' selected':''}>${c.name}</option>`);
 }
 
 function previewCalc(){
   const w=parseFloat(document.getElementById('a-wf').value)||0;
-  const admin=parseFloat(document.getElementById('a-admin').value)||0;
+  const admin=DB.settings.admin_charges||30000;
   const prev=document.getElementById('a-preview');
   if(!w){prev.style.display='none';return;}
   const f=calcFields(w,admin);
@@ -1484,7 +1478,7 @@ function addAnimal(){
   if(!code){flash('animal-flash','Animal Code is required.','err');return;}
   if(DB.animals.find(a=>a.code===code)){flash('animal-flash',`Code "${code}" already exists.`,'err');return;}
   const wf=parseFloat(document.getElementById('a-wf').value)||null;
-  const admin=parseFloat(document.getElementById('a-admin').value)||(DB.settings.admin_charges||30000);
+  const admin=DB.settings.admin_charges||30000;
   const custId=parseInt(document.getElementById('a-cust').value)||null;
   DB.animals.push({
     code, purchase_date:document.getElementById('a-date').value||null,
@@ -1502,7 +1496,6 @@ function clearAnimalForm(){
   ['a-code','a-date','a-desc','a-wf','a-animaltype','a-age','a-preview-vals'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
-  document.getElementById('a-admin').value=DB.settings.admin_charges||30000;
   document.getElementById('a-preview').style.display='none';
   _formPhotos=[];
   document.getElementById('a-photo-previews').innerHTML='';
@@ -1523,7 +1516,6 @@ function animalComputedList(filterFn){
 
 function renderAnimals(){
   populateCustDropdown('a-cust');
-  document.getElementById('a-admin').value=DB.settings.admin_charges||30000;
   const filter=_animalFilter||'all';
   const head=document.getElementById('animals-head');
   const tb=document.getElementById('animals-body');
@@ -1782,16 +1774,16 @@ function saveCustomerEdit(){
 function initSaleForm(){
   const asel=document.getElementById('s-animal');
   asel.innerHTML='<option value="">-- Select Animal --</option>';
-  DB.animals.filter(a=>a.status==='available').forEach(a=>{
+  [...DB.animals].filter(a=>a.status==='available').sort((a,b)=>Number(a.code)-Number(b.code)||a.code.localeCompare(b.code)).forEach(a=>{
     asel.innerHTML+=`<option value="${a.code}" data-w="${a.weight_final||''}" data-adm="${a.admin_charges||DB.settings.admin_charges||0}">Code: ${a.code} | ${a.age_type||''} | ${a.weight_final||'?'} kg</option>`;
   });
   const csel=document.getElementById('s-customer');
   csel.innerHTML='<option value="">-- Select Customer --</option>';
-  DB.customers.forEach(c=>csel.innerHTML+=`<option value="${c.id}" data-adm="${c.admin_charges!=null?c.admin_charges:''}">${c.name}</option>`);
+  [...DB.customers].sort((a,b)=>a.name.localeCompare(b.name)).forEach(c=>csel.innerHTML+=`<option value="${c.id}" data-adm="${c.admin_charges!=null?c.admin_charges:''}">${c.name}</option>`);
   document.getElementById('s-date').value=today();
   document.getElementById('s-rate').value=DB.settings.rate_per_kg||780;
   document.getElementById('s-admin').value='';
-  ['s-weight','s-carriage','s-saleprice','s-total','s-beefqty','s-beefrate','s-notes'].forEach(id=>document.getElementById(id).value='');
+  ['s-weight','s-carriage','s-saleprice','s-total','s-notes'].forEach(id=>document.getElementById(id).value='');
 }
 
 function customerSelected(){
@@ -1829,17 +1821,11 @@ function calcSaleTotal(){
   const r=parseFloat(document.getElementById('s-rate').value)||0;
   const adm=parseFloat(document.getElementById('s-admin').value)||0;
   const car=parseFloat(document.getElementById('s-carriage').value)||0;
-  if(!w){['s-saleprice','s-total','s-beefqty','s-beefrate'].forEach(id=>document.getElementById(id).value='');return;}
-  const np=DB.settings.num_persons||7;
+  if(!w){['s-saleprice','s-total'].forEach(id=>document.getElementById(id).value='');return;}
   const salePrice=w*r;
   const total=salePrice+car;
-  const tc=salePrice+adm;
-  const bq=(w/2)/np;
-  const br=bq>0?(tc/np)/bq:0;
   document.getElementById('s-saleprice').value=Rs(salePrice);
   document.getElementById('s-total').value=Rs(total);
-  document.getElementById('s-beefqty').value=fmtN(bq,2)+' kg';
-  document.getElementById('s-beefrate').value=Rs(br)+'/kg';
 }
 
 function recordSale(){
@@ -2228,7 +2214,7 @@ function openPaymentEdit(rno){
   // customer dropdown
   const csel=document.getElementById('ep-cid');
   csel.innerHTML='<option value="">-- Select Customer --</option>';
-  DB.customers.forEach(c=>csel.innerHTML+=`<option value="${c.id}"${c.id===p.customer_id?' selected':''}>${c.name}</option>`);
+  [...DB.customers].sort((a,b)=>a.name.localeCompare(b.name)).forEach(c=>csel.innerHTML+=`<option value="${c.id}"${c.id===p.customer_id?' selected':''}>${c.name}</option>`);
   document.getElementById('ep-date').value=p.pay_date||today();
   // method
   const isBank=p.type==='Bank';
@@ -2729,7 +2715,7 @@ function renderBudgeting(){
   const bgAsel=document.getElementById('bg-animal');
   const curAval=bgAsel.value;
   bgAsel.innerHTML='<option value="">-- Select Animal --</option>';
-  DB.animals.forEach(a=>{
+  [...DB.animals].sort((a,b)=>Number(a.code)-Number(b.code)||a.code.localeCompare(b.code)).forEach(a=>{
     const w=a.weight_final||a.weight||0;
     bgAsel.innerHTML+=`<option value="${a.code}"${a.code===curAval?' selected':''}>Code: ${a.code} | ${a.age_type||'?'} | ${w?w+' kg':'?'}</option>`;
   });
