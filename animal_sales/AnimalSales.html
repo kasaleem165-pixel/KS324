@@ -1738,6 +1738,10 @@ function renderAnimals(){
   const rawList=filter==='sold'?DB.animals.filter(a=>a.status==='sold'):DB.animals;
   if(!rawList.length){tb.innerHTML=`<tr><td colspan="12" class="empty">No animals yet. Add one above.</td></tr>`;return;}
   const list=sortArr(animalComputedList(a=>filter==='sold'?a.status==='sold':true),SORT.animals.col,SORT.animals.dir).filter(a=>!animQ||[a.code,a.description||'',a.animal_type||'',a.age_type||''].join(' ').toLowerCase().includes(animQ));
+  const gtW=list.reduce((s,a)=>s+(a._w||0),0);
+  const gtSp=list.reduce((s,a)=>s+(a._w?a._sp:0),0);
+  const gtCar=list.reduce((s,a)=>s+(a._sale?a._sale.carriage_charges||0:0),0);
+  const gtTot=list.reduce((s,a)=>s+(a._sale?a._sale.amount||0:0),0);
   tb.innerHTML=list.map((a,i)=>{
     const firstPhoto=a.photos&&a.photos.length?a.photos[0]:null;
     const photoCell=firstPhoto
@@ -1763,7 +1767,7 @@ function renderAnimals(){
         <button class="btn btn-danger btn-sm" style="margin-left:3px" onclick="deleteAnimal('${a.code}')">&#128465;</button>
       </td>
     </tr>`;
-  }).join('');
+  }).join('')+`<tr style="font-weight:700;background:#e0f2fe"><td colspan="5" style="text-align:right;color:#1a3a5c">Grand Total (${list.length})</td><td>${fmtN(gtW,1)} kg</td><td>${Rs(gtSp)}</td><td>${gtCar>0?Rs(gtCar):'-'}</td><td>${gtTot>0?Rs(gtTot):'-'}</td><td colspan="3"></td></tr>`;
 }
 
 function deleteAnimal(code){
@@ -1802,6 +1806,7 @@ function renderCustomers(){
     list=sortArr(withTotals,col,dir);
   }
   list=list.filter(c=>!custQ||[c.name,c.phone||'',c.address||''].join(' ').toLowerCase().includes(custQ));
+  const gts=list.reduce((s,c)=>s+c.ts,0),gtp=list.reduce((s,c)=>s+c.tp,0),gtd=list.reduce((s,c)=>s+c.td,0),gtb=list.reduce((s,c)=>s+c.balance,0);
   tb.innerHTML=list.map((c,i)=>{
     const {ts,tp,td,balance}=custTotals(c.id);
     return `<tr class="clickable-row" onclick="showLedger(${c.id})">
@@ -1818,7 +1823,7 @@ function renderCustomers(){
         <button class="btn btn-light btn-sm" onclick="openCustomerEdit(${c.id})">&#9998; Edit</button>
       </td>
     </tr>`;
-  }).join('');
+  }).join('')+`<tr style="font-weight:700;background:#e0f2fe"><td colspan="4" style="text-align:right;color:#1a3a5c">Grand Total (${list.length})</td><td>${Rs(gts)}</td><td style="color:#059669">${Rs(gtp)}</td><td style="color:#7c3aed">${Rs(gtd)}</td><td style="color:${gtb>0?'#d97706':'#059669'}">${Rs(gtb)}</td><td></td></tr>`;
 }
 
 // ══════════════════════════ EDIT ANIMAL ══════════════════════════
@@ -2329,6 +2334,8 @@ function renderPayments(){
     list=sortArr(withComputed,col,dir);
   }
   list=list.filter(p=>!payQ||[p.receipt_no,p.customerName,p.type||'',p.bank_name||'',p.sender_name||''].join(' ').toLowerCase().includes(payQ));
+  const totAmt=list.reduce((s,p)=>s+(p.amount||0),0);
+  const totDisc=list.reduce((s,p)=>s+(p.discount||0),0);
   tb.innerHTML=list.map((p,i)=>`<tr class="clickable-row" onclick="showPaymentDetail('${p.receipt_no||''}')">
     <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
     <td>${p.receipt_no||'-'}</td>
@@ -2344,7 +2351,7 @@ function renderPayments(){
       <button class="btn btn-primary btn-sm" onclick="showPayReceipt('${p.receipt_no}')">Receipt</button>
       <button class="btn btn-light btn-sm" style="margin-left:4px" onclick="openPaymentEdit('${p.receipt_no}')">&#9998; Edit</button>
     </td>
-  </tr>`).join('');
+  </tr>`).join('')+`<tr style="font-weight:700;background:#e0f2fe"><td colspan="8" style="text-align:right;color:#1a3a5c">Grand Total (${list.length})</td><td style="color:#059669">${Rs(totAmt)}</td><td style="color:#7c3aed">${Rs(totDisc)}</td><td></td></tr>`;
 }
 
 // ══════════════════════════ EDIT PAYMENT ══════════════════════════
@@ -3031,7 +3038,7 @@ function renderBudgetRecords(){
     <td>${Rs(e.amount)}</td>
     <td style="font-size:.82rem;color:#555">${e.notes||'-'}</td>
     <td><button class="btn btn-danger btn-sm" onclick="deleteBudgetEntry(${e.id})">&#128465;</button></td>
-  </tr>`;}).join('');
+  </tr>`;}).join('')+`<tr style="font-weight:700;background:#e0f2fe"><td colspan="6" style="text-align:right;color:#1a3a5c">Grand Total (${entries.length})</td><td>${Rs(entries.reduce((s,e)=>s+e.amount,0))}</td><td colspan="2"></td></tr>`;
 }
 function renderBudgeting(){
   const np=DB.settings.num_persons||7;
