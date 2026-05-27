@@ -336,7 +336,7 @@ input[readonly]{background:#f8fafc}
     <button class="rpt-tab"        id="rtab-payments"   onclick="showRptTab('payments')">Sales Collection</button>
     <button class="rpt-tab"        id="rtab-custledger" onclick="showRptTab('custledger')">Customer Ledger</button>
     <button class="rpt-tab"        id="rtab-location"   onclick="showRptTab('location')">Location Report</button>
-    <button class="rpt-tab"        id="rtab-waccha"     onclick="showRptTab('waccha')">Animal Sales Price Report</button>
+    <button class="rpt-tab"        id="rtab-waccha"     onclick="showRptTab('waccha')">Sale Price Report</button>
   </div>
 
   <!-- All Sales sub-tab -->
@@ -424,7 +424,7 @@ input[readonly]{background:#f8fafc}
   <div id="rsect-waccha" class="rpt-section" style="display:none">
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <div class="card-title" style="margin:0">&#128004; Animal Sales Price Report</div>
+        <div class="card-title" style="margin:0">&#128004; Sale Price Report</div>
         <button class="btn btn-light btn-sm" onclick="exportWacchaReportExcel()">&#8595; Excel</button>
       </div>
       <p style="color:#666;font-size:.82rem;margin-bottom:12px">Sale price shown is Weight × Rate (or Lump Sum amount) — excludes admin charges and carriage.</p>
@@ -894,8 +894,8 @@ input[readonly]{background:#f8fafc}
 const STORE='animal_sales_db';
 let DB={animals:[],customers:[],sales:[],payments:[],banks:[],budget:[],settings:{rate_per_kg:780,admin_charges:30000,num_persons:7}};
 
-const SORT={animals:{col:'code',dir:'asc'},customers:{col:'name',dir:'asc'},sales:{col:'receipt_no',dir:'desc'},payments:{col:'receipt_no',dir:'desc'},stock:{col:'code',dir:'asc'}};
-function sortToggle(tbl,col){if(SORT[tbl].col===col){SORT[tbl].dir=SORT[tbl].dir==='asc'?'desc':'asc';}else{SORT[tbl].col=col;SORT[tbl].dir='asc';}const fn={animals:renderAnimals,customers:renderCustomers,sales:renderSales,payments:renderPayments}[tbl];if(fn)fn();}
+const SORT={animals:{col:'code',dir:'asc'},customers:{col:'name',dir:'asc'},sales:{col:'receipt_no',dir:'desc'},payments:{col:'receipt_no',dir:'desc'},stock:{col:'code',dir:'asc'},locrpt:{col:'location',dir:'asc'},wacchart:{col:'sale_date',dir:'desc'}};
+function sortToggle(tbl,col){if(SORT[tbl].col===col){SORT[tbl].dir=SORT[tbl].dir==='asc'?'desc':'asc';}else{SORT[tbl].col=col;SORT[tbl].dir='asc';}const fn={animals:renderAnimals,customers:renderCustomers,sales:renderSales,payments:renderPayments,locrpt:renderLocationReport,wacchart:renderWacchaReport}[tbl];if(fn)fn();}
 let _animalFilter='all';
 function setAnimalFilter(f){
   _animalFilter=f;
@@ -2736,53 +2736,35 @@ function renderLocationReport(){
   const sold=DB.sales.filter(s=>s.animal_code&&(!filterLoc||(s.location||'')=== filterLoc));
   const head=document.getElementById('rpt-loc-head');
   const tb=document.getElementById('rpt-loc-body');
-  head.innerHTML='<tr><th>S#</th><th>Location</th><th>Receipt</th><th>Date</th><th>Code</th><th>Type</th><th>Age</th><th>Wt (kg)</th><th>Customer</th><th>Sale Price</th><th>Carriage</th><th>Total</th></tr>';
+  head.innerHTML='<tr><th>S#</th>'+th('Location','locrpt','location')+th('Receipt','locrpt','receipt_no')+th('Date','locrpt','sale_date')+th('Code','locrpt','animal_code')+th('Type','locrpt','animal_type')+th('Age','locrpt','age_type')+th('Wt(kg)','locrpt','weight_at_sale')+th('Customer','locrpt','customerName')+th('Sale Price','locrpt','salePrice')+th('Carriage','locrpt','carriage_charges')+th('Total','locrpt','amount')+'</tr>';
   if(!sold.length){
     document.getElementById('rpt-loc-summary').innerHTML='';
     tb.innerHTML='<tr><td colspan="12" class="empty">No sales found.</td></tr>';return;
   }
-  // Group by location for summary
+  // Attach computed fields and sort
+  const soldC=sold.map(s=>{const a=DB.animals.find(x=>x.code===s.animal_code)||{};const salePrice=s.is_lumpsum?(s.amount-(s.carriage_charges||0)):s.weight_at_sale*s.rate_per_kg;return Object.assign({},s,{customerName:cName(s.customer_id),animal_type:a.animal_type||'',age_type:a.age_type||'',salePrice});});
+  const numCols=['weight_at_sale','salePrice','carriage_charges','amount'];
+  const col=SORT.locrpt.col,dir=SORT.locrpt.dir;
+  const list=numCols.includes(col)?[...soldC].sort((a,b)=>dir==='asc'?(a[col]||0)-(b[col]||0):(b[col]||0)-(a[col]||0)):sortArr(soldC,col,dir);
+  // Group by location for summary (use sorted data)
   const byLoc={};
-  sold.forEach(s=>{const l=s.location||'(No Location)';if(!byLoc[l])byLoc[l]={cnt:0,total:0};byLoc[l].cnt++;byLoc[l].total+=s.amount||0;});
+  soldC.forEach(s=>{const l=s.location||'(No Location)';if(!byLoc[l])byLoc[l]={cnt:0,total:0};byLoc[l].cnt++;byLoc[l].total+=s.amount||0;});
   document.getElementById('rpt-loc-summary').innerHTML=
     Object.entries(byLoc).sort((a,b)=>a[0].localeCompare(b[0])).map(([l,v])=>
       `<div class="stat"><div class="n" style="font-size:.85rem">${Rs(v.total)}</div><div class="l" style="font-size:.72rem">${l} (${v.cnt})</div></div>`).join('')+
-    `<div class="stat" style="border:2px solid #1a3a5c"><div class="n" style="font-size:.95rem;color:#1a3a5c">${Rs(sold.reduce((s,x)=>s+(x.amount||0),0))}</div><div class="l">Total (${sold.length})</div></div>`;
-  // Sort by location then date
-  const list=[...sold].sort((a,b)=>(a.location||'').localeCompare(b.location||'')||(a.sale_date>b.sale_date?1:-1));
-  let html='',lastLoc=null,grpSno=0,globalSno=0;
-  list.forEach(s=>{
-    const loc=s.location||'(No Location)';
-    const a=DB.animals.find(x=>x.code===s.animal_code)||{};
-    const salePrice=s.is_lumpsum?(s.amount-(s.carriage_charges||0)):s.weight_at_sale*s.rate_per_kg;
-    if(loc!==lastLoc){
-      if(lastLoc!==null){
-        const g=byLoc[lastLoc||'(No Location)'];
-        html+=`<tr style="background:#f1f5f9;font-weight:700;font-size:.81rem"><td colspan="9" style="color:#1a3a5c;text-align:right">${lastLoc||'(No Location)'} Subtotal (${g.cnt})</td><td colspan="2"></td><td>${Rs(g.total)}</td></tr>`;
-      }
-      html+=`<tr style="background:#dbeafe;font-weight:700"><td colspan="12" style="color:#1e40af;padding:8px 10px">&#128205; ${loc}</td></tr>`;
-      lastLoc=loc; grpSno=0;
-    }
-    grpSno++; globalSno++;
-    html+=`<tr>
-      <td style="color:#94a3b8;font-size:.75rem">${grpSno}</td>
-      <td style="font-size:.78rem;color:#64748b">${loc}</td>
+    `<div class="stat" style="border:2px solid #1a3a5c"><div class="n" style="font-size:.95rem;color:#1a3a5c">${Rs(soldC.reduce((s,x)=>s+(x.amount||0),0))}</div><div class="l">Total (${soldC.length})</div></div>`;
+  tb.innerHTML=list.map((s,i)=>`<tr>
+      <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
+      <td style="font-size:.78rem;color:#64748b">${s.location||'-'}</td>
       <td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td>
       <td><strong>${s.animal_code}</strong></td>
-      <td>${a.animal_type||'-'}</td><td>${a.age_type||'-'}</td>
+      <td>${s.animal_type||'-'}</td><td>${s.age_type||'-'}</td>
       <td>${s.weight_at_sale?fmtN(s.weight_at_sale,1):'-'}</td>
-      <td>${cName(s.customer_id)}</td>
-      <td>${Rs(salePrice)}</td>
+      <td>${s.customerName}</td>
+      <td>${Rs(s.salePrice)}</td>
       <td>${s.carriage_charges?Rs(s.carriage_charges):'-'}</td>
       <td><strong>${Rs(s.amount)}</strong></td>
-    </tr>`;
-  });
-  if(lastLoc!==null){
-    const g=byLoc[lastLoc||'(No Location)'];
-    html+=`<tr style="background:#f1f5f9;font-weight:700;font-size:.81rem"><td colspan="9" style="color:#1a3a5c;text-align:right">${lastLoc||'(No Location)'} Subtotal (${g.cnt})</td><td colspan="2"></td><td>${Rs(g.total)}</td></tr>`;
-  }
-  html+=`<tr style="font-weight:700;background:#e0f2fe"><td colspan="9" style="text-align:right;color:#1a3a5c">Grand Total (${sold.length})</td><td colspan="2"></td><td>${Rs(sold.reduce((s,x)=>s+(x.amount||0),0))}</td></tr>`;
-  tb.innerHTML=html;
+    </tr>`).join('')+`<tr style="font-weight:700;background:#e0f2fe"><td colspan="9" style="text-align:right;color:#1a3a5c">Grand Total (${soldC.length})</td><td colspan="2"></td><td>${Rs(soldC.reduce((s,x)=>s+(x.amount||0),0))}</td></tr>`;
 }
 
 function renderWacchaReport(){
@@ -2798,35 +2780,33 @@ function renderWacchaReport(){
   });
   const head=document.getElementById('rpt-waccha-head');
   const tb=document.getElementById('rpt-waccha-body');
-  head.innerHTML='<tr><th>S#</th><th>Receipt</th><th>Date</th><th>Code</th><th>Type</th><th>Age</th><th>Wt (kg)</th><th>Rate/kg</th><th>Sale Price</th><th>Customer</th><th>Location</th></tr>';
+  head.innerHTML='<tr><th>S#</th>'+th('Receipt','wacchart','receipt_no')+th('Date','wacchart','sale_date')+th('Code','wacchart','animal_code')+th('Type','wacchart','animal_type')+th('Age','wacchart','age_type')+th('Wt(kg)','wacchart','weight_at_sale')+th('Rate/kg','wacchart','rate_per_kg')+th('Sale Price','wacchart','salePrice')+th('Customer','wacchart','customerName')+th('Location','wacchart','location')+'</tr>';
   if(!wSales.length){
     document.getElementById('rpt-waccha-summary').innerHTML='';
-    tb.innerHTML='<tr><td colspan="11" class="empty">No Waccha / Wacchi sales found.</td></tr>';return;
+    tb.innerHTML='<tr><td colspan="11" class="empty">No sales found in Animal Sales Price Report.</td></tr>';return;
   }
-  const totSalePrice=wSales.reduce((sum,s)=>{
-    return sum+(s.is_lumpsum?(s.amount-(s.carriage_charges||0)):s.weight_at_sale*s.rate_per_kg);
-  },0);
-  const totWt=wSales.reduce((sum,s)=>sum+(s.weight_at_sale||0),0);
+  // Attach computed fields
+  const wSalesC=wSales.map(s=>{const a=DB.animals.find(x=>x.code===s.animal_code)||{};const salePrice=s.is_lumpsum?(s.amount-(s.carriage_charges||0)):s.weight_at_sale*s.rate_per_kg;return Object.assign({},s,{animal_type:a.animal_type||'',age_type:a.age_type||'',salePrice,customerName:cName(s.customer_id)});});
+  const numColsW=['weight_at_sale','rate_per_kg','salePrice'];
+  const colW=SORT.wacchart.col,dirW=SORT.wacchart.dir;
+  const list=numColsW.includes(colW)?[...wSalesC].sort((a,b)=>dirW==='asc'?(a[colW]||0)-(b[colW]||0):(b[colW]||0)-(a[colW]||0)):sortArr(wSalesC,colW,dirW);
+  const totSalePrice=wSalesC.reduce((sum,s)=>sum+s.salePrice,0);
+  const totWt=wSalesC.reduce((sum,s)=>sum+(s.weight_at_sale||0),0);
   document.getElementById('rpt-waccha-summary').innerHTML=
-    `<div class="stat"><div class="n" style="font-size:.9rem">${wSales.length}</div><div class="l">Waccha/Wacchi Sold</div></div>`+
+    `<div class="stat"><div class="n" style="font-size:.9rem">${wSalesC.length}</div><div class="l">Animals Sold</div></div>`+
     `<div class="stat"><div class="n" style="font-size:.9rem">${fmtN(totWt,1)} kg</div><div class="l">Total Weight</div></div>`+
     `<div class="stat" style="border:2px solid #1a3a5c"><div class="n" style="font-size:.95rem;color:#1a3a5c">${Rs(totSalePrice)}</div><div class="l">Total Sale Price</div></div>`;
-  const list=[...wSales].sort((a,b)=>a.sale_date>b.sale_date?1:-1);
-  tb.innerHTML=list.map((s,i)=>{
-    const a=DB.animals.find(x=>x.code===s.animal_code)||{};
-    const salePrice=s.is_lumpsum?(s.amount-(s.carriage_charges||0)):s.weight_at_sale*s.rate_per_kg;
-    return `<tr>
+  tb.innerHTML=list.map((s,i)=>`<tr>
       <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
       <td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td>
       <td><strong>${s.animal_code}</strong></td>
-      <td>${a.animal_type||'-'}</td><td>${a.age_type||'-'}</td>
+      <td>${s.animal_type||'-'}</td><td>${s.age_type||'-'}</td>
       <td>${s.weight_at_sale?fmtN(s.weight_at_sale,1)+' kg':'-'}</td>
       <td>${s.is_lumpsum?'Lump Sum':Rs(s.rate_per_kg)+'/kg'}</td>
-      <td style="color:#059669"><strong>${Rs(salePrice)}</strong></td>
-      <td>${cName(s.customer_id)}</td>
+      <td style="color:#059669"><strong>${Rs(s.salePrice)}</strong></td>
+      <td>${s.customerName}</td>
       <td style="font-size:.82rem;color:#64748b">${s.location||'-'}</td>
-    </tr>`;
-  }).join('');
+    </tr>`).join('')+`<tr style="font-weight:700;background:#e0f2fe"><td colspan="8" style="text-align:right;color:#1a3a5c">Total (${wSalesC.length})</td><td style="color:#059669">${Rs(totSalePrice)}</td><td colspan="2"></td></tr>`;
 }
 
 function exportLocationReportExcel(){
