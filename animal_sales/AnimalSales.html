@@ -348,11 +348,10 @@ input[readonly]{background:#f8fafc}
       </div>
       <div style="margin-bottom:10px"><input id="sales-search" type="text" placeholder="&#128269; Search by receipt, code, customer, date…" style="width:100%;padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:.88rem" oninput="renderSales()"></div>
       <div style="margin-bottom:12px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;display:flex;flex-wrap:wrap;gap:18px;align-items:center">
-        <span style="font-size:.84rem;font-weight:600;color:#555">Show Total As:</span>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.88rem"><input type="radio" name="sales-mode" value="all" checked onchange="renderSales()"> Full Recorded Amount</label>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.88rem"><input type="radio" name="sales-mode" value="sp"  onchange="renderSales()"> Sale Price Only</label>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.88rem"><input type="radio" name="sales-mode" value="spc" onchange="renderSales()"> Sale Price + Carriage</label>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.88rem"><input type="radio" name="sales-mode" value="spa" onchange="renderSales()"> Sale Price + Admin Charges</label>
+        <span style="font-size:.84rem;font-weight:600;color:#555">Include in Total:</span>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.88rem"><input type="checkbox" id="chk-sp" checked disabled> Sale Price</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.88rem"><input type="checkbox" id="chk-car" onchange="renderSales()"> + Carriage Charges</label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.88rem"><input type="checkbox" id="chk-adm" onchange="renderSales()"> + Admin Charges</label>
       </div>
       <div class="tbl-wrap"><table>
         <thead id="sales-head"></thead>
@@ -2012,17 +2011,15 @@ function recordSale(){
 
 // ══════════════════════════ ALL SALES ══════════════════════════
 function renderSales(){
-  // Determine selected display mode
-  const modeEl=document.querySelector('[name="sales-mode"]:checked');
-  const mode=modeEl?modeEl.value:'all';
-  const modeLabel={all:'Total (Recorded)',sp:'Sale Price Only',spc:'Sale Price + Carriage',spa:'Sale Price + Admin'}[mode];
+  const inclCar=document.getElementById('chk-car')?.checked||false;
+  const inclAdm=document.getElementById('chk-adm')?.checked||false;
+  const parts=['Sale Price'];
+  if(inclCar) parts.push('Carriage');
+  if(inclAdm) parts.push('Admin');
+  const modeLabel=parts.join(' + ');
   function displayAmt(s){
     const sp=s.is_lumpsum?(s.amount-(s.carriage_charges||0)):s.weight_at_sale*s.rate_per_kg;
-    if(mode==='all')  return s.amount||0;
-    if(mode==='sp')   return sp;
-    if(mode==='spc')  return sp+(s.carriage_charges||0);
-    if(mode==='spa')  return sp+(s.admin_charges||0);
-    return s.amount||0;
+    return sp+(inclCar?(s.carriage_charges||0):0)+(inclAdm?(s.admin_charges||0):0);
   }
   const head=document.getElementById('sales-head');
   head.innerHTML='<tr>'+'<th>S#</th><th>Photo</th>'+th('Receipt','sales','receipt_no')+th('Date','sales','sale_date')+th('Code','sales','animal_code')+'<th>Age</th>'+th('Customer','sales','customerName')+th('Wt(kg)','sales','weight_at_sale')+th('Rate/kg','sales','rate_per_kg')+th('Sale Pr.','sales','sp')+th('Carriage','sales','carriage_charges')+th('Admin','sales','admin_charges')+`<th>${modeLabel}</th>`+'<th></th></tr>';
