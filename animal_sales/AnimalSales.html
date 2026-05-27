@@ -1075,6 +1075,17 @@ function load(){
       });
       DB.settings._tc4000=true;
     }
+    // Backfill sale locations: Lahore for all, Taragarh for animal 164
+    if(!DB.settings._loc20260527){
+      DB.sales.forEach(s=>{
+        if(!s.location) s.location=s.animal_code==='164'?'Taragarh':'Lahore';
+      });
+      if(!DB.settings.locationList||!DB.settings.locationList.includes('Lahore'))
+        DB.settings.locationList=[...(DB.settings.locationList||[]),'Lahore'].sort();
+      if(!DB.settings.locationList.includes('Taragarh'))
+        DB.settings.locationList=[...DB.settings.locationList,'Taragarh'].sort();
+      DB.settings._loc20260527=true;
+    }
     // Backfill seed photos into existing animals that have no photos yet
     DB.animals.forEach(a=>{
       if((!a.photos||!a.photos.length)&&SEED_PHOTOS[a.code]){
