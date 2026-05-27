@@ -2038,6 +2038,9 @@ function renderSales(){
   }
   list=list.filter(s=>!salesQ||[s.receipt_no,s.animal_code,s.customerName,s.sale_date].join(' ').toLowerCase().includes(salesQ));
   const grandTotal=list.reduce((sum,s)=>sum+displayAmt(s),0);
+  const grandSP=list.reduce((sum,s)=>sum+(s.is_lumpsum?(s.amount-(s.carriage_charges||0)):s.weight_at_sale*s.rate_per_kg),0);
+  const grandCar=list.reduce((sum,s)=>sum+(s.carriage_charges||0),0);
+  const grandAdm=list.reduce((sum,s)=>sum+(s.admin_charges||0),0);
   tb.innerHTML=list.map((s,i)=>{
     const sp=s.weight_at_sale*s.rate_per_kg;
     const _a=DB.animals.find(x=>x.code===s.animal_code)||{};
@@ -2061,7 +2064,14 @@ function renderSales(){
         <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="deleteSale('${s.receipt_no}')">&#128465; Del</button>
       </td>
     </tr>`;
-  }).join('')+`<tr style="font-weight:700;background:#e0f2fe"><td colspan="12" style="text-align:right;color:#1a3a5c">${modeLabel} — Total (${list.length})</td><td>${Rs(grandTotal)}</td><td></td></tr>`;
+  }).join('')+`<tr style="font-weight:700;background:#e0f2fe">
+    <td colspan="9" style="text-align:right;color:#1a3a5c">Grand Total (${list.length})</td>
+    <td style="color:#0f766e">${Rs(grandSP)}</td>
+    <td style="color:#b45309">${Rs(grandCar)}</td>
+    <td style="color:#7c3aed">${Rs(grandAdm)}</td>
+    <td style="color:#1d4ed8">${Rs(grandTotal)}</td>
+    <td></td>
+  </tr>`;
 }
 
 function deleteSale(rno){
