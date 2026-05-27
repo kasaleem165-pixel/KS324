@@ -2670,9 +2670,14 @@ function renderLocationReport(){
 
 function renderWacchaReport(){
   const wacchaTypes=['waccha','wacchi'];
+  function isWaccha(a){
+    const t=(a.animal_type||'').toLowerCase().trim();
+    const d=(a.description||'').toLowerCase();
+    return wacchaTypes.includes(t)||wacchaTypes.some(w=>d.includes(w));
+  }
   const wSales=DB.sales.filter(s=>{
     const a=DB.animals.find(x=>x.code===s.animal_code);
-    return a&&wacchaTypes.includes((a.animal_type||'').toLowerCase().trim());
+    return a&&isWaccha(a);
   });
   const head=document.getElementById('rpt-waccha-head');
   const tb=document.getElementById('rpt-waccha-body');
@@ -2722,7 +2727,13 @@ function exportLocationReportExcel(){
 
 function exportWacchaReportExcel(){
   const wacchaTypes=['waccha','wacchi'];
-  const wSales=[...DB.sales].filter(s=>{const a=DB.animals.find(x=>x.code===s.animal_code);return a&&wacchaTypes.includes((a.animal_type||'').toLowerCase().trim());})
+  const wSales=[...DB.sales].filter(s=>{
+    const a=DB.animals.find(x=>x.code===s.animal_code);
+    if(!a) return false;
+    const t=(a.animal_type||'').toLowerCase().trim();
+    const d=(a.description||'').toLowerCase();
+    return wacchaTypes.includes(t)||wacchaTypes.some(w=>d.includes(w));
+  })
     .sort((a,b)=>a.sale_date>b.sale_date?1:-1);
   const headers=['S#','Receipt','Date','Code','Type','Age','Weight(kg)','Rate/kg','Sale Price','Customer','Location'];
   const rows=wSales.map((s,i)=>{
