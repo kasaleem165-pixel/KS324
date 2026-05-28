@@ -435,6 +435,9 @@
     <button onclick="closeModal('txModal')" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>
   </div>
   <input type="hidden" id="txId">
+  <div id="txNoFeedWarning" style="display:none;background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#92400e;">
+    <i class="fas fa-exclamation-triangle"></i> <b>No feed items found.</b> Please go to the <b>Feed &amp; Stock</b> tab first and add your feed items (e.g. Wheat, Wanda), then come back here to record transactions.
+  </div>
   <div class="grid-2">
     <div class="form-group"><label>Transaction Type *</label>
       <select class="form-control" id="txType">
@@ -1036,8 +1039,14 @@ function openTxModal(id) {
 
   const feed = dbGet('feed');
   const sel = document.getElementById('txItem');
-  sel.innerHTML = feed.map(f => `<option value="${f.id}">${f.itemName} (${f.unit})</option>`).join('');
-  if(!feed.length) sel.innerHTML = '<option value="">-- No feed items --</option>';
+  const txWarning = document.getElementById('txNoFeedWarning');
+  if(!feed.length) {
+    sel.innerHTML = '<option value="">-- No feed items added yet --</option>';
+    txWarning.style.display = 'block';
+  } else {
+    sel.innerHTML = feed.map(f => `<option value="${f.id}">${f.itemName} (${f.unit})</option>`).join('');
+    txWarning.style.display = 'none';
+  }
 
   if(id) {
     const t = dbFind('transactions', id);
@@ -1060,7 +1069,8 @@ function saveTransaction() {
   const itemId = document.getElementById('txItem').value;
   const qty = Number(document.getElementById('txQty').value);
   const date = document.getElementById('txDate').value;
-  if(!itemId || !qty || !date) { toast('Please fill all required fields', 'error'); return; }
+  if(!itemId) { toast('Please add a Feed Item in the Feed & Stock tab first', 'error'); return; }
+  if(!qty || !date) { toast('Please fill all required fields', 'error'); return; }
 
   const txs = dbGet('transactions');
   let voucherNo = document.getElementById('txVoucherNo').value.trim();
