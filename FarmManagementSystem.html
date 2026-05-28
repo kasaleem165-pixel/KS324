@@ -55,6 +55,19 @@
   .search-box:focus { border-color:#2d5c3e; }
   .grid-2 { display:grid;grid-template-columns:1fr 1fr;gap:14px; }
   .grid-3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px; }
+  /* manage link next to combo labels */
+  .lbl-row { display:flex;align-items:center;justify-content:space-between;margin-bottom:4px; }
+  .lbl-row label { font-size:13px;font-weight:600;color:#374151;margin:0; }
+  .manage-link { font-size:10px;color:#2d5c3e;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border:1px solid #2d5c3e;border-radius:4px; }
+  .manage-link:hover { background:#2d5c3e;color:#fff; }
+  /* lookup list inside quick-manage modal */
+  .lookup-item { display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:6px;margin-bottom:4px;background:#f9fafb;border:1px solid #e5e7eb; }
+  .lookup-item span { font-size:13px;color:#374151; }
+  /* lookup section in setup */
+  .lookup-section { border:1.5px solid #e5e7eb;border-radius:10px;margin-bottom:12px;overflow:hidden; }
+  .lookup-section-header { background:#f9fafb;padding:10px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:13px;color:#1a3a2a; }
+  .lookup-section-body { padding:14px 16px;display:none; }
+  .lookup-section-body.open { display:block; }
   @media(max-width:768px){ .sidebar{width:60px;} .sidebar-item span{display:none;} .grid-2,.grid-3{grid-template-columns:1fr;} }
 </style>
 </head>
@@ -62,7 +75,7 @@
 
 <div style="display:flex;">
 <!-- SIDEBAR -->
-<div class="sidebar" id="sidebar">
+<div class="sidebar">
   <div style="padding:20px;border-bottom:1px solid #2d5c3e;">
     <div style="color:#4ade80;font-size:18px;font-weight:700;"><i class="fas fa-leaf"></i> <span>FarmMS</span></div>
     <div style="color:#6b9c7a;font-size:11px;margin-top:2px;"><span id="farmOwner">Kamran Saleem</span></div>
@@ -70,7 +83,7 @@
   <nav style="padding-top:10px;">
     <div class="sidebar-item active" onclick="showTab('dashboard')"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></div>
     <div class="sidebar-item" onclick="showTab('animals')"><i class="fas fa-horse"></i><span>Animals</span></div>
-    <div class="sidebar-item" onclick="showTab('inventory')"><i class="fas fa-warehouse"></i><span>Feed & Stock</span></div>
+    <div class="sidebar-item" onclick="showTab('inventory')"><i class="fas fa-warehouse"></i><span>Feed &amp; Stock</span></div>
     <div class="sidebar-item" onclick="showTab('transactions')"><i class="fas fa-exchange-alt"></i><span>Transactions</span></div>
     <div class="sidebar-item" onclick="showTab('weights')"><i class="fas fa-weight"></i><span>Weight History</span></div>
     <div class="sidebar-item" onclick="showTab('reports')"><i class="fas fa-chart-bar"></i><span>Reports</span></div>
@@ -91,23 +104,17 @@
     <button class="btn-primary" onclick="refreshDashboard()"><i class="fas fa-sync-alt"></i> Refresh</button>
   </div>
   <div class="grid-3" style="margin-bottom:20px;" id="statCards"></div>
-
-  <!-- Stage Transition Alerts -->
   <div class="card" style="margin-bottom:20px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div style="font-size:15px;font-weight:700;color:#92400e;"><i class="fas fa-bell" style="color:#f59e0b"></i> Pending Stage Transitions</div>
       <span id="transitionCount" class="badge badge-yellow">0 pending</span>
     </div>
-    <div id="transitionAlerts"><div style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">No pending transitions — all animals are up to date.</div></div>
+    <div id="transitionAlerts"><div style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">No pending transitions.</div></div>
   </div>
-
-  <!-- Low Stock Alerts -->
   <div class="card" style="margin-bottom:20px;">
     <div style="font-size:15px;font-weight:700;color:#991b1b;margin-bottom:14px;"><i class="fas fa-exclamation-triangle" style="color:#ef4444"></i> Low Stock Alerts</div>
     <div id="stockAlerts"><div style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">No low stock items.</div></div>
   </div>
-
-  <!-- Recent Transactions -->
   <div class="card">
     <div style="font-size:15px;font-weight:700;color:#1a3a2a;margin-bottom:14px;"><i class="fas fa-history"></i> Recent Transactions</div>
     <div id="recentTx"></div>
@@ -120,22 +127,17 @@
     <div class="section-title"><i class="fas fa-horse" style="color:#2d5c3e"></i> Animals Register</div>
     <button class="btn-primary" onclick="openAnimalModal()"><i class="fas fa-plus"></i> Add Animal</button>
   </div>
-  <!-- Filters -->
   <div class="card" style="margin-bottom:16px;padding:14px 20px;">
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
       <input class="search-box" id="animalSearch" placeholder="Search by Tag No or Breed..." oninput="renderAnimals()">
       <select class="form-control" style="width:140px;" id="filterType" onchange="renderAnimals()">
         <option value="">All Types</option>
-        <option>Buffalo</option><option>Cow</option><option>Goat</option><option>Sheep</option>
       </select>
       <select class="form-control" style="width:130px;" id="filterStage" onchange="renderAnimals()">
         <option value="">All Stages</option>
-        <option>Calf</option><option>Waccha</option><option>Heifer</option>
-        <option>Cow</option><option>Bull Calf</option><option>Ox</option><option>Bull</option>
       </select>
       <select class="form-control" style="width:120px;" id="filterStatus" onchange="renderAnimals()">
         <option value="">All Status</option>
-        <option>Active</option><option>Sold</option><option>Dead</option>
       </select>
     </div>
   </div>
@@ -153,7 +155,7 @@
 <!-- INVENTORY -->
 <div class="tab-content" id="tab-inventory">
   <div class="section-header">
-    <div class="section-title"><i class="fas fa-warehouse" style="color:#2d5c3e"></i> Feed & Stock</div>
+    <div class="section-title"><i class="fas fa-warehouse" style="color:#2d5c3e"></i> Feed &amp; Stock</div>
     <button class="btn-primary" onclick="openFeedModal()"><i class="fas fa-plus"></i> Add Feed Item</button>
   </div>
   <div class="card">
@@ -176,8 +178,7 @@
   <div class="card" style="margin-bottom:16px;padding:14px 20px;">
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
       <select class="form-control" style="width:150px;" id="filterTxType" onchange="renderTransactions()">
-        <option value="">All Types</option>
-        <option>Purchase</option><option>Issue</option>
+        <option value="">All Types</option><option>Purchase</option><option>Issue</option>
       </select>
       <input type="date" class="form-control" style="width:160px;" id="filterTxFrom" onchange="renderTransactions()">
       <input type="date" class="form-control" style="width:160px;" id="filterTxTo" onchange="renderTransactions()">
@@ -237,7 +238,7 @@
     <div class="card" style="text-align:center;cursor:pointer;" onclick="printReport('transactions')">
       <i class="fas fa-file-invoice" style="font-size:32px;color:#3b82f6;margin-bottom:10px;display:block;"></i>
       <div style="font-weight:700;margin-bottom:4px;">Transaction Ledger</div>
-      <div style="font-size:12px;color:#6b7280;">All feed purchases & issues</div>
+      <div style="font-size:12px;color:#6b7280;">All feed purchases &amp; issues</div>
     </div>
     <div class="card" style="text-align:center;cursor:pointer;" onclick="printReport('weight-history')">
       <i class="fas fa-weight" style="font-size:32px;color:#8b5cf6;margin-bottom:10px;display:block;"></i>
@@ -262,13 +263,21 @@
     <div style="font-size:15px;font-weight:700;margin-bottom:14px;">Farm Information</div>
     <div class="grid-2">
       <div class="form-group"><label>Farm / Owner Name</label><input class="form-control" id="setupFarmName" value="Kamran Saleem"></div>
-      <div class="form-group"><label>Default Animal Unit</label>
-        <select class="form-control" id="setupUnit">
-          <option>kg</option><option>lbs</option>
-        </select>
+      <div class="form-group"><label>Default Weight Unit</label>
+        <select class="form-control" id="setupUnit"><option>kg</option><option>lbs</option></select>
       </div>
     </div>
     <button class="btn-primary" onclick="saveFarmSetup()"><i class="fas fa-save"></i> Save Farm Info</button>
+  </div>
+
+  <!-- LOOKUP VALUES -->
+  <div class="card" style="margin-bottom:20px;">
+    <div style="font-size:15px;font-weight:700;margin-bottom:6px;"><i class="fas fa-list" style="color:#3b82f6"></i> Dropdown / Combo Box Values</div>
+    <div style="font-size:12px;color:#6b7280;margin-bottom:16px;">
+      Define the items that appear in every dropdown list across the system. Each section below matches one or more dropdowns in the forms.
+      You can also click the <span style="font-size:10px;color:#2d5c3e;border:1px solid #2d5c3e;border-radius:4px;padding:0 5px;"><i class="fas fa-pencil-alt"></i> manage</span> pointer next to any dropdown label to edit its list on the spot.
+    </div>
+    <div id="lookupsSetupContainer"></div>
   </div>
 
   <!-- Stage Transition Rules -->
@@ -278,7 +287,7 @@
       <button class="btn-primary" onclick="openTransitionRuleModal()"><i class="fas fa-plus"></i> Add Rule</button>
     </div>
     <div style="font-size:12px;color:#6b7280;margin-bottom:12px;">
-      Define at what age (in months) an animal should transition from one stage to another. The system will alert you when an animal is due.
+      Define at what age (months) an animal should transition stage. The system will alert you on the dashboard when an animal is due.
     </div>
     <div style="overflow-x:auto;"><table>
       <thead><tr>
@@ -287,16 +296,6 @@
       </tr></thead>
       <tbody id="transitionRulesTbody"></tbody>
     </table></div>
-  </div>
-
-  <!-- Feed Categories -->
-  <div class="card" style="margin-bottom:20px;">
-    <div style="font-size:15px;font-weight:700;margin-bottom:14px;"><i class="fas fa-seedling" style="color:#16a34a"></i> Feed Categories</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;" id="feedCategoryChips"></div>
-    <div style="display:flex;gap:10px;margin-top:12px;">
-      <input class="form-control" id="newCategoryInput" placeholder="New category name..." style="max-width:250px;">
-      <button class="btn-primary" onclick="addFeedCategory()"><i class="fas fa-plus"></i> Add</button>
-    </div>
   </div>
 
   <!-- Data Management -->
@@ -329,13 +328,12 @@
   <input type="hidden" id="animalId">
   <div class="grid-2">
     <div class="form-group"><label>Tag No *</label><input class="form-control" id="anTagNo" placeholder="e.g. B-001"></div>
-    <div class="form-group"><label>Animal Type *</label>
-      <select class="form-control" id="anType" onchange="updateBreedOptions()">
-        <option value="">Select Type</option>
-        <option>Buffalo</option><option>Cow</option><option>Goat</option><option>Sheep</option>
-      </select>
+    <div class="form-group">
+      <div class="lbl-row"><label>Animal Type *</label><span class="manage-link" onclick="openQuickManage('animalTypes','anType',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+      <select class="form-control" id="anType" onchange="updateBreedOptions()"><option value="">Select Type</option></select>
     </div>
-    <div class="form-group"><label>Breed</label>
+    <div class="form-group">
+      <div class="lbl-row"><label>Breed</label><span class="manage-link" onclick="openQuickManageBreed()"><i class="fas fa-pencil-alt"></i> manage</span></div>
       <select class="form-control" id="anBreed"><option value="">Select Breed</option></select>
     </div>
     <div class="form-group"><label>Gender *</label>
@@ -343,18 +341,19 @@
         <option value="">Select Gender</option><option>Female</option><option>Male</option>
       </select>
     </div>
-    <div class="form-group"><label>Stage *</label>
+    <div class="form-group">
+      <div class="lbl-row"><label>Stage *</label><span class="manage-link" onclick="openQuickManageStages()"><i class="fas fa-pencil-alt"></i> manage</span></div>
       <select class="form-control" id="anStage"><option value="">Select Stage</option></select>
     </div>
     <div class="form-group"><label>Date of Birth</label><input type="date" class="form-control" id="anDOB"></div>
     <div class="form-group"><label>Mother Tag No</label><input class="form-control" id="anMotherID" placeholder="Optional"></div>
-    <div class="form-group"><label>Source</label>
-      <select class="form-control" id="anSource">
-        <option>Purchased</option><option>Own Birth</option><option>Gifted</option>
-      </select>
+    <div class="form-group">
+      <div class="lbl-row"><label>Source</label><span class="manage-link" onclick="openQuickManage('animalSources','anSource',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+      <select class="form-control" id="anSource"></select>
     </div>
-    <div class="form-group"><label>Status</label>
-      <select class="form-control" id="anStatus"><option>Active</option><option>Sold</option><option>Dead</option><option>Transferred</option></select>
+    <div class="form-group">
+      <div class="lbl-row"><label>Status</label><span class="manage-link" onclick="openQuickManage('animalStatuses','anStatus',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+      <select class="form-control" id="anStatus"></select>
     </div>
     <div class="form-group"><label>Pregnancy Date</label><input type="date" class="form-control" id="anPregnancyDate"></div>
     <div class="form-group"><label>Lactation No</label><input type="number" class="form-control" id="anLactationNo" min="0" placeholder="0"></div>
@@ -382,13 +381,11 @@
   <input type="hidden" id="transitionAnimalId">
   <input type="hidden" id="transitionNewStage">
   <div style="background:#f9fafb;border-radius:10px;padding:16px;margin:10px 0;">
-    <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px;">If you want to defer this transition:</div>
+    <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px;">Defer this transition by:</div>
     <div style="display:flex;gap:10px;align-items:center;">
       <input type="number" class="form-control" id="deferDays" value="30" min="1" style="width:100px;">
       <select class="form-control" id="deferUnit" style="width:130px;">
-        <option value="days">Days</option>
-        <option value="weeks">Weeks</option>
-        <option value="months">Months</option>
+        <option value="days">Days</option><option value="weeks">Weeks</option><option value="months">Months</option>
       </select>
     </div>
   </div>
@@ -410,11 +407,13 @@
   <input type="hidden" id="feedId">
   <div class="grid-2">
     <div class="form-group"><label>Item Name *</label><input class="form-control" id="fdName" placeholder="e.g. Wheat, Wanda"></div>
-    <div class="form-group"><label>Category</label>
-      <select class="form-control" id="fdCategory"><option>Feed</option><option>Fertilizer</option><option>Medicine</option><option>Other</option></select>
+    <div class="form-group">
+      <div class="lbl-row"><label>Category</label><span class="manage-link" onclick="openQuickManage('feedCategories','fdCategory',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+      <select class="form-control" id="fdCategory"></select>
     </div>
-    <div class="form-group"><label>Unit</label>
-      <select class="form-control" id="fdUnit"><option>kg</option><option>bags</option><option>liters</option><option>pieces</option></select>
+    <div class="form-group">
+      <div class="lbl-row"><label>Unit</label><span class="manage-link" onclick="openQuickManage('feedUnits','fdUnit',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+      <select class="form-control" id="fdUnit"></select>
     </div>
     <div class="form-group"><label>Opening Stock</label><input type="number" class="form-control" id="fdOpening" value="0" min="0"></div>
     <div class="form-group"><label>Reorder Level</label><input type="number" class="form-control" id="fdReorder" value="100" min="0"></div>
@@ -436,7 +435,7 @@
   </div>
   <input type="hidden" id="txId">
   <div id="txNoFeedWarning" style="display:none;background:#fef3c7;border:1.5px solid #f59e0b;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#92400e;">
-    <i class="fas fa-exclamation-triangle"></i> <b>No feed items found.</b> Please go to the <b>Feed &amp; Stock</b> tab first and add your feed items (e.g. Wheat, Wanda), then come back here to record transactions.
+    <i class="fas fa-exclamation-triangle"></i> <b>No feed items found.</b> Please go to <b>Feed &amp; Stock</b> tab first and add your feed items, then come back here.
   </div>
   <div class="grid-2">
     <div class="form-group"><label>Transaction Type *</label>
@@ -450,11 +449,9 @@
     </div>
     <div class="form-group"><label>Date *</label><input type="date" class="form-control" id="txDate"></div>
     <div class="form-group"><label>Voucher No</label><input class="form-control" id="txVoucherNo" placeholder="Auto if blank"></div>
-    <div class="form-group"><label>Voucher Type</label>
-      <select class="form-control" id="txVoucherType">
-        <option>Purchase Bill</option><option>Cash Payment</option>
-        <option>Journal Voucher</option><option>Expense Voucher</option>
-      </select>
+    <div class="form-group">
+      <div class="lbl-row"><label>Voucher Type</label><span class="manage-link" onclick="openQuickManage('voucherTypes','txVoucherType',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+      <select class="form-control" id="txVoucherType"></select>
     </div>
     <div class="form-group"><label>Quantity *</label><input type="number" class="form-control" id="txQty" min="0.1" step="0.1"></div>
     <div class="form-group"><label>Amount (Rs)</label><input type="number" class="form-control" id="txAmount" min="0"></div>
@@ -500,10 +497,7 @@
   <input type="hidden" id="ruleId">
   <div class="grid-2">
     <div class="form-group"><label>Animal Type</label>
-      <select class="form-control" id="ruleAnimalType">
-        <option value="All">All Types</option>
-        <option>Buffalo</option><option>Cow</option><option>Goat</option><option>Sheep</option>
-      </select>
+      <select class="form-control" id="ruleAnimalType"><option value="All">All Types</option></select>
     </div>
     <div class="form-group"><label>Gender</label>
       <select class="form-control" id="ruleGender">
@@ -511,16 +505,10 @@
       </select>
     </div>
     <div class="form-group"><label>Current Stage</label>
-      <select class="form-control" id="ruleFromStage">
-        <option>Calf</option><option>Waccha</option><option>Heifer</option>
-        <option>Bull Calf</option><option>Cow</option>
-      </select>
+      <select class="form-control" id="ruleFromStage"></select>
     </div>
     <div class="form-group"><label>Next Stage</label>
-      <select class="form-control" id="ruleToStage">
-        <option>Heifer</option><option>Cow</option><option>Ox</option>
-        <option>Bull</option><option>Bull Calf</option>
-      </select>
+      <select class="form-control" id="ruleToStage"></select>
     </div>
     <div class="form-group"><label>Age at Transition (Months)</label>
       <input type="number" class="form-control" id="ruleAgeMonths" min="1" value="12">
@@ -532,6 +520,25 @@
   <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px;">
     <button class="btn-danger" onclick="closeModal('transitionRuleModal')">Cancel</button>
     <button class="btn-primary" onclick="saveTransitionRule()"><i class="fas fa-save"></i> Save Rule</button>
+  </div>
+</div>
+</div>
+
+<!-- Quick Manage Modal (edit any dropdown list on the spot) -->
+<div class="modal-overlay" id="quickManageModal" style="display:none;z-index:1100;">
+<div class="modal-box" style="max-width:400px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div style="font-size:16px;font-weight:700;color:#1a3a2a;" id="qmTitle">Manage List</div>
+    <button onclick="closeModal('quickManageModal')" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>
+  </div>
+  <div style="font-size:12px;color:#6b7280;margin-bottom:12px;" id="qmDescription"></div>
+  <div id="qmItemsList" style="margin-bottom:14px;max-height:260px;overflow-y:auto;"></div>
+  <div style="display:flex;gap:8px;">
+    <input class="form-control" id="qmNewItem" placeholder="Type new item and press Add..." onkeydown="if(event.key==='Enter')addQuickManageItem()">
+    <button class="btn-primary" onclick="addQuickManageItem()" style="white-space:nowrap;"><i class="fas fa-plus"></i> Add</button>
+  </div>
+  <div style="margin-top:14px;text-align:right;">
+    <button class="btn-primary" onclick="closeModal('quickManageModal')"><i class="fas fa-check"></i> Done</button>
   </div>
 </div>
 </div>
@@ -549,9 +556,6 @@
 </div>
 </div>
 
-<!-- Print Report Output (hidden) -->
-<div id="printArea" style="display:none;"></div>
-
 <script>
 // ============================================================
 // DATA LAYER
@@ -563,7 +567,6 @@ const DB = {
   setObj: (k, v) => localStorage.setItem('fms_' + k, JSON.stringify(v)),
   uid: () => Date.now().toString(36) + Math.random().toString(36).substr(2,5)
 };
-
 function dbAdd(table, obj) { const list = DB.get(table); obj.id = DB.uid(); list.push(obj); DB.set(table, list); return obj; }
 function dbUpdate(table, id, patch) { const list = DB.get(table); const i = list.findIndex(r => r.id === id); if(i>=0){ list[i]={...list[i],...patch}; DB.set(table,list); } }
 function dbDelete(table, id) { DB.set(table, DB.get(table).filter(r => r.id !== id)); }
@@ -571,28 +574,349 @@ function dbGet(table) { return DB.get(table); }
 function dbFind(table, id) { return DB.get(table).find(r => r.id === id); }
 
 // ============================================================
-// BREEDS & STAGES
+// LOOKUP VALUES — all dropdown lists in one place
 // ============================================================
-const BREEDS = {
-  Buffalo: ['Nili Ravi','Cholistani','Kundi','Azi Kheli','Mixed'],
-  Cow: ['Sahiwal','Friesian','Jersey','Crossed','Nuqra','Desi'],
-  Goat: ['Beetal','Teddy','Barbari','Desi'],
-  Sheep: ['Kajli','Lohi','Dumbi','Desi']
+const LOOKUP_DEFAULTS = {
+  animalTypes:   ['Buffalo','Cow','Goat','Sheep'],
+  breeds: {
+    Buffalo: ['Nili Ravi','Cholistani','Kundi','Azi Kheli','Mixed'],
+    Cow:     ['Sahiwal','Friesian','Jersey','Crossed','Nuqra','Desi'],
+    Goat:    ['Beetal','Teddy','Barbari','Desi'],
+    Sheep:   ['Kajli','Lohi','Dumbi','Desi'],
+    Other:   []
+  },
+  stagesFemale:   ['Calf','Waccha','Heifer','Cow'],
+  stagesMale:     ['Calf','Waccha','Bull Calf','Ox','Bull'],
+  animalSources:  ['Purchased','Own Birth','Gifted','Transferred In'],
+  animalStatuses: ['Active','Sold','Dead','Transferred'],
+  feedCategories: ['Feed','Fertilizer','Medicine','Supplements','Other'],
+  feedUnits:      ['kg','bags','liters','pieces','tons','quintal'],
+  voucherTypes:   ['Purchase Bill','Cash Payment','Journal Voucher','Sales Invoice','Expense Voucher']
 };
-const STAGES_FEMALE = ['Calf','Waccha','Heifer','Cow'];
-const STAGES_MALE = ['Calf','Waccha','Bull Calf','Ox','Bull'];
+
+function getLookups() {
+  return DB.getObj('lookups', JSON.parse(JSON.stringify(LOOKUP_DEFAULTS)));
+}
+function saveLookups(lk) { DB.setObj('lookups', lk); }
+
+function getLookupList(key) {
+  return getLookups()[key] || [];
+}
+function saveLookupList(key, arr) {
+  const lk = getLookups(); lk[key] = arr; saveLookups(lk);
+}
+
+function populateSel(selId, items, blank, currentVal) {
+  const sel = document.getElementById(selId);
+  if(!sel) return;
+  sel.innerHTML = (blank ? `<option value="">${blank}</option>` : '') +
+    items.map(i => `<option${i===currentVal?' selected':''}>${i}</option>`).join('');
+}
+
+// ============================================================
+// QUICK MANAGE MODAL
+// ============================================================
+let _qmKey = null;       // lookup key being managed
+let _qmSelId = null;     // target select to refresh after
+let _qmAfter = null;     // callback after close
+
+function openQuickManage(lookupKey, targetSelId, afterFn) {
+  _qmKey = lookupKey; _qmSelId = targetSelId; _qmAfter = afterFn;
+  const labels = {
+    animalTypes:'Animal Types', stagesFemale:'Female Stages', stagesMale:'Male Stages',
+    animalSources:'Animal Sources', animalStatuses:'Animal Statuses',
+    feedCategories:'Feed Categories', feedUnits:'Feed Units', voucherTypes:'Voucher Types'
+  };
+  const descs = {
+    animalTypes:'Types of animals on your farm (e.g. Buffalo, Cow, Goat).',
+    stagesFemale:'Life stages for female animals (e.g. Calf, Heifer, Cow).',
+    stagesMale:'Life stages for male animals (e.g. Calf, Bull Calf, Ox).',
+    animalSources:'How the animal was acquired.',
+    animalStatuses:'Current status of an animal.',
+    feedCategories:'Categories for feed/stock items.',
+    feedUnits:'Units of measurement for feed (e.g. kg, bags).',
+    voucherTypes:'Types of payment/voucher documents.'
+  };
+  document.getElementById('qmTitle').textContent = '⚙ Manage: ' + (labels[lookupKey]||lookupKey);
+  document.getElementById('qmDescription').textContent = descs[lookupKey]||'';
+  document.getElementById('qmNewItem').value = '';
+  renderQmItems();
+  openModal('quickManageModal');
+}
+
+function openQuickManageBreed() {
+  const type = document.getElementById('anType').value || 'Other';
+  _qmKey = '__breed__' + type;
+  _qmSelId = 'anBreed';
+  _qmAfter = null;
+  document.getElementById('qmTitle').textContent = `⚙ Manage Breeds: ${type}`;
+  document.getElementById('qmDescription').textContent = `Breed options shown when Animal Type is "${type}".`;
+  document.getElementById('qmNewItem').value = '';
+  renderQmItems();
+  openModal('quickManageModal');
+}
+
+function openQuickManageStages() {
+  const gender = document.getElementById('anGender').value || 'Female';
+  _qmKey = gender === 'Male' ? 'stagesMale' : 'stagesFemale';
+  _qmSelId = 'anStage';
+  _qmAfter = null;
+  document.getElementById('qmTitle').textContent = `⚙ Manage ${gender} Stages`;
+  document.getElementById('qmDescription').textContent = `Stage options for ${gender} animals.`;
+  document.getElementById('qmNewItem').value = '';
+  renderQmItems();
+  openModal('quickManageModal');
+}
+
+function getQmItems() {
+  if(_qmKey && _qmKey.startsWith('__breed__')) {
+    const type = _qmKey.replace('__breed__','');
+    const lk = getLookups();
+    return (lk.breeds && lk.breeds[type]) ? lk.breeds[type] : [];
+  }
+  return getLookupList(_qmKey);
+}
+function saveQmItems(arr) {
+  if(_qmKey && _qmKey.startsWith('__breed__')) {
+    const type = _qmKey.replace('__breed__','');
+    const lk = getLookups();
+    if(!lk.breeds) lk.breeds = {};
+    lk.breeds[type] = arr;
+    saveLookups(lk);
+  } else {
+    saveLookupList(_qmKey, arr);
+  }
+}
+
+function renderQmItems() {
+  const items = getQmItems();
+  const container = document.getElementById('qmItemsList');
+  if(!items.length) {
+    container.innerHTML = '<div style="color:#9ca3af;font-size:13px;text-align:center;padding:10px;">No items yet. Add one below.</div>';
+    return;
+  }
+  container.innerHTML = items.map((item, idx) => `
+    <div class="lookup-item">
+      <span>${item}</span>
+      <button onclick="removeQmItem(${idx})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:13px;padding:0 4px;"><i class="fas fa-times"></i></button>
+    </div>`).join('');
+}
+
+function addQuickManageItem() {
+  const val = document.getElementById('qmNewItem').value.trim();
+  if(!val) return;
+  const items = getQmItems();
+  if(items.includes(val)) { toast('Item already exists', 'warn'); return; }
+  items.push(val);
+  saveQmItems(items);
+  document.getElementById('qmNewItem').value = '';
+  renderQmItems();
+  refreshQmTarget();
+  toast(`"${val}" added`);
+}
+
+function removeQmItem(idx) {
+  const items = getQmItems();
+  const removed = items.splice(idx, 1)[0];
+  saveQmItems(items);
+  renderQmItems();
+  refreshQmTarget();
+  toast(`"${removed}" removed`, 'warn');
+}
+
+function refreshQmTarget() {
+  if(!_qmSelId) return;
+  const currentVal = document.getElementById(_qmSelId) ? document.getElementById(_qmSelId).value : '';
+  const items = getQmItems();
+  if(_qmKey === 'animalTypes') {
+    populateSel('anType', items, 'Select Type', currentVal);
+    populateSel('filterType', items, 'All Types', document.getElementById('filterType')&&document.getElementById('filterType').value);
+    populateSel('ruleAnimalType', ['All',...items], null, document.getElementById('ruleAnimalType')&&document.getElementById('ruleAnimalType').value);
+  } else if(_qmKey === 'stagesFemale' || _qmKey === 'stagesMale') {
+    const allStages = [...new Set([...getLookupList('stagesFemale'),...getLookupList('stagesMale')])];
+    populateSel('filterStage', allStages, 'All Stages');
+    populateSel('ruleFromStage', allStages, null);
+    populateSel('ruleToStage', allStages, null);
+    updateStageOptions();
+  } else if(_qmKey === 'animalStatuses') {
+    populateSel('anStatus', items, null, currentVal);
+    populateSel('filterStatus', items, 'All Status');
+  } else if(_qmKey === 'feedCategories') {
+    populateSel('fdCategory', items, null, currentVal);
+  } else if(_qmKey === 'feedUnits') {
+    populateSel('fdUnit', items, null, currentVal);
+  } else if(_qmKey === 'voucherTypes') {
+    populateSel('txVoucherType', items, null, currentVal);
+  } else {
+    populateSel(_qmSelId, items, null, currentVal);
+  }
+  if(_qmKey && _qmKey.startsWith('__breed__')) updateBreedOptions();
+  if(_qmAfter) _qmAfter();
+}
+
+// ============================================================
+// POPULATE ALL DROPDOWNS FROM LOOKUPS
+// ============================================================
+function populateAllDropdowns() {
+  const lk = getLookups();
+  populateSel('anType', lk.animalTypes, 'Select Type');
+  populateSel('anSource', lk.animalSources, null);
+  populateSel('anStatus', lk.animalStatuses, null);
+  populateSel('fdCategory', lk.feedCategories, null);
+  populateSel('fdUnit', lk.feedUnits, null);
+  populateSel('txVoucherType', lk.voucherTypes, null);
+
+  const allStages = [...new Set([...lk.stagesFemale,...lk.stagesMale])];
+  populateSel('filterType', lk.animalTypes, 'All Types');
+  populateSel('filterStage', allStages, 'All Stages');
+  populateSel('filterStatus', lk.animalStatuses, 'All Status');
+  populateSel('ruleAnimalType', ['All',...lk.animalTypes], null);
+  populateSel('ruleFromStage', allStages, null);
+  populateSel('ruleToStage', allStages, null);
+}
 
 function updateBreedOptions() {
   const type = document.getElementById('anType').value;
-  const sel = document.getElementById('anBreed');
-  sel.innerHTML = '<option value="">Select Breed</option>';
-  (BREEDS[type]||[]).forEach(b => sel.innerHTML += `<option>${b}</option>`);
+  const lk = getLookups();
+  const breeds = (lk.breeds && lk.breeds[type]) ? lk.breeds[type] : [];
+  populateSel('anBreed', breeds, 'Select Breed');
 }
+
 function updateStageOptions() {
   const gender = document.getElementById('anGender').value;
-  const sel = document.getElementById('anStage');
-  sel.innerHTML = '<option value="">Select Stage</option>';
-  (gender === 'Female' ? STAGES_FEMALE : STAGES_MALE).forEach(s => sel.innerHTML += `<option>${s}</option>`);
+  const lk = getLookups();
+  const stages = gender === 'Male' ? lk.stagesMale : lk.stagesFemale;
+  populateSel('anStage', stages||[], 'Select Stage');
+}
+
+// ============================================================
+// LOOKUP SETUP SECTION RENDERER
+// ============================================================
+const LOOKUP_SECTIONS = [
+  { key:'animalTypes',   label:'Animal Types',     icon:'fa-horse',        desc:'Types of animals on your farm (Buffalo, Cow, Goat, Sheep, etc.)' },
+  { key:'__breeds__',    label:'Breeds',           icon:'fa-dna',          desc:'Breed names grouped by animal type' },
+  { key:'stagesFemale',  label:'Female Stages',    icon:'fa-venus',        desc:'Life stages for female animals (Calf, Heifer, Cow, etc.)' },
+  { key:'stagesMale',    label:'Male Stages',      icon:'fa-mars',         desc:'Life stages for male animals (Calf, Bull Calf, Ox, etc.)' },
+  { key:'animalSources', label:'Animal Sources',   icon:'fa-truck',        desc:'How an animal was acquired (Purchased, Own Birth, etc.)' },
+  { key:'animalStatuses',label:'Animal Statuses',  icon:'fa-tag',          desc:'Current status options (Active, Sold, Dead, etc.)' },
+  { key:'feedCategories',label:'Feed Categories',  icon:'fa-seedling',     desc:'Categories for stock items (Feed, Fertilizer, Medicine, etc.)' },
+  { key:'feedUnits',     label:'Feed Units',       icon:'fa-balance-scale',desc:'Units of measurement (kg, bags, liters, etc.)' },
+  { key:'voucherTypes',  label:'Voucher Types',    icon:'fa-file-invoice', desc:'Document types for transactions (Purchase Bill, etc.)' },
+];
+
+function renderLookupsSetup() {
+  const lk = getLookups();
+  const container = document.getElementById('lookupsSetupContainer');
+  container.innerHTML = LOOKUP_SECTIONS.map(sec => {
+    if(sec.key === '__breeds__') return renderBreedSetupSection(lk);
+    const items = lk[sec.key] || [];
+    return `<div class="lookup-section">
+      <div class="lookup-section-header" onclick="toggleLookupSection('ls_${sec.key}')">
+        <span><i class="fas ${sec.icon}" style="color:#2d5c3e;width:18px;"></i> &nbsp;${sec.label}
+          <span class="badge badge-blue" style="margin-left:8px;">${items.length} items</span>
+        </span>
+        <i class="fas fa-chevron-down" style="color:#9ca3af;font-size:12px;"></i>
+      </div>
+      <div class="lookup-section-body" id="ls_${sec.key}">
+        <div style="font-size:12px;color:#6b7280;margin-bottom:10px;">${sec.desc}</div>
+        <div id="ls_items_${sec.key}" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+          ${items.map((item,i) => `
+            <span style="background:#e8f5e9;border:1.5px solid #2d5c3e;color:#1a3a2a;padding:4px 12px;border-radius:20px;font-size:13px;display:inline-flex;align-items:center;gap:6px;">
+              ${item}
+              <button onclick="removeLookupItem('${sec.key}',${i})" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:11px;line-height:1;">✕</button>
+            </span>`).join('')}
+          ${!items.length ? '<span style="color:#9ca3af;font-size:12px;">No items yet.</span>' : ''}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <input class="form-control" id="ls_input_${sec.key}" placeholder="New item..." style="max-width:240px;" onkeydown="if(event.key==='Enter')addLookupItem('${sec.key}')">
+          <button class="btn-primary" onclick="addLookupItem('${sec.key}')"><i class="fas fa-plus"></i> Add</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderBreedSetupSection(lk) {
+  const breeds = lk.breeds || {};
+  const types = lk.animalTypes || [];
+  const totalBreeds = Object.values(breeds).reduce((s,a) => s+a.length, 0);
+  const inner = types.map(type => {
+    const list = breeds[type] || [];
+    return `<div style="margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">${type}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;" id="breed_chips_${type}">
+        ${list.map((b,i) => `<span style="background:#dbeafe;border:1px solid #3b82f6;color:#1e40af;padding:3px 10px;border-radius:14px;font-size:12px;display:inline-flex;align-items:center;gap:4px;">${b}<button onclick="removeBreed('${type}',${i})" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:10px;">✕</button></span>`).join('')}
+        ${!list.length ? '<span style="color:#9ca3af;font-size:12px;">None</span>' : ''}
+      </div>
+      <div style="display:flex;gap:6px;">
+        <input class="form-control" id="breed_input_${type}" placeholder="Add breed for ${type}..." style="max-width:220px;padding:5px 10px;font-size:12px;" onkeydown="if(event.key==='Enter')addBreed('${type}')">
+        <button class="btn-sm btn-edit" onclick="addBreed('${type}')"><i class="fas fa-plus"></i></button>
+      </div>
+    </div>`;
+  }).join('<hr style="margin:10px 0;border-color:#f3f4f6;">');
+  return `<div class="lookup-section">
+    <div class="lookup-section-header" onclick="toggleLookupSection('ls___breeds__')">
+      <span><i class="fas fa-dna" style="color:#2d5c3e;width:18px;"></i> &nbsp;Breeds
+        <span class="badge badge-blue" style="margin-left:8px;">${totalBreeds} total</span>
+      </span>
+      <i class="fas fa-chevron-down" style="color:#9ca3af;font-size:12px;"></i>
+    </div>
+    <div class="lookup-section-body" id="ls___breeds__">
+      <div style="font-size:12px;color:#6b7280;margin-bottom:12px;">Breed names shown per animal type.</div>
+      ${inner}
+    </div>
+  </div>`;
+}
+
+function toggleLookupSection(id) {
+  const el = document.getElementById(id);
+  if(el) el.classList.toggle('open');
+}
+
+function addLookupItem(key) {
+  const input = document.getElementById('ls_input_' + key);
+  const val = input.value.trim();
+  if(!val) return;
+  const items = getLookupList(key);
+  if(items.includes(val)) { toast('Already exists', 'warn'); return; }
+  items.push(val);
+  saveLookupList(key, items);
+  input.value = '';
+  renderLookupsSetup();
+  populateAllDropdowns();
+  toast(`"${val}" added to ${key}`);
+}
+
+function removeLookupItem(key, idx) {
+  const items = getLookupList(key);
+  const removed = items.splice(idx,1)[0];
+  saveLookupList(key, items);
+  renderLookupsSetup();
+  populateAllDropdowns();
+  toast(`"${removed}" removed`, 'warn');
+}
+
+function addBreed(type) {
+  const input = document.getElementById('breed_input_' + type);
+  const val = input.value.trim();
+  if(!val) return;
+  const lk = getLookups();
+  if(!lk.breeds) lk.breeds = {};
+  if(!lk.breeds[type]) lk.breeds[type] = [];
+  if(lk.breeds[type].includes(val)) { toast('Already exists', 'warn'); return; }
+  lk.breeds[type].push(val);
+  saveLookups(lk);
+  input.value = '';
+  renderLookupsSetup();
+  toast(`Breed "${val}" added to ${type}`);
+}
+
+function removeBreed(type, idx) {
+  const lk = getLookups();
+  const removed = lk.breeds[type].splice(idx,1)[0];
+  saveLookups(lk);
+  renderLookupsSetup();
+  toast(`"${removed}" removed`, 'warn');
 }
 
 // ============================================================
@@ -610,7 +934,7 @@ function showTab(name) {
   if(name==='inventory') renderFeed();
   if(name==='transactions') renderTransactions();
   if(name==='weights') { renderWeights(); populateWeightTagFilter(); }
-  if(name==='setup') { renderTransitionRules(); renderFeedCategories(); }
+  if(name==='setup') { renderTransitionRules(); renderLookupsSetup(); }
 }
 
 // ============================================================
@@ -618,7 +942,7 @@ function showTab(name) {
 // ============================================================
 function toast(msg, type='success') {
   const t = document.getElementById('toast');
-  t.style.background = type==='error' ? '#dc2626' : type==='warn' ? '#d97706' : '#1a3a2a';
+  t.style.background = type==='error'?'#dc2626':type==='warn'?'#d97706':'#1a3a2a';
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3000);
 }
@@ -626,8 +950,8 @@ function toast(msg, type='success') {
 // ============================================================
 // MODAL HELPERS
 // ============================================================
-function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display='none'; }
+function openModal(id)  { document.getElementById(id).style.display='flex'; }
 function confirm2(title, msg, onOk) {
   document.getElementById('confirmTitle').textContent = title;
   document.getElementById('confirmMsg').textContent = msg;
@@ -642,15 +966,10 @@ function refreshDashboard() {
   const animals = dbGet('animals');
   const feed = dbGet('feed');
   const txs = dbGet('transactions');
-
-  // Stat cards
-  const active = animals.filter(a => a.status === 'Active').length;
-  const female = animals.filter(a => a.gender === 'Female' && a.status==='Active').length;
-  const male = animals.filter(a => a.gender === 'Male' && a.status==='Active').length;
-  const totalFeedItems = feed.length;
-  const lowStock = feed.filter(f => Number(f.currentStock) <= Number(f.reorderLevel)).length;
-  const totalTxs = txs.length;
-
+  const active = animals.filter(a=>a.status==='Active').length;
+  const female = animals.filter(a=>a.gender==='Female'&&a.status==='Active').length;
+  const male = animals.filter(a=>a.gender==='Male'&&a.status==='Active').length;
+  const lowStock = feed.filter(f=>Number(f.currentStock)<=Number(f.reorderLevel)).length;
   document.getElementById('statCards').innerHTML = `
     <div class="stat-card" style="border-color:#2d5c3e">
       <div style="font-size:28px;font-weight:800;color:#2d5c3e">${active}</div>
@@ -660,14 +979,13 @@ function refreshDashboard() {
     <div class="stat-card" style="border-color:#f59e0b">
       <div style="font-size:28px;font-weight:800;color:#f59e0b">${lowStock}</div>
       <div style="font-size:13px;color:#6b7280;margin-top:4px">Low Stock Alerts</div>
-      <div style="font-size:11px;color:#9ca3af;margin-top:2px">${totalFeedItems} total feed items</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:2px">${feed.length} total feed items</div>
     </div>
     <div class="stat-card" style="border-color:#3b82f6">
-      <div style="font-size:28px;font-weight:800;color:#3b82f6">${totalTxs}</div>
+      <div style="font-size:28px;font-weight:800;color:#3b82f6">${txs.length}</div>
       <div style="font-size:13px;color:#6b7280;margin-top:4px">Total Transactions</div>
       <div style="font-size:11px;color:#9ca3af;margin-top:2px">${animals.length} total animals registered</div>
     </div>`;
-
   renderTransitionAlerts();
   renderStockAlerts();
   renderRecentTx();
@@ -678,40 +996,26 @@ function refreshDashboard() {
 // ============================================================
 function getAnimalAgeMonths(dob) {
   if(!dob) return null;
-  const birth = new Date(dob);
-  const now = new Date();
-  return (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth());
+  const birth = new Date(dob), now = new Date();
+  return (now.getFullYear()-birth.getFullYear())*12 + (now.getMonth()-birth.getMonth());
 }
 
 function getPendingTransitions() {
-  const animals = dbGet('animals').filter(a => a.status === 'Active' && a.dob);
+  const animals = dbGet('animals').filter(a=>a.status==='Active'&&a.dob);
   const rules = dbGet('transitionRules');
   const pending = [];
   const today = new Date(); today.setHours(0,0,0,0);
-
   animals.forEach(animal => {
     const ageMonths = getAnimalAgeMonths(animal.dob);
-    if(ageMonths === null) return;
-
-    // Check if deferred and deferral not expired
-    if(animal.deferredUntil) {
-      const deferDate = new Date(animal.deferredUntil);
-      if(deferDate > today) return; // still deferred
-    }
-
+    if(ageMonths===null) return;
+    if(animal.deferredUntil && new Date(animal.deferredUntil) > today) return;
     rules.forEach(rule => {
-      const typeMatch = rule.animalType === 'All' || rule.animalType === animal.animalType;
-      const genderMatch = rule.gender === 'All' || rule.gender === animal.gender;
-      const stageMatch = rule.fromStage === animal.stage;
-      if(!typeMatch || !genderMatch || !stageMatch) return;
-
-      const ageThreshold = Number(rule.ageMonths);
-      const warnDays = Number(rule.warnDays || 7);
-      const ageAtWarn = ageThreshold - (warnDays / 30);
-
-      if(ageMonths >= ageAtWarn) {
-        pending.push({ animal, rule, ageMonths, ageThreshold, isDue: ageMonths >= ageThreshold });
-      }
+      if((rule.animalType!=='All'&&rule.animalType!==animal.animalType)) return;
+      if((rule.gender!=='All'&&rule.gender!==animal.gender)) return;
+      if(rule.fromStage!==animal.stage) return;
+      const threshold = Number(rule.ageMonths);
+      const warnAt = threshold - (Number(rule.warnDays||7)/30);
+      if(ageMonths >= warnAt) pending.push({animal,rule,ageMonths,ageThreshold:threshold,isDue:ageMonths>=threshold});
     });
   });
   return pending;
@@ -721,10 +1025,7 @@ function renderTransitionAlerts() {
   const pending = getPendingTransitions();
   document.getElementById('transitionCount').textContent = pending.length + ' pending';
   const container = document.getElementById('transitionAlerts');
-  if(!pending.length) {
-    container.innerHTML = '<div style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">No pending transitions — all animals are up to date.</div>';
-    return;
-  }
+  if(!pending.length) { container.innerHTML='<div style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">No pending transitions.</div>'; return; }
   container.innerHTML = pending.map(p => `
     <div class="transition-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
@@ -732,18 +1033,13 @@ function renderTransitionAlerts() {
           <span style="font-weight:700;color:#1a3a2a;">${p.animal.tagNo}</span>
           <span class="badge badge-blue" style="margin-left:6px;">${p.animal.animalType}</span>
           <span class="badge badge-purple" style="margin-left:4px;">${p.animal.gender}</span>
-          <div style="font-size:13px;color:#374151;margin-top:4px;">
-            Current Stage: <b>${p.animal.stage}</b> → Next Stage: <b>${p.rule.toStage}</b>
-          </div>
-          <div style="font-size:12px;color:#6b7280;margin-top:2px;">
-            Age: <b>${p.ageMonths} months</b> &nbsp;|&nbsp; Transition due at: <b>${p.ageThreshold} months</b>
-            ${p.animal.deferredUntil ? `&nbsp;|&nbsp; <span style="color:#d97706">Was deferred until ${p.animal.deferredUntil}</span>` : ''}
+          <div style="font-size:13px;color:#374151;margin-top:4px;">Stage: <b>${p.animal.stage}</b> → <b>${p.rule.toStage}</b></div>
+          <div style="font-size:12px;color:#6b7280;margin-top:2px;">Age: <b>${p.ageMonths} months</b> | Due at: <b>${p.ageThreshold} months</b>
+            ${p.animal.deferredUntil?`&nbsp;| <span style="color:#d97706">Was deferred until ${p.animal.deferredUntil}</span>`:''}
           </div>
         </div>
         <div>
-          ${p.isDue
-            ? `<span class="badge badge-red" style="margin-bottom:6px;display:block;">OVERDUE</span>`
-            : `<span class="badge badge-yellow" style="margin-bottom:6px;display:block;">DUE SOON</span>`}
+          <span class="badge ${p.isDue?'badge-red':'badge-yellow'}" style="display:block;margin-bottom:6px;">${p.isDue?'OVERDUE':'DUE SOON'}</span>
           <button class="btn-warning btn-sm" onclick="openTransitionDecision('${p.animal.id}','${p.rule.toStage}','${p.animal.tagNo}','${p.animal.stage}',${p.ageMonths},${p.ageThreshold})">
             <i class="fas fa-bell"></i> Review
           </button>
@@ -752,13 +1048,11 @@ function renderTransitionAlerts() {
     </div>`).join('');
 }
 
-function openTransitionDecision(animalId, newStage, tagNo, currentStage, ageMonths, threshold) {
+function openTransitionDecision(animalId,newStage,tagNo,currentStage,ageMonths,threshold) {
   document.getElementById('transitionAnimalId').value = animalId;
   document.getElementById('transitionNewStage').value = newStage;
-  document.getElementById('transitionMsg').innerHTML = `
-    Animal <b>${tagNo}</b> is currently <b>${currentStage}</b>.<br>
-    At <b>${ageMonths} months</b> old (threshold: ${threshold} months), it is ready to transition to <b>${newStage}</b>.<br><br>
-    You can <b>Approve</b> the transition (stage will be updated immediately) or <b>Defer</b> it for a period you specify.`;
+  document.getElementById('transitionMsg').innerHTML =
+    `Animal <b>${tagNo}</b> is currently <b>${currentStage}</b>.<br>At <b>${ageMonths} months</b> old (threshold: ${threshold} months), it is ready to become <b>${newStage}</b>.<br><br>Approve to update the stage now, or Defer to be reminded later.`;
   openModal('transitionModal');
 }
 
@@ -767,13 +1061,10 @@ function approveTransition() {
   const newStage = document.getElementById('transitionNewStage').value;
   const animal = dbFind('animals', id);
   if(!animal) return;
-
-  // Log the transition
   const log = dbGet('transitionLog');
-  log.push({ id: DB.uid(), animalId: id, tagNo: animal.tagNo, fromStage: animal.stage, toStage: newStage, date: new Date().toISOString().split('T')[0], approvedBy: 'User' });
+  log.push({id:DB.uid(),animalId:id,tagNo:animal.tagNo,fromStage:animal.stage,toStage:newStage,date:new Date().toISOString().split('T')[0],approvedBy:'User'});
   DB.set('transitionLog', log);
-
-  dbUpdate('animals', id, { stage: newStage, deferredUntil: null });
+  dbUpdate('animals', id, {stage:newStage, deferredUntil:null});
   closeModal('transitionModal');
   toast(`✓ ${animal.tagNo} transitioned to ${newStage}`);
   refreshDashboard();
@@ -781,613 +1072,430 @@ function approveTransition() {
 
 function deferTransition() {
   const id = document.getElementById('transitionAnimalId').value;
-  const days = Number(document.getElementById('deferDays').value);
+  let days = Number(document.getElementById('deferDays').value);
   const unit = document.getElementById('deferUnit').value;
-  let totalDays = days;
-  if(unit === 'weeks') totalDays = days * 7;
-  if(unit === 'months') totalDays = days * 30;
-  const deferDate = new Date();
-  deferDate.setDate(deferDate.getDate() + totalDays);
-  const dateStr = deferDate.toISOString().split('T')[0];
-  dbUpdate('animals', id, { deferredUntil: dateStr });
+  if(unit==='weeks') days*=7; if(unit==='months') days*=30;
+  const d = new Date(); d.setDate(d.getDate()+days);
+  dbUpdate('animals', id, {deferredUntil: d.toISOString().split('T')[0]});
   closeModal('transitionModal');
-  const animal = dbFind('animals', id);
-  toast(`Transition deferred until ${dateStr}`, 'warn');
+  toast('Transition deferred until '+d.toISOString().split('T')[0], 'warn');
   refreshDashboard();
 }
 
 // ============================================================
-// STOCK ALERTS
+// STOCK ALERTS & RECENT TX
 // ============================================================
 function renderStockAlerts() {
   const feed = dbGet('feed');
-  const low = feed.filter(f => Number(f.currentStock) <= Number(f.reorderLevel));
-  const container = document.getElementById('stockAlerts');
-  if(!low.length) {
-    container.innerHTML = '<div style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">No low stock items.</div>';
-    return;
-  }
-  container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:10px;">` + low.map(f => `
+  const low = feed.filter(f=>Number(f.currentStock)<=Number(f.reorderLevel));
+  const c = document.getElementById('stockAlerts');
+  if(!low.length) { c.innerHTML='<div style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">No low stock items.</div>'; return; }
+  c.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:10px;">'+low.map(f=>`
     <div style="background:#fff;border:2px solid #ef4444;border-radius:10px;padding:12px 18px;min-width:180px;">
       <div style="font-weight:700;color:#1a3a2a;">${f.itemName}</div>
-      <div style="font-size:12px;color:#6b7280;">${f.category}</div>
-      <div style="font-size:18px;font-weight:800;color:#ef4444;margin-top:4px;">${f.currentStock} ${f.unit}</div>
+      <div style="font-size:18px;font-weight:800;color:#ef4444;">${f.currentStock} ${f.unit}</div>
       <div style="font-size:11px;color:#9ca3af;">Reorder at: ${f.reorderLevel}</div>
-    </div>`).join('') + '</div>';
+    </div>`).join('')+'</div>';
 }
 
 function renderRecentTx() {
   const txs = dbGet('transactions').slice(-5).reverse();
   const feed = dbGet('feed');
-  const container = document.getElementById('recentTx');
-  if(!txs.length) { container.innerHTML = '<div style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">No transactions yet.</div>'; return; }
-  container.innerHTML = `<table><thead><tr><th>Date</th><th>Feed Item</th><th>Type</th><th>Qty</th><th>Amount</th></tr></thead><tbody>` +
-    txs.map(t => {
-      const item = feed.find(f => f.id === t.itemId) || {};
+  const c = document.getElementById('recentTx');
+  if(!txs.length) { c.innerHTML='<div style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">No transactions yet.</div>'; return; }
+  c.innerHTML='<table><thead><tr><th>Date</th><th>Feed Item</th><th>Type</th><th>Qty</th><th>Amount</th></tr></thead><tbody>'+
+    txs.map(t => { const item=feed.find(f=>f.id===t.itemId)||{};
       return `<tr><td>${t.date}</td><td>${item.itemName||'—'}</td>
         <td><span class="badge ${t.txType==='Purchase'?'badge-green':'badge-red'}">${t.txType}</span></td>
         <td>${t.qty} ${item.unit||''}</td><td>Rs ${Number(t.amount||0).toLocaleString()}</td></tr>`;
-    }).join('') + '</tbody></table>';
+    }).join('')+'</tbody></table>';
 }
 
 // ============================================================
 // ANIMALS MODULE
 // ============================================================
 function openAnimalModal(id) {
-  const fields = ['anTagNo','anType','anBreed','anGender','anStage','anDOB','anMotherID','anSource','anStatus','anPregnancyDate','anLactationNo','anPurchaseDate','anPurchaseAmount','anVoucherNo','anMedical','anRemarks'];
-  fields.forEach(f => { const el = document.getElementById(f); if(el) el.value = ''; });
-  document.getElementById('animalId').value = '';
-  document.getElementById('animalModalTitle').textContent = 'Add Animal';
+  populateAllDropdowns();
+  updateBreedOptions();
+  updateStageOptions();
+  ['anTagNo','anDOB','anMotherID','anPregnancyDate','anLactationNo','anPurchaseDate','anPurchaseAmount','anVoucherNo','anMedical','anRemarks'].forEach(f=>{const el=document.getElementById(f);if(el)el.value='';});
+  document.getElementById('animalId').value='';
+  document.getElementById('animalModalTitle').textContent='Add Animal';
   if(id) {
-    const a = dbFind('animals', id);
-    if(!a) return;
-    document.getElementById('animalModalTitle').textContent = 'Edit Animal';
-    document.getElementById('animalId').value = id;
-    document.getElementById('anTagNo').value = a.tagNo||'';
-    document.getElementById('anType').value = a.animalType||'';
-    updateBreedOptions();
-    document.getElementById('anBreed').value = a.breed||'';
-    document.getElementById('anGender').value = a.gender||'';
-    updateStageOptions();
-    document.getElementById('anStage').value = a.stage||'';
-    document.getElementById('anDOB').value = a.dob||'';
-    document.getElementById('anMotherID').value = a.motherId||'';
-    document.getElementById('anSource').value = a.source||'Purchased';
-    document.getElementById('anStatus').value = a.status||'Active';
-    document.getElementById('anPregnancyDate').value = a.pregnancyDate||'';
-    document.getElementById('anLactationNo').value = a.lactationNo||'';
-    document.getElementById('anPurchaseDate').value = a.purchaseDate||'';
-    document.getElementById('anPurchaseAmount').value = a.purchaseAmount||'';
-    document.getElementById('anVoucherNo').value = a.voucherNo||'';
-    document.getElementById('anMedical').value = a.medicalHistory||'';
-    document.getElementById('anRemarks').value = a.remarks||'';
+    const a=dbFind('animals',id); if(!a) return;
+    document.getElementById('animalModalTitle').textContent='Edit Animal';
+    document.getElementById('animalId').value=id;
+    document.getElementById('anTagNo').value=a.tagNo||'';
+    document.getElementById('anType').value=a.animalType||''; updateBreedOptions();
+    document.getElementById('anBreed').value=a.breed||'';
+    document.getElementById('anGender').value=a.gender||''; updateStageOptions();
+    document.getElementById('anStage').value=a.stage||'';
+    document.getElementById('anDOB').value=a.dob||'';
+    document.getElementById('anMotherID').value=a.motherId||'';
+    document.getElementById('anSource').value=a.source||'';
+    document.getElementById('anStatus').value=a.status||'';
+    document.getElementById('anPregnancyDate').value=a.pregnancyDate||'';
+    document.getElementById('anLactationNo').value=a.lactationNo||'';
+    document.getElementById('anPurchaseDate').value=a.purchaseDate||'';
+    document.getElementById('anPurchaseAmount').value=a.purchaseAmount||'';
+    document.getElementById('anVoucherNo').value=a.voucherNo||'';
+    document.getElementById('anMedical').value=a.medicalHistory||'';
+    document.getElementById('anRemarks').value=a.remarks||'';
   }
   openModal('animalModal');
 }
 
 function saveAnimal() {
-  const tagNo = document.getElementById('anTagNo').value.trim();
-  const animalType = document.getElementById('anType').value;
-  const gender = document.getElementById('anGender').value;
-  const stage = document.getElementById('anStage').value;
-  if(!tagNo || !animalType || !gender || !stage) { toast('Please fill all required fields', 'error'); return; }
-
-  const obj = {
-    tagNo, animalType, breed: document.getElementById('anBreed').value,
-    gender, stage, dob: document.getElementById('anDOB').value,
-    motherId: document.getElementById('anMotherID').value,
-    source: document.getElementById('anSource').value,
-    status: document.getElementById('anStatus').value,
-    pregnancyDate: document.getElementById('anPregnancyDate').value,
-    lactationNo: document.getElementById('anLactationNo').value,
-    purchaseDate: document.getElementById('anPurchaseDate').value,
-    purchaseAmount: document.getElementById('anPurchaseAmount').value,
-    voucherNo: document.getElementById('anVoucherNo').value,
-    medicalHistory: document.getElementById('anMedical').value,
-    remarks: document.getElementById('anRemarks').value,
-    deferredUntil: null
-  };
-
-  const id = document.getElementById('animalId').value;
-  if(id) { dbUpdate('animals', id, obj); toast('Animal updated'); }
-  else { dbAdd('animals', obj); toast('Animal added'); }
-  closeModal('animalModal');
-  renderAnimals();
+  const tagNo=document.getElementById('anTagNo').value.trim();
+  const animalType=document.getElementById('anType').value;
+  const gender=document.getElementById('anGender').value;
+  const stage=document.getElementById('anStage').value;
+  if(!tagNo||!animalType||!gender||!stage){toast('Please fill all required fields (*)','error');return;}
+  const obj={tagNo,animalType,breed:document.getElementById('anBreed').value,gender,stage,
+    dob:document.getElementById('anDOB').value,motherId:document.getElementById('anMotherID').value,
+    source:document.getElementById('anSource').value,status:document.getElementById('anStatus').value,
+    pregnancyDate:document.getElementById('anPregnancyDate').value,lactationNo:document.getElementById('anLactationNo').value,
+    purchaseDate:document.getElementById('anPurchaseDate').value,purchaseAmount:document.getElementById('anPurchaseAmount').value,
+    voucherNo:document.getElementById('anVoucherNo').value,medicalHistory:document.getElementById('anMedical').value,
+    remarks:document.getElementById('anRemarks').value,deferredUntil:null};
+  const id=document.getElementById('animalId').value;
+  if(id){dbUpdate('animals',id,obj);toast('Animal updated');}
+  else{dbAdd('animals',obj);toast('Animal added');}
+  closeModal('animalModal'); renderAnimals();
 }
 
 function renderAnimals() {
-  let list = dbGet('animals');
-  const search = (document.getElementById('animalSearch')||{}).value||'';
-  const fType = (document.getElementById('filterType')||{}).value||'';
-  const fStage = (document.getElementById('filterStage')||{}).value||'';
-  const fStatus = (document.getElementById('filterStatus')||{}).value||'';
-  if(search) list = list.filter(a => (a.tagNo||'').toLowerCase().includes(search.toLowerCase()) || (a.breed||'').toLowerCase().includes(search.toLowerCase()));
-  if(fType) list = list.filter(a => a.animalType === fType);
-  if(fStage) list = list.filter(a => a.stage === fStage);
-  if(fStatus) list = list.filter(a => a.status === fStatus);
-
-  const tbody = document.getElementById('animalTbody');
-  if(!list.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:30px;">No animals found.</td></tr>'; return; }
-
-  tbody.innerHTML = list.map(a => {
-    const age = a.dob ? getAnimalAgeMonths(a.dob) : null;
-    const ageStr = age !== null ? (age >= 12 ? Math.floor(age/12) + 'y ' + (age%12) + 'm' : age + 'm') : '—';
-    const statusBadge = a.status==='Active' ? 'badge-green' : a.status==='Dead' ? 'badge-red' : 'badge-yellow';
+  let list=dbGet('animals');
+  const search=(document.getElementById('animalSearch')||{}).value||'';
+  const fType=(document.getElementById('filterType')||{}).value||'';
+  const fStage=(document.getElementById('filterStage')||{}).value||'';
+  const fStatus=(document.getElementById('filterStatus')||{}).value||'';
+  if(search) list=list.filter(a=>(a.tagNo||'').toLowerCase().includes(search.toLowerCase())||(a.breed||'').toLowerCase().includes(search.toLowerCase()));
+  if(fType) list=list.filter(a=>a.animalType===fType);
+  if(fStage) list=list.filter(a=>a.stage===fStage);
+  if(fStatus) list=list.filter(a=>a.status===fStatus);
+  const tbody=document.getElementById('animalTbody');
+  if(!list.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:30px;">No animals found.</td></tr>';return;}
+  tbody.innerHTML=list.map(a=>{
+    const age=a.dob?getAnimalAgeMonths(a.dob):null;
+    const ageStr=age!==null?(age>=12?Math.floor(age/12)+'y '+(age%12)+'m':age+'m'):'—';
+    const sb=a.status==='Active'?'badge-green':a.status==='Dead'?'badge-red':'badge-yellow';
     return `<tr>
       <td><button onclick="toggleExpand('ae_${a.id}')" style="background:none;border:none;cursor:pointer;color:#6b7280;"><i class="fas fa-chevron-down"></i></button></td>
-      <td><b>${a.tagNo}</b></td>
-      <td>${a.animalType||'—'}</td>
-      <td>${a.breed||'—'}</td>
-      <td>${a.gender||'—'}</td>
-      <td><span class="badge badge-blue">${a.stage||'—'}</span></td>
-      <td>${ageStr}</td>
-      <td><span class="badge ${statusBadge}">${a.status||'—'}</span></td>
+      <td><b>${a.tagNo}</b></td><td>${a.animalType||'—'}</td><td>${a.breed||'—'}</td><td>${a.gender||'—'}</td>
+      <td><span class="badge badge-blue">${a.stage||'—'}</span></td><td>${ageStr}</td>
+      <td><span class="badge ${sb}">${a.status||'—'}</span></td>
       <td style="white-space:nowrap;">
         <button class="btn-sm btn-edit" onclick="openAnimalModal('${a.id}')"><i class="fas fa-edit"></i></button>
         <button class="btn-sm btn-del" style="margin-left:4px;" onclick="deleteAnimal('${a.id}')"><i class="fas fa-trash"></i></button>
-      </td>
-    </tr>
-    <tr id="ae_${a.id}" class="expand-row" style="display:none;">
-      <td colspan="9">
-        <div class="grid-3" style="gap:10px;">
-          <div><b>Source:</b> ${a.source||'—'}<br><b>Purchase Date:</b> ${a.purchaseDate||'—'}<br><b>Amount:</b> Rs ${Number(a.purchaseAmount||0).toLocaleString()}</div>
-          <div><b>Pregnancy Date:</b> ${a.pregnancyDate||'—'}<br><b>Lactation No:</b> ${a.lactationNo||'—'}<br><b>Mother ID:</b> ${a.motherId||'—'}</div>
-          <div><b>Medical:</b> ${a.medicalHistory||'—'}<br><b>Remarks:</b> ${a.remarks||'—'}<br><b>Deferred Until:</b> ${a.deferredUntil||'Not deferred'}</div>
-        </div>
-      </td>
-    </tr>`;
+      </td></tr>
+    <tr id="ae_${a.id}" class="expand-row" style="display:none;"><td colspan="9">
+      <div class="grid-3" style="gap:10px;">
+        <div><b>Source:</b> ${a.source||'—'}<br><b>Purchase Date:</b> ${a.purchaseDate||'—'}<br><b>Amount:</b> Rs ${Number(a.purchaseAmount||0).toLocaleString()}</div>
+        <div><b>Pregnancy Date:</b> ${a.pregnancyDate||'—'}<br><b>Lactation No:</b> ${a.lactationNo||'—'}<br><b>Mother ID:</b> ${a.motherId||'—'}</div>
+        <div><b>Medical:</b> ${a.medicalHistory||'—'}<br><b>Remarks:</b> ${a.remarks||'—'}<br><b>Deferred Until:</b> ${a.deferredUntil||'Not deferred'}</div>
+      </div>
+    </td></tr>`;
   }).join('');
 }
 
-function toggleExpand(rowId) { const r = document.getElementById(rowId); r.style.display = r.style.display==='none' ? 'table-row' : 'none'; }
+function toggleExpand(rowId){const r=document.getElementById(rowId);r.style.display=r.style.display==='none'?'table-row':'none';}
 
-function deleteAnimal(id) {
-  confirm2('Delete Animal', 'This will permanently delete the animal record.', () => {
-    dbDelete('animals', id); renderAnimals(); toast('Animal deleted', 'warn');
-  });
+function deleteAnimal(id){
+  confirm2('Delete Animal','This will permanently delete the animal record.',()=>{dbDelete('animals',id);renderAnimals();toast('Animal deleted','warn');});
 }
 
 // ============================================================
-// FEED / INVENTORY MODULE
+// FEED MODULE
 // ============================================================
 function openFeedModal(id) {
-  ['fdName','fdCategory','fdUnit','fdOpening','fdReorder','fdRate'].forEach(f => {
-    const el = document.getElementById(f); if(el) el.value = f.includes('fd')&&!['fdName','fdCategory','fdUnit'].includes(f)?'0':'';
-  });
-  document.getElementById('feedId').value = '';
-  document.getElementById('feedModalTitle').textContent = 'Add Feed Item';
-  if(id) {
-    const f = dbFind('feed', id);
-    if(!f) return;
-    document.getElementById('feedModalTitle').textContent = 'Edit Feed Item';
-    document.getElementById('feedId').value = id;
-    document.getElementById('fdName').value = f.itemName||'';
-    document.getElementById('fdCategory').value = f.category||'Feed';
-    document.getElementById('fdUnit').value = f.unit||'kg';
-    document.getElementById('fdOpening').value = f.openingStock||0;
-    document.getElementById('fdReorder').value = f.reorderLevel||100;
-    document.getElementById('fdRate').value = f.rate||0;
+  populateAllDropdowns();
+  document.getElementById('feedId').value='';
+  document.getElementById('fdName').value='';
+  document.getElementById('fdOpening').value='0';
+  document.getElementById('fdReorder').value='100';
+  document.getElementById('fdRate').value='0';
+  document.getElementById('feedModalTitle').textContent='Add Feed Item';
+  if(id){
+    const f=dbFind('feed',id); if(!f) return;
+    document.getElementById('feedModalTitle').textContent='Edit Feed Item';
+    document.getElementById('feedId').value=id;
+    document.getElementById('fdName').value=f.itemName||'';
+    document.getElementById('fdCategory').value=f.category||'';
+    document.getElementById('fdUnit').value=f.unit||'';
+    document.getElementById('fdOpening').value=f.openingStock||0;
+    document.getElementById('fdReorder').value=f.reorderLevel||100;
+    document.getElementById('fdRate').value=f.rate||0;
   }
   openModal('feedModal');
 }
 
-function saveFeed() {
-  const name = document.getElementById('fdName').value.trim();
-  if(!name) { toast('Item name is required', 'error'); return; }
-  const openingStock = Number(document.getElementById('fdOpening').value)||0;
-  const obj = {
-    itemName: name, category: document.getElementById('fdCategory').value,
-    unit: document.getElementById('fdUnit').value,
-    openingStock, currentStock: openingStock,
-    reorderLevel: Number(document.getElementById('fdReorder').value)||100,
-    rate: Number(document.getElementById('fdRate').value)||0
-  };
-  const id = document.getElementById('feedId').value;
-  if(id) { dbUpdate('feed', id, obj); toast('Feed item updated'); }
-  else { dbAdd('feed', obj); toast('Feed item added'); }
-  closeModal('feedModal');
-  renderFeed();
+function saveFeed(){
+  const name=document.getElementById('fdName').value.trim();
+  if(!name){toast('Item name is required','error');return;}
+  const openingStock=Number(document.getElementById('fdOpening').value)||0;
+  const obj={itemName:name,category:document.getElementById('fdCategory').value,unit:document.getElementById('fdUnit').value,
+    openingStock,currentStock:openingStock,reorderLevel:Number(document.getElementById('fdReorder').value)||100,
+    rate:Number(document.getElementById('fdRate').value)||0};
+  const id=document.getElementById('feedId').value;
+  if(id){dbUpdate('feed',id,obj);toast('Feed item updated');}
+  else{dbAdd('feed',obj);toast('Feed item added');}
+  closeModal('feedModal'); renderFeed();
 }
 
-function renderFeed() {
-  const list = dbGet('feed');
-  const txs = dbGet('transactions');
-  const tbody = document.getElementById('feedTbody');
-  if(!list.length) { tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#9ca3af;padding:30px;">No feed items yet. Add some to get started.</td></tr>'; return; }
-  tbody.innerHTML = list.map(f => {
-    const received = txs.filter(t => t.itemId===f.id && t.txType==='Purchase').reduce((s,t) => s + Number(t.qty||0), 0);
-    const issued = txs.filter(t => t.itemId===f.id && t.txType==='Issue').reduce((s,t) => s + Number(t.qty||0), 0);
-    const current = Number(f.openingStock||0) + received - issued;
-    // Update current stock in DB
-    dbUpdate('feed', f.id, { currentStock: current });
-    const isLow = current <= Number(f.reorderLevel||0);
-    return `<tr>
-      <td><b>${f.itemName}</b></td>
-      <td><span class="badge badge-blue">${f.category}</span></td>
-      <td>${f.unit}</td>
-      <td>${f.openingStock}</td>
+function renderFeed(){
+  const list=dbGet('feed'), txs=dbGet('transactions');
+  const tbody=document.getElementById('feedTbody');
+  if(!list.length){tbody.innerHTML='<tr><td colspan="11" style="text-align:center;color:#9ca3af;padding:30px;">No feed items yet.</td></tr>';return;}
+  tbody.innerHTML=list.map(f=>{
+    const received=txs.filter(t=>t.itemId===f.id&&t.txType==='Purchase').reduce((s,t)=>s+Number(t.qty||0),0);
+    const issued=txs.filter(t=>t.itemId===f.id&&t.txType==='Issue').reduce((s,t)=>s+Number(t.qty||0),0);
+    const current=Number(f.openingStock||0)+received-issued;
+    dbUpdate('feed',f.id,{currentStock:current});
+    const isLow=current<=Number(f.reorderLevel||0);
+    return `<tr><td><b>${f.itemName}</b></td><td><span class="badge badge-blue">${f.category}</span></td>
+      <td>${f.unit}</td><td>${f.openingStock}</td>
       <td style="color:#16a34a;font-weight:600;">${received}</td>
       <td style="color:#dc2626;font-weight:600;">${issued}</td>
       <td><b style="color:${isLow?'#dc2626':'#1a3a2a'};font-size:15px;">${current}</b></td>
-      <td>${f.reorderLevel}</td>
-      <td>Rs ${Number(f.rate||0).toLocaleString()}</td>
+      <td>${f.reorderLevel}</td><td>Rs ${Number(f.rate||0).toLocaleString()}</td>
       <td><span class="badge ${isLow?'badge-red':'badge-green'}">${isLow?'LOW STOCK':'OK'}</span></td>
       <td>
         <button class="btn-sm btn-edit" onclick="openFeedModal('${f.id}')"><i class="fas fa-edit"></i></button>
         <button class="btn-sm btn-del" style="margin-left:4px;" onclick="deleteFeed('${f.id}')"><i class="fas fa-trash"></i></button>
-      </td>
-    </tr>`;
+      </td></tr>`;
   }).join('');
 }
 
-function deleteFeed(id) {
-  confirm2('Delete Feed Item', 'This will delete the feed item and all its transactions.', () => {
-    dbDelete('feed', id); dbGet('transactions').filter(t=>t.itemId===id).forEach(t=>dbDelete('transactions',t.id));
-    renderFeed(); toast('Feed item deleted', 'warn');
+function deleteFeed(id){
+  confirm2('Delete Feed Item','Delete this feed item and all its transactions?',()=>{
+    dbDelete('feed',id); dbGet('transactions').filter(t=>t.itemId===id).forEach(t=>dbDelete('transactions',t.id));
+    renderFeed(); toast('Feed item deleted','warn');
   });
 }
 
 // ============================================================
 // TRANSACTIONS MODULE
 // ============================================================
-function openTxModal(id) {
-  ['txId','txVoucherNo','txNarration'].forEach(f => { const el=document.getElementById(f); if(el) el.value=''; });
-  document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
-  document.getElementById('txQty').value = '';
-  document.getElementById('txAmount').value = '';
-  document.getElementById('txModalTitle').textContent = 'New Transaction';
-
-  const feed = dbGet('feed');
-  const sel = document.getElementById('txItem');
-  const txWarning = document.getElementById('txNoFeedWarning');
-  if(!feed.length) {
-    sel.innerHTML = '<option value="">-- No feed items added yet --</option>';
-    txWarning.style.display = 'block';
-  } else {
-    sel.innerHTML = feed.map(f => `<option value="${f.id}">${f.itemName} (${f.unit})</option>`).join('');
-    txWarning.style.display = 'none';
-  }
-
-  if(id) {
-    const t = dbFind('transactions', id);
-    if(!t) return;
-    document.getElementById('txModalTitle').textContent = 'Edit Transaction';
-    document.getElementById('txId').value = id;
-    document.getElementById('txType').value = t.txType||'Purchase';
-    document.getElementById('txItem').value = t.itemId||'';
-    document.getElementById('txDate').value = t.date||'';
-    document.getElementById('txVoucherNo').value = t.voucherNo||'';
-    document.getElementById('txVoucherType').value = t.voucherType||'Purchase Bill';
-    document.getElementById('txQty').value = t.qty||'';
-    document.getElementById('txAmount').value = t.amount||'';
-    document.getElementById('txNarration').value = t.narration||'';
+function openTxModal(id){
+  populateAllDropdowns();
+  document.getElementById('txId').value='';
+  document.getElementById('txVoucherNo').value='';
+  document.getElementById('txNarration').value='';
+  document.getElementById('txDate').value=new Date().toISOString().split('T')[0];
+  document.getElementById('txQty').value='';
+  document.getElementById('txAmount').value='';
+  document.getElementById('txModalTitle').textContent='New Transaction';
+  const feed=dbGet('feed');
+  const sel=document.getElementById('txItem');
+  const warn=document.getElementById('txNoFeedWarning');
+  if(!feed.length){sel.innerHTML='<option value="">-- No feed items --</option>';warn.style.display='block';}
+  else{sel.innerHTML=feed.map(f=>`<option value="${f.id}">${f.itemName} (${f.unit})</option>`).join('');warn.style.display='none';}
+  if(id){
+    const t=dbFind('transactions',id); if(!t) return;
+    document.getElementById('txModalTitle').textContent='Edit Transaction';
+    document.getElementById('txId').value=id;
+    document.getElementById('txType').value=t.txType||'Purchase';
+    document.getElementById('txItem').value=t.itemId||'';
+    document.getElementById('txDate').value=t.date||'';
+    document.getElementById('txVoucherNo').value=t.voucherNo||'';
+    document.getElementById('txVoucherType').value=t.voucherType||'';
+    document.getElementById('txQty').value=t.qty||'';
+    document.getElementById('txAmount').value=t.amount||'';
+    document.getElementById('txNarration').value=t.narration||'';
   }
   openModal('txModal');
 }
 
-function saveTransaction() {
-  const itemId = document.getElementById('txItem').value;
-  const qty = Number(document.getElementById('txQty').value);
-  const date = document.getElementById('txDate').value;
-  if(!itemId) { toast('Please add a Feed Item in the Feed & Stock tab first', 'error'); return; }
-  if(!qty || !date) { toast('Please fill all required fields', 'error'); return; }
-
-  const txs = dbGet('transactions');
-  let voucherNo = document.getElementById('txVoucherNo').value.trim();
-  if(!voucherNo) {
-    const type = document.getElementById('txType').value;
-    const count = txs.filter(t => t.txType === type).length + 1;
-    voucherNo = (type === 'Purchase' ? 'PUR-' : 'ISS-') + String(count).padStart(4,'0');
-  }
-
-  const obj = {
-    txType: document.getElementById('txType').value,
-    itemId, date, voucherNo,
-    voucherType: document.getElementById('txVoucherType').value,
-    qty, amount: Number(document.getElementById('txAmount').value)||0,
-    narration: document.getElementById('txNarration').value
-  };
-
-  const id = document.getElementById('txId').value;
-  if(id) { dbUpdate('transactions', id, obj); toast('Transaction updated'); }
-  else { dbAdd('transactions', obj); toast('Transaction saved'); }
-  closeModal('txModal');
-  renderTransactions();
-  renderFeed();
+function saveTransaction(){
+  const itemId=document.getElementById('txItem').value;
+  const qty=Number(document.getElementById('txQty').value);
+  const date=document.getElementById('txDate').value;
+  if(!itemId){toast('Please add a Feed Item in the Feed & Stock tab first','error');return;}
+  if(!qty||!date){toast('Please fill all required fields','error');return;}
+  const txs=dbGet('transactions');
+  let voucherNo=document.getElementById('txVoucherNo').value.trim();
+  if(!voucherNo){const type=document.getElementById('txType').value;
+    voucherNo=(type==='Purchase'?'PUR-':'ISS-')+String(txs.filter(t=>t.txType===type).length+1).padStart(4,'0');}
+  const obj={txType:document.getElementById('txType').value,itemId,date,voucherNo,
+    voucherType:document.getElementById('txVoucherType').value,
+    qty,amount:Number(document.getElementById('txAmount').value)||0,
+    narration:document.getElementById('txNarration').value};
+  const id=document.getElementById('txId').value;
+  if(id){dbUpdate('transactions',id,obj);toast('Transaction updated');}
+  else{dbAdd('transactions',obj);toast('Transaction saved');}
+  closeModal('txModal'); renderTransactions(); renderFeed();
 }
 
-function renderTransactions() {
-  let list = dbGet('transactions');
-  const fType = (document.getElementById('filterTxType')||{}).value||'';
-  const fFrom = (document.getElementById('filterTxFrom')||{}).value||'';
-  const fTo = (document.getElementById('filterTxTo')||{}).value||'';
-  if(fType) list = list.filter(t => t.txType === fType);
-  if(fFrom) list = list.filter(t => t.date >= fFrom);
-  if(fTo) list = list.filter(t => t.date <= fTo);
-  list = list.slice().reverse();
-
-  const feed = dbGet('feed');
-  const tbody = document.getElementById('txTbody');
-  if(!list.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:30px;">No transactions found.</td></tr>'; return; }
-  tbody.innerHTML = list.map(t => {
-    const item = feed.find(f => f.id === t.itemId)||{};
-    return `<tr>
-      <td>${t.date}</td>
-      <td>${t.voucherNo||'—'}</td>
+function renderTransactions(){
+  let list=dbGet('transactions');
+  const fType=(document.getElementById('filterTxType')||{}).value||'';
+  const fFrom=(document.getElementById('filterTxFrom')||{}).value||'';
+  const fTo=(document.getElementById('filterTxTo')||{}).value||'';
+  if(fType) list=list.filter(t=>t.txType===fType);
+  if(fFrom) list=list.filter(t=>t.date>=fFrom);
+  if(fTo) list=list.filter(t=>t.date<=fTo);
+  list=list.slice().reverse();
+  const feed=dbGet('feed');
+  const tbody=document.getElementById('txTbody');
+  if(!list.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:30px;">No transactions found.</td></tr>';return;}
+  tbody.innerHTML=list.map(t=>{const item=feed.find(f=>f.id===t.itemId)||{};
+    return `<tr><td>${t.date}</td><td>${t.voucherNo||'—'}</td>
       <td><span class="badge badge-blue" style="font-size:10px;">${t.voucherType||'—'}</span></td>
       <td>${item.itemName||'—'}</td>
       <td><span class="badge ${t.txType==='Purchase'?'badge-green':'badge-red'}">${t.txType}</span></td>
-      <td>${t.qty} ${item.unit||''}</td>
-      <td>Rs ${Number(t.amount||0).toLocaleString()}</td>
+      <td>${t.qty} ${item.unit||''}</td><td>Rs ${Number(t.amount||0).toLocaleString()}</td>
       <td>${t.narration||'—'}</td>
       <td>
         <button class="btn-sm btn-edit" onclick="openTxModal('${t.id}')"><i class="fas fa-edit"></i></button>
         <button class="btn-sm btn-del" style="margin-left:4px;" onclick="deleteTx('${t.id}')"><i class="fas fa-trash"></i></button>
-      </td>
-    </tr>`;
+      </td></tr>`;
   }).join('');
 }
 
-function deleteTx(id) {
-  confirm2('Delete Transaction', 'Delete this transaction record?', () => {
-    dbDelete('transactions', id); renderTransactions(); renderFeed(); toast('Transaction deleted', 'warn');
-  });
-}
-
-function clearTxFilters() {
-  document.getElementById('filterTxType').value = '';
-  document.getElementById('filterTxFrom').value = '';
-  document.getElementById('filterTxTo').value = '';
-  renderTransactions();
-}
+function deleteTx(id){confirm2('Delete Transaction','Delete this transaction?',()=>{dbDelete('transactions',id);renderTransactions();renderFeed();toast('Deleted','warn');});}
+function clearTxFilters(){document.getElementById('filterTxType').value='';document.getElementById('filterTxFrom').value='';document.getElementById('filterTxTo').value='';renderTransactions();}
 
 // ============================================================
 // WEIGHT MODULE
 // ============================================================
-let weightChartInstance = null;
+let weightChartInstance=null;
 
-function populateWeightTagFilter() {
-  const animals = dbGet('animals');
-  const sel = document.getElementById('filterWeightTag');
-  sel.innerHTML = '<option value="">All Animals</option>' + animals.map(a => `<option value="${a.tagNo}">${a.tagNo} (${a.animalType||''})</option>`).join('');
-  // Also for weight entry modal
-  const wSel = document.getElementById('wTag');
-  if(wSel) wSel.innerHTML = animals.map(a => `<option value="${a.tagNo}">${a.tagNo} - ${a.animalType||''} ${a.breed||''}</option>`).join('');
+function populateWeightTagFilter(){
+  const animals=dbGet('animals');
+  const sel=document.getElementById('filterWeightTag');
+  sel.innerHTML='<option value="">All Animals</option>'+animals.map(a=>`<option value="${a.tagNo}">${a.tagNo} (${a.animalType||''})</option>`).join('');
+  const wSel=document.getElementById('wTag');
+  if(wSel) wSel.innerHTML=animals.map(a=>`<option value="${a.tagNo}">${a.tagNo} - ${a.animalType||''} ${a.breed||''}</option>`).join('');
 }
 
-function openWeightModal(id) {
-  document.getElementById('weightId').value = '';
-  document.getElementById('wDate').value = new Date().toISOString().split('T')[0];
-  document.getElementById('wWeight').value = '';
-  document.getElementById('wRemarks').value = '';
+function openWeightModal(id){
+  document.getElementById('weightId').value='';
+  document.getElementById('wDate').value=new Date().toISOString().split('T')[0];
+  document.getElementById('wWeight').value='';
+  document.getElementById('wRemarks').value='';
   populateWeightTagFilter();
-  if(id) {
-    const w = dbFind('weights', id);
-    if(w) {
-      document.getElementById('weightId').value = id;
-      document.getElementById('wTag').value = w.tagNo;
-      document.getElementById('wDate').value = w.date;
-      document.getElementById('wWeight').value = w.weight;
-      document.getElementById('wRemarks').value = w.remarks||'';
-    }
-  }
+  if(id){const w=dbFind('weights',id);if(w){document.getElementById('weightId').value=id;document.getElementById('wTag').value=w.tagNo;document.getElementById('wDate').value=w.date;document.getElementById('wWeight').value=w.weight;document.getElementById('wRemarks').value=w.remarks||'';}}
   openModal('weightModal');
 }
 
-function saveWeight() {
-  const tagNo = document.getElementById('wTag').value;
-  const date = document.getElementById('wDate').value;
-  const weight = Number(document.getElementById('wWeight').value);
-  if(!tagNo || !date || !weight) { toast('Please fill all required fields', 'error'); return; }
-  const obj = { tagNo, date, weight, remarks: document.getElementById('wRemarks').value };
-  const id = document.getElementById('weightId').value;
-  if(id) { dbUpdate('weights', id, obj); toast('Weight updated'); }
-  else { dbAdd('weights', obj); toast('Weight recorded'); }
-  closeModal('weightModal');
-  renderWeights();
-  renderWeightChart();
+function saveWeight(){
+  const tagNo=document.getElementById('wTag').value;
+  const date=document.getElementById('wDate').value;
+  const weight=Number(document.getElementById('wWeight').value);
+  if(!tagNo||!date||!weight){toast('Please fill all required fields','error');return;}
+  const obj={tagNo,date,weight,remarks:document.getElementById('wRemarks').value};
+  const id=document.getElementById('weightId').value;
+  if(id){dbUpdate('weights',id,obj);toast('Weight updated');}
+  else{dbAdd('weights',obj);toast('Weight recorded');}
+  closeModal('weightModal'); renderWeights(); renderWeightChart();
 }
 
-function renderWeights() {
-  let list = dbGet('weights');
-  const tag = (document.getElementById('filterWeightTag')||{}).value||'';
-  if(tag) list = list.filter(w => w.tagNo === tag);
-  list = list.slice().sort((a,b) => b.date.localeCompare(a.date));
-  const tbody = document.getElementById('weightTbody');
-  if(!list.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#9ca3af;padding:30px;">No weight records found.</td></tr>'; return; }
-  tbody.innerHTML = list.map(w => `<tr>
-    <td><b>${w.tagNo}</b></td><td>${w.date}</td>
-    <td><b>${w.weight} kg</b></td><td>${w.remarks||'—'}</td>
+function renderWeights(){
+  let list=dbGet('weights');
+  const tag=(document.getElementById('filterWeightTag')||{}).value||'';
+  if(tag) list=list.filter(w=>w.tagNo===tag);
+  list=list.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  const tbody=document.getElementById('weightTbody');
+  if(!list.length){tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#9ca3af;padding:30px;">No weight records.</td></tr>';return;}
+  tbody.innerHTML=list.map(w=>`<tr>
+    <td><b>${w.tagNo}</b></td><td>${w.date}</td><td><b>${w.weight} kg</b></td><td>${w.remarks||'—'}</td>
     <td>
       <button class="btn-sm btn-edit" onclick="openWeightModal('${w.id}')"><i class="fas fa-edit"></i></button>
       <button class="btn-sm btn-del" style="margin-left:4px;" onclick="deleteWeight('${w.id}')"><i class="fas fa-trash"></i></button>
-    </td>
-  </tr>`).join('');
+    </td></tr>`).join('');
 }
 
-function renderWeightChart() {
-  const tag = (document.getElementById('filterWeightTag')||{}).value||'';
-  if(!tag) { document.getElementById('weightChartCard').style.display='none'; return; }
-  let list = dbGet('weights').filter(w => w.tagNo === tag).sort((a,b) => a.date.localeCompare(b.date));
+function renderWeightChart(){
+  const tag=(document.getElementById('filterWeightTag')||{}).value||'';
+  if(!tag){document.getElementById('weightChartCard').style.display='none';return;}
+  const list=dbGet('weights').filter(w=>w.tagNo===tag).sort((a,b)=>a.date.localeCompare(b.date));
   if(!list.length) return;
   document.getElementById('weightChartCard').style.display='block';
   if(weightChartInstance) weightChartInstance.destroy();
-  weightChartInstance = new Chart(document.getElementById('weightChart'), {
-    type: 'line',
-    data: {
-      labels: list.map(w => w.date),
-      datasets: [{ label: `Weight (kg) - ${tag}`, data: list.map(w => w.weight),
-        borderColor: '#2d5c3e', backgroundColor: 'rgba(45,92,62,.1)', tension: 0.3, fill: true, pointRadius: 5 }]
-    },
-    options: { responsive: true, plugins: { legend: { display: true } }, scales: { y: { beginAtZero: false } } }
-  });
+  weightChartInstance=new Chart(document.getElementById('weightChart'),{
+    type:'line',data:{labels:list.map(w=>w.date),datasets:[{label:`Weight (kg) - ${tag}`,data:list.map(w=>w.weight),borderColor:'#2d5c3e',backgroundColor:'rgba(45,92,62,.1)',tension:0.3,fill:true,pointRadius:5}]},
+    options:{responsive:true,plugins:{legend:{display:true}},scales:{y:{beginAtZero:false}}}});
 }
 
-function deleteWeight(id) {
-  confirm2('Delete Weight Record', 'Delete this weight entry?', () => {
-    dbDelete('weights', id); renderWeights(); renderWeightChart(); toast('Record deleted', 'warn');
-  });
-}
+function deleteWeight(id){confirm2('Delete Weight','Delete this weight record?',()=>{dbDelete('weights',id);renderWeights();renderWeightChart();toast('Deleted','warn');});}
 
 // ============================================================
 // SETUP
 // ============================================================
-function saveFarmSetup() {
-  const name = document.getElementById('setupFarmName').value.trim();
-  DB.setObj('setup', { farmName: name, unit: document.getElementById('setupUnit').value });
-  document.getElementById('farmOwner').textContent = name;
-  document.getElementById('sidebarFarmName') && (document.getElementById('sidebarFarmName').textContent = name);
+function saveFarmSetup(){
+  const name=document.getElementById('setupFarmName').value.trim();
+  DB.setObj('setup',{farmName:name,unit:document.getElementById('setupUnit').value});
+  document.getElementById('farmOwner').textContent=name;
   toast('Settings saved');
 }
 
-function renderTransitionRules() {
-  const rules = dbGet('transitionRules');
-  const tbody = document.getElementById('transitionRulesTbody');
-  if(!rules.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:20px;">No rules defined. Add rules to enable stage transition alerts.</td></tr>'; return; }
-  tbody.innerHTML = rules.map(r => `<tr>
+function renderTransitionRules(){
+  const rules=dbGet('transitionRules');
+  const tbody=document.getElementById('transitionRulesTbody');
+  if(!rules.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:20px;">No rules yet. Add rules to enable stage transition alerts.</td></tr>';return;}
+  tbody.innerHTML=rules.map(r=>`<tr>
     <td>${r.animalType}</td><td>${r.gender}</td>
     <td><span class="badge badge-blue">${r.fromStage}</span></td>
     <td><span class="badge badge-green">${r.toStage}</span></td>
-    <td><b>${r.ageMonths} months</b></td>
-    <td>${r.warnDays} days</td>
+    <td><b>${r.ageMonths} months</b></td><td>${r.warnDays} days</td>
     <td>
-      <button class="btn-sm btn-edit" onclick="editTransitionRule('${r.id}')"><i class="fas fa-edit"></i></button>
+      <button class="btn-sm btn-edit" onclick="openTransitionRuleModal('${r.id}')"><i class="fas fa-edit"></i></button>
       <button class="btn-sm btn-del" style="margin-left:4px;" onclick="deleteTransitionRule('${r.id}')"><i class="fas fa-trash"></i></button>
-    </td>
-  </tr>`).join('');
+    </td></tr>`).join('');
 }
 
-function openTransitionRuleModal(id) {
-  document.getElementById('ruleId').value = '';
-  ['ruleAnimalType','ruleGender','ruleFromStage','ruleToStage'].forEach(f => document.getElementById(f).selectedIndex=0);
-  document.getElementById('ruleAgeMonths').value = 12;
-  document.getElementById('ruleWarnDays').value = 7;
-  if(id) {
-    const r = dbFind('transitionRules', id);
-    if(r) {
-      document.getElementById('ruleId').value = id;
-      document.getElementById('ruleAnimalType').value = r.animalType;
-      document.getElementById('ruleGender').value = r.gender;
-      document.getElementById('ruleFromStage').value = r.fromStage;
-      document.getElementById('ruleToStage').value = r.toStage;
-      document.getElementById('ruleAgeMonths').value = r.ageMonths;
-      document.getElementById('ruleWarnDays').value = r.warnDays;
-    }
+function openTransitionRuleModal(id){
+  populateAllDropdowns();
+  document.getElementById('ruleId').value='';
+  document.getElementById('ruleAgeMonths').value=12;
+  document.getElementById('ruleWarnDays').value=7;
+  if(id){
+    const r=dbFind('transitionRules',id); if(!r) return;
+    document.getElementById('ruleId').value=id;
+    document.getElementById('ruleAnimalType').value=r.animalType;
+    document.getElementById('ruleGender').value=r.gender;
+    document.getElementById('ruleFromStage').value=r.fromStage;
+    document.getElementById('ruleToStage').value=r.toStage;
+    document.getElementById('ruleAgeMonths').value=r.ageMonths;
+    document.getElementById('ruleWarnDays').value=r.warnDays;
   }
   openModal('transitionRuleModal');
 }
 
-function editTransitionRule(id) { openTransitionRuleModal(id); }
-
-function saveTransitionRule() {
-  const obj = {
-    animalType: document.getElementById('ruleAnimalType').value,
-    gender: document.getElementById('ruleGender').value,
-    fromStage: document.getElementById('ruleFromStage').value,
-    toStage: document.getElementById('ruleToStage').value,
-    ageMonths: Number(document.getElementById('ruleAgeMonths').value),
-    warnDays: Number(document.getElementById('ruleWarnDays').value)
-  };
-  const id = document.getElementById('ruleId').value;
-  if(id) { dbUpdate('transitionRules', id, obj); toast('Rule updated'); }
-  else { dbAdd('transitionRules', obj); toast('Rule added'); }
-  closeModal('transitionRuleModal');
-  renderTransitionRules();
+function saveTransitionRule(){
+  const obj={animalType:document.getElementById('ruleAnimalType').value,gender:document.getElementById('ruleGender').value,
+    fromStage:document.getElementById('ruleFromStage').value,toStage:document.getElementById('ruleToStage').value,
+    ageMonths:Number(document.getElementById('ruleAgeMonths').value),warnDays:Number(document.getElementById('ruleWarnDays').value)};
+  const id=document.getElementById('ruleId').value;
+  if(id){dbUpdate('transitionRules',id,obj);toast('Rule updated');}
+  else{dbAdd('transitionRules',obj);toast('Rule added');}
+  closeModal('transitionRuleModal'); renderTransitionRules();
 }
 
-function deleteTransitionRule(id) {
-  confirm2('Delete Rule', 'Delete this transition rule?', () => {
-    dbDelete('transitionRules', id); renderTransitionRules(); toast('Rule deleted', 'warn');
-  });
-}
-
-function renderFeedCategories() {
-  const cats = DB.getObj('feedCategories', ['Feed','Fertilizer','Medicine','Supplements','Other']);
-  const container = document.getElementById('feedCategoryChips');
-  container.innerHTML = cats.map((c,i) => `
-    <span style="background:#e8f5e9;border:1.5px solid #2d5c3e;color:#1a3a2a;padding:6px 14px;border-radius:20px;font-size:13px;display:inline-flex;align-items:center;gap:6px;">
-      ${c} <button onclick="removeCategory(${i})" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:12px;">✕</button>
-    </span>`).join('');
-}
-
-function addFeedCategory() {
-  const val = document.getElementById('newCategoryInput').value.trim();
-  if(!val) return;
-  const cats = DB.getObj('feedCategories', ['Feed','Fertilizer','Medicine','Supplements','Other']);
-  if(!cats.includes(val)) { cats.push(val); DB.setObj('feedCategories', cats); }
-  document.getElementById('newCategoryInput').value = '';
-  renderFeedCategories();
-}
-
-function removeCategory(i) {
-  const cats = DB.getObj('feedCategories', []);
-  cats.splice(i,1); DB.setObj('feedCategories', cats);
-  renderFeedCategories();
-}
+function deleteTransitionRule(id){confirm2('Delete Rule','Delete this transition rule?',()=>{dbDelete('transitionRules',id);renderTransitionRules();toast('Deleted','warn');});}
 
 // ============================================================
 // REPORTS
 // ============================================================
-function printReport(type) {
-  const animals = dbGet('animals');
-  const feed = dbGet('feed');
-  const txs = dbGet('transactions');
-  const weights = dbGet('weights');
-  const transitionLog = dbGet('transitionLog');
-  const today = new Date().toLocaleDateString('en-PK');
-  let html = '';
-  const head = (title) => `<div style="font-family:Arial;padding:20px;max-width:900px;margin:0 auto;">
+function printReport(type){
+  const animals=dbGet('animals'),feed=dbGet('feed'),txs=dbGet('transactions'),weights=dbGet('weights'),tLog=dbGet('transitionLog');
+  const today=new Date().toLocaleDateString('en-PK');
+  const farmName=DB.getObj('setup',{farmName:'Farm Management System'}).farmName;
+  const head=(title)=>`<div style="font-family:Arial;padding:20px;max-width:900px;margin:0 auto;">
     <div style="text-align:center;border-bottom:2px solid #2d5c3e;padding-bottom:12px;margin-bottom:20px;">
-      <h2 style="color:#1a3a2a;margin:0;">${DB.getObj('setup',{farmName:'Farm Management System'}).farmName}</h2>
+      <h2 style="color:#1a3a2a;margin:0;">${farmName}</h2>
       <h3 style="color:#2d5c3e;margin:4px 0;">${title}</h3>
       <div style="color:#6b7280;font-size:12px;">Generated: ${today}</div>
     </div>`;
-  const foot = `<div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:20px;border-top:1px solid #e5e7eb;padding-top:10px;">Farm Management System</div></div>`;
-
-  if(type === 'animal-register') {
-    html = head('Animal Register') + `<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;">
-      <thead style="background:#2d5c3e;color:#fff;">
-        <tr><th>Tag No</th><th>Type</th><th>Breed</th><th>Gender</th><th>Stage</th><th>DOB</th><th>Status</th><th>Purchase Amount</th></tr>
-      </thead><tbody>` +
-      animals.map(a => `<tr><td>${a.tagNo}</td><td>${a.animalType||''}</td><td>${a.breed||''}</td><td>${a.gender||''}</td><td>${a.stage||''}</td><td>${a.dob||''}</td><td>${a.status||''}</td><td>Rs ${Number(a.purchaseAmount||0).toLocaleString()}</td></tr>`).join('') +
-      `</tbody></table>` + foot;
-  } else if(type === 'feed-summary') {
-    html = head('Feed Stock Summary') + `<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;">
-      <thead style="background:#2d5c3e;color:#fff;">
-        <tr><th>Item</th><th>Category</th><th>Unit</th><th>Opening</th><th>Received</th><th>Issued</th><th>Current Stock</th><th>Reorder Level</th><th>Status</th></tr>
-      </thead><tbody>` +
-      feed.map(f => {
-        const received = txs.filter(t=>t.itemId===f.id&&t.txType==='Purchase').reduce((s,t)=>s+Number(t.qty||0),0);
-        const issued = txs.filter(t=>t.itemId===f.id&&t.txType==='Issue').reduce((s,t)=>s+Number(t.qty||0),0);
-        const current = Number(f.openingStock||0)+received-issued;
-        const isLow = current<=Number(f.reorderLevel||0);
-        return `<tr style="${isLow?'background:#fff5f5':''}"><td>${f.itemName}</td><td>${f.category}</td><td>${f.unit}</td><td>${f.openingStock}</td><td>${received}</td><td>${issued}</td><td><b>${current}</b></td><td>${f.reorderLevel}</td><td>${isLow?'⚠ LOW':'OK'}</td></tr>`;
-      }).join('') + `</tbody></table>` + foot;
-  } else if(type === 'transactions') {
-    html = head('Transaction Ledger') + `<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;">
-      <thead style="background:#2d5c3e;color:#fff;">
-        <tr><th>Date</th><th>Voucher No</th><th>Item</th><th>Type</th><th>Qty</th><th>Amount</th><th>Narration</th></tr>
-      </thead><tbody>` +
-      txs.map(t => { const item = feed.find(f=>f.id===t.itemId)||{};
-        return `<tr><td>${t.date}</td><td>${t.voucherNo||''}</td><td>${item.itemName||''}</td><td>${t.txType}</td><td>${t.qty} ${item.unit||''}</td><td>Rs ${Number(t.amount||0).toLocaleString()}</td><td>${t.narration||''}</td></tr>`;
-      }).join('') + `</tbody></table>` + foot;
-  } else if(type === 'weight-history') {
-    html = head('Weight History') + `<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;">
-      <thead style="background:#2d5c3e;color:#fff;">
-        <tr><th>Tag No</th><th>Date</th><th>Weight (kg)</th><th>Remarks</th></tr>
-      </thead><tbody>` +
-      weights.sort((a,b)=>a.tagNo.localeCompare(b.tagNo)).map(w => `<tr><td>${w.tagNo}</td><td>${w.date}</td><td>${w.weight}</td><td>${w.remarks||''}</td></tr>`).join('') +
-      `</tbody></table>` + foot;
-  } else if(type === 'stage-transitions') {
-    html = head('Stage Transitions Log') + `<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;">
-      <thead style="background:#2d5c3e;color:#fff;">
-        <tr><th>Date</th><th>Tag No</th><th>From Stage</th><th>To Stage</th><th>Approved By</th></tr>
-      </thead><tbody>` +
-      transitionLog.map(l => `<tr><td>${l.date}</td><td>${l.tagNo}</td><td>${l.fromStage}</td><td>${l.toStage}</td><td>${l.approvedBy}</td></tr>`).join('') +
-      `</tbody></table>` + foot;
-  }
-
-  const win = window.open('', '_blank');
+  const foot=`<div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:20px;border-top:1px solid #e5e7eb;padding-top:10px;">Farm Management System</div></div>`;
+  let html='';
+  if(type==='animal-register') html=head('Animal Register')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Tag No</th><th>Type</th><th>Breed</th><th>Gender</th><th>Stage</th><th>DOB</th><th>Status</th><th>Purchase Amount</th></tr></thead><tbody>`+animals.map(a=>`<tr><td>${a.tagNo}</td><td>${a.animalType||''}</td><td>${a.breed||''}</td><td>${a.gender||''}</td><td>${a.stage||''}</td><td>${a.dob||''}</td><td>${a.status||''}</td><td>Rs ${Number(a.purchaseAmount||0).toLocaleString()}</td></tr>`).join('')+`</tbody></table>`+foot;
+  else if(type==='feed-summary') html=head('Feed Stock Summary')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Item</th><th>Category</th><th>Unit</th><th>Opening</th><th>Received</th><th>Issued</th><th>Current</th><th>Reorder</th><th>Status</th></tr></thead><tbody>`+feed.map(f=>{const r=txs.filter(t=>t.itemId===f.id&&t.txType==='Purchase').reduce((s,t)=>s+Number(t.qty||0),0);const i=txs.filter(t=>t.itemId===f.id&&t.txType==='Issue').reduce((s,t)=>s+Number(t.qty||0),0);const c=Number(f.openingStock||0)+r-i;return `<tr style="${c<=Number(f.reorderLevel||0)?'background:#fff5f5':''}"><td>${f.itemName}</td><td>${f.category}</td><td>${f.unit}</td><td>${f.openingStock}</td><td>${r}</td><td>${i}</td><td><b>${c}</b></td><td>${f.reorderLevel}</td><td>${c<=Number(f.reorderLevel||0)?'⚠ LOW':'OK'}</td></tr>`}).join('')+`</tbody></table>`+foot;
+  else if(type==='transactions') html=head('Transaction Ledger')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Voucher No</th><th>Item</th><th>Type</th><th>Qty</th><th>Amount</th><th>Narration</th></tr></thead><tbody>`+txs.map(t=>{const item=feed.find(f=>f.id===t.itemId)||{};return `<tr><td>${t.date}</td><td>${t.voucherNo||''}</td><td>${item.itemName||''}</td><td>${t.txType}</td><td>${t.qty} ${item.unit||''}</td><td>Rs ${Number(t.amount||0).toLocaleString()}</td><td>${t.narration||''}</td></tr>`}).join('')+`</tbody></table>`+foot;
+  else if(type==='weight-history') html=head('Weight History')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Tag No</th><th>Date</th><th>Weight (kg)</th><th>Remarks</th></tr></thead><tbody>`+weights.sort((a,b)=>a.tagNo.localeCompare(b.tagNo)).map(w=>`<tr><td>${w.tagNo}</td><td>${w.date}</td><td>${w.weight}</td><td>${w.remarks||''}</td></tr>`).join('')+`</tbody></table>`+foot;
+  else if(type==='stage-transitions') html=head('Stage Transitions Log')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Tag No</th><th>From</th><th>To</th><th>Approved By</th></tr></thead><tbody>`+tLog.map(l=>`<tr><td>${l.date}</td><td>${l.tagNo}</td><td>${l.fromStage}</td><td>${l.toStage}</td><td>${l.approvedBy}</td></tr>`).join('')+`</tbody></table>`+foot;
+  const win=window.open('','_blank');
   win.document.write(`<!DOCTYPE html><html><head><title>Report</title></head><body onload="window.print()">${html}</body></html>`);
   win.document.close();
 }
@@ -1395,74 +1503,62 @@ function printReport(type) {
 // ============================================================
 // DATA EXPORT / IMPORT
 // ============================================================
-function exportData() {
-  const data = {
-    animals: dbGet('animals'), feed: dbGet('feed'),
-    transactions: dbGet('transactions'), weights: dbGet('weights'),
-    transitionRules: dbGet('transitionRules'), transitionLog: dbGet('transitionLog'),
-    setup: DB.getObj('setup',{})
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'FarmManagement_' + new Date().toISOString().split('T')[0] + '.json';
-  a.click();
-  toast('Data exported successfully');
+function exportData(){
+  const data={animals:dbGet('animals'),feed:dbGet('feed'),transactions:dbGet('transactions'),
+    weights:dbGet('weights'),transitionRules:dbGet('transitionRules'),transitionLog:dbGet('transitionLog'),
+    lookups:getLookups(),setup:DB.getObj('setup',{})};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='FarmManagement_'+new Date().toISOString().split('T')[0]+'.json'; a.click();
+  toast('Data exported');
 }
-
-function triggerImport() { document.getElementById('importFile').click(); }
-
-function importData(input) {
-  const file = input.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if(data.animals) DB.set('animals', data.animals);
-      if(data.feed) DB.set('feed', data.feed);
-      if(data.transactions) DB.set('transactions', data.transactions);
-      if(data.weights) DB.set('weights', data.weights);
-      if(data.transitionRules) DB.set('transitionRules', data.transitionRules);
-      if(data.transitionLog) DB.set('transitionLog', data.transitionLog);
-      if(data.setup) DB.setObj('setup', data.setup);
-      toast('Data imported successfully');
-      refreshDashboard();
-    } catch(err) { toast('Invalid file format', 'error'); }
+function triggerImport(){document.getElementById('importFile').click();}
+function importData(input){
+  const file=input.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=(e)=>{
+    try{const data=JSON.parse(e.target.result);
+      if(data.animals) DB.set('animals',data.animals);
+      if(data.feed) DB.set('feed',data.feed);
+      if(data.transactions) DB.set('transactions',data.transactions);
+      if(data.weights) DB.set('weights',data.weights);
+      if(data.transitionRules) DB.set('transitionRules',data.transitionRules);
+      if(data.transitionLog) DB.set('transitionLog',data.transitionLog);
+      if(data.lookups) DB.setObj('lookups',data.lookups);
+      if(data.setup) DB.setObj('setup',data.setup);
+      toast('Data imported'); refreshDashboard();
+    }catch(err){toast('Invalid file format','error');}
   };
   reader.readAsText(file);
 }
-
-function confirmClearData() {
-  confirm2('Clear All Data', 'This will permanently delete ALL animals, transactions, and records. This cannot be undone!', () => {
-    ['animals','feed','transactions','weights','transitionRules','transitionLog'].forEach(k => DB.set(k, []));
-    toast('All data cleared', 'warn');
-    refreshDashboard();
+function confirmClearData(){
+  confirm2('Clear All Data','This will permanently delete ALL animals, transactions, and records. Cannot be undone!',()=>{
+    ['animals','feed','transactions','weights','transitionRules','transitionLog'].forEach(k=>DB.set(k,[]));
+    toast('All data cleared','warn'); refreshDashboard();
   });
 }
 
 // ============================================================
 // FIRST-RUN CLEAN SLATE
 // ============================================================
-function ensureCleanSlate() {
-  // If this version flag is not set, wipe all old stored data and start fresh
-  if(!localStorage.getItem('fms_clean_v3')) {
+function ensureCleanSlate(){
+  if(!localStorage.getItem('fms_clean_v3')){
     ['fms_animals','fms_feed','fms_transactions','fms_weights',
-     'fms_transitionRules','fms_transitionLog','fms_setup','fms_feedCategories'].forEach(k => localStorage.removeItem(k));
-    localStorage.setItem('fms_clean_v3', '1');
+     'fms_transitionRules','fms_transitionLog','fms_setup','fms_feedCategories'].forEach(k=>localStorage.removeItem(k));
+    localStorage.setItem('fms_clean_v3','1');
   }
 }
 
 // ============================================================
 // INIT
 // ============================================================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded',()=>{
   ensureCleanSlate();
-  document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-PK', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
-  const setup = DB.getObj('setup', { farmName:'Kamran Saleem' });
-  document.getElementById('farmOwner').textContent = setup.farmName || 'Kamran Saleem';
-  document.getElementById('setupFarmName').value = setup.farmName || 'Kamran Saleem';
-  seedDefaultData();
+  document.getElementById('todayDate').textContent=new Date().toLocaleDateString('en-PK',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  const setup=DB.getObj('setup',{farmName:'Kamran Saleem'});
+  document.getElementById('farmOwner').textContent=setup.farmName||'Kamran Saleem';
+  document.getElementById('setupFarmName').value=setup.farmName||'Kamran Saleem';
+  populateAllDropdowns();
   refreshDashboard();
 });
 </script>
