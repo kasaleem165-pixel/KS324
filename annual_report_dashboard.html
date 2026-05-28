@@ -222,6 +222,11 @@
   }
   .note-box .note-icon { font-size: 1rem; flex-shrink: 0; }
 
+  .kpi-card.clickable { cursor: pointer; }
+  .kpi-card.clickable:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,0.15); }
+  .kpi-card .kpi-link { font-size: 0.72rem; color: #aaa; margin-top: 8px; display: flex; align-items: center; gap: 3px; }
+  .kpi-card .kpi-link::after { content: '→'; }
+
   /* ─── OUTCOME BREAKDOWN CARD ─────────────────────────── */
   .outcome-breakdown {
     background: white; border-radius: var(--radius); box-shadow: var(--card-shadow);
@@ -304,35 +309,41 @@
   </div>
 
   <div class="kpi-grid">
-    <div class="kpi-card red">
-      <div class="kpi-label">Investigations Conducted</div>
+    <div class="kpi-card red clickable" onclick="showSectionFromCard('investigations')">
+      <div class="kpi-label">🔍 Investigations</div>
       <div class="kpi-value">27</div>
-      <div class="kpi-sub">Across all regions</div>
+      <div class="kpi-sub">Assignments conducted — all regions</div>
+      <div class="kpi-link">View Investigations tab</div>
     </div>
-    <div class="kpi-card amber">
+    <div class="kpi-card amber clickable" onclick="showSectionFromCard('investigations')">
       <div class="kpi-label">Total Disciplinary Outcomes</div>
       <div class="kpi-value">79</div>
       <div class="kpi-sub">7 action types — breakdown below</div>
+      <div class="kpi-link">View Investigations tab</div>
     </div>
-    <div class="kpi-card teal">
-      <div class="kpi-label">Branches Audited</div>
+    <div class="kpi-card teal clickable" onclick="showSectionFromCard('branch-audit')">
+      <div class="kpi-label">🏫 Branch Audit</div>
       <div class="kpi-value">38</div>
-      <div class="kpi-sub">ROC 12 · RON 10 · ROS 16</div>
+      <div class="kpi-sub">Branches audited — ROC 12 · RON 10 · ROS 16</div>
+      <div class="kpi-link">View Branch Audit tab</div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Total Audit Observations</div>
+    <div class="kpi-card clickable" onclick="showSectionFromCard('branch-audit')">
+      <div class="kpi-label">Branch Audit Observations</div>
       <div class="kpi-value">2,264</div>
       <div class="kpi-sub">ROC 705 · RON 553 · ROS 976 · FHS 30</div>
+      <div class="kpi-link">View Branch Audit tab</div>
     </div>
-    <div class="kpi-card green">
-      <div class="kpi-label">Total Savings Achieved</div>
+    <div class="kpi-card green clickable" onclick="showSectionFromCard('savings')">
+      <div class="kpi-label">💰 Savings &amp; Initiatives</div>
       <div class="kpi-value">Rs. 10.1M</div>
-      <div class="kpi-sub">AIDN + Market Initiatives</div>
+      <div class="kpi-sub">AIDN + rate rationalization</div>
+      <div class="kpi-link">View Savings &amp; Initiatives tab</div>
     </div>
-    <div class="kpi-card amber">
-      <div class="kpi-label">AIDN Vouchers Checked</div>
+    <div class="kpi-card amber clickable" onclick="showSectionFromCard('aidn')">
+      <div class="kpi-label">🧾 AIDN Vouchers</div>
       <div class="kpi-value">121</div>
-      <div class="kpi-sub">Value: Rs. 27.6M reviewed</div>
+      <div class="kpi-sub">Vouchers checked · Rs. 27.6M reviewed</div>
+      <div class="kpi-link">View AIDN Vouchers tab</div>
     </div>
   </div>
 
@@ -361,7 +372,7 @@
       <canvas id="chart-inv-region"></canvas>
     </div>
     <div class="chart-card">
-      <h3>Overall Outcome Distribution</h3>
+      <h3>Investigations – Outcome Distribution</h3>
       <canvas id="chart-outcomes-overall"></canvas>
     </div>
     <div class="chart-card">
@@ -369,7 +380,7 @@
       <canvas id="chart-ba-region"></canvas>
     </div>
     <div class="chart-card">
-      <h3>Savings Breakdown (Rs. in Millions)</h3>
+      <h3>Savings &amp; Initiatives – Breakdown (Rs. M)</h3>
       <canvas id="chart-savings-overview"></canvas>
     </div>
   </div>
@@ -378,7 +389,7 @@
     <h3>Key Highlights at a Glance</h3>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:10px;">
       <div>
-        <p style="font-weight:700;color:var(--primary);margin-bottom:4px;">Disciplinary Actions <span style="font-weight:400;font-size:0.75rem;color:#888;">(all 7 types · 19+24+16+9+3+6+2 = 79)</span></p>
+        <p style="font-weight:700;color:var(--primary);margin-bottom:4px;">🔍 Investigations – Disciplinary Actions <span style="font-weight:400;font-size:0.75rem;color:#888;">(all 7 types · 19+24+16+9+3+6+2 = 79)</span></p>
         <p style="font-size:0.72rem;color:#aaa;margin-bottom:10px;">Bars scaled to the largest value (Recoveries = 24)</p>
         <div class="progress-row"><div class="progress-label"><span>Recoveries</span><span>24</span></div><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:100%"></div></div></div>
         <div class="progress-row"><div class="progress-label"><span>End of Service (Resign / Term.)</span><span>19</span></div><div class="progress-bar-bg"><div class="progress-bar-fill red" style="width:79%"></div></div></div>
@@ -392,14 +403,14 @@
         </div>
       </div>
       <div>
-        <p style="font-weight:700;color:var(--primary);margin-bottom:10px;">Audit Observation Risk Levels (ROC)</p>
+        <p style="font-weight:700;color:var(--primary);margin-bottom:10px;">🏫 Branch Audit – Risk Levels (ROC)</p>
         <div class="progress-row"><div class="progress-label"><span>High Risk</span><span>45</span></div><div class="progress-bar-bg"><div class="progress-bar-fill red" style="width:40%"></div></div></div>
         <div class="progress-row"><div class="progress-label"><span>Medium-High Risk</span><span>220</span></div><div class="progress-bar-bg"><div class="progress-bar-fill amber" style="width:100%"></div></div></div>
         <div class="progress-row"><div class="progress-label"><span>Low-Medium Risk</span><span>322</span></div><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:100%"></div></div></div>
         <div class="progress-row"><div class="progress-label"><span>Low Risk</span><span>118</span></div><div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:54%"></div></div></div>
       </div>
       <div>
-        <p style="font-weight:700;color:var(--primary);margin-bottom:10px;">Top Pre-Audit Issues (HO)</p>
+        <p style="font-weight:700;color:var(--primary);margin-bottom:10px;">📋 Pre-Audit – Top Issues (HO)</p>
         <div class="progress-row"><div class="progress-label"><span>Missing/Incomplete Documents</span><span>252</span></div><div class="progress-bar-bg"><div class="progress-bar-fill red" style="width:100%"></div></div></div>
         <div class="progress-row"><div class="progress-label"><span>Tax Related Issues</span><span>12</span></div><div class="progress-bar-bg"><div class="progress-bar-fill amber" style="width:5%"></div></div></div>
         <div class="progress-row"><div class="progress-label"><span>Miscellaneous</span><span>7</span></div><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:3%"></div></div></div>
@@ -931,7 +942,7 @@
 ══════════════════════════════════════════════════════════ -->
 <div id="section-branch-audit" class="section">
   <div class="section-heading">
-    <h2>Post-Audit (Branch Audit)</h2>
+    <h2>Branch Audit</h2>
     <span class="badge">38 Branches</span>
   </div>
 
@@ -1016,7 +1027,7 @@
 ══════════════════════════════════════════════════════════ -->
 <div id="section-pre-audit" class="section">
   <div class="section-heading">
-    <h2>Pre-Audit Observations</h2>
+    <h2>Pre-Audit</h2>
     <span class="badge">All Regions</span>
   </div>
 
@@ -1082,7 +1093,7 @@
 ══════════════════════════════════════════════════════════ -->
 <div id="section-aidn" class="section">
   <div class="section-heading">
-    <h2>AIDN Voucher Checking (Section D)</h2>
+    <h2>AIDN Vouchers</h2>
     <span class="badge">121 Vouchers</span>
   </div>
 
@@ -1133,7 +1144,7 @@
 ══════════════════════════════════════════════════════════ -->
 <div id="section-savings" class="section">
   <div class="section-heading">
-    <h2>Savings &amp; Market Initiatives</h2>
+    <h2>Savings &amp; Initiatives</h2>
     <span class="badge">Rs. 10.1M+</span>
   </div>
 
@@ -1415,6 +1426,20 @@ function showSection(id) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('section-' + id).classList.add('active');
   event.target.classList.add('active');
+}
+
+// Called from clickable KPI cards (no event.target available)
+function showSectionFromCard(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('section-' + id).classList.add('active');
+  // Activate matching tab button
+  document.querySelectorAll('.nav-tab').forEach(t => {
+    if (t.getAttribute('onclick') && t.getAttribute('onclick').includes("'" + id + "'")) {
+      t.classList.add('active');
+    }
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function showRegion(id) {
