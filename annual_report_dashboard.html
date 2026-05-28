@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beaconhouse Group – S&A Annual Report 2024</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary: #1a3a5c;
+    --secondary: #c8102e;
+    --accent: #f0a500;
+    --success: #28a745;
+    --info: #17a2b8;
+    --warning: #ffc107;
+    --light: #f8f9fa;
+    --dark: #212529;
+    --card-shadow: 0 4px 20px rgba(0,0,0,0.10);
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #eef2f7; color: var(--dark); }
+
+  /* ─── HEADER ─────────────────────────────────────────── */
+  .header {
+    background: linear-gradient(135deg, var(--primary) 0%, #2d5986 100%);
+    color: white; padding: 28px 40px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  }
+  .header-left h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: 0.5px; }
+  .header-left p  { font-size: 0.95rem; opacity: 0.85; margin-top: 4px; }
+  .header-badge {
+    background: var(--secondary); color: white;
+    padding: 8px 18px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;
+  }
+
+  /* ─── NAV TABS ────────────────────────────────────────── */
+  .nav-tabs {
+    display: flex; gap: 4px; padding: 16px 40px 0;
+    background: white; border-bottom: 3px solid #dce3ec;
+    flex-wrap: wrap;
+  }
+  .nav-tab {
+    padding: 10px 20px; cursor: pointer; border: none; background: none;
+    font-size: 0.88rem; font-weight: 600; color: #555;
+    border-radius: 8px 8px 0 0; transition: all 0.2s;
+    border-bottom: 3px solid transparent; margin-bottom: -3px;
+  }
+  .nav-tab:hover { background: #eef2f7; color: var(--primary); }
+  .nav-tab.active { background: #eef2f7; color: var(--primary); border-bottom: 3px solid var(--secondary); }
+
+  /* ─── SECTIONS ────────────────────────────────────────── */
+  .section { display: none; padding: 28px 40px; }
+  .section.active { display: block; }
+
+  /* ─── KPI CARDS ───────────────────────────────────────── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 18px; margin-bottom: 28px; }
+  .kpi-card {
+    background: white; border-radius: var(--radius); padding: 22px;
+    box-shadow: var(--card-shadow); border-left: 5px solid var(--primary);
+    transition: transform 0.2s;
+  }
+  .kpi-card:hover { transform: translateY(-3px); }
+  .kpi-card.red  { border-left-color: var(--secondary); }
+  .kpi-card.amber { border-left-color: var(--accent); }
+  .kpi-card.green { border-left-color: var(--success); }
+  .kpi-card.teal  { border-left-color: var(--info); }
+  .kpi-card .kpi-label { font-size: 0.78rem; color: #777; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; }
+  .kpi-card .kpi-value { font-size: 2rem; font-weight: 700; color: var(--primary); line-height: 1; }
+  .kpi-card.red  .kpi-value  { color: var(--secondary); }
+  .kpi-card.amber .kpi-value { color: #b07d00; }
+  .kpi-card.green .kpi-value { color: #1a7a32; }
+  .kpi-card.teal  .kpi-value { color: #0d7385; }
+  .kpi-card .kpi-sub { font-size: 0.78rem; color: #888; margin-top: 6px; }
+
+  /* ─── CHART GRID ──────────────────────────────────────── */
+  .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 22px; margin-bottom: 28px; }
+  .chart-card {
+    background: white; border-radius: var(--radius); padding: 22px;
+    box-shadow: var(--card-shadow);
+  }
+  .chart-card h3 { font-size: 0.95rem; color: var(--primary); margin-bottom: 16px; font-weight: 700; }
+  .chart-card canvas { max-height: 280px; }
+
+  /* ─── SECTION HEADING ─────────────────────────────────── */
+  .section-heading {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+  }
+  .section-heading h2 { font-size: 1.25rem; color: var(--primary); font-weight: 700; }
+  .section-heading .badge {
+    background: var(--secondary); color: white; padding: 3px 12px;
+    border-radius: 12px; font-size: 0.75rem; font-weight: 600;
+  }
+
+  /* ─── TABLE ───────────────────────────────────────────── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  thead th {
+    background: var(--primary); color: white; padding: 11px 14px;
+    text-align: left; font-weight: 600; letter-spacing: 0.3px;
+  }
+  tbody tr { border-bottom: 1px solid #e8edf2; }
+  tbody tr:hover { background: #f4f8fc; }
+  tbody td { padding: 9px 14px; }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  tbody tr:nth-child(even):hover { background: #edf3fa; }
+
+  /* ─── REGION PANEL ────────────────────────────────────── */
+  .region-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .region-btn {
+    padding: 8px 22px; border: 2px solid var(--primary); background: white;
+    color: var(--primary); border-radius: 20px; cursor: pointer;
+    font-size: 0.85rem; font-weight: 600; transition: all 0.2s;
+  }
+  .region-btn.active, .region-btn:hover { background: var(--primary); color: white; }
+  .region-panel { display: none; }
+  .region-panel.active { display: block; }
+
+  /* ─── OUTCOME PILLS ───────────────────────────────────── */
+  .outcome-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+  .outcome-pill {
+    display: flex; align-items: center; gap: 8px;
+    background: white; border-radius: 20px; padding: 8px 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08); font-size: 0.85rem;
+  }
+  .outcome-pill .num { font-weight: 700; font-size: 1.1rem; color: var(--secondary); }
+  .outcome-pill .lbl { color: #555; }
+
+  /* ─── SAVINGS TABLE ───────────────────────────────────── */
+  .savings-highlight { background: #fff8e1; border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 8px; margin-bottom: 8px; font-size: 0.88rem; }
+  .savings-highlight strong { color: #8a6000; }
+
+  /* ─── PROGRESS BAR ────────────────────────────────────── */
+  .progress-row { margin-bottom: 12px; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 0.82rem; color: #555; margin-bottom: 4px; }
+  .progress-bar-bg { background: #e8edf2; border-radius: 6px; height: 10px; }
+  .progress-bar-fill { height: 10px; border-radius: 6px; background: linear-gradient(90deg, var(--primary), #4a8ec2); }
+  .progress-bar-fill.red  { background: linear-gradient(90deg, var(--secondary), #e87b8a); }
+  .progress-bar-fill.amber { background: linear-gradient(90deg, var(--accent), #f8c84d); }
+  .progress-bar-fill.green { background: linear-gradient(90deg, var(--success), #6fcf8d); }
+
+  /* ─── COLLAPSIBLE DETAIL ──────────────────────────────── */
+  .collapsible-header {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--primary); color: white; padding: 12px 18px;
+    border-radius: 8px; cursor: pointer; margin-bottom: 4px; user-select: none;
+  }
+  .collapsible-header:hover { background: #1f4a78; }
+  .collapsible-header h4 { font-size: 0.9rem; font-weight: 600; }
+  .collapsible-header .arrow { transition: transform 0.3s; }
+  .collapsible-body { display: none; border: 1px solid #dce3ec; border-radius: 0 0 8px 8px; margin-bottom: 12px; }
+  .collapsible-body.open { display: block; }
+
+  /* ─── FOOTER ──────────────────────────────────────────── */
+  .footer {
+    text-align: center; padding: 18px; color: #888; font-size: 0.8rem;
+    border-top: 1px solid #dce3ec; background: white; margin-top: 20px;
+  }
+
+  @media (max-width: 700px) {
+    .header { padding: 18px 20px; flex-direction: column; gap: 12px; }
+    .nav-tabs { padding: 12px 20px 0; }
+    .section { padding: 18px 20px; }
+    .chart-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <h1>Beaconhouse Group &mdash; Systems &amp; Audit Department</h1>
+    <p>Annual Report &bull; January – December 2024 &bull; Confidential &bull; For Management Review</p>
+  </div>
+  <div class="header-badge">FY 2024</div>
+</div>
+
+<!-- NAV TABS -->
+<div class="nav-tabs">
+  <button class="nav-tab active" onclick="showSection('overview')">📊 Executive Overview</button>
+  <button class="nav-tab" onclick="showSection('investigations')">🔍 Investigations</button>
+  <button class="nav-tab" onclick="showSection('branch-audit')">🏫 Branch Audit</button>
+  <button class="nav-tab" onclick="showSection('pre-audit')">📋 Pre-Audit</button>
+  <button class="nav-tab" onclick="showSection('aidn')">🧾 AIDN Vouchers</button>
+  <button class="nav-tab" onclick="showSection('savings')">💰 Savings &amp; Initiatives</button>
+  <button class="nav-tab" onclick="showSection('regions')">🗺 Region Drill-Down</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     1. EXECUTIVE OVERVIEW
+══════════════════════════════════════════════════════════ -->
+<div id="section-overview" class="section active">
+  <div class="section-heading">
+    <h2>Executive Overview – FY 2024</h2>
+    <span class="badge">Systems &amp; Audit</span>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card red">
+      <div class="kpi-label">Investigations Conducted</div>
+      <div class="kpi-value">27</div>
+      <div class="kpi-sub">Across all regions</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Allegations Proved</div>
+      <div class="kpi-value">79</div>
+      <div class="kpi-sub">Disciplinary outcomes issued</div>
+    </div>
+    <div class="kpi-card teal">
+      <div class="kpi-label">Branches Audited</div>
+      <div class="kpi-value">38</div>
+      <div class="kpi-sub">ROC 12 · RON 10 · ROS 16</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Total Audit Observations</div>
+      <div class="kpi-value">2,264</div>
+      <div class="kpi-sub">ROC 705 · RON 553 · ROS 976 · FHS 30</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Total Savings Achieved</div>
+      <div class="kpi-value">Rs. 10.1M</div>
+      <div class="kpi-sub">AIDN + Market Initiatives</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">AIDN Vouchers Checked</div>
+      <div class="kpi-value">121</div>
+      <div class="kpi-sub">Value: Rs. 27.6M reviewed</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Vendor Blacklistings</div>
+      <div class="kpi-value">6</div>
+      <div class="kpi-sub">Across ROS &amp; ROC regions</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">End of Service Actions</div>
+      <div class="kpi-value">19</div>
+      <div class="kpi-sub">Terminations &amp; Resignations</div>
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>Investigations by Region</h3>
+      <canvas id="chart-inv-region"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Overall Outcome Distribution</h3>
+      <canvas id="chart-outcomes-overall"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Branch Audit Observations by Region</h3>
+      <canvas id="chart-ba-region"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Savings Breakdown (Rs. in Millions)</h3>
+      <canvas id="chart-savings-overview"></canvas>
+    </div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:22px;">
+    <h3>Key Highlights at a Glance</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:10px;">
+      <div>
+        <p style="font-weight:700;color:var(--primary);margin-bottom:10px;">Disciplinary Actions</p>
+        <div class="progress-row"><div class="progress-label"><span>Resignations / Terminations</span><span>19</span></div><div class="progress-bar-bg"><div class="progress-bar-fill red" style="width:100%"></div></div></div>
+        <div class="progress-row"><div class="progress-label"><span>Recoveries Made</span><span>24</span></div><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:100%"></div></div></div>
+        <div class="progress-row"><div class="progress-label"><span>Warning Letters</span><span>16</span></div><div class="progress-bar-bg"><div class="progress-bar-fill amber" style="width:67%"></div></div></div>
+        <div class="progress-row"><div class="progress-label"><span>Letter of Advice</span><span>9</span></div><div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:38%"></div></div></div>
+        <div class="progress-row"><div class="progress-label"><span>Letter of Caution</span><span>3</span></div><div class="progress-bar-bg"><div class="progress-bar-fill amber" style="width:13%"></div></div></div>
+        <div class="progress-row"><div class="progress-label"><span>Transfers</span><span>2</span></div><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:8%"></div></div></div>
+        <div class="progress-row"><div class="progress-label"><span>Vendor Blacklistings</span><span>6</span></div><div class="progress-bar-bg"><div class="progress-bar-fill red" style="width:25%"></div></div></div>
+      </div>
+      <div>
+        <p style="font-weight:700;color:var(--primary);margin-bottom:10px;">Audit Observation Risk Levels (ROC)</p>
+        <div class="progress-row"><div class="progress-label"><span>High Risk</span><span>45</span></div><div class="progress-bar-bg"><div class="progress-bar-fill red" style="width:40%"></div></div></div>
+        <div class="progress-row"><div class="progress-label"><span>Medium-High Risk</span><span>220</span></div><div class="progress-bar-bg"><div class="progress-bar-fill amber" style="width:100%"></div></div></div>
+        <div class="progress-row"><div class="progress-label"><span>Low-Medium Risk</span><span>322</span></div><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:100%"></div></div></div>
+        <div class="progress-row"><div class="progress-label"><span>Low Risk</span><span>118</span></div><div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:54%"></div></div></div>
+      </div>
+      <div>
+        <p style="font-weight:700;color:var(--primary);margin-bottom:10px;">Top Pre-Audit Issues (HO)</p>
+        <div class="progress-row"><div class="progress-label"><span>Missing/Incomplete Documents</span><span>252</span></div><div class="progress-bar-bg"><div class="progress-bar-fill red" style="width:100%"></div></div></div>
+        <div class="progress-row"><div class="progress-label"><span>Tax Related Issues</span><span>12</span></div><div class="progress-bar-bg"><div class="progress-bar-fill amber" style="width:5%"></div></div></div>
+        <div class="progress-row"><div class="progress-label"><span>Miscellaneous</span><span>7</span></div><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:3%"></div></div></div>
+        <div class="progress-row"><div class="progress-label"><span>Late Payments</span><span>4</span></div><div class="progress-bar-bg"><div class="progress-bar-fill green" style="width:2%"></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     2. INVESTIGATIONS
+══════════════════════════════════════════════════════════ -->
+<div id="section-investigations" class="section">
+  <div class="section-heading">
+    <h2>Investigations &amp; Fact-Finding Exercises</h2>
+    <span class="badge">27 Assignments</span>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card red"><div class="kpi-label">Total Assignments</div><div class="kpi-value">27</div></div>
+    <div class="kpi-card amber"><div class="kpi-label">Allegations Proved</div><div class="kpi-value">79</div></div>
+    <div class="kpi-card green"><div class="kpi-label">Recoveries</div><div class="kpi-value">24</div><div class="kpi-sub">Assets &amp; funds recovered</div></div>
+    <div class="kpi-card red"><div class="kpi-label">End of Service</div><div class="kpi-value">19</div><div class="kpi-sub">Terminations + Resignations</div></div>
+    <div class="kpi-card"><div class="kpi-label">Warning Letters</div><div class="kpi-value">16</div></div>
+    <div class="kpi-card teal"><div class="kpi-label">Vendor Blacklistings</div><div class="kpi-value">6</div></div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>Investigations per Region</h3>
+      <canvas id="chart-inv-region2"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Outcome Types – All Regions</h3>
+      <canvas id="chart-outcome-types"></canvas>
+    </div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:22px;">
+    <h3>Investigation Details by Region</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Region</th>
+            <th>Assignments</th>
+            <th>Allegations Proved</th>
+            <th>Resignations / Terminations</th>
+            <th>Recoveries</th>
+            <th>Warning Letters</th>
+            <th>Letter of Caution</th>
+            <th>Letter of Advice</th>
+            <th>Vendor Blacklisting</th>
+            <th>Transfers</th>
+            <th>Total Outcomes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>ROC</strong></td><td>4</td><td>6</td><td>1</td><td>1</td><td>2</td><td>2</td><td>0</td><td>0</td><td>0</td><td>6</td></tr>
+          <tr><td><strong>RON</strong></td><td>10</td><td>15</td><td>6</td><td>3</td><td>4</td><td>0</td><td>0</td><td>0</td><td>2</td><td>15</td></tr>
+          <tr><td><strong>ROS</strong></td><td>12</td><td>54</td><td>11</td><td>19</td><td>9</td><td>1</td><td>9</td><td>6</td><td>0</td><td>54</td></tr>
+          <tr><td><strong>FHS</strong></td><td>1</td><td>4</td><td>2</td><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td><td>4</td></tr>
+          <tr style="font-weight:700;background:#e8f0fe;">
+            <td>TOTAL</td><td>27</td><td>79</td><td>20</td><td>24</td><td>16</td><td>3</td><td>9</td><td>6</td><td>2</td><td>79</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <h3>Notable Investigation Cases</h3>
+    <div style="margin-top:8px;">
+
+      <div class="collapsible-header" onclick="toggleCollapse(this)">
+        <h4>🔴 ROS – KG 1 Campus, Jauhar (425) | Attendance Fraud &amp; Asset Misuse</h4>
+        <span class="arrow">▼</span>
+      </div>
+      <div class="collapsible-body">
+        <div style="padding:16px;">
+          <p style="margin-bottom:8px;"><strong>Findings:</strong> Attendance fraud and assets misuse discovered during fact-finding exercise.</p>
+          <p style="margin-bottom:8px;"><strong>Outcomes:</strong> Resignation (4), Warning Letter (2), Letter of Advice (8), Recovery (6)</p>
+          <p><strong>Recoveries:</strong> Rs. 421,888 from Head of School (false leaves) + Rs. 183,705 from 5 teachers (unregistered students) = <strong>Rs. 605,593 total</strong></p>
+        </div>
+      </div>
+
+      <div class="collapsible-header" onclick="toggleCollapse(this)">
+        <h4>🔴 ROS – Newlands Karachi (458) | Fraud &amp; Misappropriation in School Funds</h4>
+        <span class="arrow">▼</span>
+      </div>
+      <div class="collapsible-body">
+        <div style="padding:16px;">
+          <p style="margin-bottom:8px;"><strong>Findings:</strong> Cash misappropriation, vendor collusion, and fund misuse identified.</p>
+          <p style="margin-bottom:8px;"><strong>Outcomes:</strong> Resignation (2), Recovery (4), Warning Letter (1), Letter of Advice (1), Blacklisting (2)</p>
+          <p><strong>Recoveries:</strong> Rs. 30,762 + Rs. 21,411 (Officer Accounts), Rs. 18,200 + Rs. 14,200 + Rs. 16,790 (M/s Nishat), Rs. 22,755 (M/s Aftab Sports), Rs. 49,959 (Office Attendant)</p>
+        </div>
+      </div>
+
+      <div class="collapsible-header" onclick="toggleCollapse(this)">
+        <h4>🔴 ROS – Main Campus Quetta (471) | Blank Letter Heads, Fake Vendors</h4>
+        <span class="arrow">▼</span>
+      </div>
+      <div class="collapsible-body">
+        <div style="padding:16px;">
+          <p style="margin-bottom:8px;"><strong>Findings:</strong> Blank letter heads/bills, high rates, and fake vendor collusion.</p>
+          <p style="margin-bottom:8px;"><strong>Outcomes:</strong> Resignation (2), Recovery (2), Warning Letter (2), Letter of Caution (1), Blacklisting (2)</p>
+          <p><strong>Recoveries:</strong> Rs. 80,140 from Officer Accountant + Rs. 34,703 from Member PC</p>
+        </div>
+      </div>
+
+      <div class="collapsible-header" onclick="toggleCollapse(this)">
+        <h4>🔴 RON – BSS-320/F10-4 Islamabad | Fund Misuse &amp; Record Manipulation</h4>
+        <span class="arrow">▼</span>
+      </div>
+      <div class="collapsible-body">
+        <div style="padding:16px;">
+          <p style="margin-bottom:8px;"><strong>Findings:</strong> Misuse of company funds through unposted vouchers, record manipulation, and collusion with a PC member.</p>
+          <p style="margin-bottom:8px;"><strong>Outcomes:</strong> Resignation (1), Recovery (1), Warning Letter (1)</p>
+          <p><strong>Recovery:</strong> Rs. 390,204 from Muzaffar Hayat (Branch Accountant)</p>
+        </div>
+      </div>
+
+      <div class="collapsible-header" onclick="toggleCollapse(this)">
+        <h4>🔴 FHS – Ambiance Karachi | Cash Misappropriation &amp; Invoice Manipulation</h4>
+        <span class="arrow">▼</span>
+      </div>
+      <div class="collapsible-body">
+        <div style="padding:16px;">
+          <p style="margin-bottom:8px;"><strong>Findings:</strong> Cash misappropriation and invoice manipulation.</p>
+          <p style="margin-bottom:8px;"><strong>Outcomes:</strong> Resignation (2), Warning Letter (1), Recovery (1)</p>
+          <p><strong>Recovery:</strong> Rs. 768,605 from M. Faheem</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     3. BRANCH AUDIT
+══════════════════════════════════════════════════════════ -->
+<div id="section-branch-audit" class="section">
+  <div class="section-heading">
+    <h2>Post-Audit (Branch Audit)</h2>
+    <span class="badge">38 Branches</span>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-label">ROC – Branches Audited</div><div class="kpi-value">12</div><div class="kpi-sub">705 observations</div></div>
+    <div class="kpi-card teal"><div class="kpi-label">RON – Branches Audited</div><div class="kpi-value">10</div><div class="kpi-sub">553 observations</div></div>
+    <div class="kpi-card amber"><div class="kpi-label">ROS – Branches Audited</div><div class="kpi-value">16</div><div class="kpi-sub">976 observations</div></div>
+    <div class="kpi-card red"><div class="kpi-label">Total Observations</div><div class="kpi-value">2,264</div><div class="kpi-sub">Across all regions</div></div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>Observations by Audit Area (ROC – 12 Branches)</h3>
+      <canvas id="chart-ba-roc"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Observations by Audit Area (RON – 10 Branches)</h3>
+      <canvas id="chart-ba-ron"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Observations by Audit Area (ROS – 16 Branches)</h3>
+      <canvas id="chart-ba-ros"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Risk Level Distribution – ROC (705 Observations)</h3>
+      <canvas id="chart-risk-roc"></canvas>
+    </div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:22px;">
+    <h3>Detailed Observations by Area &amp; Region</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Audit Area</th>
+            <th>ROC Total</th>
+            <th>RON Total</th>
+            <th>ROS Total</th>
+            <th>Grand Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Branch Imprest, Payments &amp; Accounts</td><td>153</td><td>131</td><td>187</td><td>471</td></tr>
+          <tr><td>Cash &amp; Bank</td><td>41</td><td>25</td><td>13</td><td>79</td></tr>
+          <tr><td>Fixed Assets</td><td>111</td><td>78</td><td>124</td><td>313</td></tr>
+          <tr><td>Library &amp; Laboratory</td><td>86</td><td>46</td><td>145</td><td>277</td></tr>
+          <tr><td>Recruitment, Payroll &amp; Employee Records</td><td>128</td><td>141</td><td>176</td><td>445</td></tr>
+          <tr><td>Safety &amp; Security</td><td>51</td><td>9</td><td>121</td><td>181</td></tr>
+          <tr><td>Students Record</td><td>56</td><td>92</td><td>119</td><td>267</td></tr>
+          <tr><td>Others / Miscellaneous</td><td>79</td><td>31</td><td>91</td><td>201</td></tr>
+          <tr style="font-weight:700;background:#e8f0fe;">
+            <td>TOTAL</td><td>705</td><td>553</td><td>976</td><td>2,234</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <h3>Observation Referral Breakdown</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Region</th><th>Branches Audited</th><th>Total Observations</th><th>Referred to Branch</th><th>Referred to RO</th><th>Referred to HO</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>ROC</strong></td><td>12</td><td>705</td><td>577</td><td>128</td><td>0</td></tr>
+          <tr><td><strong>RON</strong></td><td>10</td><td>583</td><td>490</td><td>265</td><td>19</td></tr>
+          <tr><td><strong>ROS</strong></td><td>16</td><td>976</td><td>617</td><td>342</td><td>17</td></tr>
+          <tr style="font-weight:700;background:#e8f0fe;">
+            <td>TOTAL</td><td>38</td><td>2,264</td><td>1,684</td><td>735</td><td>36</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     4. PRE-AUDIT
+══════════════════════════════════════════════════════════ -->
+<div id="section-pre-audit" class="section">
+  <div class="section-heading">
+    <h2>Pre-Audit Observations</h2>
+    <span class="badge">All Regions</span>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>HO Pre-Audit Observations (3,452 Vouchers)</h3>
+      <canvas id="chart-pa-ho"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>ROC Pre-Audit Observations (4,547 Vouchers)</h3>
+      <canvas id="chart-pa-roc"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>RON Pre-Audit Observations (5,770 Vouchers)</h3>
+      <canvas id="chart-pa-ron"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>ROS Pre-Audit Observations (2,670 Vouchers)</h3>
+      <canvas id="chart-pa-ros"></canvas>
+    </div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:22px;">
+    <h3>Pre-Audit Issue Comparison – All Regions</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Issue Type</th>
+            <th>HO</th>
+            <th>ROC</th>
+            <th>RON</th>
+            <th>ROS</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Vendor Reg / RFQ / Budgetary Issues</td><td>0</td><td>0</td><td>3</td><td>2</td><td>5</td></tr>
+          <tr><td>PMC / CSQ / Rates / Quality</td><td>3</td><td>2</td><td>10</td><td>17</td><td>32</td></tr>
+          <tr><td>Missing / Incomplete Documents</td><td>252</td><td>276</td><td>72</td><td>24</td><td>624</td></tr>
+          <tr><td>Late Payments</td><td>4</td><td>373</td><td>31</td><td>0</td><td>408</td></tr>
+          <tr><td>Tax Related Issues</td><td>12</td><td>0</td><td>2</td><td>0</td><td>14</td></tr>
+          <tr><td>Wrong Account Head</td><td>0</td><td>0</td><td>2</td><td>1</td><td>3</td></tr>
+          <tr><td>Data Entry / Typos / Calc Errors</td><td>1</td><td>0</td><td>9</td><td>0</td><td>10</td></tr>
+          <tr><td>Employee Advances / Allowances</td><td>0</td><td>0</td><td>9</td><td>16</td><td>25</td></tr>
+          <tr><td>Miscellaneous</td><td>7</td><td>23</td><td>1</td><td>0</td><td>31</td></tr>
+          <tr style="font-weight:700;background:#e8f0fe;">
+            <td>Total Issues</td><td>279</td><td>674</td><td>139</td><td>60</td><td>1,152</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <h3>Quarterly Pre-Audit Trends (ROC – Late Payments)</h3>
+    <canvas id="chart-pa-quarterly"></canvas>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     5. AIDN VOUCHERS
+══════════════════════════════════════════════════════════ -->
+<div id="section-aidn" class="section">
+  <div class="section-heading">
+    <h2>AIDN Voucher Checking (Section D)</h2>
+    <span class="badge">121 Vouchers</span>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-label">Total Vouchers Received</div><div class="kpi-value">199</div><div class="kpi-sub">All regions combined</div></div>
+    <div class="kpi-card teal"><div class="kpi-label">Vouchers Checked</div><div class="kpi-value">121</div><div class="kpi-sub">61% coverage rate</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Value Reviewed</div><div class="kpi-value">Rs. 27.6M</div><div class="kpi-sub">Across checked vouchers</div></div>
+    <div class="kpi-card green"><div class="kpi-label">Total Savings (AIDN)</div><div class="kpi-value">Rs. 1.39M</div><div class="kpi-sub">One-off savings achieved</div></div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>Vouchers Checked by Region</h3>
+      <canvas id="chart-aidn-vouchers"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>AIDN Savings by Region (Rs.)</h3>
+      <canvas id="chart-aidn-savings"></canvas>
+    </div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:22px;">
+    <h3>AIDN Quarterly Breakdown</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Region</th><th>Q1 (Jan-Mar)</th><th>Q2 (Apr-Jun)</th><th>Q3 (Jul-Sep)</th><th>Q4 (Oct-Dec)</th><th>Total Vouchers</th><th>Total Value (Rs.)</th><th>Savings (Rs.)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>ROC</strong></td><td>11</td><td>3</td><td>18</td><td>35</td><td>67</td><td>10,324,623</td><td>1,210,427</td></tr>
+          <tr><td><strong>RON</strong></td><td>4</td><td>4</td><td>15</td><td>7</td><td>30</td><td>3,842,083</td><td>0</td></tr>
+          <tr><td><strong>ROS</strong></td><td>6</td><td>3</td><td>5</td><td>9</td><td>23</td><td>7,923,085</td><td>178,337</td></tr>
+          <tr><td><strong>FHS</strong></td><td>1</td><td>0</td><td>0</td><td>0</td><td>1</td><td>13,200</td><td>0</td></tr>
+          <tr style="font-weight:700;background:#e8f0fe;"><td>TOTAL</td><td>22</td><td>10</td><td>38</td><td>51</td><td>121</td><td>22,102,991</td><td>1,388,764</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <h3>Quarterly AIDN Activity Trend</h3>
+    <canvas id="chart-aidn-quarterly"></canvas>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     6. SAVINGS & INITIATIVES
+══════════════════════════════════════════════════════════ -->
+<div id="section-savings" class="section">
+  <div class="section-heading">
+    <h2>Savings &amp; Market Initiatives</h2>
+    <span class="badge">Rs. 10.1M+</span>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card green"><div class="kpi-label">ROC – Rate Rationalization</div><div class="kpi-value">Rs. 3.52M</div><div class="kpi-sub">11 vendor negotiations</div></div>
+    <div class="kpi-card green"><div class="kpi-label">RON – Construction Rebate</div><div class="kpi-value">Rs. 3.25M</div><div class="kpi-sub">GST error correction</div></div>
+    <div class="kpi-card green"><div class="kpi-label">ROS – Various Initiatives</div><div class="kpi-value">Rs. 2.16M</div><div class="kpi-sub">5 separate savings</div></div>
+    <div class="kpi-card green"><div class="kpi-label">AIDN Savings</div><div class="kpi-value">Rs. 1.39M</div><div class="kpi-sub">Voucher checking results</div></div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>Savings by Region (Rs. Millions)</h3>
+      <canvas id="chart-savings-region"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>ROC – Individual Savings by Vendor</h3>
+      <canvas id="chart-roc-vendor-savings"></canvas>
+    </div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:22px;">
+    <h3>ROC – Rate Rationalization Initiatives</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Vendor</th><th>Activity / Purpose</th><th>Savings (Rs.)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>M/S Market Eye</td><td>Early Years Giveaways Package 1 (Activity sheets, Crayons, Activity Books, etc.)</td><td style="font-weight:700;color:green;">797,680</td></tr>
+          <tr><td>M/S Market Eye</td><td>Early Years Giveaways Package 2 (Sticker sheets, Crayons, Bag-shaped walk-in pack)</td><td style="font-weight:700;color:green;">899,160</td></tr>
+          <tr><td>M/S Raziq Enterprises</td><td>Water Bottle for BCP</td><td style="font-weight:700;color:green;">328,000</td></tr>
+          <tr><td>M/S Raziq Enterprises</td><td>Water Bottle for Newlands, Laptop Sleeve, Stickers</td><td style="font-weight:700;color:green;">201,169</td></tr>
+          <tr><td>M/S DOT X</td><td>Marketing OOH Campaign – ROC Outstation Branches</td><td style="font-weight:700;color:green;">495,719</td></tr>
+          <tr><td>M/S AVS Traders</td><td>Lab Equipments for IB-DP Labs</td><td style="font-weight:700;color:green;">167,037</td></tr>
+          <tr><td>M/S Osaka Lighting</td><td>Security Lights for ROC Branches</td><td style="font-weight:700;color:green;">172,900</td></tr>
+          <tr><td>M/S Monarch Marcom &amp; Rawaha</td><td>Vinyl Pasting with lamination work</td><td style="font-weight:700;color:green;">112,100</td></tr>
+          <tr><td>M/S Monarch Marcom</td><td>Backlight Board Flex printing with installation</td><td style="font-weight:700;color:green;">107,050</td></tr>
+          <tr><td>M/S Agis Advertising Agency</td><td>Catering &amp; Decor for ADP Event</td><td style="font-weight:700;color:green;">174,000</td></tr>
+          <tr><td>M/S Monarch</td><td>BNCF Wooden Setup Lights &amp; Vinyl</td><td style="font-weight:700;color:green;">16,000</td></tr>
+          <tr><td>M/S Monarch</td><td>MSA Logo Preparation at TNS-DHA</td><td style="font-weight:700;color:green;">54,008</td></tr>
+          <tr style="font-weight:700;background:#e8f0fe;"><td colspan="2">ROC TOTAL</td><td style="color:green;">3,524,823</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:22px;">
+    <h3>RON &amp; ROS – Key Savings Initiatives</h3>
+    <div class="savings-highlight">
+      <strong>RON – BSS-376 Gulberg Green (Rs. 3,249,198):</strong> S&amp;A team identified an additional 5% GST incorrectly applied on the Mega Project. Following review and discussions, the contractor acknowledged the error and agreed to a 1.5% reduction in the tax rate.
+    </div>
+    <div class="savings-highlight">
+      <strong>ROS – Elimination of Extra Sales Tax on Utility Bills (Rs. 1,340,198):</strong> Correction of Further and Extra Sales Tax improperly charged on utility bills.
+    </div>
+    <div class="savings-highlight">
+      <strong>ROS – Shuttle Service Contract Terms (Rs. 225,940):</strong> Changed contract terms for student pick-and-drop service.
+    </div>
+    <div class="savings-highlight">
+      <strong>ROS – Genset Movement Rate Negotiation (Rs. 210,598):</strong> Re-negotiated rates for generator set movement.
+    </div>
+    <div class="savings-highlight">
+      <strong>ROS – Defence Campus De-watering Maintenance (Rs. 194,000):</strong> Annual maintenance contract rate renegotiation.
+    </div>
+    <div class="savings-highlight">
+      <strong>ROS – CES Event 2024/25 Rate Rationalization (Rs. 190,000):</strong> Re-negotiated rates in CSQ for CES event.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     7. REGION DRILL-DOWN
+══════════════════════════════════════════════════════════ -->
+<div id="section-regions" class="section">
+  <div class="section-heading">
+    <h2>Region Drill-Down</h2>
+    <span class="badge">Click a Region</span>
+  </div>
+
+  <div class="region-tabs">
+    <button class="region-btn active" onclick="showRegion('roc')">ROC (Central)</button>
+    <button class="region-btn" onclick="showRegion('ron')">RON (North)</button>
+    <button class="region-btn" onclick="showRegion('ros')">ROS (South)</button>
+    <button class="region-btn" onclick="showRegion('fhs')">FHS</button>
+    <button class="region-btn" onclick="showRegion('cons')">Construction</button>
+  </div>
+
+  <!-- ROC -->
+  <div id="region-roc" class="region-panel active">
+    <div class="kpi-grid">
+      <div class="kpi-card red"><div class="kpi-label">Investigations</div><div class="kpi-value">4</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Allegations Proved</div><div class="kpi-value">6</div></div>
+      <div class="kpi-card"><div class="kpi-label">Branches Audited</div><div class="kpi-value">12</div></div>
+      <div class="kpi-card teal"><div class="kpi-label">Total Observations</div><div class="kpi-value">705</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Savings Achieved</div><div class="kpi-value">Rs. 4.73M</div><div class="kpi-sub">Rate rationalization + AIDN</div></div>
+      <div class="kpi-card"><div class="kpi-label">AIDN Vouchers</div><div class="kpi-value">67</div><div class="kpi-sub">Rs. 10.3M checked</div></div>
+    </div>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>ROC – Quarterly Audit Observations</h3>
+        <canvas id="chart-roc-quarterly"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>ROC – Observation Risk Profile</h3>
+        <canvas id="chart-roc-risk"></canvas>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-top:16px;">
+      <h3>ROC – Investigation Summary</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Branch/Location</th><th>Assignment Type</th><th>Outcomes</th></tr></thead>
+          <tbody>
+            <tr><td>Wapda Town Campus, Lahore (606)</td><td>Fact Finding – Missing Assets</td><td>Letter of Caution (2): Ms. Zunaira Akhtar, Ms. Naimal Laiq</td></tr>
+            <tr><td>Bosan Road Campus, Multan (221)</td><td>Fact Finding – Missing Assets</td><td>Warning Letter (1) to Mr. Irfan Ali (AMCO) + Recovery Rs. 65,794</td></tr>
+            <tr><td>Johar Town Girls Campus (667)</td><td>Fact Finding – Procurement Discrepancy</td><td>Resignation (1): Mr. Zohaib Ahmed (OFA)</td></tr>
+            <tr><td>Main Campus Sialkot (271)</td><td>Fact Finding – Missing Assets</td><td>Warning Letter (1): Mr. Tanveer Shaukat (OFA)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- RON -->
+  <div id="region-ron" class="region-panel">
+    <div class="kpi-grid">
+      <div class="kpi-card red"><div class="kpi-label">Investigations</div><div class="kpi-value">10</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Allegations Proved</div><div class="kpi-value">15</div></div>
+      <div class="kpi-card"><div class="kpi-label">Branches Audited</div><div class="kpi-value">10</div></div>
+      <div class="kpi-card teal"><div class="kpi-label">Total Observations</div><div class="kpi-value">553</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Savings Achieved</div><div class="kpi-value">Rs. 3.25M</div><div class="kpi-sub">GST rebate Gulberg Green</div></div>
+      <div class="kpi-card"><div class="kpi-label">AIDN Vouchers</div><div class="kpi-value">30</div><div class="kpi-sub">Rs. 3.8M checked</div></div>
+    </div>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>RON – Quarterly Audit Observations</h3>
+        <canvas id="chart-ron-quarterly"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>RON – Observation Risk Profile</h3>
+        <canvas id="chart-ron-risk"></canvas>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-top:16px;">
+      <h3>RON – Investigation Summary</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Branch/Location</th><th>Assignment Type</th><th>Outcomes</th></tr></thead>
+          <tbody>
+            <tr><td>BSS-320/F10-4 Islamabad</td><td>Fund misuse – unposted vouchers, record manipulation</td><td>Resignation + Recovery Rs. 390,204 + Warning Letter</td></tr>
+            <tr><td>BSS-364 Gujrat Campus</td><td>Generator rented at high rates</td><td>Transfer (1), Warning Letter (1)</td></tr>
+            <tr><td>BSS-364 Gujrat Campus</td><td>Procurement &amp; financial irregularities</td><td>Resignation (1), Transfer (1), Warning Letter (2)</td></tr>
+            <tr><td>BSS-378 Metropolitan G-11</td><td>Missing asset during branch code split</td><td>Asset written off Rs. 430</td></tr>
+            <tr><td>BSS-378 Metropolitan G-11</td><td>Missing assets on OFA resignation</td><td>Recovery Rs. 19,861 from Mr. Zaheer Mughal</td></tr>
+            <tr><td>BSS-364 Gujrat Campus</td><td>Unauthorized relocation of school assets</td><td>Resignation (2): Muhammad Suleiman &amp; Siddque Masih</td></tr>
+            <tr><td>392-MBD Phalia Road</td><td>Missing netbook from librarian</td><td>Recovery Rs. 4,626 from Ms. Laraib</td></tr>
+            <tr><td>BMI-311 Margalla Campus</td><td>Missing multimedia smart box</td><td>Asset written off Rs. 5,174</td></tr>
+            <tr><td>BAC-340 Attock Campus</td><td>Coordinator persistent underperformance &amp; misconduct</td><td>Termination: Ms. Nadia Anwar</td></tr>
+            <tr><td>Jalala Campus, Mardan-372</td><td>Forgery of documents &amp; falsified employment records</td><td>Termination: Mr. Hadayat Ur Rehman</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-top:16px;">
+      <h3>RON – Process Review Recommendations (In Progress)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Process</th><th>Issue Identified</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>BEAMS Unposted Voucher Control Gap</td><td>Segregation weakness allows transaction manipulation</td><td>🔄 In Process</td></tr>
+            <tr><td>Withholding Tax Deposited with Delay</td><td>Index Reference Not Available</td><td>🔄 In Process</td></tr>
+            <tr><td>Capitalization Threshold Update</td><td>Change from Rs. 10,000 to Rs. 20,000</td><td>🔄 In Process</td></tr>
+            <tr><td>Premature Transfer Policy in INDEX</td><td>Policy no longer applicable</td><td>🔄 In Process</td></tr>
+            <tr><td>Generator Maintenance Guidelines</td><td>6-month / 200-hour oil change limit to be incorporated</td><td>🔄 In Process</td></tr>
+            <tr><td>Gifted Assets Policy</td><td>Needs update on INDEX</td><td>🔄 In Process</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROS -->
+  <div id="region-ros" class="region-panel">
+    <div class="kpi-grid">
+      <div class="kpi-card red"><div class="kpi-label">Investigations</div><div class="kpi-value">12</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Allegations Proved</div><div class="kpi-value">54</div></div>
+      <div class="kpi-card"><div class="kpi-label">Branches Audited</div><div class="kpi-value">16</div></div>
+      <div class="kpi-card teal"><div class="kpi-label">Total Observations</div><div class="kpi-value">976</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Savings Achieved</div><div class="kpi-value">Rs. 2.34M</div><div class="kpi-sub">Rate rationalization + AIDN</div></div>
+      <div class="kpi-card"><div class="kpi-label">AIDN Vouchers</div><div class="kpi-value">23</div><div class="kpi-sub">of 100 received checked</div></div>
+    </div>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>ROS – Quarterly Audit Observations</h3>
+        <canvas id="chart-ros-quarterly"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>ROS – Observation Risk Profile</h3>
+        <canvas id="chart-ros-risk"></canvas>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-top:16px;">
+      <h3>ROS – Investigation Summary</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Branch/Location</th><th>Issue</th><th>Key Outcomes</th></tr></thead>
+          <tbody>
+            <tr><td>Main Campus Quetta (471)</td><td>Blank letter heads, high rates, fake vendor</td><td>Resignation (2), Recovery Rs. 114,843, Warning Letter (2), Blacklisting (2)</td></tr>
+            <tr><td>Cantt Campus Quetta (484)</td><td>Blank letter heads, high rates, fake vendor</td><td>Resignation (1), Warning Letter (1), Blacklisting (2)</td></tr>
+            <tr><td>KG Latifabad, Hyderabad (452)</td><td>High rates &amp; fake quotations</td><td>Warning Letter (1) to Br. Accountant</td></tr>
+            <tr><td>Jubilee Campus (445)</td><td>Missing laptop Chromebook</td><td>Recovery Rs. 29,923 from Librarian</td></tr>
+            <tr><td>Creek Campus (458)</td><td>Missing laptop &amp; 2 library chairs</td><td>Recovery Rs. 67,495 (IT Officer + Manager Admin)</td></tr>
+            <tr><td>Primary-4, Gulshan Karachi (468)</td><td>Missing tablet</td><td>Recovery Rs. 119,623 from 3 individuals</td></tr>
+            <tr><td>Newlands Karachi (458)</td><td>Missing tablet</td><td>Recovery Rs. 24,884 from ITO</td></tr>
+            <tr><td>ROS HQ (400)</td><td>Non-disclosure of conflict of interest</td><td>Warning Letter to DM Marketing</td></tr>
+            <tr><td>Newlands Karachi (458)</td><td>Fraud &amp; misappropriation in school funds</td><td>Resignation (2), Recovery Rs. 174,077, Blacklisting (2)</td></tr>
+            <tr><td>Thatta Campus</td><td>Inappropriate conduct by Principal</td><td>Warning Letter to School Head</td></tr>
+            <tr><td>KG 1 Jauhar (425)</td><td>Attendance fraud &amp; asset misuse</td><td>Resignation (4), Recovery Rs. 605,593, Warning (2), Advice (8)</td></tr>
+            <tr><td>Bahria Town</td><td>Fund fraud &amp; misappropriation</td><td>Resignation (1), Recovery Rs. 73,000</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- FHS -->
+  <div id="region-fhs" class="region-panel">
+    <div class="kpi-grid">
+      <div class="kpi-card red"><div class="kpi-label">Investigations</div><div class="kpi-value">1</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">Allegations Proved</div><div class="kpi-value">4</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Recovery</div><div class="kpi-value">Rs. 768,605</div><div class="kpi-sub">Ambiance Karachi case</div></div>
+      <div class="kpi-card"><div class="kpi-label">AIDN Vouchers</div><div class="kpi-value">1</div><div class="kpi-sub">Rs. 13,200 value checked</div></div>
+    </div>
+    <div class="chart-card">
+      <h3>FHS – Investigation Detail</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Branch</th><th>Issue</th><th>Outcomes</th><th>Recovery</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>FHS – Ambiance Karachi</td>
+              <td>Cash misappropriation and invoice manipulation</td>
+              <td>Resignation (2): Riaz Ahmed + M. Faheem; Warning Letter (1): Syed Abid Ali; Recovery (1)</td>
+              <td><strong>Rs. 768,605</strong> from M. Faheem</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONSTRUCTION -->
+  <div id="region-cons" class="region-panel">
+    <div class="kpi-grid">
+      <div class="kpi-card green"><div class="kpi-label">Major Saving</div><div class="kpi-value">Rs. 3.25M</div><div class="kpi-sub">Gulberg Green – GST correction</div></div>
+      <div class="kpi-card"><div class="kpi-label">AIDN Vouchers</div><div class="kpi-value">0</div><div class="kpi-sub">No AIDN activity recorded</div></div>
+    </div>
+    <div class="chart-card">
+      <h3>Construction – Key Initiative</h3>
+      <div style="padding:16px;">
+        <div class="savings-highlight">
+          <strong>RON – BSS-376: Rebate against Mega Project Gulberg Green (Rs. 3,249,198)</strong>
+          <p style="margin-top:8px;">The S&amp;A team identified that the contractor had applied an additional 5% GST on the Mega Project. A detailed review revealed the GST had been incorrectly calculated. Following discussions, the contractor acknowledged the error and agreed to a 1.5% reduction in the applied tax rate, resulting in a saving of Rs. 3,249,198.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  Beaconhouse Group &bull; Systems &amp; Audit Department &bull; Annual Report January – December 2024 &bull; Confidential &bull; For Management Use Only
+</div>
+
+<script>
+// ─── Navigation ────────────────────────────────────────────
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('section-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function showRegion(id) {
+  document.querySelectorAll('.region-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.region-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('region-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function toggleCollapse(header) {
+  const body = header.nextElementSibling;
+  const arrow = header.querySelector('.arrow');
+  body.classList.toggle('open');
+  arrow.style.transform = body.classList.contains('open') ? 'rotate(180deg)' : '';
+}
+
+// ─── Color Palettes ─────────────────────────────────────────
+const COLORS = {
+  primary: '#1a3a5c', secondary: '#c8102e', accent: '#f0a500',
+  success: '#28a745', info: '#17a2b8', warning: '#ffc107',
+  palette: ['#1a3a5c','#c8102e','#f0a500','#28a745','#17a2b8','#6f42c1','#e83e8c','#fd7e14','#20c997','#6610f2']
+};
+
+// ─── Chart.js Defaults ──────────────────────────────────────
+Chart.defaults.font.family = "'Segoe UI', Arial, sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.plugins.legend.position = 'bottom';
+
+function makeBar(id, labels, data, opts = {}) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  return new Chart(ctx, {
+    type: opts.type || 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: opts.label || 'Count',
+        data,
+        backgroundColor: opts.colors || COLORS.palette.slice(0, data.length),
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: opts.showLegend !== false } },
+      scales: opts.type === 'bar' || !opts.type ? {
+        y: { beginAtZero: true, grid: { color: '#eee' } },
+        x: { grid: { display: false } }
+      } : {}
+    }
+  });
+}
+
+function makeDoughnut(id, labels, data, colors) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  return new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: colors || COLORS.palette, hoverOffset: 8 }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      cutout: '60%',
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
+}
+
+function makeMultiBar(id, labels, datasets, opts = {}) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  return new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: true } },
+      scales: {
+        y: { beginAtZero: true, stacked: !!opts.stacked, grid: { color: '#eee' } },
+        x: { stacked: !!opts.stacked, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ─── OVERVIEW CHARTS ─────────────────────────────────────────
+makeBar('chart-inv-region',
+  ['ROC', 'RON', 'ROS', 'FHS'],
+  [4, 10, 12, 1],
+  { label: 'Assignments', colors: [COLORS.primary, COLORS.info, COLORS.secondary, COLORS.accent] }
+);
+
+makeDoughnut('chart-outcomes-overall',
+  ['End of Service', 'Recoveries', 'Warning Letters', 'Letter of Advice', 'Letter of Caution', 'Vendor Blacklisting', 'Transfers'],
+  [19, 24, 16, 9, 3, 6, 2],
+  ['#c8102e','#1a3a5c','#f0a500','#28a745','#17a2b8','#6f42c1','#fd7e14']
+);
+
+makeBar('chart-ba-region',
+  ['ROC\n(12 branches)', 'RON\n(10 branches)', 'ROS\n(16 branches)'],
+  [705, 553, 976],
+  { label: 'Observations', colors: [COLORS.primary, COLORS.info, COLORS.secondary] }
+);
+
+makeBar('chart-savings-overview',
+  ['ROC Rate\nRation.', 'RON GST\nRebate', 'ROS\nInitiatives', 'AIDN\nSavings'],
+  [3.52, 3.25, 2.16, 1.39],
+  { label: 'Rs. Millions', colors: ['#28a745','#1a3a5c','#c8102e','#f0a500'] }
+);
+
+// ─── INVESTIGATIONS CHARTS ───────────────────────────────────
+makeBar('chart-inv-region2',
+  ['ROC', 'RON', 'ROS', 'FHS'],
+  [4, 10, 12, 1],
+  { label: 'Investigations', colors: [COLORS.primary, COLORS.info, COLORS.secondary, COLORS.accent] }
+);
+
+makeMultiBar('chart-outcome-types',
+  ['Resignations/\nTerminations', 'Recoveries', 'Warning\nLetters', 'Letter of\nAdvice', 'Letter of\nCaution', 'Vendor\nBlacklisting', 'Transfers'],
+  [
+    { label: 'ROC',  data: [1,1,2,0,2,0,0], backgroundColor: COLORS.primary },
+    { label: 'RON',  data: [6,3,4,0,0,0,2], backgroundColor: COLORS.info },
+    { label: 'ROS',  data: [11,19,9,9,1,6,0], backgroundColor: COLORS.secondary },
+    { label: 'FHS',  data: [2,1,1,0,0,0,0], backgroundColor: COLORS.accent },
+  ]
+);
+
+// ─── BRANCH AUDIT CHARTS ─────────────────────────────────────
+const BA_LABELS = ['Branch\nImprest', 'Cash &\nBank', 'Fixed\nAssets', 'Library &\nLab', 'HR &\nPayroll', 'Safety &\nSecurity', 'Students\nRecord', 'Others'];
+
+makeBar('chart-ba-roc', BA_LABELS, [153, 41, 111, 86, 128, 51, 56, 79],
+  { label: 'Observations (ROC)', colors: [COLORS.primary,'#2d5986','#3a6fa3','#4a8ec2','#5dadd9','#74c6e8','#93d7f0','#b5e8f8'] }
+);
+makeBar('chart-ba-ron', BA_LABELS, [131, 25, 78, 46, 141, 9, 92, 31],
+  { label: 'Observations (RON)', colors: [COLORS.info,'#0d8fa0','#10a8bc','#14c3d8','#44d4e6','#6fdef0','#9de9f7','#c5f4fc'] }
+);
+makeBar('chart-ba-ros', BA_LABELS, [187, 13, 124, 145, 176, 121, 119, 91],
+  { label: 'Observations (ROS)', colors: [COLORS.secondary,'#d63050','#e05572','#ea7990','#f29dae','#f7bcca','#fbdae3','#fff0f3'] }
+);
+
+makeDoughnut('chart-risk-roc',
+  ['High Risk (45)', 'Med-High (220)', 'Low-Med (322)', 'Low (118)'],
+  [45, 220, 322, 118],
+  ['#c8102e','#f0a500','#17a2b8','#28a745']
+);
+
+// ─── PRE-AUDIT CHARTS ────────────────────────────────────────
+const PA_LABELS_SHORT = ['Vendor\nReg', 'PMC/CSQ', 'Missing\nDocs', 'Late\nPayments', 'Tax\nIssues', 'Wrong\nHead', 'Data\nEntry', 'Employee\nAdv.', 'Misc'];
+
+makeDoughnut('chart-pa-ho',
+  ['Missing Docs (252)','Tax Issues (12)','Misc (7)','Late Payments (4)','PMC/CSQ (3)','Data Entry (1)'],
+  [252, 12, 7, 4, 3, 1],
+  [COLORS.secondary, COLORS.accent, COLORS.info, COLORS.primary, COLORS.success, '#6f42c1']
+);
+
+makeDoughnut('chart-pa-roc',
+  ['No Observation (3,873)','Missing Docs (276)','Late Payments (373)','Misc (23)','PMC/CSQ (2)'],
+  [3873, 276, 373, 23, 2],
+  [COLORS.success, COLORS.secondary, COLORS.accent, COLORS.info, COLORS.primary]
+);
+
+makeDoughnut('chart-pa-ron',
+  ['No Obs (5,632)','Missing Docs (72)','Late Payments (31)','Employee Adv (9)','Data Entry (9)','PMC/CSQ (10)','Others (17)'],
+  [5632, 72, 31, 9, 9, 10, 17],
+  [COLORS.success, COLORS.secondary, COLORS.accent, COLORS.info, COLORS.primary, '#6f42c1','#fd7e14']
+);
+
+makeDoughnut('chart-pa-ros',
+  ['No Obs (2,610)','PMC/CSQ (17)','Emp Advances (16)','Missing Docs (24)','Vendor Reg (2)','Wrong Head (1)'],
+  [2610, 17, 16, 24, 2, 1],
+  [COLORS.success, COLORS.secondary, COLORS.accent, COLORS.info, COLORS.primary, '#6f42c1']
+);
+
+makeMultiBar('chart-pa-quarterly',
+  ['Q1 (Jan-Mar)', 'Q2 (Apr-Jun)', 'Q3 (Jul-Sep)', 'Q4 (Oct-Dec)'],
+  [
+    { label: 'Late Payments – ROC', data: [98, 71, 35, 169], backgroundColor: COLORS.secondary },
+    { label: 'Missing Docs – ROC',  data: [75, 73, 45, 83],  backgroundColor: COLORS.primary },
+    { label: 'Late Payments – RON', data: [5,  6,  3,  17],  backgroundColor: '#17a2b8' },
+    { label: 'Missing Docs – RON',  data: [10, 8,  16, 38],  backgroundColor: '#6f42c1' },
+  ]
+);
+
+// ─── AIDN CHARTS ─────────────────────────────────────────────
+makeBar('chart-aidn-vouchers',
+  ['ROC', 'RON', 'ROS', 'FHS'],
+  [67, 30, 23, 1],
+  { label: 'Vouchers Checked', colors: [COLORS.primary, COLORS.info, COLORS.secondary, COLORS.accent] }
+);
+
+makeBar('chart-aidn-savings',
+  ['ROC', 'RON', 'ROS', 'FHS'],
+  [1210427, 0, 178337, 0],
+  { label: 'Savings (Rs.)', colors: [COLORS.success, '#ccc', COLORS.accent, '#ccc'] }
+);
+
+makeMultiBar('chart-aidn-quarterly',
+  ['Q1', 'Q2', 'Q3', 'Q4'],
+  [
+    { label: 'ROC Vouchers', data: [11, 3, 18, 35], backgroundColor: COLORS.primary },
+    { label: 'RON Vouchers', data: [4, 4, 15, 7],  backgroundColor: COLORS.info },
+    { label: 'ROS Vouchers', data: [6, 3, 5, 9],   backgroundColor: COLORS.secondary },
+  ]
+);
+
+// ─── SAVINGS CHARTS ──────────────────────────────────────────
+makeBar('chart-savings-region',
+  ['ROC\nRate Rationalization', 'RON\nGST Rebate', 'ROS\nInitiatives', 'AIDN\nSavings'],
+  [3524823, 3249198, 2160736, 1388764],
+  { label: 'Savings (Rs.)', colors: [COLORS.success, COLORS.primary, COLORS.secondary, COLORS.accent] }
+);
+
+makeBar('chart-roc-vendor-savings',
+  ['Market Eye\n(Pkg 2)', 'Market Eye\n(Pkg 1)', 'DOT X', 'Raziq\n(BCP)', 'Agis Advert', 'Osaka\nLighting', 'AVS\nTraders', 'Raziq\n(NL+)', 'Marcom\n& Rawaha', 'Marcom\nFlex', 'Monarch\n(MSA)', 'Monarch\n(BNCF)'],
+  [899160, 797680, 495719, 328000, 174000, 172900, 167037, 201169, 112100, 107050, 54008, 16000],
+  { label: 'Savings (Rs.)', colors: COLORS.palette }
+);
+
+// ─── REGION DRILL-DOWN CHARTS ────────────────────────────────
+makeMultiBar('chart-roc-quarterly',
+  ['Q1', 'Q2', 'Q3', 'Q4'],
+  [
+    { label: 'High Risk',   data: [0,  21, 2,  22], backgroundColor: COLORS.secondary },
+    { label: 'Med-High',   data: [0, 107, 31, 82], backgroundColor: COLORS.accent },
+    { label: 'Low-Med',    data: [0, 147, 56,119], backgroundColor: COLORS.info },
+    { label: 'Low',        data: [0,  69, 26, 23], backgroundColor: COLORS.success },
+  ], { stacked: true }
+);
+
+makeDoughnut('chart-roc-risk',
+  ['High (45)', 'Med-High (220)', 'Low-Med (322)', 'Low (118)'],
+  [45, 220, 322, 118],
+  [COLORS.secondary, COLORS.accent, COLORS.info, COLORS.success]
+);
+
+makeMultiBar('chart-ron-quarterly',
+  ['Q1', 'Q2', 'Q3', 'Q4'],
+  [
+    { label: 'High Risk', data: [2,  1, 16, 2],  backgroundColor: COLORS.secondary },
+    { label: 'Med-High',  data: [18,26,200,41],  backgroundColor: COLORS.accent },
+    { label: 'Low-Med',   data: [26,26,160,29],  backgroundColor: COLORS.info },
+    { label: 'Low',       data: [1,  0,  2, 3],  backgroundColor: COLORS.success },
+  ], { stacked: true }
+);
+
+makeDoughnut('chart-ron-risk',
+  ['High (21)', 'Med-High (285)', 'Low-Med (241)', 'Low (6)'],
+  [21, 285, 241, 6],
+  [COLORS.secondary, COLORS.accent, COLORS.info, COLORS.success]
+);
+
+makeMultiBar('chart-ros-quarterly',
+  ['Q1', 'Q2', 'Q3', 'Q4'],
+  [
+    { label: 'High Risk', data: [20, 16, 23, 30], backgroundColor: COLORS.secondary },
+    { label: 'Med-High',  data: [91, 24, 76, 87], backgroundColor: COLORS.accent },
+    { label: 'Low-Med',   data: [169,34,186,161], backgroundColor: COLORS.info },
+    { label: 'Low',       data: [26,  6, 12, 15], backgroundColor: COLORS.success },
+  ], { stacked: true }
+);
+
+makeDoughnut('chart-ros-risk',
+  ['High (89)', 'Med-High (278)', 'Low-Med (550)', 'Low (59)'],
+  [89, 278, 550, 59],
+  [COLORS.secondary, COLORS.accent, COLORS.info, COLORS.success]
+);
+</script>
+</body>
+</html>
