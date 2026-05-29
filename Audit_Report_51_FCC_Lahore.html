@@ -66,6 +66,17 @@
   .syn-table .cat{font-size:.7rem;color:var(--muted)}
 
   .obs-block{scroll-margin-top:65px}
+  /* synopsis rows need the same offset so they clear the sticky nav */
+  tr[id^="syn-row-"]{scroll-margin-top:70px}
+  /* highlight animation when returning from a detail page */
+  @keyframes rowPulse{
+    0%  {background:#fff8dc}
+    30% {background:#ffe066}
+    70% {background:#fff3b0}
+    100%{background:transparent}
+  }
+  tr.syn-highlight td{animation:rowPulse 2.4s ease forwards}
+  tr.syn-highlight td a{color:var(--accent)}
   .obs-header{display:flex;align-items:flex-start;gap:.8rem;margin-bottom:.9rem;flex-wrap:wrap}
   .obs-num{background:var(--primary);color:#fff;border-radius:6px;padding:.25rem .6rem;
     font-size:.78rem;font-weight:700;white-space:nowrap}
@@ -1966,6 +1977,28 @@ function toggle(h){
   if(b.classList.contains('open')){b.classList.remove('open');a.classList.remove('open');}
   else{b.classList.add('open');a.classList.add('open');}
 }
+
+// ── Back-to-Synopsis: scroll to exact row and highlight it ──────────────────
+document.querySelectorAll('a.back-link[href^="#syn-row-"]').forEach(function(link){
+  link.addEventListener('click', function(e){
+    e.preventDefault();
+    var targetId = this.getAttribute('href').slice(1);
+    var row = document.getElementById(targetId);
+    if(!row) return;
+    // Remove any existing highlight first
+    document.querySelectorAll('tr.syn-highlight').forEach(function(r){
+      r.classList.remove('syn-highlight');
+    });
+    // Scroll row into view (offset for sticky nav handled by scroll-margin-top)
+    row.scrollIntoView({behavior:'smooth', block:'center'});
+    // Apply highlight after scroll settles
+    setTimeout(function(){
+      row.classList.add('syn-highlight');
+      // Remove highlight class after animation completes so it can retrigger next time
+      setTimeout(function(){ row.classList.remove('syn-highlight'); }, 2600);
+    }, 400);
+  });
+});
 </script>
 </body>
 </html>
