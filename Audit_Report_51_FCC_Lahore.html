@@ -69,14 +69,14 @@
   /* synopsis rows need the same offset so they clear the sticky nav */
   tr[id^="syn-row-"]{scroll-margin-top:70px}
   /* highlight animation when returning from a detail page */
-  @keyframes rowPulse{
-    0%  {background:#fff8dc}
-    30% {background:#ffe066}
-    70% {background:#fff3b0}
-    100%{background:transparent}
+  /* persistent highlight — stays until user clicks elsewhere */
+  tr.syn-highlight td{
+    background:#fff3b0 !important;
+    border-left:4px solid var(--accent);
+    transition:background .3s;
   }
-  tr.syn-highlight td{animation:rowPulse 2.4s ease forwards}
-  tr.syn-highlight td a{color:var(--accent)}
+  tr.syn-highlight td:first-child{border-left:4px solid var(--accent)}
+  tr.syn-highlight td a{color:var(--accent) !important;font-weight:700}
   .obs-header{display:flex;align-items:flex-start;gap:.8rem;margin-bottom:.9rem;flex-wrap:wrap}
   .obs-num{background:var(--primary);color:#fff;border-radius:6px;padding:.25rem .6rem;
     font-size:.78rem;font-weight:700;white-space:nowrap}
@@ -1978,26 +1978,59 @@ function toggle(h){
   else{b.classList.add('open');a.classList.add('open');}
 }
 
-// ── Back-to-Synopsis: scroll to exact row and highlight it ──────────────────
+// ── Manual smooth-scroll (visible animation) ─────────────────────────────────
+function smoothScrollTo(targetY, duration) {
+  var startY = window.pageYOffset;
+  var diff   = targetY - startY;
+  var startTime = null;
+  function step(timestamp) {
+    if (!startTime) startTime = timestamp;
+    var progress = Math.min((timestamp - startTime) / duration, 1);
+    // ease-in-out cubic
+    var ease = progress < 0.5
+      ? 4 * progress * progress * progress
+      : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+    window.scrollTo(0, startY + diff * ease);
+    if (progress < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// ── Back-to-Synopsis: animated scroll + persistent highlight ─────────────────
+var highlightedRow = null;
+
 document.querySelectorAll('a.back-link[href^="#syn-row-"]').forEach(function(link){
   link.addEventListener('click', function(e){
     e.preventDefault();
     var targetId = this.getAttribute('href').slice(1);
     var row = document.getElementById(targetId);
-    if(!row) return;
-    // Remove any existing highlight first
-    document.querySelectorAll('tr.syn-highlight').forEach(function(r){
-      r.classList.remove('syn-highlight');
-    });
-    // Scroll row into view (offset for sticky nav handled by scroll-margin-top)
-    row.scrollIntoView({behavior:'smooth', block:'center'});
-    // Apply highlight after scroll settles
+    if (!row) return;
+
+    // Clear any previous highlight immediately
+    if (highlightedRow) highlightedRow.classList.remove('syn-highlight');
+
+    // Calculate target scroll position (centre row, respect sticky nav)
+    var navH    = 54;
+    var rowRect = row.getBoundingClientRect();
+    var rowMid  = window.pageYOffset + rowRect.top + rowRect.height / 2;
+    var targetY = Math.max(0, rowMid - window.innerHeight / 2);
+
+    // Animate scroll (~700 ms) then apply highlight
+    smoothScrollTo(targetY, 700);
     setTimeout(function(){
       row.classList.add('syn-highlight');
-      // Remove highlight class after animation completes so it can retrigger next time
-      setTimeout(function(){ row.classList.remove('syn-highlight'); }, 2600);
-    }, 400);
+      highlightedRow = row;
+    }, 720);
   });
+});
+
+// Remove highlight when user clicks anywhere else on the page
+document.addEventListener('click', function(e){
+  if (!highlightedRow) return;
+  // Keep highlight if user clicked within the highlighted row itself
+  if (highlightedRow.contains(e.target)) return;
+  highlightedRow.classList.remove('syn-highlight');
+  highlightedRow = null;
 });
 </script>
 </body>
