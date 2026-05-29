@@ -1729,7 +1729,7 @@ function renderAnimals(){
     const dirEl=document.getElementById('stock-sort-dir');
     const col=colEl?colEl.value:'code';
     const dir=dirEl?dirEl.value:'asc';
-    head.innerHTML='<tr><th>S#</th><th>Photo</th>'+th('Code','stock','code')+th('Date','stock','purchase_date')+th('Age','stock','age_type')+th('Weight(kg)','stock','_w')+th('Sale Price(est.)','stock','_sp')+'<th>Description</th><th>Actions</th></tr>';
+    head.innerHTML='<tr><th>S#</th><th>Photo</th>'+th('Code','stock','code')+th('Date','stock','purchase_date')+th('Age','stock','age_type')+th('Weight(kg)','stock','_w')+th('Sale Price(est.)','stock','_sp')+'<th>Actions</th><th>Description</th></tr>';
     let available=animalComputedList(a=>a.status==='available');
     available=available.filter(a=>!animQ||[a.code,a.description||'',a.animal_type||'',a.age_type||''].join(' ').toLowerCase().includes(animQ));
     if(!available.length){tb.innerHTML=`<tr><td colspan="9" class="empty">No available animals.</td></tr>`;return;}
@@ -1750,11 +1750,11 @@ function renderAnimals(){
         <td>${isK?`<span style="background:#d97706;color:#fff;border-radius:4px;padding:1px 6px;font-size:.75rem">Kheera</span>`:(a.age_type||'-')}</td>
         <td><strong>${a._w?fmtN(a._w,1):'-'}</strong></td>
         <td>${a._w?Rs(a._sp):'-'}</td>
-        <td style="max-width:160px;font-size:.78rem">${a.description||'-'}</td>
         <td style="white-space:nowrap" onclick="event.stopPropagation()">
           <button class="btn btn-light btn-sm" onclick="openAnimalEdit('${a.code}')">&#9998; Edit</button>
           <button class="btn btn-danger btn-sm" style="margin-left:3px" onclick="deleteAnimal('${a.code}')">&#128465; Delete</button>
         </td>
+        <td style="max-width:160px;font-size:.78rem">${a.description||'-'}</td>
       </tr>`;
     }
     function sumRowStock(list,label,color){
@@ -2803,8 +2803,12 @@ function showAnimalDetail(code){
       <div><span style="color:#777">Weight (latest):</span> <strong>${a.weight_final?fmtN(a.weight_final,1)+' kg':'-'}</strong></div>
       <div><span style="color:#777">Customer:</span> ${c?c.name:'-'}</div>
     </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 4px">
+      <button class="btn btn-primary btn-sm" onclick="closeModal('dashdetail-overlay');openAnimalEdit('${a.code}')">&#9998; Edit Animal</button>
+      <button class="btn btn-danger btn-sm" onclick="closeModal('dashdetail-overlay');deleteAnimal('${a.code}')">&#128465; Delete Animal</button>
+    </div>
     ${sale?`
-    <p style="font-weight:600;color:#1a3a5c;margin-bottom:8px">Sale Details</p>
+    <p style="font-weight:600;color:#1a3a5c;margin:14px 0 8px">Sale Details</p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 20px;font-size:.86rem;margin-bottom:12px">
       <div><span style="color:#777">Receipt:</span> ${sale.receipt_no}</div>
       <div><span style="color:#777">Sale Date:</span> ${fmtD(sale.sale_date)}</div>
@@ -2814,7 +2818,10 @@ function showAnimalDetail(code){
       <div><span style="color:#777">Carriage:</span> ${car>0?Rs(car):'-'}</div>
       <div><span style="color:#777">Total Amount:</span> <strong>${Rs(sale.amount)}</strong></div>
     </div>
-    <button class="btn btn-primary btn-sm" onclick="showReceipt('${sale.receipt_no}')">&#128196; View Receipt</button>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <button class="btn btn-primary btn-sm" onclick="showReceipt('${sale.receipt_no}')">&#128196; View Invoice</button>
+      <button class="btn btn-light btn-sm" onclick="closeModal('dashdetail-overlay');openSaleEdit('${sale.receipt_no}')">&#9998; Edit Sale</button>
+    </div>
     `:'<p style="color:#aaa;font-style:italic;font-size:.84rem">Not yet sold.</p>'}
   `;
   document.getElementById('dashdetail-content').innerHTML=html;
