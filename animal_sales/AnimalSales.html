@@ -1752,8 +1752,8 @@ function renderAnimals(){
         <td>${a._w?Rs(a._sp):'-'}</td>
         <td style="max-width:160px;font-size:.78rem">${a.description||'-'}</td>
         <td style="white-space:nowrap" onclick="event.stopPropagation()">
-          <button class="btn btn-light btn-sm" onclick="openAnimalEdit('${a.code}')">&#9998;</button>
-          <button class="btn btn-danger btn-sm" style="margin-left:3px" onclick="deleteAnimal('${a.code}')">&#128465;</button>
+          <button class="btn btn-light btn-sm" onclick="openAnimalEdit('${a.code}')">&#9998; Edit</button>
+          <button class="btn btn-danger btn-sm" style="margin-left:3px" onclick="deleteAnimal('${a.code}')">&#128465; Delete</button>
         </td>
       </tr>`;
     }
@@ -1831,16 +1831,16 @@ function renderAnimals(){
       <td><span class="badge ${a.status}">${a.status==='available'?'Available':'Sold'}</span></td>
       <td>${a._custId?cName(a._custId):'-'}</td>
       <td style="white-space:nowrap" onclick="event.stopPropagation()">
-        ${a._sale?`<button class="btn btn-primary btn-sm" onclick="showReceipt('${a._sale.receipt_no}')">&#128196;</button> `:''}
-        <button class="btn btn-light btn-sm" onclick="openAnimalEdit('${a.code}')">&#9998;</button>
-        <button class="btn btn-danger btn-sm" style="margin-left:3px" onclick="deleteAnimal('${a.code}')">&#128465;</button>
+        ${a._sale?`<button class="btn btn-primary btn-sm" onclick="showReceipt('${a._sale.receipt_no}')">Invoice</button> `:''}
+        <button class="btn btn-light btn-sm" onclick="openAnimalEdit('${a.code}')">&#9998; Edit</button>
+        <button class="btn btn-danger btn-sm" style="margin-left:3px" onclick="deleteAnimal('${a.code}')">&#128465; Delete</button>
       </td>
     </tr>`;
   }).join('')+`<tr style="font-weight:700;background:#e0f2fe"><td colspan="5" style="text-align:right;color:#1a3a5c">Grand Total (${list.length})</td><td>${fmtN(gtW,1)} kg</td><td>${Rs(gtSp)}</td><td>${gtCar>0?Rs(gtCar):'-'}</td><td>${gtTot>0?Rs(gtTot):'-'}</td><td colspan="3"></td></tr>`;
 }
 
 function deleteAnimal(code){
-  if(!confirm(`Delete animal ${code} from records? This cannot be undone.`)) return;
+  if(!confirm(`⚠️ WARNING: Delete Animal ${code}?\n\nThis will permanently remove this animal record. This action cannot be undone.\n\nAre you sure you want to delete?`)) return;
   const hasSale=DB.sales.find(s=>s.animal_code===code);
   if(hasSale){alert(`Animal ${code} has a sale record (${hasSale.receipt_no}). Delete the sale first.`);return;}
   DB.animals=DB.animals.filter(a=>a.code!==code);
@@ -1955,6 +1955,7 @@ function editCustFromAnimal(){
 }
 function saveAnimalEdit(){
   const code=document.getElementById('ea-code').value;
+  if(!confirm('Save changes to Animal '+code+'?\n\nThis will permanently update the animal record. Are you sure?')) return;
   const a=DB.animals.find(x=>x.code===code); if(!a){flash('editanimal-flash','Animal not found.','err');return;}
   const wVal=document.getElementById('ea-wf').value;
   const w=wVal!==''?parseFloat(wVal):null;
