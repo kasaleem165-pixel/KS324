@@ -168,8 +168,27 @@
   .inv-stat-pill {
     background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
     border-radius: 20px; padding: 5px 14px; font-size: 0.8rem; font-weight: 600;
+    cursor: pointer; transition: background 0.15s, transform 0.1s; user-select: none;
   }
+  .inv-stat-pill:hover { background: rgba(255,255,255,0.28); transform: translateY(-1px); }
+  .inv-stat-pill.active { background: #fff; color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.18); }
   .inv-stat-pill span { opacity: 0.8; font-weight: 400; }
+  .inv-stat-pill.active span { opacity: 1; font-weight: 700; }
+  .inv-filter-strip {
+    display: flex; align-items: center; gap: 10px; padding: 8px 16px;
+    background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 0.78rem; color: #64748b;
+  }
+  .inv-filter-active-badge {
+    background: #1e3a5f; color: #fff; border-radius: 12px; padding: 3px 12px;
+    font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .inv-filter-clear {
+    cursor: pointer; background: #e2e8f0; border: none; border-radius: 10px;
+    padding: 3px 10px; font-size: 0.75rem; color: #334155; font-weight: 600;
+  }
+  .inv-filter-clear:hover { background: #cbd5e1; }
+  .inv-case-row.hidden-by-filter { display: none; }
+  .inv-region-block.all-hidden { display: none; }
   .inv-region-block { border-bottom: 2px solid #eef2f7; }
   .inv-region-block:last-child { border-bottom: none; }
   .inv-region-label {
@@ -540,17 +559,23 @@
     <div class="inv-dashboard-header">
       <div>
         <h3>🔍 All Investigations &amp; Outcomes — FY 2024</h3>
-        <div class="inv-meta">27 assignments &nbsp;|&nbsp; 79 total disciplinary actions &nbsp;|&nbsp; ~2.9 actions per case on average</div>
+        <div class="inv-meta">27 assignments &nbsp;|&nbsp; 79 total disciplinary actions &nbsp;|&nbsp; ~2.9 actions per case on average &nbsp;·&nbsp; <em>Click any outcome below to filter cases</em></div>
       </div>
       <div class="inv-stat-pills">
-        <div class="inv-stat-pill">🔴 End of Service <span>19</span></div>
-        <div class="inv-stat-pill">🔵 Recovery <span>24</span></div>
-        <div class="inv-stat-pill">🟡 Warning Letter <span>16</span></div>
-        <div class="inv-stat-pill">🟢 Letter of Advice <span>9</span></div>
-        <div class="inv-stat-pill">🟣 Letter of Caution <span>3</span></div>
-        <div class="inv-stat-pill">⚫ Blacklisting <span>6</span></div>
-        <div class="inv-stat-pill">🔄 Transfer <span>2</span></div>
+        <div class="inv-stat-pill" onclick="filterInvestigations('resign')" title="Show only End of Service cases">🔴 End of Service <span>19</span></div>
+        <div class="inv-stat-pill" onclick="filterInvestigations('recover')" title="Show only Recovery cases">🔵 Recovery <span>24</span></div>
+        <div class="inv-stat-pill" onclick="filterInvestigations('warning')" title="Show only Warning Letter cases">🟡 Warning Letter <span>16</span></div>
+        <div class="inv-stat-pill" onclick="filterInvestigations('advice')" title="Show only Letter of Advice cases">🟢 Letter of Advice <span>9</span></div>
+        <div class="inv-stat-pill" onclick="filterInvestigations('caution')" title="Show only Letter of Caution cases">🟣 Letter of Caution <span>3</span></div>
+        <div class="inv-stat-pill" onclick="filterInvestigations('black')" title="Show only Blacklisting cases">⚫ Blacklisting <span>6</span></div>
+        <div class="inv-stat-pill" onclick="filterInvestigations('transfer')" title="Show only Transfer cases">🔄 Transfer <span>2</span></div>
       </div>
+    </div>
+    <!-- Active filter indicator strip (hidden until a filter is applied) -->
+    <div class="inv-filter-strip" id="inv-filter-strip" style="display:none;">
+      Showing: <span class="inv-filter-active-badge" id="inv-filter-badge">—</span>
+      &nbsp;cases only &nbsp;·&nbsp;
+      <button class="inv-filter-clear" onclick="filterInvestigations(null)">✕ Clear filter — show all 27</button>
     </div>
 
     <!-- ROC -->
@@ -2702,6 +2727,67 @@ makeDoughnut('chart-savings-mix',
   [73055616, 6228734, 113483709],
   ['#0284c7', '#16a34a', '#ea580c']
 );
+
+// ─── Investigation outcome filter ──────────────────────────
+function filterInvestigations(type) {
+  const rows   = document.querySelectorAll('.inv-case-row');
+  const blocks = document.querySelectorAll('.inv-region-block');
+  const strip  = document.getElementById('inv-filter-strip');
+  const badge  = document.getElementById('inv-filter-badge');
+  const pills  = document.querySelectorAll('.inv-stat-pill');
+
+  // Clear active state on all pills
+  pills.forEach(p => p.classList.remove('active'));
+
+  if (!type) {
+    // Reset — show everything
+    rows.forEach(r => r.classList.remove('hidden-by-filter'));
+    blocks.forEach(b => b.classList.remove('all-hidden'));
+    strip.style.display = 'none';
+    return;
+  }
+
+  // Mark active pill
+  pills.forEach(p => {
+    if (p.getAttribute('onclick') && p.getAttribute('onclick').includes("'" + type + "'")) {
+      p.classList.add('active');
+    }
+  });
+
+  // Filter case rows
+  rows.forEach(row => {
+    const hasType = row.querySelector('.out-chip.' + type);
+    if (hasType) {
+      row.classList.remove('hidden-by-filter');
+    } else {
+      row.classList.add('hidden-by-filter');
+    }
+  });
+
+  // Hide region blocks where all rows are hidden
+  blocks.forEach(block => {
+    const visible = block.querySelectorAll('.inv-case-row:not(.hidden-by-filter)');
+    if (visible.length === 0) {
+      block.classList.add('all-hidden');
+    } else {
+      block.classList.remove('all-hidden');
+    }
+  });
+
+  // Show filter strip with active badge
+  const labels = {
+    resign: '🔴 End of Service',
+    recover: '🔵 Recovery',
+    warning: '🟡 Warning Letter',
+    advice: '🟢 Letter of Advice',
+    caution: '🟣 Letter of Caution',
+    black: '⚫ Blacklisting',
+    transfer: '🔄 Transfer'
+  };
+  const matchCount = document.querySelectorAll('.inv-case-row:not(.hidden-by-filter)').length;
+  badge.textContent = (labels[type] || type) + ' — ' + matchCount + ' case(s)';
+  strip.style.display = 'flex';
+}
 </script>
 </body>
 </html>
