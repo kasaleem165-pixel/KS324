@@ -720,7 +720,6 @@ input[readonly]{background:#f8fafc}
     <div class="print-area" id="receipt-content"></div>
     <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap" class="no-print">
       <button class="btn btn-primary" onclick="window.print()">&#128438; Print Invoice</button>
-      <button class="btn btn-light" id="receipt-edit-btn" onclick="">&#9998; Edit Sale</button>
       <button class="btn btn-light" onclick="closeModal('receipt-overlay')">Close</button>
     </div>
   </div>
@@ -1259,7 +1258,7 @@ function renderDashboard(){
     <td>${s.receipt_no}</td><td><strong>${s.animal_code}</strong></td>
     <td>${cName(s.customer_id)}</td><td>${fmtD(s.sale_date)}</td>
     <td><strong>${Rs(s.amount)}</strong></td>
-    <td><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Invoice</button></td>
+    <td style="white-space:nowrap"><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Invoice</button> <button class="btn btn-light btn-sm" onclick="openSaleEditPage('${s.receipt_no}')">&#9998; Edit</button></td>
   </tr>`).join('');
 }
 
@@ -1307,7 +1306,7 @@ function showDashDetail(key){
           <td>${fmtN(s.weight_at_sale,1)}</td><td>${fmtN(s.rate_per_kg)}</td>
           <td>${Rs(sp)}</td><td>${s.carriage_charges>0?Rs(s.carriage_charges):'-'}</td>
           <td><strong>${Rs(s.amount)}</strong></td>
-          <td onclick="event.stopPropagation()"><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Invoice</button></td>
+          <td style="white-space:nowrap" onclick="event.stopPropagation()"><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Invoice</button> <button class="btn btn-light btn-sm" onclick="closeModal('dashdetail-overlay');openSaleEditPage('${s.receipt_no}')">&#9998; Edit</button></td>
         </tr>`;
       });
       html+=`</tbody></table></div>`;
@@ -1459,7 +1458,7 @@ function showDashDetail(key){
           <td>${fmtN(s.weight_at_sale,1)} kg</td><td>${fmtN(s.rate_per_kg)}</td>
           <td>${Rs(sp)}</td><td>${s.carriage_charges>0?Rs(s.carriage_charges):'-'}</td>
           <td><strong>${Rs(s.amount)}</strong></td>
-          <td onclick="event.stopPropagation()"><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Invoice</button></td>
+          <td style="white-space:nowrap" onclick="event.stopPropagation()"><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Invoice</button> <button class="btn btn-light btn-sm" onclick="closeModal('dashdetail-overlay');openSaleEditPage('${s.receipt_no}')">&#9998; Edit</button></td>
         </tr>`;
       });
       html+=`</tbody></table></div>`;
@@ -2156,6 +2155,7 @@ function openSaleEditPage(rno){
 }
 
 function saveSalePageEdit(rno){
+  if(!confirm('You are about to save changes to Sale '+rno+'.\n\nThis will permanently update the sale record. Are you sure?')) return;
   const s=DB.sales.find(x=>x.receipt_no===rno); if(!s) return;
   const code=document.getElementById('s-animal').value;
   const cid=parseInt(document.getElementById('s-customer').value);
@@ -2346,7 +2346,8 @@ function renderSaleLedger(){
         <td>${Rs(sp)}</td>
         <td><strong>${Rs(s.amount)}</strong></td>
         <td>${s.customerName||cName(s.customer_id)}</td>
-        <td></td><td></td><td></td>
+        <td></td><td></td>
+        <td style="white-space:nowrap" onclick="event.stopPropagation()"><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Invoice</button> <button class="btn btn-light btn-sm" onclick="openSaleEditPage('${s.receipt_no}')">&#9998; Edit</button></td>
       </tr>`;
     });
     // Customer subtotal row with payments
@@ -2853,8 +2854,6 @@ function showReceipt(rno){
       <div class="sig-box"><div class="sig-line">Customer Signature</div></div>
       <div class="sig-box"><div class="sig-line">Seller Signature</div></div>
     </div>`;
-  const editBtn=document.getElementById('receipt-edit-btn');
-  if(editBtn) editBtn.onclick=()=>{closeModal('receipt-overlay');openSaleEditPage(rno);};
   document.getElementById('receipt-overlay').classList.add('open');
 }
 
