@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit Report | 51 FCC Campus, Lahore | Report No. 206</title>
+<style>
+  :root {
+    --primary: #1a3557;
+    --accent:  #c8960c;
+    --high:    #c0392b;
+    --mh:      #e67e22;
+    --lm:      #2980b9;
+    --low:     #27ae60;
+    --bg:      #f4f6f9;
+    --card:    #ffffff;
+    --border:  #dde2ea;
+    --text:    #2c3e50;
+    --muted:   #7f8c8d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+
+  /* ── NAV BAR ── */
+  .topnav {
+    background: var(--primary);
+    color: #fff;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 999;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    height: 54px;
+  }
+  .topnav .brand { font-size: 1rem; font-weight: 700; letter-spacing: .3px; }
+  .topnav .brand span { color: var(--accent); }
+  .topnav a { color: #cfd8e3; text-decoration: none; font-size: .82rem; margin-left: 1.2rem; transition: color .2s; }
+  .topnav a:hover { color: #fff; }
+
+  /* ── HERO / COVER ── */
+  .cover {
+    background: linear-gradient(135deg, var(--primary) 60%, #24527a 100%);
+    color: #fff; padding: 3.5rem 3rem 3rem;
+    display: flex; flex-direction: column; gap: 1rem;
+  }
+  .cover .badge { background: var(--accent); color: #fff; display: inline-block; padding: .2rem .8rem; border-radius: 20px; font-size: .75rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; width: fit-content; }
+  .cover h1 { font-size: 2rem; font-weight: 800; line-height: 1.25; }
+  .cover .sub { font-size: 1rem; color: #b8cde0; }
+  .cover .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .8rem; margin-top: .5rem; }
+  .cover .meta-item { background: rgba(255,255,255,.08); border-radius: 8px; padding: .7rem 1rem; }
+  .cover .meta-item .label { font-size: .7rem; color: #7fb3d3; text-transform: uppercase; letter-spacing: .8px; }
+  .cover .meta-item .value { font-size: .9rem; font-weight: 600; margin-top: .15rem; }
+  .confidential { background: rgba(200,150,12,.15); border: 1px solid var(--accent); border-radius: 6px; padding: .4rem 1rem; font-size: .78rem; color: var(--accent); font-weight: 700; letter-spacing: 1px; width: fit-content; margin-top: .3rem; }
+
+  /* ── SECTIONS ── */
+  .section { max-width: 1100px; margin: 2rem auto; padding: 0 1.5rem; }
+  .section-title {
+    font-size: 1.35rem; font-weight: 700; color: var(--primary);
+    border-left: 5px solid var(--accent); padding-left: .9rem;
+    margin-bottom: 1.2rem; padding-top: .1rem;
+  }
+  .card { background: var(--card); border-radius: 10px; border: 1px solid var(--border); padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+
+  /* ── SYNOPSIS KPI ROW ── */
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .kpi { background: var(--card); border-radius: 10px; border: 1px solid var(--border); padding: 1.1rem 1rem; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  .kpi .num { font-size: 2.2rem; font-weight: 800; line-height: 1; }
+  .kpi .lbl { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-top: .35rem; }
+  .kpi.red  .num { color: var(--high); }
+  .kpi.org  .num { color: var(--mh); }
+  .kpi.blu  .num { color: var(--lm); }
+  .kpi.grn  .num { color: var(--low); }
+
+  /* ── RISK BADGE ── */
+  .risk { display: inline-block; padding: .18rem .65rem; border-radius: 20px; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
+  .risk.high { background: #fdecea; color: var(--high); border: 1px solid #f5b7b1; }
+  .risk.mh   { background: #fef3e2; color: var(--mh);   border: 1px solid #fad7a0; }
+  .risk.lm   { background: #eaf4fb; color: var(--lm);   border: 1px solid #aed6f1; }
+  .risk.low  { background: #e9f7ef; color: var(--low);  border: 1px solid #a9dfbf; }
+
+  /* ── SYNOPSIS TABLE ── */
+  .syn-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  .syn-table th { background: var(--primary); color: #fff; padding: .6rem .8rem; text-align: left; font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; }
+  .syn-table td { padding: .55rem .8rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .syn-table tr:hover td { background: #f0f4f9; }
+  .syn-table a { color: var(--primary); text-decoration: none; font-weight: 600; }
+  .syn-table a:hover { text-decoration: underline; color: var(--accent); }
+  .syn-table .cat { font-size: .7rem; color: var(--muted); }
+
+  /* ── OBSERVATION DETAIL ── */
+  .obs-block { scroll-margin-top: 65px; }
+  .obs-header { display: flex; align-items: flex-start; gap: .8rem; margin-bottom: .9rem; flex-wrap: wrap; }
+  .obs-num { background: var(--primary); color: #fff; border-radius: 6px; padding: .25rem .6rem; font-size: .78rem; font-weight: 700; white-space: nowrap; }
+  .obs-title { font-size: 1.05rem; font-weight: 700; color: var(--text); flex: 1; }
+  .obs-meta { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-bottom: .8rem; }
+  .obs-meta .tag { background: #eef1f5; color: var(--text); border-radius: 4px; padding: .15rem .5rem; font-size: .72rem; }
+
+  .accordion { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: .5rem; }
+  .acc-toggle { background: #f7f9fc; padding: .6rem 1rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: .85rem; font-weight: 600; color: var(--primary); user-select: none; }
+  .acc-toggle:hover { background: #edf1f7; }
+  .acc-arrow { transition: transform .25s; font-size: .7rem; }
+  .acc-body { display: none; padding: .8rem 1rem; font-size: .87rem; background: #fff; border-top: 1px solid var(--border); }
+  .acc-body.open { display: block; }
+  .acc-arrow.open { transform: rotate(180deg); }
+
+  .finding-box { border-left: 3px solid var(--accent); padding: .6rem .9rem; background: #fffdf5; border-radius: 0 6px 6px 0; font-size: .87rem; margin-bottom: .6rem; }
+  .rec-box { border-left: 3px solid var(--low); padding: .6rem .9rem; background: #f0faf4; border-radius: 0 6px 6px 0; font-size: .87rem; margin-bottom: .6rem; }
+  .resp-box { border-left: 3px solid var(--lm); padding: .6rem .9rem; background: #f0f7ff; border-radius: 0 6px 6px 0; font-size: .87rem; margin-bottom: .6rem; }
+  .view-box  { border-left: 3px solid var(--mh); padding: .6rem .9rem; background: #fffaf0; border-radius: 0 6px 6px 0; font-size: .87rem; margin-bottom: .6rem; }
+  .action-box { border-left: 3px solid var(--low); padding: .4rem .9rem; background: #e9f7ef; border-radius: 0 6px 6px 0; font-size: .82rem; font-weight: 600; color: var(--low); }
+
+  .box-label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); margin-bottom: .25rem; }
+
+  /* ── BACK LINKS ── */
+  .back-link { display: inline-flex; align-items: center; gap: .35rem; color: var(--primary); font-size: .8rem; font-weight: 600; text-decoration: none; margin-top: .5rem; padding: .3rem .75rem; border: 1px solid var(--border); border-radius: 20px; background: #fff; transition: all .2s; }
+  .back-link:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+  /* ── SECTION DIVIDER ── */
+  .sec-divider { border: none; border-top: 2px solid var(--border); margin: 2.5rem 0; }
+
+  /* ── ANALYSIS TABLE ── */
+  .stat-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  .stat-table th { background: var(--primary); color: #fff; padding: .55rem .8rem; text-align: center; font-size: .78rem; }
+  .stat-table td { padding: .5rem .8rem; border: 1px solid var(--border); text-align: center; }
+  .stat-table tr:nth-child(even) td { background: #f7f9fc; }
+  .stat-table .total-row td { background: var(--primary); color: #fff; font-weight: 700; }
+
+  /* ── CATEGORY HEADER ── */
+  .cat-header { background: linear-gradient(90deg, #eef1f7, #f7f9fc); border-left: 4px solid var(--primary); padding: .5rem .9rem; font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; color: var(--primary); border-radius: 0 6px 6px 0; margin: 1.2rem 0 .6rem; }
+
+  /* ── SENSITIVITY MATRIX ── */
+  .matrix-wrap { overflow-x: auto; }
+  .matrix { border-collapse: collapse; font-size: .8rem; min-width: 520px; }
+  .matrix td { border: 1px solid var(--border); padding: .6rem .8rem; text-align: center; }
+  .matrix .cell-high { background: #fdecea; color: var(--high); font-weight: 700; }
+  .matrix .cell-mh   { background: #fef3e2; color: var(--mh);  font-weight: 700; }
+  .matrix .cell-lm   { background: #eaf4fb; color: var(--lm);  font-weight: 700; }
+  .matrix .cell-low  { background: #e9f7ef; color: var(--low); font-weight: 700; }
+  .matrix .axis      { background: var(--primary); color: #fff; font-weight: 700; font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; }
+
+  /* ── FOOTER ── */
+  footer { background: var(--primary); color: #7fb3d3; text-align: center; padding: 1.5rem; font-size: .78rem; margin-top: 3rem; }
+  footer strong { color: #fff; }
+
+  /* ── PRINT ── */
+  @media print {
+    .topnav { display: none; }
+    .back-link { display: none; }
+    .acc-body { display: block !important; }
+  }
+
+  /* ── TOC SIDEBAR style on summary ── */
+  .toc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+  .toc-item { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: .6rem .9rem; display: flex; align-items: center; gap: .6rem; font-size: .85rem; }
+  .toc-item a { color: var(--primary); text-decoration: none; font-weight: 600; flex: 1; }
+  .toc-item a:hover { color: var(--accent); }
+
+  @media (max-width: 640px) {
+    .cover h1 { font-size: 1.4rem; }
+    .toc-grid { grid-template-columns: 1fr; }
+    .topnav a { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ TOP NAV ═══════════════ -->
+<nav class="topnav">
+  <div class="brand">Beaconhouse &nbsp;<span>Systems & Audit</span></div>
+  <div>
+    <a href="#synopsis">Synopsis</a>
+    <a href="#intro">Background</a>
+    <a href="#repeated-obs">Repeated</a>
+    <a href="#new-obs">New Findings</a>
+    <a href="#annexures">Annexures</a>
+  </div>
+</nav>
+
+<!-- ═══════════════ COVER ═══════════════ -->
+<div class="cover" id="top">
+  <div class="badge">Confidential &nbsp;|&nbsp; Internal Audit</div>
+  <h1>Audit Report — 51 FCC Campus, Lahore<br><small style="font-weight:400;font-size:1rem;color:#a8c8e0">Report No. 206-LMA &nbsp;|&nbsp; Systems &amp; Audit Department</small></h1>
+  <div class="confidential">⚠ Confidential &amp; Proprietary Document</div>
+  <div class="meta-grid">
+    <div class="meta-item"><div class="label">Branch</div><div class="value">51 FCC Campus, Gulberg, Lahore</div></div>
+    <div class="meta-item"><div class="label">Region</div><div class="value">Center</div></div>
+    <div class="meta-item"><div class="label">Audit Visit</div><div class="value">26 Jan 2026 – 18 Feb 2026</div></div>
+    <div class="meta-item"><div class="label">Period Covered</div><div class="value">Oct 21, 2019 – Jan 26, 2026</div></div>
+    <div class="meta-item"><div class="label">Branch Head</div><div class="value">Ms. Sadia Saleem</div></div>
+    <div class="meta-item"><div class="label">Branch Accountant</div><div class="value">Ms. Sadaf Sarwar</div></div>
+    <div class="meta-item"><div class="label">Audit Type</div><div class="value">Routine + Follow-Up</div></div>
+    <div class="meta-item"><div class="label">Report Date</div><div class="value">May 2026</div></div>
+  </div>
+</div>
+
+<!-- ═══════════════ MANAGEMENT SYNOPSIS ═══════════════ -->
+<div class="section" id="synopsis">
+  <div class="section-title">📋 Management Synopsis &amp; Executive Dashboard</div>
+  <p style="font-size:.9rem;color:var(--muted);margin-bottom:1.2rem">This page is designed for senior management. It summarises what matters most. Click any observation to jump directly to its full detail — and use the <strong>← Back to Synopsis</strong> button to return here.</p>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-row">
+    <div class="kpi red"><div class="num">3</div><div class="lbl">High Risk Findings</div></div>
+    <div class="kpi org"><div class="num">14</div><div class="lbl">Medium-High Risk</div></div>
+    <div class="kpi blu"><div class="num">15</div><div class="lbl">Low-Medium Risk</div></div>
+    <div class="kpi grn"><div class="num">5</div><div class="lbl">Low Risk</div></div>
+    <div class="kpi" style="border-top:3px solid var(--primary)"><div class="num" style="color:var(--primary)">36</div><div class="lbl">Total Unresolved</div></div>
+    <div class="kpi" style="border-top:3px solid var(--low)"><div class="num" style="color:var(--low)">36</div><div class="lbl">Resolved This Cycle</div></div>
+  </div>
+
+  <!-- RESOLUTION MATRIX -->
+  <div class="card">
+    <div style="font-weight:700;color:var(--primary);margin-bottom:.8rem;font-size:.95rem">Observation Resolution Summary</div>
+    <div style="overflow-x:auto">
+    <table class="stat-table">
+      <thead>
+        <tr>
+          <th>Referred To</th>
+          <th>Last Audit — Total</th>
+          <th>Last Audit — Resolved</th>
+          <th>Last Audit — Unresolved</th>
+          <th>New Observations</th>
+          <th>New — Resolved</th>
+          <th>New — Unresolved</th>
+          <th>Total Unresolved</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Regional Office</td><td>14</td><td>12</td><td>2</td><td>—</td><td>—</td><td>—</td><td><strong>2</strong></td></tr>
+        <tr><td>Branch Head</td><td>36</td><td>24</td><td>10</td><td>27</td><td>3</td><td>24</td><td><strong>34</strong></td></tr>
+        <tr class="total-row"><td>Total</td><td>50</td><td>36</td><td>12</td><td>27</td><td>3</td><td>24</td><td><strong>36</strong></td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- HIGH RISK ALERT BOX -->
+  <div style="background:#fdecea;border:1.5px solid #f5b7b1;border-radius:10px;padding:1rem 1.2rem;margin-bottom:1.2rem">
+    <div style="font-weight:800;color:var(--high);font-size:.95rem;margin-bottom:.5rem">🔴 Immediate Attention Required — HIGH RISK Observations</div>
+    <ul style="list-style:none;display:flex;flex-direction:column;gap:.4rem;font-size:.88rem">
+      <li><a href="#obs-2-1" style="color:var(--high);font-weight:700;text-decoration:none">→ 2.1 &nbsp;Vendors Registration not Completed</a> — Active vendors not registered; procurement integrity at risk.</li>
+      <li><a href="#obs-2-3" style="color:var(--high);font-weight:700;text-decoration:none">→ 2.3 &nbsp;All 3-Quotations Provided by Selected Vendor</a> — Conflict of interest in procurement; collusion risk.</li>
+      <li><a href="#obs-2-25" style="color:var(--high);font-weight:700;text-decoration:none">→ 2.25 Ex-Armed Forces Personnel not Provided by Security Company</a> — Contract non-compliance; student safety risk.</li>
+    </ul>
+  </div>
+
+  <!-- REPEATED OBSERVATIONS TABLE -->
+  <div class="card">
+    <div style="font-weight:700;color:var(--primary);margin-bottom:.8rem;font-size:.95rem">Section 1 — Repeated (Unresolved) Observations &nbsp;<span style="font-weight:400;font-size:.8rem;color:var(--muted)">(15 observations carried forward)</span></div>
+    <table class="syn-table">
+      <thead><tr><th style="width:55px">#</th><th>Observation</th><th style="width:90px">Risk</th><th style="width:80px">Ref. To</th></tr></thead>
+      <tbody>
+        <tr><td><a href="#obs-1-1">1.1</a></td><td><a href="#obs-1-1">Expenditure Exceeded the Budgeted Amount</a><br><span class="cat">Branch Imprest, Payments &amp; Accounts</span></td><td><span class="risk mh">M to H</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-1-2">1.2</a></td><td><a href="#obs-1-2">Savings in Student Expenditure</a><br><span class="cat">Branch Imprest, Payments &amp; Accounts</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-1-3">1.3</a></td><td><a href="#obs-1-3">Delay in Deposit of Withholding Tax</a><br><span class="cat">Branch Imprest, Payments &amp; Accounts</span></td><td><span class="risk mh">M to H</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-1-4">1.4</a></td><td><a href="#obs-1-4">Delayed Reimbursement of Claims by RO</a><br><span class="cat">Branch Imprest, Payments &amp; Accounts</span></td><td><span class="risk lm">L to M</span></td><td>RO</td></tr>
+        <tr><td><a href="#obs-1-5">1.5</a></td><td><a href="#obs-1-5">Track Record of Quotations not Maintained</a><br><span class="cat">Branch Imprest, Payments &amp; Accounts</span></td><td><span class="risk mh">M to H</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-1-6">1.6</a></td><td><a href="#obs-1-6">Delay in Finalization of Final Settlement Claims</a><br><span class="cat">Recruitment, Payroll &amp; HR</span></td><td><span class="risk lm">L to M</span></td><td>RO</td></tr>
+        <tr><td><a href="#obs-1-7">1.7</a></td><td><a href="#obs-1-7">Missing Approval — Blood Relatives Employed</a><br><span class="cat">Recruitment, Payroll &amp; HR</span></td><td><span class="risk low">Low</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-1-8">1.8</a></td><td><a href="#obs-1-8">Livery Items Provided with Delays</a><br><span class="cat">Recruitment, Payroll &amp; HR</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-1-9">1.9</a></td><td><a href="#obs-1-9">Delay in Confirmation of Employees</a><br><span class="cat">Recruitment, Payroll &amp; HR</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-1-10">1.10</a></td><td><a href="#obs-1-10">Registration Fee Deposited with Delay</a><br><span class="cat">Students' Record</span></td><td><span class="risk low">Low</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-1-11">1.11</a></td><td><a href="#obs-1-11">Un-Numbered Fixed Assets</a><br><span class="cat">Fixed Assets</span></td><td><span class="risk mh">M to H</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-1-12">1.12</a></td><td><a href="#obs-1-12">High Book-to-Child Ratio in Library</a><br><span class="cat">Library</span></td><td><span class="risk mh">M to H</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-1-13">1.13</a></td><td><a href="#obs-1-13">Demolition Register not Prepared</a><br><span class="cat">Others</span></td><td><span class="risk low">Low</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-1-14">1.14</a></td><td><a href="#obs-1-14">Discrepancies in Sports Register</a><br><span class="cat">Others</span></td><td><span class="risk mh">M to H</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-1-15">1.15</a></td><td><a href="#obs-1-15">Generator Log Book not Validated by BH</a><br><span class="cat">Others</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- NEW OBSERVATIONS TABLE -->
+  <div class="card">
+    <div style="font-weight:700;color:var(--primary);margin-bottom:.8rem;font-size:.95rem">Section 2 — New Observations &nbsp;<span style="font-weight:400;font-size:.8rem;color:var(--muted)">(27 new findings)</span></div>
+    <table class="syn-table">
+      <thead><tr><th style="width:55px">#</th><th>Observation</th><th style="width:90px">Risk</th><th style="width:80px">Ref. To</th></tr></thead>
+      <tbody>
+        <tr><td><a href="#obs-2-1">2.1</a></td><td><a href="#obs-2-1">Vendors Registration not Completed</a><br><span class="cat">Branch Imprest, Payments &amp; Accounts</span></td><td><span class="risk high">High</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-2">2.2</a></td><td><a href="#obs-2-2">List of Preferred Vendors not Available</a><br><span class="cat">Branch Imprest, Payments &amp; Accounts</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-3">2.3</a></td><td><a href="#obs-2-3">All 3 Quotations from Selected Vendor</a><br><span class="cat">Branch Imprest, Payments &amp; Accounts</span></td><td><span class="risk high">High</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-4">2.4</a></td><td><a href="#obs-2-4">Cheque Number Not Recorded in BPV</a><br><span class="cat">Cash &amp; Bank</span></td><td><span class="risk low">Low</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-5">2.5</a></td><td><a href="#obs-2-5">Negative Balance in Principal Bank Account</a><br><span class="cat">Cash &amp; Bank</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-6">2.6</a></td><td><a href="#obs-2-6">Cash in Hand Exceeding Limit</a><br><span class="cat">Cash &amp; Bank</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-7">2.7</a></td><td><a href="#obs-2-7">Short Office Hours</a><br><span class="cat">Recruitment, Payroll &amp; HR</span></td><td><span class="risk mh">M to H</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-8">2.8</a></td><td><a href="#obs-2-8">Departure Attendance Not Marked</a><br><span class="cat">Recruitment, Payroll &amp; HR</span></td><td><span class="risk mh">M to H</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-9">2.9</a></td><td><a href="#obs-2-9">Employees not Registered in EOBI</a><br><span class="cat">Recruitment, Payroll &amp; HR</span></td><td><span class="risk mh">M to H</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-10">2.10</a></td><td><a href="#obs-2-10">Record for Livery Issued not Maintained</a><br><span class="cat">Recruitment, Payroll &amp; HR</span></td><td><span class="risk mh">M to H</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-11">2.11</a></td><td><a href="#obs-2-11">Incomplete Employees' Files</a><br><span class="cat">Recruitment, Payroll &amp; HR</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-12">2.12</a></td><td><a href="#obs-2-12">Branch Accountant File Maintained at Branch</a><br><span class="cat">Recruitment, Payroll &amp; HR</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-13">2.13</a></td><td><a href="#obs-2-13">Incomplete Students' Files</a><br><span class="cat">Students' Records</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-14">2.14</a></td><td><a href="#obs-2-14">Reason for Reg. Fee Waiver not Mentioned</a><br><span class="cat">Students' Records</span></td><td><span class="risk mh">M to H</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-15">2.15</a></td><td><a href="#obs-2-15">Memorandum Records of FA not as per Policy</a><br><span class="cat">Fixed Assets</span></td><td><span class="risk mh">M to H</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-16">2.16</a></td><td><a href="#obs-2-16">Out of Order Assets Found in Branch</a><br><span class="cat">Fixed Assets</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-17">2.17</a></td><td><a href="#obs-2-17">Un-Matched Assets Found in Branch</a><br><span class="cat">Fixed Assets</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-18">2.18</a></td><td><a href="#obs-2-18">Bar Code Labelling on Books Incomplete</a><br><span class="cat">Library</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-19">2.19</a></td><td><a href="#obs-2-19">Books Not Accessed in Library Module (KOHA)</a><br><span class="cat">Library</span></td><td><span class="risk mh">M to H</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-20">2.20</a></td><td><a href="#obs-2-20">Torn-Out Books in Branch Library</a><br><span class="cat">Library</span></td><td><span class="risk low">Low</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-21">2.21</a></td><td><a href="#obs-2-21">File for Librarian Meeting Minutes Missing</a><br><span class="cat">Library</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-22">2.22</a></td><td><a href="#obs-2-22">Clearance Forms File not Maintained</a><br><span class="cat">Library</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-23">2.23</a></td><td><a href="#obs-2-23">File for Overdue Book Reminders Missing</a><br><span class="cat">Library</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-24">2.24</a></td><td><a href="#obs-2-24">Discrepancies with Library Module (KOHA)</a><br><span class="cat">Library</span></td><td><span class="risk mh">M to H</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-25">2.25</a></td><td><a href="#obs-2-25">Ex-Armed Forces Personnel not Provided</a><br><span class="cat">Safety &amp; Security</span></td><td><span class="risk high">High</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-26">2.26</a></td><td><a href="#obs-2-26">Discrepancies in Printed Stationery Register</a><br><span class="cat">Others</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+        <tr><td><a href="#obs-2-27">2.27</a></td><td><a href="#obs-2-27">Discrepancies in Teaching Aid Register</a><br><span class="cat">Others</span></td><td><span class="risk lm">L to M</span></td><td>BH</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- QUICK NAV -->
+  <div class="card">
+    <div style="font-weight:700;color:var(--primary);margin-bottom:.8rem;font-size:.95rem">Report Sections — Quick Navigation</div>
+    <div class="toc-grid">
+      <div class="toc-item"><span>A.</span><a href="#intro">Introduction &amp; Background</a></div>
+      <div class="toc-item"><span>B.</span><a href="#scope">Objectives &amp; Scope</a></div>
+      <div class="toc-item"><span>C.</span><a href="#methodology">Audit Methodology</a></div>
+      <div class="toc-item"><span>D.</span><a href="#terms">Terms &amp; Abbreviations</a></div>
+      <div class="toc-item"><span>E.</span><a href="#analysis">Analysis of Controls</a></div>
+      <div class="toc-item"><span>F.</span><a href="#matrix">Sensitivity Matrix</a></div>
+      <div class="toc-item"><span>G.</span><a href="#repeated-obs">Repeated Observations</a></div>
+      <div class="toc-item"><span>H.</span><a href="#new-obs">New Observations</a></div>
+      <div class="toc-item"><span>I.</span><a href="#followup">Follow-Up</a></div>
+      <div class="toc-item"><span>J.</span><a href="#annexures">Annexures</a></div>
+    </div>
+  </div>
+</div>
+
+<hr class="sec-divider" style="max-width:1100px;margin:2rem auto">
+
+<!-- ═══════════════ INTRO ═══════════════ -->
+<div class="section" id="intro">
+  <div class="section-title">A. Introduction &amp; Background</div>
+  <div class="card">
+    <p style="font-size:.9rem">The internal audit report is submitted as a result of an audit exercise of <strong>51 FCC Campus, Lahore</strong>. The audit was performed as a routine audit visit. The period covered by this report is from <strong>October 21, 2019 to January 26, 2026</strong>, while the audit visit took place from <strong>January 26, 2026 to February 18, 2026</strong>.</p>
+    <p style="font-size:.9rem;margin-top:.7rem">The audit was conducted by the <strong>Systems &amp; Audit Department</strong> of Beaconhouse Group in accordance with the International Standards for the Professional Practice of Internal Auditing issued by the Institute of Internal Auditors (IIA).</p>
+  </div>
+  <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+</div>
+
+<!-- ═══════════════ SCOPE ═══════════════ -->
+<div class="section" id="scope">
+  <div class="section-title">B. Objectives &amp; Scope</div>
+  <div class="card">
+    <p style="font-size:.9rem;margin-bottom:.8rem">The purpose of the visit was a routine branch audit along with follow-up of the last audit report. The scope included:</p>
+    <ul style="font-size:.88rem;display:grid;grid-template-columns:1fr 1fr;gap:.4rem .8rem;list-style:none">
+      <li>✔ Correctness &amp; integrity of financial data entry</li>
+      <li>✔ General compliance of accounting practices</li>
+      <li>✔ Compliance with Company Policies and Manuals</li>
+      <li>✔ Controls over Cash and Bank</li>
+      <li>✔ Recording and safeguarding of fixed assets</li>
+      <li>✔ Procurement and imprest reimbursements</li>
+      <li>✔ Employee and student record completeness</li>
+      <li>✔ Student attendance validation</li>
+      <li>✔ Library records and documentation</li>
+      <li>✔ Emergency Procedures and security compliance</li>
+      <li>✔ Stock register and related records</li>
+      <li>✔ Third-party contracts and their compliance</li>
+    </ul>
+  </div>
+  <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+</div>
+
+<!-- ═══════════════ METHODOLOGY ═══════════════ -->
+<div class="section" id="methodology">
+  <div class="section-title">C. Audit Methodology</div>
+  <div class="card" style="font-size:.9rem">
+    <p>Audit areas were planned based on an <strong>initial risk assessment</strong>. Findings were analysed according to the widely accepted <strong>Internal Control — Integrated Framework (COSO)</strong>. Country-specific legal requirements also governed the assessment.</p>
+    <p style="margin-top:.7rem">Observations were discussed with the Branch Head, auditee staff, and concerned Regional Office staff. Their responses are included where appropriate. Immediate actions taken by the branch during the audit are also noted.</p>
+  </div>
+  <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+</div>
+
+<!-- ═══════════════ TERMS ═══════════════ -->
+<div class="section" id="terms">
+  <div class="section-title">D. Explanation of Terms &amp; Abbreviations</div>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.4rem .8rem;font-size:.85rem">
+      <div><strong>BH</strong> — Branch Head</div><div><strong>CA</strong> — Control Activity</div>
+      <div><strong>CE</strong> — Control Environment</div><div><strong>COO</strong> — Chief Operating Officer</div>
+      <div><strong>RO</strong> — Regional Office</div><div><strong>ROC</strong> — Regional Office Controller</div>
+      <div><strong>BEAMS</strong> — Beaconhouse ERP System</div><div><strong>BPV</strong> — Bank Payment Voucher</div>
+      <div><strong>FA</strong> — Fixed Assets</div><div><strong>EOBI</strong> — Employees' Old-Age Benefits Institution</div>
+      <div><strong>KOHA</strong> — Open Source Library Module</div><div><strong>COSO</strong> — Committee of Sponsoring Organizations</div>
+      <div><strong>LARR</strong> — Last Audit Report Reference</div><div><strong>PRO</strong> — Public Relations Officer</div>
+      <div><strong>AIDN</strong> — Asset ID Number (write-off process)</div><div><strong>PC</strong> — Purchase Committee</div>
+    </div>
+  </div>
+  <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+</div>
+
+<!-- ═══════════════ ANALYSIS ═══════════════ -->
+<div class="section" id="analysis">
+  <div class="section-title">E. Analysis of Observations &amp; Controls</div>
+  <div class="card" style="font-size:.88rem">
+    <p>Observations are analysed according to their relevance to <strong>Control Environment (CE)</strong>, <strong>Control Activity (CA)</strong>, and <strong>Monitoring</strong> under the COSO Framework. Each observation is rated by risk sensitivity and referred to the appropriate authority for resolution.</p>
+    <p style="margin-top:.7rem">The four risk tiers used throughout this report:</p>
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.6rem">
+      <span class="risk high">High — Immediate action required</span>
+      <span class="risk mh">Medium-High — Priority resolution</span>
+      <span class="risk lm">Low-Medium — Planned corrective action</span>
+      <span class="risk low">Low — Monitor and improve</span>
+    </div>
+  </div>
+  <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+</div>
+
+<!-- ═══════════════ MATRIX ═══════════════ -->
+<div class="section" id="matrix">
+  <div class="section-title">F. Sensitivity Matrix</div>
+  <div class="card">
+    <p style="font-size:.85rem;margin-bottom:1rem;color:var(--muted)">Observations are categorised by Impact (vertical) vs Likelihood / Non-Compliance (horizontal)</p>
+    <div class="matrix-wrap">
+    <table class="matrix">
+      <tr>
+        <td class="axis" colspan="2" rowspan="2"></td>
+        <td class="axis" colspan="3">LIKELIHOOD / NON-COMPLIANCE</td>
+      </tr>
+      <tr>
+        <td class="axis">HIGH</td>
+        <td class="axis">MEDIUM</td>
+        <td class="axis">LOW</td>
+      </tr>
+      <tr>
+        <td class="axis" rowspan="3">IMPACT</td>
+        <td class="axis">HIGH</td>
+        <td class="cell-high">🔴 HIGH RISK<br><small>Obs: 2.1, 2.3, 2.25</small></td>
+        <td class="cell-mh">🟠 MED-HIGH<br><small>Obs: 1.1, 1.3, 1.5, 1.11, 1.12, 2.7, 2.8, 2.9, 2.10, 2.14, 2.15, 2.19, 2.24</small></td>
+        <td class="cell-lm">🔵 LOW-MED<br><small>Obs: 1.2, 1.4, 1.6, 1.8, 1.9, 2.2, 2.5, 2.6, 2.11–2.13, 2.16–2.18, 2.21–2.23, 2.26, 2.27</small></td>
+      </tr>
+      <tr>
+        <td class="axis">MEDIUM</td>
+        <td class="cell-mh">🟠 MED-HIGH</td>
+        <td class="cell-lm">🔵 LOW-MED</td>
+        <td class="cell-low">🟢 LOW</td>
+      </tr>
+      <tr>
+        <td class="axis">LOW</td>
+        <td class="cell-lm">🔵 LOW-MED</td>
+        <td class="cell-low">🟢 LOW</td>
+        <td class="cell-low">🟢 LOW<br><small>Obs: 1.7, 1.10, 1.13, 2.4, 2.20</small></td>
+      </tr>
+    </table>
+    </div>
+  </div>
+  <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+</div>
+
+<hr class="sec-divider" style="max-width:1100px;margin:2rem auto">
+
+<!-- ═══════════════ REPEATED OBSERVATIONS ═══════════════ -->
+<div class="section" id="repeated-obs">
+  <div class="section-title">Section 1 — Repeated (Unresolved) Observations</div>
+
+  <!-- 1.1 -->
+  <div class="obs-block" id="obs-1-1">
+    <div class="card">
+      <div class="obs-header">
+        <span class="obs-num">1.1</span>
+        <span class="obs-title">Expenditure Exceeded the Budgeted Amount</span>
+        <span class="risk mh">M to H</span>
+      </div>
+      <div class="obs-meta">
+        <span class="tag">Branch Imprest, Payments &amp; Accounts</span>
+        <span class="tag">Referred To: BH</span>
+        <span class="tag">Last Audit Ref: 1.4</span>
+      </div>
+      <div class="finding-box"><div class="box-label">Finding</div>Review of system-generated "Budget Variance Sheets" revealed significant overspending under various heads of accounts. Budget should be monitored by Branch Head and RO on a monthly basis.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Recommendation <span class="acc-arrow">▼</span></div><div class="acc-body">Overspending should be controlled/monitored by Branch Head. Imprest budget should be monitored by ROC on monthly basis. As per policy: <em>"Budget variance shall be monitored for judicious use of funds allocated under all heads of expenses. Imprest budget variances of Branches shall be conducted monthly at the RO."</em></div></div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Due to the impact of hyperinflation, there have been discrepancies across a few heads of accounts. The school has consistently made every effort to manage and maintain expenditures within the allocated budget. Moving forward, every effort will be made to adhere strictly to the allocated budgets.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 1.2 -->
+  <div class="obs-block" id="obs-1-2">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">1.2</span><span class="obs-title">Savings in Student Expenditure</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">Branch Imprest, Payments &amp; Accounts</span><span class="tag">Referred To: BH</span><span class="tag">Last Audit Ref: 1.1</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Budget for student expenditure remained under-utilized across multiple years. As per policy, there should be no saving of funds under the category of "student expenses".</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Recommendation <span class="acc-arrow">▼</span></div><div class="acc-body">Budget for student expenses should be fully utilized. Savings in these heads should be avoided as per policy.</div></div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">During 2019–20, 2020–21, and 2021–22 the school operated online due to COVID-19, restricting school events and activities. In 2022–23, budget was reserved for major events but deferred due to financial constraints. For 2023–24 and 2024–25, allocated budget for educational visits was insufficient; excursion trips were partially managed through cash collection from parents.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 1.3 -->
+  <div class="obs-block" id="obs-1-3">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">1.3</span><span class="obs-title">Delay in Deposit of Withholding Tax</span><span class="risk mh">M to H</span></div>
+      <div class="obs-meta"><span class="tag">Branch Imprest, Payments &amp; Accounts</span><span class="tag">Referred To: BH</span><span class="tag">Last Audit Ref: 1.2</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Withholding tax must be deposited within 7 days of deduction. Multiple delays were observed in tax deposits, creating risk of government penalties for the company.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Recommendation <span class="acc-arrow">▼</span></div><div class="acc-body">Tax policies must be strictly followed. Any lapses may result in penalties. Per DF letter No. 10597 dated Jan 27, 2011: tax must be deposited into Government Treasury within seven days of deduction.</div></div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">The branch remains vigilant in ensuring withholding tax is deposited per prescribed policy. Acknowledged room for improvement; even greater diligence will be exercised going forward.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 1.4 -->
+  <div class="obs-block" id="obs-1-4">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">1.4</span><span class="obs-title">Delayed Reimbursement of Claims by RO</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">Branch Imprest, Payments &amp; Accounts</span><span class="tag">Referred To: RO</span><span class="tag">Last Audit Ref: 1.3</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Late reimbursements from RO lead to shortage of funds for smooth branch operations. Policy requires reimbursement claims to be processed within 20 days of receipt.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">RO Response <span class="acc-arrow">▼</span></div><div class="acc-body">ROC Finance handles reimbursements systematically but cannot commit to a 20-day timeline due to: (1) bills requiring PO generation, (2) late submissions from branches, (3) competing priorities. The 20-day timeline is deemed insufficient in many practical scenarios.</div></div>
+      <div class="view-box"><div class="box-label">Audit View</div>Timelines mentioned in policies must be followed. If not practicable, they should be formally amended through the proper procedure.</div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 1.5 -->
+  <div class="obs-block" id="obs-1-5">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">1.5</span><span class="obs-title">Track Record of Quotations not Maintained</span><span class="risk mh">M to H</span></div>
+      <div class="obs-meta"><span class="tag">Branch Imprest, Payments &amp; Accounts</span><span class="tag">Referred To: BH</span><span class="tag">Last Audit Ref: 2.29</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>For procurements above Rs. 100,000, a track record of quotations must be filed and authenticated by the Purchase Committee. This was not maintained at the branch.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Branch has started maintaining the record.</div></div>
+      <div class="action-box">✔ Action Taken: Verified during subsequent audit visit that branch has started maintaining the track record of quotations.</div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- ─── HR CATEGORY ─── -->
+  <div class="cat-header">Recruitment, Payroll &amp; Employees' Record</div>
+
+  <!-- 1.6 -->
+  <div class="obs-block" id="obs-1-6">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">1.6</span><span class="obs-title">Delay in Finalization of Final Settlement Claims</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">HR</span><span class="tag">Referred To: RO</span><span class="tag">Last Audit Ref: 1.8</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Final settlement claims must be processed within 45 days from an employee's last working day. Multiple delays were observed.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">RO Response <span class="acc-arrow">▼</span></div><div class="acc-body">The BEAMS-based final settlement process has improved efficiency; however, delays persist from July–October due to high workload. This is a systemic issue impacting the 45-day timeline.</div></div>
+      <div class="view-box"><div class="box-label">Audit View</div>Policy timelines must be adhered to. If not practicable, they should be revised through the proper procedure.</div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 1.7 -->
+  <div class="obs-block" id="obs-1-7">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">1.7</span><span class="obs-title">Missing Approval for Blood Relatives &amp; Related Family Members</span><span class="risk low">Low</span></div>
+      <div class="obs-meta"><span class="tag">HR</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Blood relatives and related family members require prior approval from Head HR before employment in the same branch. Some such employees were working without this approval. Two instances: (1) Skeena &amp; Aisa — Mother/Daughter (Aaya &amp; Teaching Aid), (2) Yousaf Masih &amp; Rani Bibi — Husband/Wife (Junior Staff).</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">The branch is working on obtaining the required HR approval.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 1.8 -->
+  <div class="obs-block" id="obs-1-8">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">1.8</span><span class="obs-title">Livery Items Provided with Delays</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">HR</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Summer &amp; Winter uniforms were provided to junior staff with significant delays. Delays ranged from 2–5 months across sessions 2023–25.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Detail of Delays <span class="acc-arrow">▼</span></div><div class="acc-body">
+        <table class="stat-table" style="font-size:.82rem">
+          <tr><th>Session</th><th>Due Date</th><th>Delivery Date</th><th>Delay</th></tr>
+          <tr><td>Winter 2025</td><td>Sep 2025</td><td>26 Dec 2025</td><td>3 months</td></tr>
+          <tr><td>Summer 2025</td><td>Apr 2025</td><td>11 Jun 2025</td><td>2 months</td></tr>
+          <tr><td>Winter 2024</td><td>Sep 2024</td><td>28 Dec 2024</td><td>3 months</td></tr>
+          <tr><td>Winter 2023</td><td>Sep 2023</td><td>31 Jan 2024</td><td>5 months</td></tr>
+        </table>
+      </div></div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Only one authorized vendor exists per Head Office approval, leading to dependency delays. No alternative vendors accepted the activity within the approved budget. The branch will continue efforts to procure on time.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 1.9 -->
+  <div class="obs-block" id="obs-1-9">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">1.9</span><span class="obs-title">Delay in Confirmation of Employees</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">HR</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Employees must be confirmed after the 6-month probationary period. Unnecessary delays in issuing confirmation letters were observed without formal extension justification.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Noted.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- ─── STUDENTS CATEGORY ─── -->
+  <div class="cat-header">Students' Record</div>
+
+  <!-- 1.10 -->
+  <div class="obs-block" id="obs-1-10">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">1.10</span><span class="obs-title">Registration Fee Deposited with Delay</span><span class="risk low">Low</span></div>
+      <div class="obs-meta"><span class="tag">Students' Record</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Registration fees must be deposited weekly or immediately upon reaching Rs. 10,000. Multiple delays were observed in depositing collected registration fees.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">The PRO and Accountant will exercise greater vigilance and diligence in all related matters going forward.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- ─── FIXED ASSETS CATEGORY ─── -->
+  <div class="cat-header">Fixed Assets</div>
+
+  <!-- 1.11 -->
+  <div class="obs-block" id="obs-1-11">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">1.11</span><span class="obs-title">Un-Numbered Fixed Assets</span><span class="risk mh">M to H</span></div>
+      <div class="obs-meta"><span class="tag">Fixed Assets</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>All fixed assets must be tagged with identification codes per the Fixed Asset Register. Un-numbered assets were found in the branch (see Annexure-H).</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Missing asset numbers have been labelled.</div></div>
+      <div class="action-box">✔ Action Taken: Verified during subsequent audit visit that all un-numbered assets have been numbered.</div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- ─── LIBRARY CATEGORY ─── -->
+  <div class="cat-header">Library</div>
+
+  <!-- 1.12 -->
+  <div class="obs-block" id="obs-1-12">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">1.12</span><span class="obs-title">High Book-to-Child Ratio in Library</span><span class="risk mh">M to H</span></div>
+      <div class="obs-meta"><span class="tag">Library</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>The book-per-child ratio has increased to 61 in the library, which is significantly above the ideal standard. Books marked as AIDN need redistribution to other branches.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Branch is in coordination with Head Office regarding AIDN books. Guidance has been requested on which branches these surplus books should be transferred to.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- ─── OTHERS CATEGORY ─── -->
+  <div class="cat-header">Others</div>
+
+  <!-- 1.13 -->
+  <div class="obs-block" id="obs-1-13">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">1.13</span><span class="obs-title">Demolition Register not Prepared</span><span class="risk low">Low</span></div>
+      <div class="obs-meta"><span class="tag">Others</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>A demolition register for scrap obtained from demolition must be maintained as per policy. This register was not found at the branch.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Noted.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 1.14 -->
+  <div class="obs-block" id="obs-1-14">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">1.14</span><span class="obs-title">Discrepancies in Maintaining Sports Register</span><span class="risk mh">M to H</span></div>
+      <div class="obs-meta"><span class="tag">Others</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Sports register was not maintained per policy. Closing balances were not calculated correctly and the register was not validated by the Branch Head.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Noted.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 1.15 -->
+  <div class="obs-block" id="obs-1-15">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">1.15</span><span class="obs-title">Generator Log Book not Validated by Branch Head</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">Others</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Generator log book must be properly maintained and verified by the Branch Head. This was not done.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Noted.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+</div>
+
+<hr class="sec-divider" style="max-width:1100px;margin:2rem auto">
+
+<!-- ═══════════════ NEW OBSERVATIONS ═══════════════ -->
+<div class="section" id="new-obs">
+  <div class="section-title">Section 2 — New Observations</div>
+
+  <div class="cat-header">Branch Imprest, Payments &amp; Accounts</div>
+
+  <!-- 2.1 HIGH -->
+  <div class="obs-block" id="obs-2-1">
+    <div class="card" style="border-top:3px solid var(--high)">
+      <div class="obs-header"><span class="obs-num">2.1</span><span class="obs-title">Vendors Registration not Completed</span><span class="risk high">High</span></div>
+      <div class="obs-meta"><span class="tag">Procurement</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Active vendors being used by the branch are not formally registered in the vendor management system. This undermines procurement controls and transparency.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Recommendation <span class="acc-arrow">▼</span></div><div class="acc-body">All active vendors must be registered immediately in the system. Unregistered vendors should not be used for any procurement until registration is complete.</div></div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Branch is in the process of completing vendor registrations.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.2 -->
+  <div class="obs-block" id="obs-2-2">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.2</span><span class="obs-title">List of Preferred Vendors not Available at Branch</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">Procurement</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>An approved/preferred vendor list was not available at the branch, which is required to ensure only vetted vendors are engaged for procurement.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Branch will obtain and maintain the preferred vendor list.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.3 HIGH -->
+  <div class="obs-block" id="obs-2-3">
+    <div class="card" style="border-top:3px solid var(--high)">
+      <div class="obs-header"><span class="obs-num">2.3</span><span class="obs-title">All 3 Quotations Provided by the Selected Vendor</span><span class="risk high">High</span></div>
+      <div class="obs-meta"><span class="tag">Procurement — Conflict of Interest</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>During a review of Purchase Committee records, it was found that all three required quotations for a procurement were submitted by the same vendor (the ultimately selected vendor). This represents a serious conflict of interest and undermines the competitive procurement process.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Recommendation <span class="acc-arrow">▼</span></div><div class="acc-body">Quotations must always be obtained from three genuinely independent vendors. Any procurement where quotation integrity is compromised should be escalated to management. Strict adherence to Purchase Committee procedures is required.</div></div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">The branch acknowledges the finding and will ensure independent quotations are obtained for future procurements.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <div class="cat-header">Cash &amp; Bank</div>
+
+  <!-- 2.4 -->
+  <div class="obs-block" id="obs-2-4">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.4</span><span class="obs-title">Cheque Number Not Recorded in BPV</span><span class="risk low">Low</span></div>
+      <div class="obs-meta"><span class="tag">Cash &amp; Bank</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Cheque numbers were not recorded in Bank Payment Vouchers, reducing auditability of payment transactions.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">The branch will ensure cheque numbers are recorded in all future BPVs.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.5 -->
+  <div class="obs-block" id="obs-2-5">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.5</span><span class="obs-title">Negative Balance in Principal Bank Account</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">Cash &amp; Bank</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>The branch's principal bank account showed a negative (credit) balance on multiple occasions, indicating expenditures were recorded without adequate funds — a cash management risk.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Branch will monitor bank balances closely to avoid negative positions.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.6 -->
+  <div class="obs-block" id="obs-2-6">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.6</span><span class="obs-title">Cash in Hand Exceeding Limit</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">Cash &amp; Bank</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Cash in hand was found to exceed the prescribed limit on multiple occasions, increasing the risk of loss or misappropriation.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Branch will ensure cash in hand is kept within the prescribed limits at all times.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <div class="cat-header">Recruitment, Payroll &amp; Employees' Records</div>
+
+  <!-- 2.7 -->
+  <div class="obs-block" id="obs-2-7">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.7</span><span class="obs-title">Short Office Hours</span><span class="risk mh">M to H</span></div>
+      <div class="obs-meta"><span class="tag">HR / Attendance</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Review of attendance records revealed that staff were completing fewer than the prescribed working hours. This has implications for productivity and payroll accuracy. Detail in Annexure-K.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Policy Reference <span class="acc-arrow">▼</span></div><div class="acc-body">Teachers on duty: 30 minutes before school starts until 30 minutes after school ends. Admin &amp; Office staff: 8 working hours per day.</div></div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Branch management will monitor and enforce prescribed office hours.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.8 -->
+  <div class="obs-block" id="obs-2-8">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.8</span><span class="obs-title">Departure Attendance Not Marked</span><span class="risk mh">M to H</span></div>
+      <div class="obs-meta"><span class="tag">HR / Attendance</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Departure time was not being marked in attendance records for many staff members, preventing verification of actual working hours. Detail in Annexure-L.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Branch will enforce departure attendance marking for all staff.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.9 -->
+  <div class="obs-block" id="obs-2-9">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.9</span><span class="obs-title">Employees Not Registered in EOBI</span><span class="risk mh">M to H</span></div>
+      <div class="obs-meta"><span class="tag">HR / Legal Compliance</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Certain employees were not registered in the Employees' Old-Age Benefits Institution (EOBI) system as legally required, creating legal compliance risk for the organization.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Ms. Saria (joining date 07/01/2026) has since been registered. EOBI registration has been initiated.</div></div>
+      <div class="action-box">✔ Action Taken: Verified during subsequent visit that the unregistered employee has been registered in EOBI.</div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.10 -->
+  <div class="obs-block" id="obs-2-10">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.10</span><span class="obs-title">Record for Livery Issued Not Maintained</span><span class="risk mh">M to H</span></div>
+      <div class="obs-meta"><span class="tag">HR</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Records of livery items issued to junior staff must be maintained. Livery issuance records prior to 2022 were not available at the branch.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Old records were not maintained by the previous management. Future records will be maintained properly.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.11 -->
+  <div class="obs-block" id="obs-2-11">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.11</span><span class="obs-title">Incomplete Employees' Files</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">HR Records</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Employee files were found with missing documents during audit (sample basis). Instances in Annexure-M. Documents such as photographs and performance appraisal forms were missing.</div>
+      <div class="view-box"><div class="box-label">Audit View</div>As the audit was performed on a sample basis, branch must complete ALL employee files as prescribed in policy.</div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.12 -->
+  <div class="obs-block" id="obs-2-12">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.12</span><span class="obs-title">Branch Accountant's Personal File Maintained at Branch</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">HR Records</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Per policy, personal files of Principal, HM/HMistress, Senior Master/Mistress, and Branch Accounts Staff must be maintained at the Regional Office — not at the branch. The Branch Accountant's (Ms. Sadaf) file was kept at the branch.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">File has been dispatched to the RO.</div></div>
+      <div class="action-box">✔ Action Taken: Verified that file has been shifted to RO.</div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <div class="cat-header">Students' Records</div>
+
+  <!-- 2.13 -->
+  <div class="obs-block" id="obs-2-13">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.13</span><span class="obs-title">Incomplete Students' Files</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">Students' Records</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Student files checked during audit were found with missing documents — Birth Certificate, Photograph, and Parent CNIC were absent in several files. Instances in Annexure-N.</div>
+      <div class="view-box"><div class="box-label">Audit View</div>As audit was performed on sample basis, branch must complete all student files as per policy.</div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.14 -->
+  <div class="obs-block" id="obs-2-14">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.14</span><span class="obs-title">Reason for Registration Fee Waiver Not Mentioned</span><span class="risk mh">M to H</span></div>
+      <div class="obs-meta"><span class="tag">Students' Records</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>BEAMS Registration Register did not contain the reason for free/waived registration fees. Instances in Annexure-O. This creates a transparency and revenue integrity risk.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">This is identified as a glitch in the BEAMS module. The matter has been reported.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <div class="cat-header">Fixed Assets</div>
+
+  <!-- 2.15 -->
+  <div class="obs-block" id="obs-2-15">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.15</span><span class="obs-title">Memorandum Records of FA Not Maintained as per Policy</span><span class="risk mh">M to H</span></div>
+      <div class="obs-meta"><span class="tag">Fixed Assets</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Stock registers for assets costing less than Rs. 20,000 were not maintained properly: register was not signed/verified by Branch Head and physical quantity did not match records.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Register has been maintained by OFA. Going forward it will be reviewed and signed by the Section Head for verification.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.16 -->
+  <div class="obs-block" id="obs-2-16">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.16</span><span class="obs-title">Out of Order Assets Found in Branch</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">Fixed Assets</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Multiple assets found during physical verification were out of order and no repair or disposal had been initiated. Instances in Annexure-P.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">These are in the AIDN process already.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.17 -->
+  <div class="obs-block" id="obs-2-17">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.17</span><span class="obs-title">Un-Matched Assets Found in Branch</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">Fixed Assets</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Fixed assets physically present in the branch but not appearing in the Fixed Asset Register were observed. Instances in Annexure-Q.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Branch will consult RO to resolve the matter and update the FA register.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <div class="cat-header">Library</div>
+
+  <!-- 2.18 -->
+  <div class="obs-block" id="obs-2-18">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.18</span><span class="obs-title">Bar Code Labelling on Library Books Not Completed</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">Library</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Approximately 1,635 library books were without bar code labels, hampering tracking and inventory control.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Books will be entered in KOHA module first, after which labels will be generated and applied.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.19 -->
+  <div class="obs-block" id="obs-2-19">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.19</span><span class="obs-title">Books Not Accessed in Library Module (KOHA)</span><span class="risk mh">M to H</span></div>
+      <div class="obs-meta"><span class="tag">Library</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>1,635 library books had not been entered in the KOHA library management module. Without proper module entry, circulation management and accountability are compromised.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">The librarian will enter all remaining books in KOHA this academic year.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.20 -->
+  <div class="obs-block" id="obs-2-20">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.20</span><span class="obs-title">Torn-Out Books Found in Branch Library</span><span class="risk low">Low</span></div>
+      <div class="obs-meta"><span class="tag">Library</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>500 library books were found with torn titles/pages requiring repair or disposal. Policy requires librarians to maintain books and initiate repair/replacement on an ongoing basis.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">These books have been set aside as AIDN. Matter is pending resolution from RO regarding previously approved books.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.21 -->
+  <div class="obs-block" id="obs-2-21">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.21</span><span class="obs-title">File for Librarian Meeting Minutes Not Maintained</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">Library</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Minutes of meetings between the librarian and the Regional Librarian should be filed for reference. This file was not being maintained.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">The librarian will maintain this file going forward.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.22 -->
+  <div class="obs-block" id="obs-2-22">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.22</span><span class="obs-title">File of Clearance Forms Not Maintained</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">Library</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Clearance Forms for withdrawn students were not prepared or filed by the branch. Policy requires a record of outstanding books/library items to be maintained on clearance forms.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">For withdrawn students, documentation is captured through the Security Refund Form signed by School Head, PRO, and parent, which is uploaded at withdrawal time.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.23 -->
+  <div class="obs-block" id="obs-2-23">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.23</span><span class="obs-title">File for Overdue Book Reminders Not Maintained</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">Library</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>No file was being maintained for reminders issued for overdue library books. Policy requires reminders to be issued and a record kept.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">In line with Head Office's paper-free environment policy, communication with parents is conducted digitally via Google Classroom, email, or SMS. Digital records are maintained.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.24 -->
+  <div class="obs-block" id="obs-2-24">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.24</span><span class="obs-title">Discrepancies with Library Module (KOHA)</span><span class="risk mh">M to H</span></div>
+      <div class="obs-meta"><span class="tag">Library — IT Systems</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Several KOHA module discrepancies were identified:
+        <ul style="margin-top:.4rem;padding-left:1.2rem">
+          <li>Branch librarian rights were not restricted to the specific branch (access control gap)</li>
+          <li>Auto-generation of overdue book notifications (email) was not activated</li>
+          <li>Auto-generation of issued &amp; returned book notifications (email) was not activated</li>
+        </ul>
+      </div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Agreed with the above discrepancies. Steps will be taken to configure KOHA appropriately.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <div class="cat-header">Safety &amp; Security</div>
+
+  <!-- 2.25 HIGH -->
+  <div class="obs-block" id="obs-2-25">
+    <div class="card" style="border-top:3px solid var(--high)">
+      <div class="obs-header"><span class="obs-num">2.25</span><span class="obs-title">Ex-Armed Forces Personnel Not Provided by Security Company</span><span class="risk high">High</span></div>
+      <div class="obs-meta"><span class="tag">Safety &amp; Security — Contract Compliance</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>The security contract with <strong>Parwest Pacific Security Private Limited</strong> requires 50% of armed guards to be ex-Armed Forces personnel. None of the 3 armed guards at the school met this requirement — a critical contract non-compliance and <strong>student safety risk</strong>.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Recommendation <span class="acc-arrow">▼</span></div><div class="acc-body">Non-compliance of the security services contract must be formally reported to the concerned department and followed up until resolved. Imposing a Rs. 100 fine is insufficient — school security cannot be compromised at the expense of penalty charges.</div></div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">The issue has been verbally discussed with the relevant department and a fine of Rs. 100 is being charged. An email will also be sent to the relevant department.</div></div>
+      <div class="view-box"><div class="box-label">Audit View</div>School security cannot be compromised at the expense of penalty charges. Formal written escalation is required immediately.</div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <div class="cat-header">Others</div>
+
+  <!-- 2.26 -->
+  <div class="obs-block" id="obs-2-26">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.26</span><span class="obs-title">Discrepancies in Printed Stationery Register</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">Others</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Printed stationery register was not maintained per policy. Closing balances of all items showed zero (incorrect) and the register was not validated by the Branch Head.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Will be maintained as guided by the Audit Team and will be signed and followed up by the Section Head.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+  <!-- 2.27 -->
+  <div class="obs-block" id="obs-2-27">
+    <div class="card">
+      <div class="obs-header"><span class="obs-num">2.27</span><span class="obs-title">Discrepancies in Maintaining Teaching Aid Register</span><span class="risk lm">L to M</span></div>
+      <div class="obs-meta"><span class="tag">Others</span><span class="tag">Referred To: BH</span></div>
+      <div class="finding-box"><div class="box-label">Finding</div>Teaching Aid Register was not maintained per policy. Closing balances of all items were zero (incorrect) and the register was not validated by the Branch Head.</div>
+      <div class="accordion"><div class="acc-toggle" onclick="toggle(this)">Auditee Response <span class="acc-arrow">▼</span></div><div class="acc-body">Updated records will be maintained, signed, and followed up by the Section Head from next session.</div></div>
+      <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+    </div>
+  </div>
+
+</div>
+
+<hr class="sec-divider" style="max-width:1100px;margin:2rem auto">
+
+<!-- ═══════════════ FOLLOW UP ═══════════════ -->
+<div class="section" id="followup">
+  <div class="section-title">Follow-Up</div>
+  <div class="card" style="font-size:.9rem;background:linear-gradient(90deg,#f0f7ff,#fff);border-left:4px solid var(--lm)">
+    <p>All relevant authorities are requested to inform the <strong>Systems &amp; Audit Department</strong> of the action taken with respect to the issues raised in this report. Timely follow-up and documented responses are essential for closing observations and strengthening internal controls.</p>
+    <p style="margin-top:.7rem">Unresolved observations from this report will be carried forward to the next audit cycle and escalated accordingly.</p>
+  </div>
+  <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+</div>
+
+<hr class="sec-divider" style="max-width:1100px;margin:2rem auto">
+
+<!-- ═══════════════ ANNEXURES INDEX ═══════════════ -->
+<div class="section" id="annexures">
+  <div class="section-title">Annexures — Quick Reference Index</div>
+  <div class="card">
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">Detailed supporting data for each observation is contained in the following annexures (refer to the original Word document for full tabular data).</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.5rem;font-size:.86rem">
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure A</strong> — Expenses Exceeded Budgeted Amount <a href="#obs-1-1" style="float:right;color:var(--primary);font-size:.75rem">→ 1.1</a></div>
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure B</strong> — Student Expenses Remained Unutilized <a href="#obs-1-2" style="float:right;color:var(--primary);font-size:.75rem">→ 1.2</a></div>
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure C</strong> — Delay in Deposit of Withholding Tax <a href="#obs-1-3" style="float:right;color:var(--primary);font-size:.75rem">→ 1.3</a></div>
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure D</strong> — Delay in Reimbursement Claims <a href="#obs-1-4" style="float:right;color:var(--primary);font-size:.75rem">→ 1.4</a></div>
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure E</strong> — Delay in Final Settlement Claims <a href="#obs-1-6" style="float:right;color:var(--primary);font-size:.75rem">→ 1.6</a></div>
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure F</strong> — Delay in Confirmation of Employee <a href="#obs-1-9" style="float:right;color:var(--primary);font-size:.75rem">→ 1.9</a></div>
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure G</strong> — Registration Fee Deposited with Delays <a href="#obs-1-10" style="float:right;color:var(--primary);font-size:.75rem">→ 1.10</a></div>
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure H</strong> — Un-Numbered Assets <a href="#obs-1-11" style="float:right;color:var(--primary);font-size:.75rem">→ 1.11</a></div>
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure I</strong> — Overdue Books</div>
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure J</strong> — Purchase Committee Statements <a href="#obs-2-3" style="float:right;color:var(--primary);font-size:.75rem">→ 2.3</a></div>
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure K</strong> — Short Office Hours <a href="#obs-2-7" style="float:right;color:var(--primary);font-size:.75rem">→ 2.7</a></div>
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure L</strong> — Departure Attendance Not Marked <a href="#obs-2-8" style="float:right;color:var(--primary);font-size:.75rem">→ 2.8</a></div>
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure M</strong> — Incomplete Employee Files <a href="#obs-2-11" style="float:right;color:var(--primary);font-size:.75rem">→ 2.11</a></div>
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure N</strong> — Incomplete Student Files <a href="#obs-2-13" style="float:right;color:var(--primary);font-size:.75rem">→ 2.13</a></div>
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure O</strong> — Registration Fee Waiver Not Mentioned <a href="#obs-2-14" style="float:right;color:var(--primary);font-size:.75rem">→ 2.14</a></div>
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure P</strong> — Out of Order Assets <a href="#obs-2-16" style="float:right;color:var(--primary);font-size:.75rem">→ 2.16</a></div>
+      <div style="background:#f7f9fc;border-radius:6px;padding:.55rem .8rem;border:1px solid var(--border)"><strong>Annexure Q</strong> — Un-Matched Assets <a href="#obs-2-17" style="float:right;color:var(--primary);font-size:.75rem">→ 2.17</a></div>
+    </div>
+  </div>
+  <a href="#synopsis" class="back-link">↑ Back to Synopsis</a>
+</div>
+
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<footer>
+  <strong>Beaconhouse Group — Systems &amp; Audit Department</strong><br>
+  Audit Report No. 206-LMA &nbsp;|&nbsp; 51 FCC Campus, Gulberg, Lahore &nbsp;|&nbsp; <em>Confidential &amp; Proprietary</em><br>
+  <span style="font-size:.7rem">Generated for internal management use only. Not for external distribution.</span>
+</footer>
+
+<script>
+function toggle(header) {
+  const body = header.nextElementSibling;
+  const arrow = header.querySelector('.acc-arrow');
+  if (body.classList.contains('open')) {
+    body.classList.remove('open');
+    arrow.classList.remove('open');
+  } else {
+    body.classList.add('open');
+    arrow.classList.add('open');
+  }
+}
+</script>
+</body>
+</html>
