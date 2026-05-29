@@ -281,9 +281,10 @@ input[readonly]{background:#f8fafc}
 <div class="page" id="page-sale">
   <div class="card" style="max-width:700px;margin-left:auto;margin-right:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-      <div class="card-title" style="margin:0">Record New Sale</div>
+      <div class="card-title" style="margin:0" id="sale-page-title">Record New Sale</div>
       <button onclick="goBack()" title="Go back" style="background:none;border:1px solid #e2e8f0;border-radius:50%;width:32px;height:32px;font-size:1.1rem;cursor:pointer;color:#64748b;display:flex;align-items:center;justify-content:center;line-height:1">&#10005;</button>
     </div>
+    <input type="hidden" id="s-edit-rno" value="">
     <div id="sale-flash"></div>
     <div class="form-grid">
       <div class="fg"><label>Animal Code *</label>
@@ -336,8 +337,8 @@ input[readonly]{background:#f8fafc}
         <input id="s-notes" placeholder="Optional"></div>
     </div>
     <div class="form-actions">
-      <button class="btn btn-success" onclick="recordSale()">Record Sale &amp; Generate Receipt</button>
-      <button class="btn btn-light" onclick="initSaleForm()">Clear</button>
+      <button class="btn btn-success" id="sale-submit-btn" onclick="submitSaleForm()">Record Sale &amp; Generate Receipt</button>
+      <button class="btn btn-light" onclick="initSaleForm()">Clear / New</button>
     </div>
   </div>
 </div>
@@ -403,6 +404,7 @@ input[readonly]{background:#f8fafc}
           <button class="btn btn-success btn-sm" onclick="openPayment(0)">+ Record Collection</button>
         </div>
       </div>
+      <div id="payments-cust-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px"></div>
       <div style="margin-bottom:10px"><input id="payments-search" type="text" placeholder="&#128269; Search by receipt, customer, bank, type…" style="width:100%;padding:7px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:.88rem" oninput="renderPayments()"></div>
       <div class="tbl-wrap"><table>
         <thead id="payments-head"></thead>
@@ -874,7 +876,7 @@ input[readonly]{background:#f8fafc}
 <div class="overlay" id="editpay-overlay">
   <div class="modal" style="max-width:540px">
     <button class="modal-close" onclick="closeModal('editpay-overlay')">&#10005;</button>
-    <div class="card-title">Edit Payment</div>
+    <div class="card-title">Edit Collection</div>
     <div id="editpay-flash"></div>
     <input type="hidden" id="ep-rno">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
@@ -1939,7 +1941,7 @@ function editSaleFromAnimal(){
   const sale=DB.sales.find(s=>s.animal_code===codeVal);
   if(!sale){alert('No sale record found for this animal.');return;}
   closeModal('editanimal-overlay');
-  openSaleEdit(sale.receipt_no);
+  openSaleEditPage(sale.receipt_no);
 }
 function editCustFromAnimal(){
   const codeVal=document.getElementById('ea-code-val')?document.getElementById('ea-code-val').value:'';
@@ -2004,6 +2006,11 @@ function saveCustomerEdit(){
 
 // ══════════════════════════ NEW SALE ══════════════════════════
 function initSaleForm(){
+  document.getElementById('s-edit-rno').value='';
+  const titleEl=document.getElementById('sale-page-title');
+  if(titleEl) titleEl.textContent='Record New Sale';
+  const submitBtn=document.getElementById('sale-submit-btn');
+  if(submitBtn) submitBtn.textContent='Record Sale & Generate Receipt';
   const asel=document.getElementById('s-animal');
   asel.innerHTML='<option value="">-- Select Animal --</option>';
   [...DB.animals].filter(a=>a.status==='available').sort((a,b)=>Number(a.code)-Number(b.code)||a.code.localeCompare(b.code)).forEach(a=>{
@@ -2099,6 +2106,103 @@ function recordSale(){
   save(); initSaleForm(); showReceipt(rno);
 }
 
+function submitSaleForm(){
+  const editRno=document.getElementById('s-edit-rno').value;
+  if(editRno) saveSalePageEdit(editRno); else recordSale();
+}
+
+function openSaleEditPage(rno){
+  const s=DB.sales.find(x=>x.receipt_no===rno); if(!s) return;
+  initSaleForm();
+  document.getElementById('s-edit-rno').value=rno;
+  document.getElementById('sale-page-title').textContent='Edit Sale — '+rno;
+  document.getElementById('sale-submit-btn').textContent='Save Changes';
+
+  // Populate animal dropdown to include sold animals
+  const asel=document.getElementById('s-animal');
+  asel.innerHTML='<option value="">-- Select Animal --</option>';
+  [...DB.animals].sort((a,b)=>Number(a.code)-Number(b.code)||a.code.localeCompare(b.code)).forEach(a=>{
+    const sel=a.code===s.animal_code?'selected':'';
+    asel.innerHTML+=`<option value="${a.code}" data-w="${a.weight_final||''}" data-adm="${a.admin_charges||DB.settings.admin_charges||0}" ${sel}>Code: ${a.code} | ${a.age_type||''} | ${a.weight_final||'?'} kg</option>`;
+  });
+
+  // Set customer
+  const csel=document.getElementById('s-customer');
+  [...csel.options].forEach(o=>{if(parseInt(o.value)===s.customer_id) o.selected=true;});
+
+  document.getElementById('s-date').value=s.sale_date||today();
+  const locSel=document.getElementById('s-location');
+  if(locSel) locSel.value=s.location||'';
+  document.getElementById('s-admin').value=s.admin_charges||0;
+  document.getElementById('s-notes').value=s.notes||'';
+
+  const isLump=!!s.is_lumpsum;
+  document.querySelector('[name="s-mode"][value="'+(isLump?'lumpsum':'weight')+'"]').checked=true;
+  toggleSaleMode();
+  if(isLump){
+    document.getElementById('s-weight-lump').value=s.weight_at_sale||'';
+    const lumpCar=s.carriage_charges||0;
+    const lumpAmt=(s.amount||0)-lumpCar;
+    document.getElementById('s-lumpamt').value=lumpAmt>0?lumpAmt:'';
+    document.getElementById('s-lumpcar').value=lumpCar||'';
+  } else {
+    document.getElementById('s-weight').value=s.weight_at_sale||'';
+    document.getElementById('s-rate').value=s.rate_per_kg||'';
+    document.getElementById('s-carriage').value=s.carriage_charges||0;
+  }
+  calcSaleTotal();
+  show('sale');
+}
+
+function saveSalePageEdit(rno){
+  const s=DB.sales.find(x=>x.receipt_no===rno); if(!s) return;
+  const code=document.getElementById('s-animal').value;
+  const cid=parseInt(document.getElementById('s-customer').value);
+  const isLump=document.querySelector('[name="s-mode"]:checked')&&document.querySelector('[name="s-mode"]:checked').value==='lumpsum';
+  const adm=parseFloat(document.getElementById('s-admin').value)||0;
+  const car=parseFloat(document.getElementById('s-carriage').value)||0;
+  const dateVal=document.getElementById('s-date').value;
+  const errors=[];
+  if(!code) errors.push('Animal Code is required.');
+  if(!cid||isNaN(cid)) errors.push('Customer is required.');
+  if(!dateVal) errors.push('Sale Date is required.');
+  let w,r,amount,lumpcar=0;
+  if(isLump){
+    w=parseFloat(document.getElementById('s-weight-lump').value)||0;
+    r=0;
+    const lumpamt=parseFloat(document.getElementById('s-lumpamt').value);
+    lumpcar=parseFloat(document.getElementById('s-lumpcar').value)||0;
+    if(!lumpamt||lumpamt<=0) errors.push('Sale Amount is required for lump sum.');
+    amount=(lumpamt||0)+lumpcar;
+  } else {
+    w=parseFloat(document.getElementById('s-weight').value);
+    r=parseFloat(document.getElementById('s-rate').value);
+    if(!w||w<=0) errors.push('Weight at Sale must be a positive number.');
+    if(!r||r<=0) errors.push('Rate per kg must be a positive number.');
+    amount=(w*r)+car;
+  }
+  if(errors.length){flash('sale-flash',errors.join(' '),'err');return;}
+  if(s.animal_code!==code){
+    const oldA=DB.animals.find(a=>a.code===s.animal_code);
+    if(oldA) oldA.status='available';
+    const newA=DB.animals.find(a=>a.code===code);
+    if(newA){newA.status='sold';if(w) newA.weight_final=w;}
+  } else {
+    const animal=DB.animals.find(a=>a.code===code);
+    if(animal&&w) animal.weight_final=w;
+  }
+  s.animal_code=code; s.customer_id=cid; s.sale_date=dateVal;
+  s.weight_at_sale=w; s.rate_per_kg=r; s.admin_charges=adm;
+  s.carriage_charges=isLump?lumpcar:car; s.amount=amount;
+  s.is_lumpsum=isLump;
+  s.location=document.getElementById('s-location').value.trim()||'';
+  s.notes=document.getElementById('s-notes').value.trim()||'';
+  save();
+  flash('sale-flash','Sale '+rno+' updated.','ok');
+  initSaleForm();
+  renderSales(); renderDashboard(); renderAnimals();
+}
+
 // ══════════════════════════ ALL SALES ══════════════════════════
 function renderSales(){
   const inclCar=document.getElementById('chk-car')?.checked||false;
@@ -2150,7 +2254,7 @@ function renderSales(){
       <td><strong>${Rs(displayAmt(s))}</strong></td>
       <td style="white-space:nowrap" onclick="event.stopPropagation()">
         <button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Invoice</button>
-        <button class="btn btn-light btn-sm" style="margin-left:4px" onclick="openSaleEdit('${s.receipt_no}')">&#9998; Edit</button>
+        <button class="btn btn-light btn-sm" style="margin-left:4px" onclick="openSaleEditPage('${s.receipt_no}')">&#9998; Edit</button>
         <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="deleteSale('${s.receipt_no}')">&#128465; Del</button>
       </td>
     </tr>`;
@@ -2514,12 +2618,35 @@ function renderSenderwiseReport(){
 }
 
 function renderPayments(){
+  // Customer summary — show ALL customers who have sales, even with zero collection
+  const custSummaryEl=document.getElementById('payments-cust-summary');
+  if(custSummaryEl){
+    const custIds=[...new Set(DB.sales.map(s=>s.customer_id))];
+    if(custIds.length){
+      custSummaryEl.innerHTML=custIds.map(cid=>{
+        const c=DB.customers.find(x=>x.id===cid)||{name:'Unknown'};
+        const billed=DB.sales.filter(s=>s.customer_id===cid).reduce((s,x)=>s+x.amount,0);
+        const collected=DB.payments.filter(p=>p.customer_id===cid).reduce((s,p)=>s+(p.amount||0),0);
+        const disc=DB.payments.filter(p=>p.customer_id===cid).reduce((s,p)=>s+(p.discount||0),0);
+        const bal=billed-collected-disc;
+        const hasCol=collected>0||disc>0;
+        return `<div class="stat" style="border:2px solid ${hasCol?'#e2e8f0':'#fca5a5'};cursor:pointer" onclick="openPayment(${cid})" title="Click to add collection">
+          <div style="font-size:.8rem;font-weight:700;color:#1a3a5c;margin-bottom:4px">${c.name}</div>
+          <div style="font-size:.75rem;color:#64748b">Billed: ${Rs(billed)}</div>
+          <div style="font-size:.75rem;color:#059669">Collected: ${Rs(collected)}</div>
+          <div style="font-size:.82rem;font-weight:700;color:${bal>0?'#dc2626':'#059669'}">${bal>0?'Balance: '+Rs(bal):'&#10003; Settled'}</div>
+        </div>`;
+      }).join('');
+    } else {
+      custSummaryEl.innerHTML='';
+    }
+  }
+
   const head=document.getElementById('payments-head');
   head.innerHTML='<tr>'+'<th>S#</th>'+th('Receipt','payments','receipt_no')+th('Date','payments','pay_date')+th('Customer','payments','customerName')+th('Type','payments','type')+th('Bank','payments','bank_name')+'<th>Sender</th><th>Place</th>'+th('Amount','payments','amount')+th('Discount','payments','discount')+'<th></th></tr>';
   const tb=document.getElementById('payments-body');
-  if(!DB.payments.length){tb.innerHTML=`<tr><td colspan="11" class="empty">No payments recorded yet.</td></tr>`;return;}
+  if(!DB.payments.length){tb.innerHTML=`<tr><td colspan="11" class="empty">No collections recorded yet.</td></tr>`;return;}
   const payQ=(document.getElementById('payments-search')||{value:''}).value.trim().toLowerCase();
-  // Attach computed fields for sorting
   const withComputed=DB.payments.map(p=>Object.assign({},p,{customerName:cName(p.customer_id)}));
   const col=SORT.payments.col;
   const dir=SORT.payments.dir;
@@ -2957,7 +3084,7 @@ function renderInlineLedger(){
     function thS(label,col){return `<th class="sortable${SORT.custledger_s.col===col?' sort-'+SORT.custledger_s.dir:''}" onclick="sortToggle('custledger_s','${col}')" style="cursor:pointer">${label}</th>`;}
     html+=`<div class="tbl-wrap"><table><thead><tr><th>S#</th>${thS('Invoice No.','receipt_no')}${thS('Date','sale_date')}${thS('Animal','animal_code')}${thS('Weight','weight_at_sale')}${thS('Rate/kg','rate_per_kg')}${thS('Sale Price','sp')}${thS('Carriage','carriage_charges')}${thS('Total','amount')}<th></th></tr></thead><tbody>`;
     sortedSales.forEach((s,i)=>{
-      html+=`<tr><td style="color:#94a3b8;font-size:.75rem">${i+1}</td><td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td><td>${s.animal_code}</td><td>${s.weight_at_sale?fmtN(s.weight_at_sale,1)+' kg':'-'}</td><td>${s.is_lumpsum?'Lump Sum':Rs(s.rate_per_kg)+'/kg'}</td><td>${Rs(s.sp)}</td><td>${s.carriage_charges?Rs(s.carriage_charges):'-'}</td><td><strong>${Rs(s.amount)}</strong></td><td><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Invoice</button> <button class="btn btn-light btn-sm" onclick="openSaleEdit('${s.receipt_no}')">&#9998;</button></td></tr>`;
+      html+=`<tr><td style="color:#94a3b8;font-size:.75rem">${i+1}</td><td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td><td>${s.animal_code}</td><td>${s.weight_at_sale?fmtN(s.weight_at_sale,1)+' kg':'-'}</td><td>${s.is_lumpsum?'Lump Sum':Rs(s.rate_per_kg)+'/kg'}</td><td>${Rs(s.sp)}</td><td>${s.carriage_charges?Rs(s.carriage_charges):'-'}</td><td><strong>${Rs(s.amount)}</strong></td><td><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Invoice</button> <button class="btn btn-light btn-sm" onclick="openSaleEditPage('${s.receipt_no}')">&#9998;</button></td></tr>`;
     });
     html+=`<tr style="font-weight:700;background:#e0f2fe"><td colspan="6" style="text-align:right;color:#1a3a5c">Total (${sortedSales.length})</td><td style="color:#0f766e">${Rs(grandSP)}</td><td style="color:#b45309">${Rs(grandCar)}</td><td style="color:#1d4ed8">${Rs(grandTotal)}</td><td></td></tr></tbody></table></div>`;
   } else html+=`<p style="color:#aaa;font-style:italic">No sales yet.</p>`;
