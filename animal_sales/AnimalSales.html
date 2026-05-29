@@ -143,13 +143,20 @@ input[readonly]{background:#f8fafc}
 <!-- ══════════ DASHBOARD ══════════ -->
 <div class="page active" id="page-dashboard">
   <div class="stats" id="dash-stats"></div>
+  <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+    <button class="btn btn-primary" onclick="show('sale')" style="flex:1;min-width:140px;padding:12px 10px;font-size:.93rem">&#128722; New Sale</button>
+    <button class="btn btn-success" onclick="openPayment(0)" style="flex:1;min-width:140px;padding:12px 10px;font-size:.93rem">&#128181; Record Collection</button>
+    <button class="btn btn-light" onclick="show('animals')" style="flex:1;min-width:140px;padding:12px 10px;font-size:.93rem">&#128004; Add Animal</button>
+    <button class="btn btn-light" onclick="show('customers')" style="flex:1;min-width:140px;padding:12px 10px;font-size:.93rem">&#128100; Add Customer</button>
+    <button class="btn btn-light" onclick="show('budgeting')" style="flex:1;min-width:140px;padding:12px 10px;font-size:.93rem">&#128203; Budgeting</button>
+    <button class="btn btn-light" onclick="show('reports')" style="flex:1;min-width:140px;padding:12px 10px;font-size:.93rem">&#128202; Reports</button>
+  </div>
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
       <div class="card-title" style="margin:0">Recent Sales</div>
-      <button class="btn btn-success btn-sm" onclick="show('sale')">+ New Sale</button>
     </div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>Receipt</th><th>Animal Code</th><th>Customer</th><th>Date</th><th>Amount (Rs.)</th><th></th></tr></thead>
+      <thead><tr><th>Invoice No.</th><th>Animal Code</th><th>Customer</th><th>Date</th><th>Amount (Rs.)</th><th></th></tr></thead>
       <tbody id="dash-body"></tbody>
     </table></div>
   </div>
@@ -337,6 +344,8 @@ input[readonly]{background:#f8fafc}
     <button class="rpt-tab"        id="rtab-custledger" onclick="showRptTab('custledger')">Customer Ledger</button>
     <button class="rpt-tab"        id="rtab-location"   onclick="showRptTab('location')">Location Report</button>
     <button class="rpt-tab"        id="rtab-waccha"     onclick="showRptTab('waccha')">Sale Price Report</button>
+    <button class="rpt-tab"        id="rtab-bankwise"   onclick="showRptTab('bankwise')">Bank-wise Collection</button>
+    <button class="rpt-tab"        id="rtab-senderwise" onclick="showRptTab('senderwise')">Sender-wise Collection</button>
   </div>
 
   <!-- All Sales sub-tab -->
@@ -439,6 +448,26 @@ input[readonly]{background:#f8fafc}
         <thead id="rpt-waccha-head"></thead>
         <tbody id="rpt-waccha-body"></tbody>
       </table></div>
+    </div>
+  </div>
+
+  <!-- Bank-wise Collection sub-tab -->
+  <div id="rsect-bankwise" class="rpt-section" style="display:none">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+        <div class="card-title" style="margin:0">&#127981; Bank-wise Collection</div>
+      </div>
+      <div id="rpt-bankwise-content"></div>
+    </div>
+  </div>
+
+  <!-- Sender-wise Collection sub-tab -->
+  <div id="rsect-senderwise" class="rpt-section" style="display:none">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
+        <div class="card-title" style="margin:0">&#128100; Sender-wise Collection</div>
+      </div>
+      <div id="rpt-senderwise-content"></div>
     </div>
   </div>
 </div>
@@ -1199,7 +1228,7 @@ function renderDashboard(){
     <td>${s.receipt_no}</td><td><strong>${s.animal_code}</strong></td>
     <td>${cName(s.customer_id)}</td><td>${fmtD(s.sale_date)}</td>
     <td><strong>${Rs(s.amount)}</strong></td>
-    <td><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Receipt</button></td>
+    <td><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Invoice</button></td>
   </tr>`).join('');
 }
 
@@ -2070,7 +2099,7 @@ function renderSales(){
       <td>${s.admin_charges>0?Rs(s.admin_charges):'-'}</td>
       <td><strong>${Rs(displayAmt(s))}</strong></td>
       <td style="white-space:nowrap" onclick="event.stopPropagation()">
-        <button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Receipt</button>
+        <button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Invoice</button>
         <button class="btn btn-light btn-sm" style="margin-left:4px" onclick="openSaleEdit('${s.receipt_no}')">&#9998; Edit</button>
         <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="deleteSale('${s.receipt_no}')">&#128465; Del</button>
       </td>
@@ -2335,6 +2364,97 @@ function saveSaleEdit(){
 }
 
 // ══════════════════════════ PAYMENTS LIST ══════════════════════════
+function renderBankwiseReport(){
+  const el=document.getElementById('rpt-bankwise-content');
+  if(!el) return;
+  const payments=DB.payments||[];
+  // Group by bank / type
+  const groups={};
+  payments.forEach(p=>{
+    const key=p.type==='Bank'?(p.bank_name||'Unknown Bank'):'Cash';
+    if(!groups[key]) groups[key]={label:key,payments:[],total:0,discount:0};
+    groups[key].payments.push(p);
+    groups[key].total+=(p.amount||0);
+    groups[key].discount+=(p.discount||0);
+  });
+  const keys=Object.keys(groups).sort();
+  if(!keys.length){el.innerHTML='<p style="color:#aaa;font-style:italic;padding:12px">No collection records yet.</p>';return;}
+  const grandTotal=payments.reduce((s,p)=>s+(p.amount||0),0);
+  const grandDiscount=payments.reduce((s,p)=>s+(p.discount||0),0);
+  el.innerHTML=keys.map(k=>{
+    const g=groups[k];
+    const rows=g.payments.map((p,i)=>`<tr>
+      <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
+      <td>${p.receipt_no||'-'}</td>
+      <td>${fmtD(p.pay_date)}</td>
+      <td>${cName(p.customer_id)}</td>
+      <td>${p.sender_name||'-'}</td>
+      <td>${p.place||'-'}</td>
+      <td style="color:#059669;text-align:right"><strong>${Rs(p.amount||0)}</strong></td>
+      <td style="color:#7c3aed;text-align:right">${p.discount?Rs(p.discount):'-'}</td>
+    </tr>`).join('');
+    return `<div style="margin-bottom:20px">
+      <div style="background:#1a3a5c;color:#fff;padding:8px 14px;border-radius:8px 8px 0 0;font-weight:600;font-size:.92rem;display:flex;justify-content:space-between;align-items:center">
+        <span>${g.label} <span style="font-weight:400;font-size:.82rem;opacity:.8">(${g.payments.length} entries)</span></span>
+        <span>${Rs(g.total)}</span>
+      </div>
+      <div class="tbl-wrap" style="margin:0"><table style="border-radius:0 0 8px 8px">
+        <thead><tr><th>S#</th><th>Receipt</th><th>Date</th><th>Customer</th><th>Sender</th><th>Place</th><th style="text-align:right">Amount</th><th style="text-align:right">Discount</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr style="font-weight:700;background:#e0f2fe"><td colspan="6" style="text-align:right;color:#1a3a5c">Sub-total</td><td style="color:#059669;text-align:right">${Rs(g.total)}</td><td style="color:#7c3aed;text-align:right">${Rs(g.discount)}</td></tr></tfoot>
+      </table></div>
+    </div>`;
+  }).join('')+`<div style="background:#0f172a;color:#fff;padding:10px 16px;border-radius:8px;display:flex;justify-content:space-between;font-weight:700;font-size:.93rem;margin-top:4px">
+    <span>Grand Total (${payments.length} entries)</span>
+    <span>${Rs(grandTotal)}&nbsp;&nbsp;<span style="color:#c4b5fd;font-size:.83rem">Disc: ${Rs(grandDiscount)}</span></span>
+  </div>`;
+}
+
+function renderSenderwiseReport(){
+  const el=document.getElementById('rpt-senderwise-content');
+  if(!el) return;
+  const payments=DB.payments||[];
+  const groups={};
+  payments.forEach(p=>{
+    const key=(p.sender_name||'').trim()||'(Unknown)';
+    if(!groups[key]) groups[key]={label:key,payments:[],total:0,discount:0};
+    groups[key].payments.push(p);
+    groups[key].total+=(p.amount||0);
+    groups[key].discount+=(p.discount||0);
+  });
+  const keys=Object.keys(groups).sort();
+  if(!keys.length){el.innerHTML='<p style="color:#aaa;font-style:italic;padding:12px">No collection records yet.</p>';return;}
+  const grandTotal=payments.reduce((s,p)=>s+(p.amount||0),0);
+  const grandDiscount=payments.reduce((s,p)=>s+(p.discount||0),0);
+  el.innerHTML=keys.map(k=>{
+    const g=groups[k];
+    const rows=g.payments.map((p,i)=>`<tr>
+      <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
+      <td>${p.receipt_no||'-'}</td>
+      <td>${fmtD(p.pay_date)}</td>
+      <td>${cName(p.customer_id)}</td>
+      <td>${p.type==='Bank'?(p.bank_name||'-'):'Cash'}</td>
+      <td>${p.place||'-'}</td>
+      <td style="color:#059669;text-align:right"><strong>${Rs(p.amount||0)}</strong></td>
+      <td style="color:#7c3aed;text-align:right">${p.discount?Rs(p.discount):'-'}</td>
+    </tr>`).join('');
+    return `<div style="margin-bottom:20px">
+      <div style="background:#065f46;color:#fff;padding:8px 14px;border-radius:8px 8px 0 0;font-weight:600;font-size:.92rem;display:flex;justify-content:space-between;align-items:center">
+        <span>${g.label} <span style="font-weight:400;font-size:.82rem;opacity:.8">(${g.payments.length} entries)</span></span>
+        <span>${Rs(g.total)}</span>
+      </div>
+      <div class="tbl-wrap" style="margin:0"><table style="border-radius:0 0 8px 8px">
+        <thead><tr><th>S#</th><th>Receipt</th><th>Date</th><th>Customer</th><th>Bank/Type</th><th>Place</th><th style="text-align:right">Amount</th><th style="text-align:right">Discount</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr style="font-weight:700;background:#e0f2fe"><td colspan="6" style="text-align:right;color:#1a3a5c">Sub-total</td><td style="color:#059669;text-align:right">${Rs(g.total)}</td><td style="color:#7c3aed;text-align:right">${Rs(g.discount)}</td></tr></tfoot>
+      </table></div>
+    </div>`;
+  }).join('')+`<div style="background:#0f172a;color:#fff;padding:10px 16px;border-radius:8px;display:flex;justify-content:space-between;font-weight:700;font-size:.93rem;margin-top:4px">
+    <span>Grand Total (${payments.length} entries)</span>
+    <span>${Rs(grandTotal)}&nbsp;&nbsp;<span style="color:#c4b5fd;font-size:.83rem">Disc: ${Rs(grandDiscount)}</span></span>
+  </div>`;
+}
+
 function renderPayments(){
   const head=document.getElementById('payments-head');
   head.innerHTML='<tr>'+'<th>S#</th>'+th('Receipt','payments','receipt_no')+th('Date','payments','pay_date')+th('Customer','payments','customerName')+th('Type','payments','type')+th('Bank','payments','bank_name')+'<th>Sender</th><th>Place</th>'+th('Amount','payments','amount')+th('Discount','payments','discount')+'<th></th></tr>';
@@ -2722,7 +2842,7 @@ function showRptTab(tab){
   document.querySelectorAll('.rpt-section').forEach(s=>s.style.display='none');
   document.getElementById('rtab-'+tab).classList.add('active');
   document.getElementById('rsect-'+tab).style.display='';
-  const fns={sales:renderSales,saleledger:renderSaleLedger,payments:renderPayments,location:renderLocationReport,waccha:renderWacchaReport,custledger:renderInlineLedger};
+  const fns={sales:renderSales,saleledger:renderSaleLedger,payments:renderPayments,location:renderLocationReport,waccha:renderWacchaReport,custledger:renderInlineLedger,bankwise:renderBankwiseReport,senderwise:renderSenderwiseReport};
   if(fns[tab]) fns[tab]();
 }
 
