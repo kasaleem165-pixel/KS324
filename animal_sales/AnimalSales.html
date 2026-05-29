@@ -416,7 +416,7 @@ input[readonly]{background:#f8fafc}
     <div class="card">
       <div class="card-title" style="margin-bottom:12px">Customer Ledger</div>
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
-        <select id="rpt-cust-sel" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem" onchange="renderInlineLedger()">
+        <select id="rpt-cust-sel" style="flex:1;min-width:200px;padding:8px 12px;border:2px solid #1a3a5c;border-radius:8px;font-size:.9rem;background:#eff6ff;color:#1a3a5c;font-weight:600" onchange="renderInlineLedger()">
           <option value="">-- Select Customer --</option>
         </select>
       </div>
@@ -699,6 +699,8 @@ input[readonly]{background:#f8fafc}
     </div>
 
     <div class="form-grid" style="margin-top:4px">
+      <div class="fg"><label>Admin Charges (Rs.)</label>
+        <input id="es-admin" type="number" step="1" placeholder="e.g. 30000" value="0"></div>
       <div class="fg full"><label>Notes</label>
         <input id="es-notes" placeholder="Optional"></div>
     </div>
@@ -736,7 +738,13 @@ input[readonly]{background:#f8fafc}
     <button class="modal-close" onclick="closeModal('editanimal-overlay')">&#10005;</button>
     <div class="card-title">Edit Animal Record</div>
     <div id="editanimal-flash"></div>
+    <div id="editanimal-actions" style="margin-bottom:12px;padding:10px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <span style="font-size:.8rem;color:#555;font-weight:600">Also edit:</span>
+      <button id="btn-edit-sale-from-animal" class="btn btn-primary btn-sm" onclick="editSaleFromAnimal()">&#128196; Edit Sale Invoice</button>
+      <button id="btn-edit-cust-from-animal" class="btn btn-light btn-sm" onclick="editCustFromAnimal()">&#128100; Edit Customer</button>
+    </div>
     <input type="hidden" id="ea-code">
+    <input type="hidden" id="ea-code-val">
     <div class="form-grid" style="margin-top:14px">
       <div class="fg"><label>Animal Code</label>
         <input id="ea-code-display" readonly style="background:#f1f5f9;color:#64748b;font-weight:700"></div>
@@ -944,8 +952,8 @@ input[readonly]{background:#f8fafc}
 const STORE='animal_sales_db';
 let DB={animals:[],customers:[],sales:[],payments:[],banks:[],budget:[],settings:{rate_per_kg:780,admin_charges:30000,num_persons:7}};
 
-const SORT={animals:{col:'code',dir:'asc'},customers:{col:'name',dir:'asc'},sales:{col:'receipt_no',dir:'desc'},payments:{col:'receipt_no',dir:'desc'},stock:{col:'code',dir:'asc'},locrpt:{col:'location',dir:'asc'},wacchart:{col:'sale_date',dir:'desc'}};
-function sortToggle(tbl,col){if(SORT[tbl].col===col){SORT[tbl].dir=SORT[tbl].dir==='asc'?'desc':'asc';}else{SORT[tbl].col=col;SORT[tbl].dir='asc';}const fn={animals:renderAnimals,customers:renderCustomers,sales:renderSales,payments:renderPayments,locrpt:renderLocationReport,wacchart:renderWacchaReport}[tbl];if(fn)fn();}
+const SORT={animals:{col:'code',dir:'asc'},customers:{col:'name',dir:'asc'},sales:{col:'receipt_no',dir:'desc'},payments:{col:'receipt_no',dir:'desc'},stock:{col:'code',dir:'asc'},locrpt:{col:'location',dir:'asc'},wacchart:{col:'sale_date',dir:'desc'},saleledger:{col:'receipt_no',dir:'asc'},custledger_s:{col:'receipt_no',dir:'asc'},custledger_p:{col:'pay_date',dir:'asc'}};
+function sortToggle(tbl,col){if(SORT[tbl].col===col){SORT[tbl].dir=SORT[tbl].dir==='asc'?'desc':'asc';}else{SORT[tbl].col=col;SORT[tbl].dir='asc';}const fn={animals:renderAnimals,customers:renderCustomers,sales:renderSales,payments:renderPayments,locrpt:renderLocationReport,wacchart:renderWacchaReport,saleledger:renderSaleLedger,custledger_s:renderInlineLedger,custledger_p:renderInlineLedger}[tbl];if(fn)fn();}
 let _animalFilter='all';
 function setAnimalFilter(f){
   _animalFilter=f;
@@ -1913,13 +1921,35 @@ function openAnimalEdit(code){
   }
   populateCustDropdown('ea-cust', a.assigned_customer||'');
   document.getElementById('editanimal-flash').innerHTML='';
+  document.getElementById('ea-code-val').value=code;
   eaRenderPhotos(code);
+  const hasSale=DB.sales.some(s=>s.animal_code===code);
+  const actBar=document.getElementById('editanimal-actions');
+  if(actBar) actBar.style.display=hasSale?'flex':'none';
   document.getElementById('editanimal-overlay').classList.add('open');
 }
 function eaToggleAgeOther(){
   const v=document.getElementById('ea-type').value;
   document.getElementById('ea-type-other-row').style.display=v==='Other'?'flex':'none';
   if(v!=='Other') document.getElementById('ea-type-other').value='';
+}
+function editSaleFromAnimal(){
+  const codeVal=document.getElementById('ea-code-val')?document.getElementById('ea-code-val').value:'';
+  if(!codeVal) return;
+  const sale=DB.sales.find(s=>s.animal_code===codeVal);
+  if(!sale){alert('No sale record found for this animal.');return;}
+  closeModal('editanimal-overlay');
+  openSaleEdit(sale.receipt_no);
+}
+function editCustFromAnimal(){
+  const codeVal=document.getElementById('ea-code-val')?document.getElementById('ea-code-val').value:'';
+  if(!codeVal) return;
+  const sale=DB.sales.find(s=>s.animal_code===codeVal);
+  const a=DB.animals.find(x=>x.code===codeVal);
+  const cid=sale?sale.customer_id:(a&&a.customer_id?a.customer_id:null);
+  if(!cid){alert('No customer linked to this animal.');return;}
+  closeModal('editanimal-overlay');
+  openCustomerEdit(cid);
 }
 function saveAnimalEdit(){
   const code=document.getElementById('ea-code').value;
@@ -2278,6 +2308,7 @@ function openSaleEdit(rno){
   const esLocSel=document.getElementById('es-location');
   if(esLocSel){esLocSel.innerHTML='<option value="">-- Select Location --</option>'+(DB.settings.locationList||[]).slice().sort().map(v=>`<option value="${v}">${v}</option>`).join('');esLocSel.value=s.location||'';}
   document.getElementById('es-notes').value=s.notes||'';
+  document.getElementById('es-admin').value=s.admin_charges||0;
 
   // Set sale mode
   const isLump=!!s.is_lumpsum;
@@ -2376,6 +2407,7 @@ function saveSaleEdit(){
   s.is_lumpsum=isLump;
   s.location=document.getElementById('es-location').value.trim()||'';
   s.notes=document.getElementById('es-notes').value.trim()||'';
+  s.admin_charges=parseFloat(document.getElementById('es-admin').value)||0;
 
   save();
   closeModal('editsale-overlay');
