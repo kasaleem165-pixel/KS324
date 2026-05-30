@@ -569,26 +569,22 @@ input[readonly]{background:#f8fafc}
 
 <!-- ══════════ BUDGETING ══════════ -->
 <div class="page" id="page-budgeting">
-  <!-- Budget Entry Form -->
-  <div class="card" style="margin-bottom:18px">
+  <!-- Budget Entry Form — replica of Record New Sale -->
+  <div class="card" style="max-width:700px;margin-left:auto;margin-right:auto;margin-bottom:18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <div class="card-title" style="margin:0">Record Budget Entry</div>
       <button onclick="goBack()" title="Go back" style="background:none;border:1px solid #e2e8f0;border-radius:50%;width:32px;height:32px;font-size:1.1rem;cursor:pointer;color:#64748b;display:flex;align-items:center;justify-content:center;line-height:1">&#10005;</button>
     </div>
     <div id="budget-flash"></div>
     <div class="form-grid" style="margin-top:12px">
-      <div class="fg"><label>Date *</label>
-        <input id="bg-date" type="date"></div>
       <div class="fg"><label>Animal Code <span style="font-weight:400;color:#aaa">(optional)</span></label>
         <select id="bg-animal" onchange="bgAnimalSelected()">
           <option value="">-- Select Animal --</option>
         </select></div>
-      <div class="fg"><label>Age</label>
-        <input id="bg-age" readonly placeholder="Auto-filled" style="background:#f8fafc;color:#555"></div>
-      <div class="fg"><label>Weight (kg)</label>
-        <input id="bg-weight" readonly placeholder="Auto-filled" style="background:#f8fafc;color:#555"></div>
-      <div class="fg"><label>Paid To / Vendor</label>
+      <div class="fg"><label>Payee / Vendor *</label>
         <input id="bg-vendor" placeholder="e.g. Hafiz Tahir, Feed Supplier"></div>
+      <div class="fg"><label>Budget Date *</label>
+        <input id="bg-date" type="date"></div>
       <div class="fg"><label>Budget Head *</label>
         <select id="bg-head">
           <option value="">-- Select Head --</option>
@@ -601,14 +597,46 @@ input[readonly]{background:#f8fafc}
           <option>Administrative</option>
           <option>Miscellaneous</option>
         </select></div>
-      <div class="fg"><label>Amount (Rs.) *</label>
-        <input id="bg-amount" type="number" step="1" placeholder="e.g. 50000"></div>
+    </div>
+    <!-- Entry Mode toggle -->
+    <div style="margin:12px 0;padding:11px 14px;background:#f1f5f9;border-radius:8px;display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:.85rem;font-weight:600;color:#555">Entry Mode:</span>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.9rem">
+        <input type="radio" name="bg-mode" value="weight" checked onchange="bgToggleMode()"> Weight × Rate
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.9rem">
+        <input type="radio" name="bg-mode" value="lumpsum" onchange="bgToggleMode()"> Lump Sum Amount
+      </label>
+    </div>
+    <div class="form-grid">
+      <!-- Weight × Rate fields -->
+      <div class="fg" id="bg-weight-row"><label>Weight (kg) *</label>
+        <input id="bg-weight" type="number" step="0.1" placeholder="Weight in kg" oninput="bgCalc()"></div>
+      <div class="fg" id="bg-rate-row"><label>Rate per kg (Rs.) *</label>
+        <input id="bg-rate" type="number" step="1" oninput="bgCalc()"></div>
+      <div class="fg"><label>Admin Charges (Rs.)</label>
+        <input id="bg-admin" type="number" step="1" oninput="bgCalc()" placeholder="e.g. 30000" value="0"></div>
+      <div class="fg"><label>Carriage / Transport (Rs.)</label>
+        <input id="bg-carriage" type="number" step="1" oninput="bgCalc()" placeholder="e.g. 5000"></div>
+      <div class="fg" id="bg-baseprice-row"><label>Base Amount (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Wt × Rate</span></label>
+        <input id="bg-baseprice" readonly style="color:#1a3a5c"></div>
+      <div class="fg" id="bg-total-row"><label>Total Amount (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Base + Carriage + Admin</span></label>
+        <input id="bg-total" readonly style="font-weight:700;font-size:1rem"></div>
+      <!-- Lump Sum fields (hidden by default) -->
+      <div class="fg" id="bg-lumpsum-row" style="display:none"><label>Weight (kg) <span style="font-weight:400;color:#aaa">(optional)</span></label>
+        <input id="bg-weight-lump" type="number" step="0.1" placeholder="For records only"></div>
+      <div class="fg" id="bg-lumpamt-row" style="display:none"><label>Lump Sum Amount (Rs.) *</label>
+        <input id="bg-lumpamt" type="number" step="1" placeholder="Agreed amount" style="font-weight:700;font-size:1rem" oninput="bgCalc()"></div>
+      <div class="fg" id="bg-lumpcar-row" style="display:none"><label>Carriage / Transport (Rs.)</label>
+        <input id="bg-lumpcar" type="number" step="1" placeholder="e.g. 4000" oninput="bgCalc()"></div>
+      <div class="fg" id="bg-lumptotal-row" style="display:none"><label>Total Amount (Rs.)</label>
+        <input id="bg-lumptotal" readonly style="font-weight:700;font-size:1rem;background:#f8fafc" placeholder="Auto-calculated"></div>
       <div class="fg full"><label>Notes</label>
         <input id="bg-notes" placeholder="Optional description"></div>
     </div>
     <div class="form-actions">
-      <button class="btn btn-primary" onclick="addBudgetEntry()">Add Entry</button>
-      <button class="btn btn-light" onclick="clearBudgetForm()">Clear</button>
+      <button class="btn btn-success" onclick="addBudgetEntry()">&#128203; Add Budget Entry</button>
+      <button class="btn btn-light" onclick="clearBudgetForm()">Clear / New</button>
     </div>
   </div>
 
@@ -619,7 +647,7 @@ input[readonly]{background:#f8fafc}
     </div>
     <div id="budget-records-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px"></div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>S#</th><th>Date</th><th>Animal Code</th><th>Age</th><th>Wt(kg)</th><th>Paid To / Vendor</th><th>Head</th><th>Amount</th><th>Notes</th><th></th></tr></thead>
+      <thead><tr><th>S#</th><th>Date</th><th>Animal</th><th>Payee / Vendor</th><th>Head</th><th>Mode</th><th>Wt(kg)</th><th>Rate/kg</th><th>Base Amt</th><th>Carriage</th><th>Admin</th><th>Total</th><th>Notes</th><th></th></tr></thead>
       <tbody id="budget-records-body"></tbody>
     </table></div>
   </div>
@@ -3385,74 +3413,145 @@ function saveSettings(){
 function bgAnimalSelected(){
   const code=document.getElementById('bg-animal').value;
   const a=DB.animals.find(x=>x.code===code);
-  document.getElementById('bg-age').value=a?(a.age_type||'-'):'' ;
-  document.getElementById('bg-weight').value=a&&(a.weight_final||a.weight)?(a.weight_final||a.weight):'';
+  // Pre-fill weight if animal has a known weight
+  const wEl=document.getElementById('bg-weight');
+  if(a&&(a.weight_final||a.weight)) wEl.value=a.weight_final||a.weight;
+  bgCalc();
 }
+
+function bgToggleMode(){
+  const isLump=document.querySelector('[name="bg-mode"]:checked').value==='lumpsum';
+  ['bg-weight-row','bg-rate-row','bg-baseprice-row','bg-total-row'].forEach(id=>{
+    document.getElementById(id).style.display=isLump?'none':'';
+  });
+  ['bg-lumpsum-row','bg-lumpamt-row','bg-lumpcar-row','bg-lumptotal-row'].forEach(id=>{
+    document.getElementById(id).style.display=isLump?'':'none';
+  });
+  document.getElementById('bg-weight').required=!isLump;
+  document.getElementById('bg-rate').required=!isLump;
+  document.getElementById('bg-lumpamt').required=isLump;
+  bgCalc();
+}
+
+function bgCalc(){
+  const isLump=document.querySelector('[name="bg-mode"]:checked')&&document.querySelector('[name="bg-mode"]:checked').value==='lumpsum';
+  const adm=parseFloat(document.getElementById('bg-admin').value)||0;
+  if(isLump){
+    const amt=parseFloat(document.getElementById('bg-lumpamt').value)||0;
+    const car=parseFloat(document.getElementById('bg-lumpcar').value)||0;
+    const tot=amt+car+adm;
+    document.getElementById('bg-lumptotal').value=tot>0?'Rs. '+tot.toLocaleString():'';
+    return;
+  }
+  const w=parseFloat(document.getElementById('bg-weight').value)||0;
+  const r=parseFloat(document.getElementById('bg-rate').value)||0;
+  const car=parseFloat(document.getElementById('bg-carriage').value)||0;
+  if(!w){['bg-baseprice','bg-total'].forEach(id=>document.getElementById(id).value='');return;}
+  const base=w*r;
+  document.getElementById('bg-baseprice').value=Rs(base);
+  document.getElementById('bg-total').value=Rs(base+car+adm);
+}
+
 function addBudgetEntry(){
   const date=document.getElementById('bg-date').value;
   const animal_code=document.getElementById('bg-animal').value;
-  const head=document.getElementById('bg-head').value;
-  const amount=parseFloat(document.getElementById('bg-amount').value);
   const vendor=document.getElementById('bg-vendor').value.trim();
+  const head=document.getElementById('bg-head').value;
+  const isLump=document.querySelector('[name="bg-mode"]:checked').value==='lumpsum';
+  const adm=parseFloat(document.getElementById('bg-admin').value)||0;
   const errors=[];
-  if(!date) errors.push('Date is required.');
+  if(!date) errors.push('Budget Date is required.');
+  if(!vendor) errors.push('Payee / Vendor is required.');
   if(!head) errors.push('Budget Head is required.');
-  if(!amount||amount<=0) errors.push('Amount must be a positive number.');
+  let w,r,car,amount;
+  if(isLump){
+    w=parseFloat(document.getElementById('bg-weight-lump').value)||0;
+    r=0;
+    const lumpAmt=parseFloat(document.getElementById('bg-lumpamt').value);
+    car=parseFloat(document.getElementById('bg-lumpcar').value)||0;
+    if(!lumpAmt||lumpAmt<=0) errors.push('Lump Sum Amount is required.');
+    amount=(lumpAmt||0)+car+adm;
+  } else {
+    w=parseFloat(document.getElementById('bg-weight').value);
+    r=parseFloat(document.getElementById('bg-rate').value);
+    car=parseFloat(document.getElementById('bg-carriage').value)||0;
+    if(!w||w<=0) errors.push('Weight must be a positive number.');
+    if(!r||r<=0) errors.push('Rate per kg must be a positive number.');
+    amount=(w*r)+car+adm;
+  }
   if(errors.length){flash('budget-flash',errors.join(' '),'err');return;}
   const a=animal_code?DB.animals.find(x=>x.code===animal_code):null;
   DB.budget.push({id:Date.now(),date,animal_code:animal_code||'',
     animal_age:a?(a.age_type||''):'',
-    animal_weight:a?(a.weight_final||a.weight||0):0,
-    head,vendor,amount,notes:document.getElementById('bg-notes').value.trim()||''});
+    animal_weight:w||0,
+    vendor,head,is_lumpsum:isLump,
+    weight_at_entry:w,rate_per_kg:r,
+    admin_charges:adm,carriage_charges:car,amount,
+    notes:document.getElementById('bg-notes').value.trim()||''});
   save(); clearBudgetForm(); renderBudgeting();
-  flash('budget-flash','Entry added.','ok');
+  flash('budget-flash','Budget entry added.','ok');
 }
+
 function clearBudgetForm(){
   document.getElementById('bg-date').value=today();
   document.getElementById('bg-animal').value='';
-  document.getElementById('bg-age').value='';
-  document.getElementById('bg-weight').value='';
   document.getElementById('bg-vendor').value='';
   document.getElementById('bg-head').value='';
-  document.getElementById('bg-amount').value='';
-  document.getElementById('bg-notes').value='';
+  document.getElementById('bg-admin').value='0';
+  ['bg-weight','bg-rate','bg-carriage','bg-baseprice','bg-total',
+   'bg-weight-lump','bg-lumpamt','bg-lumpcar','bg-lumptotal','bg-notes']
+    .forEach(id=>document.getElementById(id).value='');
+  // Reset to weight mode
+  document.querySelector('[name="bg-mode"][value="weight"]').checked=true;
+  bgToggleMode();
 }
+
 function deleteBudgetEntry(id){
   if(!confirm('Delete this budget entry?')) return;
   DB.budget=DB.budget.filter(e=>e.id!==id);
   save(); renderBudgeting();
 }
+
 function renderBudgetRecords(){
   const entries=[...DB.budget].sort((a,b)=>a.date>b.date?-1:1);
   const tb=document.getElementById('budget-records-body');
-  if(!entries.length){tb.innerHTML='<tr><td colspan="10" class="empty">No budget entries yet.</td></tr>';
-    document.getElementById('budget-records-summary').innerHTML='';return;}
-  // Summary by head
+  if(!entries.length){
+    tb.innerHTML='<tr><td colspan="14" class="empty">No budget entries yet.</td></tr>';
+    document.getElementById('budget-records-summary').innerHTML='';return;
+  }
   const byHead={};
   entries.forEach(e=>{byHead[e.head]=(byHead[e.head]||0)+e.amount;});
-  // Summary by animal
-  const byAnimal={};
-  entries.forEach(e=>{byAnimal[e.animal_code||'-']=(byAnimal[e.animal_code||'-']||0)+e.amount;});
   const grandTotal=entries.reduce((s,e)=>s+e.amount,0);
+  const grandCarriage=entries.reduce((s,e)=>s+(e.carriage_charges||0),0);
+  const grandAdmin=entries.reduce((s,e)=>s+(e.admin_charges||0),0);
   document.getElementById('budget-records-summary').innerHTML=
     Object.entries(byHead).map(([h,v])=>`<div class="stat"><div class="n" style="font-size:.85rem">${Rs(v)}</div><div class="l" style="font-size:.72rem">${h}</div></div>`).join('')+
     `<div class="stat" style="border:2px solid #1a3a5c"><div class="n" style="font-size:.95rem;color:#1a3a5c">${Rs(grandTotal)}</div><div class="l">Total Budget</div></div>`;
   tb.innerHTML=entries.map((e,i)=>{
-    const a=DB.animals.find(x=>x.code===e.animal_code);
-    const age=e.animal_age||(a?a.age_type:'')||'-';
-    const wt=e.animal_weight||(a?(a.weight_final||a.weight):0)||0;
+    const isLump=e.is_lumpsum;
+    const baseAmt=isLump?(e.amount-(e.carriage_charges||0)-(e.admin_charges||0)):(e.weight_at_entry||0)*(e.rate_per_kg||0);
+    const wt=e.weight_at_entry||e.animal_weight||0;
     return `<tr>
     <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
     <td>${fmtD(e.date)}</td>
     <td><strong>${e.animal_code||'-'}</strong></td>
-    <td>${age}</td>
-    <td>${wt?fmtN(wt,1)+' kg':'-'}</td>
     <td style="font-size:.82rem">${e.vendor||'-'}</td>
     <td><strong>${e.head}</strong></td>
-    <td>${Rs(e.amount)}</td>
+    <td style="font-size:.78rem;color:#555">${isLump?'Lump Sum':'Wt×Rate'}</td>
+    <td>${wt?fmtN(wt,1)+' kg':'-'}</td>
+    <td>${e.rate_per_kg?Rs(e.rate_per_kg):'-'}</td>
+    <td>${baseAmt>0?Rs(baseAmt):'-'}</td>
+    <td>${(e.carriage_charges||0)>0?Rs(e.carriage_charges):'-'}</td>
+    <td>${(e.admin_charges||0)>0?Rs(e.admin_charges):'-'}</td>
+    <td><strong>${Rs(e.amount)}</strong></td>
     <td style="font-size:.82rem;color:#555">${e.notes||'-'}</td>
     <td><button class="btn btn-danger btn-sm" onclick="deleteBudgetEntry(${e.id})">&#128465;</button></td>
-  </tr>`;}).join('')+`<tr style="font-weight:700;background:#e0f2fe"><td colspan="7" style="text-align:right;color:#1a3a5c">Grand Total (${entries.length})</td><td>${Rs(entries.reduce((s,e)=>s+e.amount,0))}</td><td colspan="2"></td></tr>`;
+  </tr>`;}).join('')+
+  `<tr style="font-weight:700;background:#e0f2fe">
+    <td colspan="8" style="text-align:right;color:#1a3a5c">Grand Total (${entries.length} entries)</td>
+    <td></td><td>${grandCarriage>0?Rs(grandCarriage):'-'}</td><td>${grandAdmin>0?Rs(grandAdmin):'-'}</td>
+    <td>${Rs(grandTotal)}</td><td colspan="2"></td>
+  </tr>`;
 }
 function renderBudgeting(){
   const np=DB.settings.num_persons||7;
@@ -3463,10 +3562,13 @@ function renderBudgeting(){
   // Set default date for entry form
   const bgDate=document.getElementById('bg-date');
   if(bgDate&&!bgDate.value) bgDate.value=today();
+  // Set default rate from settings
+  const bgRate=document.getElementById('bg-rate');
+  if(bgRate&&!bgRate.value) bgRate.value=DB.settings.rate_per_kg||780;
   // Populate animal dropdown
   const bgAsel=document.getElementById('bg-animal');
   const curAval=bgAsel.value;
-  bgAsel.innerHTML='<option value="">-- Select Animal --</option>';
+  bgAsel.innerHTML='<option value="">-- Select Animal (optional) --</option>';
   [...DB.animals].sort((a,b)=>Number(a.code)-Number(b.code)||a.code.localeCompare(b.code)).forEach(a=>{
     const w=a.weight_final||a.weight||0;
     bgAsel.innerHTML+=`<option value="${a.code}"${a.code===curAval?' selected':''}>Code: ${a.code} | ${a.age_type||'?'} | ${w?w+' kg':'?'}</option>`;
