@@ -74,6 +74,12 @@
   .health-filter-btn { padding:5px 13px;border-radius:20px;border:1.5px solid #d1d5db;background:#f9fafb;color:#374151;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s; }
   .health-filter-btn.active { border-color:#ef4444;background:#fee2e2;color:#991b1b; }
   .stage-suggest-box { background:#dcfce7;border:1.5px solid #16a34a;border-radius:8px;padding:8px 14px;margin-top:4px;font-size:13px;color:#166534;display:none; }
+  /* animal photo */
+  .photo-upload-box { width:110px;height:110px;border:2px dashed #d1d5db;border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f9fafb;cursor:pointer;transition:border .2s;flex-shrink:0; }
+  .photo-upload-box:hover { border-color:#2d5c3e; }
+  .photo-upload-box img { width:100%;height:100%;object-fit:cover; }
+  .photo-thumb { width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #e5e7eb;vertical-align:middle; }
+  .photo-thumb-lg { width:130px;height:130px;border-radius:10px;object-fit:cover;border:2px solid #e5e7eb;box-shadow:0 2px 8px rgba(0,0,0,.12); }
   @media(max-width:768px){ .sidebar{width:60px;} .sidebar-item span{display:none;} .grid-2,.grid-3{grid-template-columns:1fr;} }
 </style>
 </head>
@@ -153,7 +159,7 @@
   <div class="card">
     <div style="overflow-x:auto;"><table id="animalTable">
       <thead><tr>
-        <th></th><th>Tag No</th><th>Type</th><th>Breed</th><th>Gender</th>
+        <th></th><th style="width:44px;"></th><th>Tag No</th><th>Type</th><th>Breed</th><th>Gender</th>
         <th>Stage</th><th>Age</th><th>Status</th><th>Actions</th>
       </tr></thead>
       <tbody id="animalTbody"></tbody>
@@ -478,6 +484,28 @@
     <div class="form-group"><label>Purchase Amount (Rs)</label><input type="number" class="form-control" id="anPurchaseAmount" placeholder="0"></div>
     <div class="form-group"><label>Voucher No</label><input class="form-control" id="anVoucherNo"></div>
     <div class="form-group"><label>Voucher Date</label><input type="date" class="form-control" id="anVoucherDate"></div>
+  </div>
+  <!-- Photo Upload -->
+  <div class="form-group" style="grid-column:1/-1;border-top:1px solid #f3f4f6;padding-top:14px;margin-top:4px;">
+    <label style="margin-bottom:10px;display:block;">Animal Photo</label>
+    <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+      <div class="photo-upload-box" id="photoUploadBox" onclick="document.getElementById('anPhoto').click()" title="Click to upload photo">
+        <i class="fas fa-camera" style="color:#9ca3af;font-size:28px;" id="photoPlaceholderIcon"></i>
+        <img id="photoPreviewImg" style="display:none;width:100%;height:100%;object-fit:cover;" src="" alt="Animal photo">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;justify-content:center;">
+        <input type="file" id="anPhoto" accept="image/*" style="display:none;" onchange="handlePhotoUpload(this)">
+        <button type="button" onclick="document.getElementById('anPhoto').click()" class="btn-primary" style="font-size:13px;">
+          <i class="fas fa-upload"></i> Upload Photo
+        </button>
+        <button type="button" onclick="removeAnimalPhoto()" id="removePhotoBtn" class="btn-danger btn-sm" style="display:none;">
+          <i class="fas fa-times"></i> Remove Photo
+        </button>
+        <div style="font-size:11px;color:#9ca3af;line-height:1.5;">
+          JPG / PNG / WebP supported.<br>Auto-compressed to save storage.
+        </div>
+      </div>
+    </div>
   </div>
   <div class="form-group"><label>Medical History</label><textarea class="form-control" id="anMedical" rows="2" placeholder="Deworming dates, vaccinations..."></textarea></div>
   <div class="form-group"><label>Remarks</label><textarea class="form-control" id="anRemarks" rows="2"></textarea></div>
@@ -1602,6 +1630,57 @@ function renderRecentTx() {
 }
 
 // ============================================================
+// ANIMAL PHOTO HANDLING
+// ============================================================
+let _anPhotoData = null;
+
+function handlePhotoUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024) { toast('Image too large (max 8 MB)', 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 480;
+      let w = img.width, h = img.height;
+      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+      if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      _anPhotoData = canvas.toDataURL('image/jpeg', 0.78);
+      setPhotoPreview(_anPhotoData);
+      const kb = Math.round(_anPhotoData.length * 0.75 / 1024);
+      toast(`Photo ready (${kb} KB)`);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function setPhotoPreview(src) {
+  const img = document.getElementById('photoPreviewImg');
+  const icon = document.getElementById('photoPlaceholderIcon');
+  const btn = document.getElementById('removePhotoBtn');
+  if (src) {
+    img.src = src; img.style.display = 'block';
+    icon.style.display = 'none';
+    if (btn) btn.style.display = 'inline-block';
+  } else {
+    img.src = ''; img.style.display = 'none';
+    icon.style.display = 'block';
+    if (btn) btn.style.display = 'none';
+  }
+}
+
+function removeAnimalPhoto() {
+  _anPhotoData = null;
+  setPhotoPreview(null);
+  document.getElementById('anPhoto').value = '';
+}
+
+// ============================================================
 // ANIMALS MODULE
 // ============================================================
 function openAnimalModal(id) {
@@ -1612,6 +1691,7 @@ function openAnimalModal(id) {
   document.getElementById('animalId').value='';
   document.getElementById('animalModalTitle').textContent='Add Animal';
   document.getElementById('stageSuggestion').style.display='none';
+  _anPhotoData = null; setPhotoPreview(null); document.getElementById('anPhoto').value='';
   if(id) {
     const a=dbFind('animals',id); if(!a) return;
     document.getElementById('animalModalTitle').textContent='Edit Animal';
@@ -1635,6 +1715,8 @@ function openAnimalModal(id) {
     document.getElementById('anVoucherDate').value=a.voucherDate||'';
     document.getElementById('anMedical').value=a.medicalHistory||'';
     document.getElementById('anRemarks').value=a.remarks||'';
+    _anPhotoData = a.photo || null;
+    setPhotoPreview(_anPhotoData);
   }
   openModal('animalModal');
 }
@@ -1645,6 +1727,7 @@ function saveAnimal() {
   const gender=document.getElementById('anGender').value;
   const stage=document.getElementById('anStage').value;
   if(!tagNo||!animalType||!gender||!stage){toast('Please fill all required fields (*)','error');return;}
+  const existingAnimal = document.getElementById('animalId').value ? dbFind('animals', document.getElementById('animalId').value) : null;
   const obj={tagNo,animalType,breed:document.getElementById('anBreed').value,gender,stage,
     dob:document.getElementById('anDOB').value,
     acqType:document.getElementById('anAcqType').value,
@@ -1655,7 +1738,9 @@ function saveAnimal() {
     purchaseDate:document.getElementById('anPurchaseDate').value,purchaseAmount:document.getElementById('anPurchaseAmount').value,
     voucherNo:document.getElementById('anVoucherNo').value,voucherDate:document.getElementById('anVoucherDate').value,
     medicalHistory:document.getElementById('anMedical').value,
-    remarks:document.getElementById('anRemarks').value,deferredUntil:null};
+    remarks:document.getElementById('anRemarks').value,
+    photo: _anPhotoData !== null ? _anPhotoData : (existingAnimal ? existingAnimal.photo||'' : ''),
+    deferredUntil:null};
   const id=document.getElementById('animalId').value;
   if(id){dbUpdate('animals',id,obj);toast('Animal updated');}
   else{dbAdd('animals',obj);toast('Animal added');}
@@ -1673,13 +1758,17 @@ function renderAnimals() {
   if(fStage) list=list.filter(a=>a.stage===fStage);
   if(fStatus) list=list.filter(a=>a.status===fStatus);
   const tbody=document.getElementById('animalTbody');
-  if(!list.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:30px;">No animals found.</td></tr>';return;}
+  if(!list.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:30px;">No animals found.</td></tr>';return;}
   tbody.innerHTML=list.map(a=>{
     const age=a.dob?getAnimalAgeMonths(a.dob):null;
     const ageStr=age!==null?(age>=12?Math.floor(age/12)+'y '+(age%12)+'m':age+'m'):'—';
     const sb=a.status==='Active'?'badge-green':a.status==='Dead'?'badge-red':'badge-yellow';
+    const thumbHtml = a.photo
+      ? `<img src="${a.photo}" class="photo-thumb" alt="${a.tagNo}" onclick="viewAnimalPhoto('${a.id}')" title="Click to view photo" style="cursor:pointer;">`
+      : `<div style="width:36px;height:36px;border-radius:50%;background:#f3f4f6;border:2px solid #e5e7eb;display:flex;align-items:center;justify-content:center;"><i class="fas fa-cow" style="color:#d1d5db;font-size:14px;"></i></div>`;
     return `<tr>
       <td><button onclick="toggleExpand('ae_${a.id}')" style="background:none;border:none;cursor:pointer;color:#6b7280;"><i class="fas fa-chevron-down"></i></button></td>
+      <td style="text-align:center;">${thumbHtml}</td>
       <td><b>${a.tagNo}</b></td><td>${a.animalType||'—'}</td><td>${a.breed||'—'}</td><td>${a.gender||'—'}</td>
       <td><span class="badge badge-blue">${a.stage||'—'}</span></td><td>${ageStr}</td>
       <td><span class="badge ${sb}">${a.status||'—'}</span></td>
@@ -1687,11 +1776,16 @@ function renderAnimals() {
         <button class="btn-sm btn-edit" onclick="openAnimalModal('${a.id}')"><i class="fas fa-edit"></i></button>
         <button class="btn-sm btn-del" style="margin-left:4px;" onclick="deleteAnimal('${a.id}')"><i class="fas fa-trash"></i></button>
       </td></tr>
-    <tr id="ae_${a.id}" class="expand-row" style="display:none;"><td colspan="9">
-      <div class="grid-3" style="gap:10px;">
-        <div><b>Acquisition:</b> ${a.acqType||'—'}<br><b>Source:</b> ${a.source||'—'}<br><b>Purchase Date:</b> ${a.purchaseDate||'—'}<br><b>Voucher No:</b> ${a.voucherNo||'—'} <b>Date:</b> ${a.voucherDate||'—'}<br><b>Amount:</b> Rs ${Number(a.purchaseAmount||0).toLocaleString()}<br><b>Initial Weight:</b> ${a.initialWeight||'—'} kg</div>
-        <div><b>Pregnancy Date:</b> ${a.pregnancyDate||'—'}<br><b>Lactation No:</b> ${a.lactationNo||'—'}<br><b>Mother ID:</b> ${a.motherId||'—'}<br><b>DOB:</b> ${a.dob||'—'}</div>
-        <div><b>Medical:</b> ${a.medicalHistory||'—'}<br><b>Remarks:</b> ${a.remarks||'—'}<br><b>Deferred Until:</b> ${a.deferredUntil||'Not deferred'}</div>
+    <tr id="ae_${a.id}" class="expand-row" style="display:none;"><td colspan="10">
+      <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;">
+        ${a.photo ? `<img src="${a.photo}" class="photo-thumb-lg" alt="${a.tagNo}" onclick="viewAnimalPhoto('${a.id}')" style="cursor:zoom-in;" title="Click to enlarge">` : ''}
+        <div style="flex:1;min-width:260px;">
+          <div class="grid-3" style="gap:10px;">
+            <div><b>Acquisition:</b> ${a.acqType||'—'}<br><b>Source:</b> ${a.source||'—'}<br><b>Purchase Date:</b> ${a.purchaseDate||'—'}<br><b>Voucher No:</b> ${a.voucherNo||'—'} <b>Date:</b> ${a.voucherDate||'—'}<br><b>Amount:</b> Rs ${Number(a.purchaseAmount||0).toLocaleString()}<br><b>Initial Weight:</b> ${a.initialWeight||'—'} kg</div>
+            <div><b>Pregnancy Date:</b> ${a.pregnancyDate||'—'}<br><b>Lactation No:</b> ${a.lactationNo||'—'}<br><b>Mother ID:</b> ${a.motherId||'—'}<br><b>DOB:</b> ${a.dob||'—'}</div>
+            <div><b>Medical:</b> ${a.medicalHistory||'—'}<br><b>Remarks:</b> ${a.remarks||'—'}<br><b>Deferred Until:</b> ${a.deferredUntil||'Not deferred'}</div>
+          </div>
+        </div>
       </div>
     </td></tr>`;
   }).join('');
@@ -1701,6 +1795,25 @@ function toggleExpand(rowId){const r=document.getElementById(rowId);r.style.disp
 
 function deleteAnimal(id){
   confirm2('Delete Animal','This will permanently delete the animal record.',()=>{dbDelete('animals',id);renderAnimals();toast('Animal deleted','warn');});
+}
+
+function viewAnimalPhoto(id) {
+  const a = dbFind('animals', id);
+  if (!a || !a.photo) return;
+  // Simple lightbox overlay
+  const existing = document.getElementById('photoLightbox');
+  if (existing) existing.remove();
+  const lb = document.createElement('div');
+  lb.id = 'photoLightbox';
+  lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:zoom-out;';
+  lb.onclick = () => lb.remove();
+  lb.innerHTML = `
+    <div style="color:#fff;font-size:16px;font-weight:700;margin-bottom:12px;">
+      <i class="fas fa-tag" style="color:#4ade80;"></i> Tag #${a.tagNo} — ${a.animalType||''} ${a.breed||''} (${a.gender||''})
+    </div>
+    <img src="${a.photo}" style="max-width:90vw;max-height:78vh;border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.6);object-fit:contain;">
+    <div style="color:#9ca3af;font-size:12px;margin-top:12px;">Click anywhere to close</div>`;
+  document.body.appendChild(lb);
 }
 
 // ============================================================
@@ -1988,7 +2101,7 @@ function printReport(type){
     </div>`;
   const foot=`<div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:20px;border-top:1px solid #e5e7eb;padding-top:10px;">Farm Management System</div></div>`;
   let html='';
-  if(type==='animal-register') html=head('Animal Register')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Tag No</th><th>Type</th><th>Breed</th><th>Gender</th><th>Stage</th><th>DOB</th><th>Status</th><th>Purchase Amount</th></tr></thead><tbody>`+animals.map(a=>`<tr><td>${a.tagNo}</td><td>${a.animalType||''}</td><td>${a.breed||''}</td><td>${a.gender||''}</td><td>${a.stage||''}</td><td>${a.dob||''}</td><td>${a.status||''}</td><td>Rs ${Number(a.purchaseAmount||0).toLocaleString()}</td></tr>`).join('')+`</tbody></table>`+foot;
+  if(type==='animal-register') html=head('Animal Register')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Photo</th><th>Tag No</th><th>Type</th><th>Breed</th><th>Gender</th><th>Stage</th><th>DOB</th><th>Status</th><th>Purchase Amount</th></tr></thead><tbody>`+animals.map(a=>`<tr><td style="text-align:center;">${a.photo?`<img src="${a.photo}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;">`:''}</td><td>${a.tagNo}</td><td>${a.animalType||''}</td><td>${a.breed||''}</td><td>${a.gender||''}</td><td>${a.stage||''}</td><td>${a.dob||''}</td><td>${a.status||''}</td><td>Rs ${Number(a.purchaseAmount||0).toLocaleString()}</td></tr>`).join('')+`</tbody></table>`+foot;
   else if(type==='feed-summary') html=head('Feed Stock Summary')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Item</th><th>Category</th><th>Unit</th><th>Opening</th><th>Received</th><th>Issued</th><th>Current</th><th>Reorder</th><th>Status</th></tr></thead><tbody>`+feed.map(f=>{const r=txs.filter(t=>t.itemId===f.id&&t.txType==='Purchase').reduce((s,t)=>s+Number(t.qty||0),0);const i=txs.filter(t=>t.itemId===f.id&&t.txType==='Issue').reduce((s,t)=>s+Number(t.qty||0),0);const c=Number(f.openingStock||0)+r-i;return `<tr style="${c<=Number(f.reorderLevel||0)?'background:#fff5f5':''}"><td>${f.itemName}</td><td>${f.category}</td><td>${f.unit}</td><td>${f.openingStock}</td><td>${r}</td><td>${i}</td><td><b>${c}</b></td><td>${f.reorderLevel}</td><td>${c<=Number(f.reorderLevel||0)?'⚠ LOW':'OK'}</td></tr>`}).join('')+`</tbody></table>`+foot;
   else if(type==='transactions') html=head('Transaction Ledger')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Voucher No</th><th>Item</th><th>Type</th><th>Qty</th><th>Amount</th><th>Narration</th></tr></thead><tbody>`+txs.map(t=>{const item=feed.find(f=>f.id===t.itemId)||{};return `<tr><td>${t.date}</td><td>${t.voucherNo||''}</td><td>${item.itemName||''}</td><td>${t.txType}</td><td>${t.qty} ${item.unit||''}</td><td>Rs ${Number(t.amount||0).toLocaleString()}</td><td>${t.narration||''}</td></tr>`}).join('')+`</tbody></table>`+foot;
   else if(type==='weight-history') html=head('Weight History')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Tag No</th><th>Date</th><th>Weight (kg)</th><th>Remarks</th></tr></thead><tbody>`+weights.sort((a,b)=>a.tagNo.localeCompare(b.tagNo)).map(w=>`<tr><td>${w.tagNo}</td><td>${w.date}</td><td>${w.weight}</td><td>${w.remarks||''}</td></tr>`).join('')+`</tbody></table>`+foot;
