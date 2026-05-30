@@ -2366,33 +2366,50 @@ var RISK_LABELS = {high:"High Risk",mh:"Medium-High",lm:"Low-Medium",low:"Low Ri
 var RISK_COLORS = {high:"var(--high)",mh:"var(--mh)",lm:"var(--lm)",low:"var(--low)"};
 var RISK_BG    = {high:"#fdecea",mh:"#fef3e2",lm:"#eaf4fb",low:"#e9f7ef"};
 
+// Helper functions called by KPI modal buttons — avoids quote-escaping issues
+function kpiDetail(obsId){
+  closeModal();
+  setTimeout(function(){
+    var b = document.getElementById('btn-'+obsId);
+    if(b){
+      var synRow = document.getElementById('syn-row-'+obsId);
+      if(synRow) synRow.scrollIntoView({behavior:'smooth', block:'center'});
+      setTimeout(function(){ b.click(); }, 400);
+    }
+  }, 350);
+}
+function kpiReport(obsId){
+  closeModal();
+  setTimeout(function(){ openReportModal(obsId); }, 350);
+}
+
 function openKpiModal(filter){
-  var filtered, title, accentColor;
+  var filtered, title;
   if(filter==='resolved'){
     filtered = OBS_INDEX.filter(function(o){return o.resolved;});
     title = '&#10004; Resolved This Cycle ('+filtered.length+' observations)';
-    accentColor = 'var(--low)';
   } else if(filter==='unresolved'){
     filtered = OBS_INDEX.filter(function(o){return !o.resolved;});
     title = 'Total Unresolved ('+filtered.length+' observations)';
-    accentColor = 'var(--primary)';
   } else {
     filtered = OBS_INDEX.filter(function(o){return o.risk===filter;});
     title = RISK_LABELS[filter]+' Observations ('+filtered.length+')';
-    accentColor = RISK_COLORS[filter];
   }
 
   var rows = filtered.map(function(o){
-    var badge = filter==='resolved'?'<span class="risk '+o.risk+'">'+RISK_LABELS[o.risk]+'</span> ':
-                filter==='unresolved'?'<span class="risk '+o.risk+'">'+RISK_LABELS[o.risk]+'</span> ':'';
-    var resolvedBadge = o.resolved ? '<span style="color:var(--low);font-size:.7rem;font-weight:700;margin-left:.4rem">&#10004; Resolved</span>':'';
+    var showRisk = (filter==='resolved'||filter==='unresolved');
+    var badge = showRisk ? '<span class="risk '+o.risk+'">'+RISK_LABELS[o.risk]+'</span> ' : '';
+    var resolvedBadge = o.resolved
+      ? '<span style="color:var(--low);font-size:.7rem;font-weight:700;margin-left:.4rem">&#10004; Resolved</span>'
+      : '';
     return '<div class="kpi-obs-item" style="background:'+RISK_BG[o.risk]+';border-color:'+RISK_COLORS[o.risk]+'">'
       +'<span class="obs-num-sm">'+o.num+'</span>'
-      +badge+'<span style="flex:1;font-weight:600">'+o.title+resolvedBadge+'</span>'
+      +badge
+      +'<span style="flex:1;font-weight:600">'+o.title+resolvedBadge+'</span>'
       +'<div class="obs-cat">'+o.cat+'</div>'
-      +'<div style="margin-top:.3rem;display:flex;gap:.5rem;flex-wrap:wrap">'
-      +'<button class="det-btn" onclick="closeModal();setTimeout(function(){var b=document.getElementById('btn-'+o.id+'');if(b){b.scrollIntoView({behavior:'smooth',block:'center'});b.click();}},300)" style="font-size:.7rem;padding:.2rem .6rem">&#9660; Detail</button>'
-      +'<button class="rep-btn" onclick="closeModal();setTimeout(function(){openReportModal(''+o.id+'');},300)" style="font-size:.7rem;padding:.2rem .6rem">&#128196; View as in Report</button>'
+      +'<div style="margin-top:.4rem;display:flex;gap:.5rem;flex-wrap:wrap">'
+      +'<button class="det-btn" onclick="kpiDetail(\'' + o.id + '\')" style="font-size:.7rem;padding:.2rem .65rem">&#9660; Detail</button>'
+      +'<button class="rep-btn" onclick="kpiReport(\'' + o.id + '\')" style="font-size:.7rem;padding:.2rem .65rem">&#128196; View as in Report</button>'
       +'</div></div>';
   }).join('');
 
