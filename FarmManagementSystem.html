@@ -85,6 +85,9 @@
     <div class="sidebar-item" onclick="showTab('animals')"><i class="fas fa-horse"></i><span>Animals</span></div>
     <div class="sidebar-item" onclick="showTab('inventory')"><i class="fas fa-warehouse"></i><span>Feed &amp; Stock</span></div>
     <div class="sidebar-item" onclick="showTab('transactions')"><i class="fas fa-exchange-alt"></i><span>Transactions</span></div>
+    <div class="sidebar-item" onclick="showTab('milk')"><i class="fas fa-tint"></i><span>Milk Production</span></div>
+    <div class="sidebar-item" onclick="showTab('health')"><i class="fas fa-heartbeat"></i><span>Health Records</span></div>
+    <div class="sidebar-item" onclick="showTab('expenses')"><i class="fas fa-rupee-sign"></i><span>Expenses</span></div>
     <div class="sidebar-item" onclick="showTab('weights')"><i class="fas fa-weight"></i><span>Weight History</span></div>
     <div class="sidebar-item" onclick="showTab('reports')"><i class="fas fa-chart-bar"></i><span>Reports</span></div>
     <div class="sidebar-item" onclick="showTab('setup')"><i class="fas fa-cog"></i><span>Setup</span></div>
@@ -103,7 +106,7 @@
     <div class="section-title"><i class="fas fa-tachometer-alt" style="color:#2d5c3e"></i> Dashboard</div>
     <button class="btn-primary" onclick="refreshDashboard()"><i class="fas fa-sync-alt"></i> Refresh</button>
   </div>
-  <div class="grid-3" style="margin-bottom:20px;" id="statCards"></div>
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px;" id="statCards"></div>
   <div class="card" style="margin-bottom:20px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div style="font-size:15px;font-weight:700;color:#92400e;"><i class="fas fa-bell" style="color:#f59e0b"></i> Pending Stage Transitions</div>
@@ -221,6 +224,79 @@
   </div>
 </div>
 
+<!-- MILK PRODUCTION -->
+<div class="tab-content" id="tab-milk">
+  <div class="section-header">
+    <div class="section-title"><i class="fas fa-tint" style="color:#3b82f6"></i> Milk Production</div>
+    <button class="btn-primary" onclick="openMilkModal()"><i class="fas fa-plus"></i> Record Milk</button>
+  </div>
+  <div class="card" style="margin-bottom:16px;padding:14px 20px;">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <select class="form-control" style="width:200px;" id="filterMilkTag" onchange="renderMilk()"><option value="">All Animals</option></select>
+      <select class="form-control" style="width:140px;" id="filterMilkShift" onchange="renderMilk()"><option value="">All Shifts</option></select>
+      <input type="date" class="form-control" style="width:160px;" id="filterMilkFrom" onchange="renderMilk()">
+      <input type="date" class="form-control" style="width:160px;" id="filterMilkTo" onchange="renderMilk()">
+      <button class="btn-primary" onclick="clearMilkFilters()">Clear</button>
+    </div>
+  </div>
+  <div class="grid-3" style="margin-bottom:16px;" id="milkSummaryCards"></div>
+  <div class="card">
+    <div style="overflow-x:auto;"><table>
+      <thead><tr><th>Date</th><th>Animal (Tag)</th><th>Shift</th><th>Quantity</th><th>Unit</th><th>Remarks</th><th>Actions</th></tr></thead>
+      <tbody id="milkTbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- HEALTH RECORDS -->
+<div class="tab-content" id="tab-health">
+  <div class="section-header">
+    <div class="section-title"><i class="fas fa-heartbeat" style="color:#ef4444"></i> Health Records</div>
+    <button class="btn-primary" onclick="openHealthModal()"><i class="fas fa-plus"></i> Add Record</button>
+  </div>
+  <div class="card" style="margin-bottom:16px;padding:14px 20px;">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <select class="form-control" style="width:200px;" id="filterHealthTag" onchange="renderHealth()"><option value="">All Animals</option></select>
+      <select class="form-control" style="width:170px;" id="filterHealthType" onchange="renderHealth()"><option value="">All Event Types</option></select>
+      <input type="date" class="form-control" style="width:160px;" id="filterHealthFrom" onchange="renderHealth()">
+      <input type="date" class="form-control" style="width:160px;" id="filterHealthTo" onchange="renderHealth()">
+      <button class="btn-primary" onclick="clearHealthFilters()">Clear</button>
+    </div>
+  </div>
+  <!-- Due Soon Alert -->
+  <div id="healthDueAlert" style="margin-bottom:16px;"></div>
+  <div class="card">
+    <div style="overflow-x:auto;"><table>
+      <thead><tr><th>Date</th><th>Animal</th><th>Event Type</th><th>Description</th><th>Doctor/Vet</th><th>Cost (Rs)</th><th>Next Due</th><th>Actions</th></tr></thead>
+      <tbody id="healthTbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- EXPENSES -->
+<div class="tab-content" id="tab-expenses">
+  <div class="section-header">
+    <div class="section-title"><i class="fas fa-rupee-sign" style="color:#d97706"></i> Expenses</div>
+    <button class="btn-primary" onclick="openExpenseModal()"><i class="fas fa-plus"></i> Add Expense</button>
+  </div>
+  <div class="card" style="margin-bottom:16px;padding:14px 20px;">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <select class="form-control" style="width:180px;" id="filterExpCat" onchange="renderExpenses()"><option value="">All Categories</option></select>
+      <select class="form-control" style="width:160px;" id="filterExpMode" onchange="renderExpenses()"><option value="">All Pay Modes</option></select>
+      <input type="date" class="form-control" style="width:160px;" id="filterExpFrom" onchange="renderExpenses()">
+      <input type="date" class="form-control" style="width:160px;" id="filterExpTo" onchange="renderExpenses()">
+      <button class="btn-primary" onclick="clearExpFilters()">Clear</button>
+    </div>
+  </div>
+  <div class="grid-3" style="margin-bottom:16px;" id="expSummaryCards"></div>
+  <div class="card">
+    <div style="overflow-x:auto;"><table>
+      <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (Rs)</th><th>Payment Mode</th><th>Reference No</th><th>Remarks</th><th>Actions</th></tr></thead>
+      <tbody id="expTbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
 <!-- REPORTS -->
 <div class="tab-content" id="tab-reports">
   <div class="section-title" style="margin-bottom:20px;"><i class="fas fa-chart-bar" style="color:#2d5c3e"></i> Reports</div>
@@ -249,6 +325,21 @@
       <i class="fas fa-sync-alt" style="font-size:32px;color:#ef4444;margin-bottom:10px;display:block;"></i>
       <div style="font-weight:700;margin-bottom:4px;">Stage Transitions Log</div>
       <div style="font-size:12px;color:#6b7280;">All completed transitions</div>
+    </div>
+    <div class="card" style="text-align:center;cursor:pointer;" onclick="printReport('milk')">
+      <i class="fas fa-tint" style="font-size:32px;color:#3b82f6;margin-bottom:10px;display:block;"></i>
+      <div style="font-weight:700;margin-bottom:4px;">Milk Production</div>
+      <div style="font-size:12px;color:#6b7280;">All milk yield records</div>
+    </div>
+    <div class="card" style="text-align:center;cursor:pointer;" onclick="printReport('health')">
+      <i class="fas fa-heartbeat" style="font-size:32px;color:#ef4444;margin-bottom:10px;display:block;"></i>
+      <div style="font-weight:700;margin-bottom:4px;">Health Records</div>
+      <div style="font-size:12px;color:#6b7280;">Vaccinations &amp; treatments</div>
+    </div>
+    <div class="card" style="text-align:center;cursor:pointer;" onclick="printReport('expenses')">
+      <i class="fas fa-rupee-sign" style="font-size:32px;color:#d97706;margin-bottom:10px;display:block;"></i>
+      <div style="font-weight:700;margin-bottom:4px;">Expense Report</div>
+      <div style="font-size:12px;color:#6b7280;">All farm expenses</div>
     </div>
   </div>
   <div id="reportOutput"></div>
@@ -496,7 +587,8 @@
   </div>
   <input type="hidden" id="ruleId">
   <div class="grid-2">
-    <div class="form-group"><label>Animal Type</label>
+    <div class="form-group">
+      <div class="lbl-row"><label>Animal Type</label><span class="manage-link" onclick="openQuickManage('animalTypes','ruleAnimalType',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
       <select class="form-control" id="ruleAnimalType"><option value="All">All Types</option></select>
     </div>
     <div class="form-group"><label>Gender</label>
@@ -504,10 +596,12 @@
         <option value="All">Both</option><option>Female</option><option>Male</option>
       </select>
     </div>
-    <div class="form-group"><label>Current Stage</label>
+    <div class="form-group">
+      <div class="lbl-row"><label>Current Stage</label><span class="manage-link" onclick="openQuickManage('stagesFemale','ruleFromStage',()=>populateRuleStages())"><i class="fas fa-pencil-alt"></i> manage</span></div>
       <select class="form-control" id="ruleFromStage"></select>
     </div>
-    <div class="form-group"><label>Next Stage</label>
+    <div class="form-group">
+      <div class="lbl-row"><label>Next Stage</label><span class="manage-link" onclick="openQuickManage('stagesMale','ruleToStage',()=>populateRuleStages())"><i class="fas fa-pencil-alt"></i> manage</span></div>
       <select class="form-control" id="ruleToStage"></select>
     </div>
     <div class="form-group"><label>Age at Transition (Months)</label>
@@ -520,6 +614,95 @@
   <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px;">
     <button class="btn-danger" onclick="closeModal('transitionRuleModal')">Cancel</button>
     <button class="btn-primary" onclick="saveTransitionRule()"><i class="fas fa-save"></i> Save Rule</button>
+  </div>
+</div>
+</div>
+
+<!-- Milk Modal -->
+<div class="modal-overlay" id="milkModal" style="display:none;">
+<div class="modal-box" style="max-width:480px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <div style="font-size:17px;font-weight:700;color:#1a3a2a;" id="milkModalTitle">Record Milk</div>
+    <button onclick="closeModal('milkModal')" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>
+  </div>
+  <input type="hidden" id="milkId">
+  <div class="form-group"><label>Animal (Tag No) *</label><select class="form-control" id="milkTag"></select></div>
+  <div class="grid-2">
+    <div class="form-group"><label>Date *</label><input type="date" class="form-control" id="milkDate"></div>
+    <div class="form-group">
+      <div class="lbl-row"><label>Shift *</label><span class="manage-link" onclick="openQuickManage('milkShifts','milkShift',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+      <select class="form-control" id="milkShift"></select>
+    </div>
+    <div class="form-group"><label>Quantity *</label><input type="number" class="form-control" id="milkQty" min="0" step="0.1" placeholder="0.0"></div>
+    <div class="form-group">
+      <div class="lbl-row"><label>Unit</label><span class="manage-link" onclick="openQuickManage('milkUnits','milkUnit',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+      <select class="form-control" id="milkUnit"></select>
+    </div>
+  </div>
+  <div class="form-group"><label>Remarks</label><input class="form-control" id="milkRemarks" placeholder="Optional notes..."></div>
+  <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px;">
+    <button class="btn-danger" onclick="closeModal('milkModal')">Cancel</button>
+    <button class="btn-primary" onclick="saveMilk()"><i class="fas fa-save"></i> Save</button>
+  </div>
+</div>
+</div>
+
+<!-- Health Modal -->
+<div class="modal-overlay" id="healthModal" style="display:none;">
+<div class="modal-box" style="max-width:580px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <div style="font-size:17px;font-weight:700;color:#1a3a2a;" id="healthModalTitle">Add Health Record</div>
+    <button onclick="closeModal('healthModal')" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>
+  </div>
+  <input type="hidden" id="healthId">
+  <div class="grid-2">
+    <div class="form-group"><label>Animal (Tag No) *</label><select class="form-control" id="healthTag"></select></div>
+    <div class="form-group"><label>Date *</label><input type="date" class="form-control" id="healthDate"></div>
+    <div class="form-group">
+      <div class="lbl-row"><label>Event Type *</label><span class="manage-link" onclick="openQuickManage('healthEventTypes','healthType',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+      <select class="form-control" id="healthType"></select>
+    </div>
+    <div class="form-group">
+      <div class="lbl-row"><label>Doctor / Vet</label><span class="manage-link" onclick="openQuickManage('doctorNames','healthDoctor',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+      <select class="form-control" id="healthDoctor"></select>
+    </div>
+    <div class="form-group"><label>Cost (Rs)</label><input type="number" class="form-control" id="healthCost" min="0" placeholder="0"></div>
+    <div class="form-group"><label>Next Due Date</label><input type="date" class="form-control" id="healthNextDue"></div>
+  </div>
+  <div class="form-group"><label>Description / Notes</label><textarea class="form-control" id="healthDesc" rows="2" placeholder="Details of treatment, vaccine batch, dosage..."></textarea></div>
+  <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px;">
+    <button class="btn-danger" onclick="closeModal('healthModal')">Cancel</button>
+    <button class="btn-primary" onclick="saveHealth()"><i class="fas fa-save"></i> Save</button>
+  </div>
+</div>
+</div>
+
+<!-- Expense Modal -->
+<div class="modal-overlay" id="expenseModal" style="display:none;">
+<div class="modal-box" style="max-width:520px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <div style="font-size:17px;font-weight:700;color:#1a3a2a;" id="expenseModalTitle">Add Expense</div>
+    <button onclick="closeModal('expenseModal')" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>
+  </div>
+  <input type="hidden" id="expenseId">
+  <div class="grid-2">
+    <div class="form-group"><label>Date *</label><input type="date" class="form-control" id="expDate"></div>
+    <div class="form-group">
+      <div class="lbl-row"><label>Category *</label><span class="manage-link" onclick="openQuickManage('expenseCategories','expCat',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+      <select class="form-control" id="expCat"></select>
+    </div>
+    <div class="form-group"><label>Amount (Rs) *</label><input type="number" class="form-control" id="expAmount" min="0" placeholder="0"></div>
+    <div class="form-group">
+      <div class="lbl-row"><label>Payment Mode</label><span class="manage-link" onclick="openQuickManage('paymentModes','expMode',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+      <select class="form-control" id="expMode"></select>
+    </div>
+    <div class="form-group"><label>Reference No</label><input class="form-control" id="expRef" placeholder="Bill/receipt no."></div>
+  </div>
+  <div class="form-group"><label>Description *</label><input class="form-control" id="expDesc" placeholder="What was this expense for?"></div>
+  <div class="form-group"><label>Remarks</label><input class="form-control" id="expRemarks" placeholder="Optional notes..."></div>
+  <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px;">
+    <button class="btn-danger" onclick="closeModal('expenseModal')">Cancel</button>
+    <button class="btn-primary" onclick="saveExpense()"><i class="fas fa-save"></i> Save</button>
   </div>
 </div>
 </div>
@@ -591,7 +774,13 @@ const LOOKUP_DEFAULTS = {
   animalStatuses: ['Active','Sold','Dead','Transferred'],
   feedCategories: ['Feed','Fertilizer','Medicine','Supplements','Other'],
   feedUnits:      ['kg','bags','liters','pieces','tons','quintal'],
-  voucherTypes:   ['Purchase Bill','Cash Payment','Journal Voucher','Sales Invoice','Expense Voucher']
+  voucherTypes:   ['Purchase Bill','Cash Payment','Journal Voucher','Sales Invoice','Expense Voucher'],
+  milkShifts:     ['Morning','Evening','Night'],
+  milkUnits:      ['Liters','kg'],
+  healthEventTypes:['Deworming','FMD Vaccination','LSD Vaccination','Brucellosis Vaccination','Treatment','Check-up','Pregnancy Check','Surgery','Other'],
+  doctorNames:    [],
+  expenseCategories:['Feed Purchase','Medicine','Vet Fees','Labor / Wages','Electricity','Fuel','Equipment','Repairs','Other'],
+  paymentModes:   ['Cash','Bank Transfer','Cheque','Credit']
 };
 
 function getLookups() {
@@ -765,12 +954,29 @@ function populateAllDropdowns() {
   populateSel('fdCategory', lk.feedCategories, null);
   populateSel('fdUnit', lk.feedUnits, null);
   populateSel('txVoucherType', lk.voucherTypes, null);
+  populateSel('milkShift', lk.milkShifts, null);
+  populateSel('milkUnit', lk.milkUnits, null);
+  populateSel('healthType', lk.healthEventTypes, null);
+  populateSel('healthDoctor', lk.doctorNames.length ? lk.doctorNames : ['No Doctor / Self'], null);
+  populateSel('expCat', lk.expenseCategories, null);
+  populateSel('expMode', lk.paymentModes, null);
+  populateSel('filterMilkShift', lk.milkShifts, 'All Shifts');
+  populateSel('filterHealthType', lk.healthEventTypes, 'All Event Types');
+  populateSel('filterExpCat', lk.expenseCategories, 'All Categories');
+  populateSel('filterExpMode', lk.paymentModes, 'All Pay Modes');
 
   const allStages = [...new Set([...lk.stagesFemale,...lk.stagesMale])];
   populateSel('filterType', lk.animalTypes, 'All Types');
   populateSel('filterStage', allStages, 'All Stages');
   populateSel('filterStatus', lk.animalStatuses, 'All Status');
   populateSel('ruleAnimalType', ['All',...lk.animalTypes], null);
+  populateSel('ruleFromStage', allStages, null);
+  populateSel('ruleToStage', allStages, null);
+}
+
+function populateRuleStages() {
+  const lk = getLookups();
+  const allStages = [...new Set([...lk.stagesFemale,...lk.stagesMale])];
   populateSel('ruleFromStage', allStages, null);
   populateSel('ruleToStage', allStages, null);
 }
@@ -801,7 +1007,13 @@ const LOOKUP_SECTIONS = [
   { key:'animalStatuses',label:'Animal Statuses',  icon:'fa-tag',          desc:'Current status options (Active, Sold, Dead, etc.)' },
   { key:'feedCategories',label:'Feed Categories',  icon:'fa-seedling',     desc:'Categories for stock items (Feed, Fertilizer, Medicine, etc.)' },
   { key:'feedUnits',     label:'Feed Units',       icon:'fa-balance-scale',desc:'Units of measurement (kg, bags, liters, etc.)' },
-  { key:'voucherTypes',  label:'Voucher Types',    icon:'fa-file-invoice', desc:'Document types for transactions (Purchase Bill, etc.)' },
+  { key:'voucherTypes',     label:'Voucher Types',       icon:'fa-file-invoice',  desc:'Document types for feed transactions.' },
+  { key:'milkShifts',       label:'Milk Shifts',         icon:'fa-clock',         desc:'Milking times (Morning, Evening, Night).' },
+  { key:'milkUnits',        label:'Milk Units',          icon:'fa-tint',          desc:'Units for milk measurement (Liters, kg).' },
+  { key:'healthEventTypes', label:'Health Event Types',  icon:'fa-heartbeat',     desc:'Types of health events (Deworming, Vaccination, Treatment, etc.).' },
+  { key:'doctorNames',      label:'Doctor / Vet Names',  icon:'fa-user-md',       desc:'Names of veterinary doctors you use.' },
+  { key:'expenseCategories',label:'Expense Categories',  icon:'fa-rupee-sign',    desc:'Categories for farm expenses (Feed, Labor, Electricity, etc.).' },
+  { key:'paymentModes',     label:'Payment Modes',       icon:'fa-wallet',        desc:'How expenses are paid (Cash, Bank Transfer, etc.).' },
 ];
 
 function renderLookupsSetup() {
@@ -933,6 +1145,9 @@ function showTab(name) {
   if(name==='animals') renderAnimals();
   if(name==='inventory') renderFeed();
   if(name==='transactions') renderTransactions();
+  if(name==='milk') { populateAllDropdowns(); populateMilkAnimalFilter(); renderMilk(); renderMilkSummary(); }
+  if(name==='health') { populateAllDropdowns(); populateHealthAnimalFilter(); renderHealth(); renderHealthDue(); }
+  if(name==='expenses') { populateAllDropdowns(); renderExpenses(); renderExpenseSummary(); }
   if(name==='weights') { renderWeights(); populateWeightTagFilter(); }
   if(name==='setup') { renderTransitionRules(); renderLookupsSetup(); }
 }
@@ -970,6 +1185,12 @@ function refreshDashboard() {
   const female = animals.filter(a=>a.gender==='Female'&&a.status==='Active').length;
   const male = animals.filter(a=>a.gender==='Male'&&a.status==='Active').length;
   const lowStock = feed.filter(f=>Number(f.currentStock)<=Number(f.reorderLevel)).length;
+  const today=new Date().toISOString().split('T')[0];
+  const soon=new Date(); soon.setDate(soon.getDate()+14);
+  const healthDue=dbGet('healthRecords').filter(r=>r.nextDue&&r.nextDue<=soon.toISOString().split('T')[0]).length;
+  const todayMilk=dbGet('milkRecords').filter(r=>r.date===today).reduce((s,r)=>s+Number(r.qty||0),0);
+  const thisMonth=today.substr(0,7);
+  const monthExp=dbGet('expenses').filter(r=>r.date.startsWith(thisMonth)).reduce((s,r)=>s+Number(r.amount||0),0);
   document.getElementById('statCards').innerHTML = `
     <div class="stat-card" style="border-color:#2d5c3e">
       <div style="font-size:28px;font-weight:800;color:#2d5c3e">${active}</div>
@@ -982,9 +1203,19 @@ function refreshDashboard() {
       <div style="font-size:11px;color:#9ca3af;margin-top:2px">${feed.length} total feed items</div>
     </div>
     <div class="stat-card" style="border-color:#3b82f6">
-      <div style="font-size:28px;font-weight:800;color:#3b82f6">${txs.length}</div>
-      <div style="font-size:13px;color:#6b7280;margin-top:4px">Total Transactions</div>
-      <div style="font-size:11px;color:#9ca3af;margin-top:2px">${animals.length} total animals registered</div>
+      <div style="font-size:24px;font-weight:800;color:#3b82f6">${todayMilk.toFixed(1)} L</div>
+      <div style="font-size:13px;color:#6b7280;margin-top:4px">Today's Milk</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:2px">${txs.length} feed transactions</div>
+    </div>
+    <div class="stat-card" style="border-color:#ef4444">
+      <div style="font-size:28px;font-weight:800;color:#ef4444">${healthDue}</div>
+      <div style="font-size:13px;color:#6b7280;margin-top:4px">Health Events Due</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:2px">within next 14 days</div>
+    </div>
+    <div class="stat-card" style="border-color:#d97706">
+      <div style="font-size:22px;font-weight:800;color:#d97706">Rs ${monthExp.toLocaleString()}</div>
+      <div style="font-size:13px;color:#6b7280;margin-top:4px">Expenses This Month</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:2px">${animals.length} animals registered</div>
     </div>`;
   renderTransitionAlerts();
   renderStockAlerts();
@@ -1495,6 +1726,9 @@ function printReport(type){
   else if(type==='transactions') html=head('Transaction Ledger')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Voucher No</th><th>Item</th><th>Type</th><th>Qty</th><th>Amount</th><th>Narration</th></tr></thead><tbody>`+txs.map(t=>{const item=feed.find(f=>f.id===t.itemId)||{};return `<tr><td>${t.date}</td><td>${t.voucherNo||''}</td><td>${item.itemName||''}</td><td>${t.txType}</td><td>${t.qty} ${item.unit||''}</td><td>Rs ${Number(t.amount||0).toLocaleString()}</td><td>${t.narration||''}</td></tr>`}).join('')+`</tbody></table>`+foot;
   else if(type==='weight-history') html=head('Weight History')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Tag No</th><th>Date</th><th>Weight (kg)</th><th>Remarks</th></tr></thead><tbody>`+weights.sort((a,b)=>a.tagNo.localeCompare(b.tagNo)).map(w=>`<tr><td>${w.tagNo}</td><td>${w.date}</td><td>${w.weight}</td><td>${w.remarks||''}</td></tr>`).join('')+`</tbody></table>`+foot;
   else if(type==='stage-transitions') html=head('Stage Transitions Log')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Tag No</th><th>From</th><th>To</th><th>Approved By</th></tr></thead><tbody>`+tLog.map(l=>`<tr><td>${l.date}</td><td>${l.tagNo}</td><td>${l.fromStage}</td><td>${l.toStage}</td><td>${l.approvedBy}</td></tr>`).join('')+`</tbody></table>`+foot;
+  else if(type==='milk'){const milk=dbGet('milkRecords').sort((a,b)=>b.date.localeCompare(a.date));html=head('Milk Production Records')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Tag No</th><th>Shift</th><th>Qty</th><th>Unit</th><th>Remarks</th></tr></thead><tbody>`+milk.map(r=>`<tr><td>${r.date}</td><td>${r.tagNo}</td><td>${r.shift||''}</td><td>${r.qty}</td><td>${r.unit||'Liters'}</td><td>${r.remarks||''}</td></tr>`).join('')+`</tbody></table>`+foot;}
+  else if(type==='health'){const hr=dbGet('healthRecords').sort((a,b)=>b.date.localeCompare(a.date));html=head('Health Records')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Tag No</th><th>Event Type</th><th>Description</th><th>Doctor</th><th>Cost (Rs)</th><th>Next Due</th></tr></thead><tbody>`+hr.map(r=>`<tr><td>${r.date}</td><td>${r.tagNo}</td><td>${r.eventType}</td><td>${r.description||''}</td><td>${r.doctor||''}</td><td>Rs ${Number(r.cost||0).toLocaleString()}</td><td>${r.nextDue||''}</td></tr>`).join('')+`</tbody></table>`+foot;}
+  else if(type==='expenses'){const exp=dbGet('expenses').sort((a,b)=>b.date.localeCompare(a.date));const total=exp.reduce((s,r)=>s+Number(r.amount||0),0);html=head('Expense Report')+`<p style="font-weight:700;">Total: Rs ${total.toLocaleString()}</p><table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (Rs)</th><th>Payment Mode</th><th>Reference</th></tr></thead><tbody>`+exp.map(r=>`<tr><td>${r.date}</td><td>${r.category}</td><td>${r.description||''}</td><td>Rs ${Number(r.amount||0).toLocaleString()}</td><td>${r.paymentMode||''}</td><td>${r.refNo||''}</td></tr>`).join('')+`</tbody></table>`+foot;}
   const win=window.open('','_blank');
   win.document.write(`<!DOCTYPE html><html><head><title>Report</title></head><body onload="window.print()">${html}</body></html>`);
   win.document.close();
@@ -1506,6 +1740,7 @@ function printReport(type){
 function exportData(){
   const data={animals:dbGet('animals'),feed:dbGet('feed'),transactions:dbGet('transactions'),
     weights:dbGet('weights'),transitionRules:dbGet('transitionRules'),transitionLog:dbGet('transitionLog'),
+    milkRecords:dbGet('milkRecords'),healthRecords:dbGet('healthRecords'),expenses:dbGet('expenses'),
     lookups:getLookups(),setup:DB.getObj('setup',{})};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
@@ -1524,6 +1759,9 @@ function importData(input){
       if(data.weights) DB.set('weights',data.weights);
       if(data.transitionRules) DB.set('transitionRules',data.transitionRules);
       if(data.transitionLog) DB.set('transitionLog',data.transitionLog);
+      if(data.milkRecords) DB.set('milkRecords',data.milkRecords);
+      if(data.healthRecords) DB.set('healthRecords',data.healthRecords);
+      if(data.expenses) DB.set('expenses',data.expenses);
       if(data.lookups) DB.setObj('lookups',data.lookups);
       if(data.setup) DB.setObj('setup',data.setup);
       toast('Data imported'); refreshDashboard();
@@ -1533,10 +1771,219 @@ function importData(input){
 }
 function confirmClearData(){
   confirm2('Clear All Data','This will permanently delete ALL animals, transactions, and records. Cannot be undone!',()=>{
-    ['animals','feed','transactions','weights','transitionRules','transitionLog'].forEach(k=>DB.set(k,[]));
+    ['animals','feed','transactions','weights','transitionRules','transitionLog','milkRecords','healthRecords','expenses'].forEach(k=>DB.set(k,[]));
     toast('All data cleared','warn'); refreshDashboard();
   });
 }
+
+// ============================================================
+// MILK PRODUCTION MODULE
+// ============================================================
+function populateMilkAnimalFilter() {
+  const animals = dbGet('animals');
+  const opts = '<option value="">All Animals</option>' + animals.map(a=>`<option value="${a.tagNo}">${a.tagNo} (${a.animalType||''})</option>`).join('');
+  document.getElementById('filterMilkTag').innerHTML = opts;
+  document.getElementById('milkTag').innerHTML = animals.map(a=>`<option value="${a.tagNo}">${a.tagNo} - ${a.animalType||''} ${a.breed||''}</option>`).join('');
+}
+
+function openMilkModal(id) {
+  populateAllDropdowns(); populateMilkAnimalFilter();
+  document.getElementById('milkId').value='';
+  document.getElementById('milkDate').value=new Date().toISOString().split('T')[0];
+  document.getElementById('milkQty').value=''; document.getElementById('milkRemarks').value='';
+  document.getElementById('milkModalTitle').textContent='Record Milk';
+  if(id) { const r=dbFind('milkRecords',id); if(r) { document.getElementById('milkId').value=id; document.getElementById('milkTag').value=r.tagNo; document.getElementById('milkDate').value=r.date; document.getElementById('milkShift').value=r.shift; document.getElementById('milkQty').value=r.qty; document.getElementById('milkUnit').value=r.unit; document.getElementById('milkRemarks').value=r.remarks||''; document.getElementById('milkModalTitle').textContent='Edit Milk Record'; } }
+  openModal('milkModal');
+}
+
+function saveMilk() {
+  const tagNo=document.getElementById('milkTag').value;
+  const date=document.getElementById('milkDate').value;
+  const qty=Number(document.getElementById('milkQty').value);
+  if(!tagNo||!date||!qty){toast('Please fill all required fields','error');return;}
+  const obj={tagNo,date,shift:document.getElementById('milkShift').value,qty,unit:document.getElementById('milkUnit').value,remarks:document.getElementById('milkRemarks').value};
+  const id=document.getElementById('milkId').value;
+  if(id){dbUpdate('milkRecords',id,obj);toast('Record updated');}else{dbAdd('milkRecords',obj);toast('Milk recorded');}
+  closeModal('milkModal'); renderMilk(); renderMilkSummary();
+}
+
+function renderMilk() {
+  let list=dbGet('milkRecords');
+  const tag=(document.getElementById('filterMilkTag')||{}).value||'';
+  const shift=(document.getElementById('filterMilkShift')||{}).value||'';
+  const from=(document.getElementById('filterMilkFrom')||{}).value||'';
+  const to=(document.getElementById('filterMilkTo')||{}).value||'';
+  if(tag) list=list.filter(r=>r.tagNo===tag);
+  if(shift) list=list.filter(r=>r.shift===shift);
+  if(from) list=list.filter(r=>r.date>=from);
+  if(to) list=list.filter(r=>r.date<=to);
+  list=list.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  const tbody=document.getElementById('milkTbody');
+  if(!list.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:30px;">No milk records found.</td></tr>';return;}
+  tbody.innerHTML=list.map(r=>`<tr>
+    <td>${r.date}</td><td><b>${r.tagNo}</b></td>
+    <td><span class="badge badge-blue">${r.shift||'—'}</span></td>
+    <td><b>${r.qty}</b></td><td>${r.unit||'Liters'}</td><td>${r.remarks||'—'}</td>
+    <td>
+      <button class="btn-sm btn-edit" onclick="openMilkModal('${r.id}')"><i class="fas fa-edit"></i></button>
+      <button class="btn-sm btn-del" style="margin-left:4px;" onclick="deleteMilk('${r.id}')"><i class="fas fa-trash"></i></button>
+    </td></tr>`).join('');
+}
+
+function renderMilkSummary() {
+  const list=dbGet('milkRecords');
+  const today=new Date().toISOString().split('T')[0];
+  const todayTotal=list.filter(r=>r.date===today).reduce((s,r)=>s+Number(r.qty||0),0);
+  const thisMonth=today.substr(0,7);
+  const monthTotal=list.filter(r=>r.date.startsWith(thisMonth)).reduce((s,r)=>s+Number(r.qty||0),0);
+  const allTotal=list.reduce((s,r)=>s+Number(r.qty||0),0);
+  const unit=list[0]?list[0].unit:'Liters';
+  document.getElementById('milkSummaryCards').innerHTML=`
+    <div class="stat-card" style="border-color:#3b82f6"><div style="font-size:24px;font-weight:800;color:#3b82f6">${todayTotal.toFixed(1)} ${unit}</div><div style="font-size:13px;color:#6b7280;">Today's Total</div></div>
+    <div class="stat-card" style="border-color:#8b5cf6"><div style="font-size:24px;font-weight:800;color:#8b5cf6">${monthTotal.toFixed(1)} ${unit}</div><div style="font-size:13px;color:#6b7280;">This Month</div></div>
+    <div class="stat-card" style="border-color:#2d5c3e"><div style="font-size:24px;font-weight:800;color:#2d5c3e">${allTotal.toFixed(1)} ${unit}</div><div style="font-size:13px;color:#6b7280;">All Time Total</div></div>`;
+}
+
+function deleteMilk(id){confirm2('Delete Record','Delete this milk record?',()=>{dbDelete('milkRecords',id);renderMilk();renderMilkSummary();toast('Deleted','warn');});}
+function clearMilkFilters(){['filterMilkTag','filterMilkShift','filterMilkFrom','filterMilkTo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});renderMilk();}
+
+// ============================================================
+// HEALTH RECORDS MODULE
+// ============================================================
+function populateHealthAnimalFilter() {
+  const animals=dbGet('animals');
+  const opts='<option value="">All Animals</option>'+animals.map(a=>`<option value="${a.tagNo}">${a.tagNo} (${a.animalType||''})</option>`).join('');
+  document.getElementById('filterHealthTag').innerHTML=opts;
+  document.getElementById('healthTag').innerHTML=animals.map(a=>`<option value="${a.tagNo}">${a.tagNo} - ${a.animalType||''} ${a.breed||''}</option>`).join('');
+}
+
+function openHealthModal(id) {
+  populateAllDropdowns(); populateHealthAnimalFilter();
+  document.getElementById('healthId').value='';
+  document.getElementById('healthDate').value=new Date().toISOString().split('T')[0];
+  document.getElementById('healthCost').value=''; document.getElementById('healthNextDue').value=''; document.getElementById('healthDesc').value='';
+  document.getElementById('healthModalTitle').textContent='Add Health Record';
+  if(id){const r=dbFind('healthRecords',id);if(r){document.getElementById('healthId').value=id;document.getElementById('healthTag').value=r.tagNo;document.getElementById('healthDate').value=r.date;document.getElementById('healthType').value=r.eventType;document.getElementById('healthDoctor').value=r.doctor||'';document.getElementById('healthCost').value=r.cost||'';document.getElementById('healthNextDue').value=r.nextDue||'';document.getElementById('healthDesc').value=r.description||'';document.getElementById('healthModalTitle').textContent='Edit Health Record';}}
+  openModal('healthModal');
+}
+
+function saveHealth() {
+  const tagNo=document.getElementById('healthTag').value;
+  const date=document.getElementById('healthDate').value;
+  const eventType=document.getElementById('healthType').value;
+  if(!tagNo||!date||!eventType){toast('Please fill all required fields','error');return;}
+  const obj={tagNo,date,eventType,doctor:document.getElementById('healthDoctor').value,cost:Number(document.getElementById('healthCost').value)||0,nextDue:document.getElementById('healthNextDue').value,description:document.getElementById('healthDesc').value};
+  const id=document.getElementById('healthId').value;
+  if(id){dbUpdate('healthRecords',id,obj);toast('Record updated');}else{dbAdd('healthRecords',obj);toast('Health record saved');}
+  closeModal('healthModal'); renderHealth(); renderHealthDue();
+}
+
+function renderHealth() {
+  let list=dbGet('healthRecords');
+  const tag=(document.getElementById('filterHealthTag')||{}).value||'';
+  const type=(document.getElementById('filterHealthType')||{}).value||'';
+  const from=(document.getElementById('filterHealthFrom')||{}).value||'';
+  const to=(document.getElementById('filterHealthTo')||{}).value||'';
+  if(tag) list=list.filter(r=>r.tagNo===tag);
+  if(type) list=list.filter(r=>r.eventType===type);
+  if(from) list=list.filter(r=>r.date>=from);
+  if(to) list=list.filter(r=>r.date<=to);
+  list=list.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  const tbody=document.getElementById('healthTbody');
+  if(!list.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:30px;">No health records found.</td></tr>';return;}
+  tbody.innerHTML=list.map(r=>{
+    const isDue=r.nextDue&&r.nextDue<=new Date().toISOString().split('T')[0];
+    return `<tr>
+      <td>${r.date}</td><td><b>${r.tagNo}</b></td>
+      <td><span class="badge badge-blue">${r.eventType||'—'}</span></td>
+      <td>${r.description||'—'}</td><td>${r.doctor||'—'}</td>
+      <td>Rs ${Number(r.cost||0).toLocaleString()}</td>
+      <td style="color:${isDue?'#dc2626':'inherit'};font-weight:${isDue?'700':'400'}">${r.nextDue||'—'}${isDue?' ⚠':''}</td>
+      <td>
+        <button class="btn-sm btn-edit" onclick="openHealthModal('${r.id}')"><i class="fas fa-edit"></i></button>
+        <button class="btn-sm btn-del" style="margin-left:4px;" onclick="deleteHealth('${r.id}')"><i class="fas fa-trash"></i></button>
+      </td></tr>`;
+  }).join('');
+}
+
+function renderHealthDue() {
+  const today=new Date().toISOString().split('T')[0];
+  const soon=new Date(); soon.setDate(soon.getDate()+14);
+  const soonStr=soon.toISOString().split('T')[0];
+  const due=dbGet('healthRecords').filter(r=>r.nextDue&&r.nextDue<=soonStr);
+  const c=document.getElementById('healthDueAlert');
+  if(!due.length){c.innerHTML='';return;}
+  c.innerHTML=`<div class="alert-banner"><b><i class="fas fa-bell"></i> ${due.length} health event(s) due within 14 days:</b><br><br>`+
+    due.map(r=>`<span style="margin-right:12px;">• <b>${r.tagNo}</b> — ${r.eventType} due <b>${r.nextDue}</b>${r.nextDue<=today?' <span style="color:#dc2626">(OVERDUE)</span>':''}</span>`).join('')+'</div>';
+}
+
+function deleteHealth(id){confirm2('Delete Record','Delete this health record?',()=>{dbDelete('healthRecords',id);renderHealth();renderHealthDue();toast('Deleted','warn');});}
+function clearHealthFilters(){['filterHealthTag','filterHealthType','filterHealthFrom','filterHealthTo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});renderHealth();}
+
+// ============================================================
+// EXPENSES MODULE
+// ============================================================
+function openExpenseModal(id) {
+  populateAllDropdowns();
+  document.getElementById('expenseId').value='';
+  document.getElementById('expDate').value=new Date().toISOString().split('T')[0];
+  document.getElementById('expAmount').value=''; document.getElementById('expRef').value=''; document.getElementById('expDesc').value=''; document.getElementById('expRemarks').value='';
+  document.getElementById('expenseModalTitle').textContent='Add Expense';
+  if(id){const r=dbFind('expenses',id);if(r){document.getElementById('expenseId').value=id;document.getElementById('expDate').value=r.date;document.getElementById('expCat').value=r.category;document.getElementById('expAmount').value=r.amount;document.getElementById('expMode').value=r.paymentMode||'';document.getElementById('expRef').value=r.refNo||'';document.getElementById('expDesc').value=r.description||'';document.getElementById('expRemarks').value=r.remarks||'';document.getElementById('expenseModalTitle').textContent='Edit Expense';}}
+  openModal('expenseModal');
+}
+
+function saveExpense() {
+  const date=document.getElementById('expDate').value;
+  const category=document.getElementById('expCat').value;
+  const amount=Number(document.getElementById('expAmount').value);
+  const description=document.getElementById('expDesc').value.trim();
+  if(!date||!category||!amount||!description){toast('Please fill all required fields','error');return;}
+  const obj={date,category,amount,paymentMode:document.getElementById('expMode').value,refNo:document.getElementById('expRef').value,description,remarks:document.getElementById('expRemarks').value};
+  const id=document.getElementById('expenseId').value;
+  if(id){dbUpdate('expenses',id,obj);toast('Expense updated');}else{dbAdd('expenses',obj);toast('Expense saved');}
+  closeModal('expenseModal'); renderExpenses(); renderExpenseSummary();
+}
+
+function renderExpenses() {
+  let list=dbGet('expenses');
+  const cat=(document.getElementById('filterExpCat')||{}).value||'';
+  const mode=(document.getElementById('filterExpMode')||{}).value||'';
+  const from=(document.getElementById('filterExpFrom')||{}).value||'';
+  const to=(document.getElementById('filterExpTo')||{}).value||'';
+  if(cat) list=list.filter(r=>r.category===cat);
+  if(mode) list=list.filter(r=>r.paymentMode===mode);
+  if(from) list=list.filter(r=>r.date>=from);
+  if(to) list=list.filter(r=>r.date<=to);
+  list=list.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  const tbody=document.getElementById('expTbody');
+  if(!list.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:30px;">No expenses found.</td></tr>';return;}
+  tbody.innerHTML=list.map(r=>`<tr>
+    <td>${r.date}</td><td><span class="badge badge-yellow">${r.category}</span></td>
+    <td>${r.description||'—'}</td><td><b>Rs ${Number(r.amount||0).toLocaleString()}</b></td>
+    <td>${r.paymentMode||'—'}</td><td>${r.refNo||'—'}</td><td>${r.remarks||'—'}</td>
+    <td>
+      <button class="btn-sm btn-edit" onclick="openExpenseModal('${r.id}')"><i class="fas fa-edit"></i></button>
+      <button class="btn-sm btn-del" style="margin-left:4px;" onclick="deleteExpense('${r.id}')"><i class="fas fa-trash"></i></button>
+    </td></tr>`).join('');
+}
+
+function renderExpenseSummary() {
+  const list=dbGet('expenses');
+  const today=new Date().toISOString().split('T')[0];
+  const thisMonth=today.substr(0,7);
+  const monthTotal=list.filter(r=>r.date.startsWith(thisMonth)).reduce((s,r)=>s+Number(r.amount||0),0);
+  const allTotal=list.reduce((s,r)=>s+Number(r.amount||0),0);
+  const cats=[...new Set(list.map(r=>r.category))];
+  const topCat=cats.length?cats.sort((a,b)=>list.filter(r=>r.category===b).reduce((s,r)=>s+Number(r.amount||0),0)-list.filter(r=>r.category===a).reduce((s,r)=>s+Number(r.amount||0),0))[0]:'—';
+  document.getElementById('expSummaryCards').innerHTML=`
+    <div class="stat-card" style="border-color:#d97706"><div style="font-size:22px;font-weight:800;color:#d97706">Rs ${monthTotal.toLocaleString()}</div><div style="font-size:13px;color:#6b7280;">This Month</div></div>
+    <div class="stat-card" style="border-color:#ef4444"><div style="font-size:22px;font-weight:800;color:#ef4444">Rs ${allTotal.toLocaleString()}</div><div style="font-size:13px;color:#6b7280;">Total All Time</div></div>
+    <div class="stat-card" style="border-color:#6b7280"><div style="font-size:18px;font-weight:800;color:#374151">${topCat}</div><div style="font-size:13px;color:#6b7280;">Top Expense Category</div></div>`;
+}
+
+function deleteExpense(id){confirm2('Delete Expense','Delete this expense record?',()=>{dbDelete('expenses',id);renderExpenses();renderExpenseSummary();toast('Deleted','warn');});}
+function clearExpFilters(){['filterExpCat','filterExpMode','filterExpFrom','filterExpTo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});renderExpenses();}
 
 // ============================================================
 // FIRST-RUN CLEAN SLATE
