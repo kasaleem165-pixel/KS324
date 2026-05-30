@@ -142,6 +142,16 @@ input[readonly]{background:#f8fafc}
 <!-- ══════════ DASHBOARD ══════════ -->
 <div class="page active" id="page-dashboard">
   <div class="stats" id="dash-stats"></div>
+  <!-- Favourites card -->
+  <div class="card" style="margin-bottom:18px" id="fav-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="card-title" style="margin:0">&#11088; Favourites</div>
+      <button class="btn btn-light btn-sm" onclick="openFavEdit()">&#9998; Edit</button>
+    </div>
+    <div id="fav-buttons" style="display:flex;flex-wrap:wrap;gap:8px">
+      <span style="color:#aaa;font-size:.85rem;font-style:italic">Click Edit to pin your favourite tabs and reports here.</span>
+    </div>
+  </div>
   <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px">
     <button class="btn btn-light" onclick="show('animals')" style="flex:1;min-width:140px;padding:12px 10px;font-size:.93rem">&#128004; Add Animal</button>
     <button class="btn btn-light" onclick="show('customers')" style="flex:1;min-width:140px;padding:12px 10px;font-size:.93rem">&#128100; Add Customer</button>
@@ -961,6 +971,20 @@ input[readonly]{background:#f8fafc}
   <img id="pv-full-img" src="" alt="">
 </div>
 
+<!-- ══════════ FAVOURITES EDIT MODAL ══════════ -->
+<div class="overlay" id="favedit-overlay">
+  <div class="modal" style="max-width:520px">
+    <button class="modal-close" onclick="closeModal('favedit-overlay')">&#10005;</button>
+    <div class="card-title">&#11088; Edit Favourites</div>
+    <p style="font-size:.83rem;color:#64748b;margin-bottom:14px">Select the tabs and reports you want pinned to your dashboard.</p>
+    <div id="favedit-groups" style="display:flex;flex-direction:column;gap:14px"></div>
+    <div class="form-actions" style="margin-top:18px">
+      <button class="btn btn-success" onclick="saveFavourites()">&#10003; Save Favourites</button>
+      <button class="btn btn-light" onclick="closeModal('favedit-overlay')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════ PAYMENT RECEIPT MODAL ══════════ -->
 <div class="overlay" id="payreceipt-overlay">
   <div class="modal">
@@ -1083,6 +1107,70 @@ const SEED_ANIMALS=[
 const SEED_SETTINGS={rate_per_kg:780,admin_charges:0,num_persons:7};
 
 function save(){localStorage.setItem(STORE,JSON.stringify(DB));}
+
+// ══════════════════════════ FAVOURITES ══════════════════════════
+const FAV_OPTIONS=[
+  {group:'Pages',items:[
+    {id:'pg-animals',   label:'&#128004; Animals',          action:"show('animals')"},
+    {id:'pg-customers', label:'&#128100; Customers',         action:"show('customers')"},
+    {id:'pg-sale',      label:'&#128722; New Sale',           action:"show('sale')"},
+    {id:'pg-budgeting', label:'&#128203; Budgeting',          action:"show('budgeting')"},
+    {id:'pg-reports',   label:'&#128202; Reports',            action:"show('reports')"},
+    {id:'pg-settings',  label:'&#9881; Settings',             action:"show('settings')"},
+  ]},
+  {group:'Quick Actions',items:[
+    {id:'act-collection',label:'&#128181; Record Collection', action:"openPayment(0)"},
+  ]},
+  {group:'Reports',items:[
+    {id:'rpt-sales',      label:'&#128196; All Sales',           action:"show('reports');showRptTab('sales')"},
+    {id:'rpt-saleledger', label:'&#128221; Sale Ledger',          action:"show('reports');showRptTab('saleledger')"},
+    {id:'rpt-payments',   label:'&#128184; Sales Collection',     action:"show('reports');showRptTab('payments')"},
+    {id:'rpt-custledger', label:'&#128065; Customer Ledger',      action:"show('reports');showRptTab('custledger')"},
+    {id:'rpt-location',   label:'&#128205; Location Report',      action:"show('reports');showRptTab('location')"},
+    {id:'rpt-waccha',     label:'&#128178; Sale Price Report',    action:"show('reports');showRptTab('waccha')"},
+    {id:'rpt-bankwise',   label:'&#127981; Bank-wise Collection', action:"show('reports');showRptTab('bankwise')"},
+    {id:'rpt-senderwise', label:'&#128100; Sender-wise Collection',action:"show('reports');showRptTab('senderwise')"},
+  ]},
+];
+
+function renderFavourites(){
+  const favs=DB.settings.favourites||[];
+  const el=document.getElementById('fav-buttons');
+  if(!el) return;
+  if(!favs.length){
+    el.innerHTML='<span style="color:#aaa;font-size:.85rem;font-style:italic">Click Edit to pin your favourite tabs and reports here.</span>';
+    return;
+  }
+  const all=FAV_OPTIONS.flatMap(g=>g.items);
+  el.innerHTML=favs.map(id=>{
+    const opt=all.find(o=>o.id===id);
+    if(!opt) return '';
+    return `<button class="btn btn-light" onclick="${opt.action}" style="padding:9px 16px;font-size:.9rem;border:1.5px solid #cbd5e1;border-radius:10px">${opt.label}</button>`;
+  }).join('');
+}
+
+function openFavEdit(){
+  const favs=new Set(DB.settings.favourites||[]);
+  document.getElementById('favedit-groups').innerHTML=FAV_OPTIONS.map(g=>`
+    <div>
+      <div style="font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">${g.group}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${g.items.map(o=>`
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:7px 12px;border:1.5px solid ${favs.has(o.id)?'#1a3a5c':'#e2e8f0'};border-radius:9px;background:${favs.has(o.id)?'#eef2ff':'#fff'};font-size:.88rem;transition:all .15s">
+            <input type="checkbox" value="${o.id}" ${favs.has(o.id)?'checked':''} onchange="this.closest('label').style.borderColor=this.checked?'#1a3a5c':'#e2e8f0';this.closest('label').style.background=this.checked?'#eef2ff':'#fff'">
+            ${o.label}
+          </label>`).join('')}
+      </div>
+    </div>`).join('');
+  document.getElementById('favedit-overlay').classList.add('open');
+}
+
+function saveFavourites(){
+  DB.settings.favourites=[...document.querySelectorAll('#favedit-groups input[type=checkbox]:checked')].map(c=>c.value);
+  save();
+  closeModal('favedit-overlay');
+  renderFavourites();
+}
 function load(){
   const d=localStorage.getItem(STORE);
   if(d){
@@ -1095,6 +1183,7 @@ function load(){
     if(!DB.settings.admin_charges) DB.settings.admin_charges=DB.settings.expenses_default||30000;
     DB.sales.forEach(s=>{if(!s.hasOwnProperty('carriage_charges'))s.carriage_charges=0;});
     if(!DB.budget) DB.budget=[];
+    if(!DB.settings.favourites) DB.settings.favourites=[];
     // Backfill animal_age/animal_weight on old budget entries
     DB.budget.forEach(e=>{
       if(e.animal_code&&!e.animal_age){
@@ -1291,6 +1380,7 @@ function custTotals(cid){
 
 // ══════════════════════════ DASHBOARD ══════════════════════════
 function renderDashboard(){
+  renderFavourites();
   const ta=DB.animals.length, av=DB.animals.filter(a=>a.status==='available').length;
   const sold=DB.animals.filter(a=>a.status==='sold').length;
   const rev=DB.sales.reduce((a,s)=>a+s.amount,0);
