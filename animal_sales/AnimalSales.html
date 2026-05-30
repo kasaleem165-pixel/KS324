@@ -581,22 +581,13 @@ input[readonly]{background:#f8fafc}
         <select id="bg-animal" onchange="bgAnimalSelected()">
           <option value="">-- Select Animal --</option>
         </select></div>
-      <div class="fg"><label>Payee / Vendor *</label>
-        <input id="bg-vendor" placeholder="e.g. Hafiz Tahir, Feed Supplier"></div>
+      <div class="fg"><label>Customer *</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select id="bg-customer"><option value="">-- Select Customer --</option></select>
+          <button class="btn btn-light btn-sm" onclick="show('customers')" title="Add new customer" style="white-space:nowrap;flex-shrink:0">＋ New</button>
+        </div></div>
       <div class="fg"><label>Budget Date *</label>
         <input id="bg-date" type="date"></div>
-      <div class="fg"><label>Budget Head *</label>
-        <select id="bg-head">
-          <option value="">-- Select Head --</option>
-          <option>Animal Purchase</option>
-          <option>Feed / Fodder</option>
-          <option>Veterinary / Medical</option>
-          <option>Transport / Truck</option>
-          <option>Qasai / Labor</option>
-          <option>Commission / Adda</option>
-          <option>Administrative</option>
-          <option>Miscellaneous</option>
-        </select></div>
     </div>
     <!-- Entry Mode toggle -->
     <div style="margin:12px 0;padding:11px 14px;background:#f1f5f9;border-radius:8px;display:flex;gap:22px;align-items:center;flex-wrap:wrap">
@@ -647,7 +638,7 @@ input[readonly]{background:#f8fafc}
     </div>
     <div id="budget-records-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px"></div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>S#</th><th>Date</th><th>Animal</th><th>Payee / Vendor</th><th>Head</th><th>Mode</th><th>Wt(kg)</th><th>Rate/kg</th><th>Base Amt</th><th>Carriage</th><th>Admin</th><th>Total</th><th>Notes</th><th></th></tr></thead>
+      <thead><tr><th>S#</th><th>Date</th><th>Animal</th><th>Customer</th><th>Mode</th><th>Wt(kg)</th><th>Rate/kg</th><th>Sale Price</th><th>Carriage</th><th>Admin</th><th>Total</th><th>Notes</th><th></th></tr></thead>
       <tbody id="budget-records-body"></tbody>
     </table></div>
   </div>
@@ -3413,7 +3404,6 @@ function saveSettings(){
 function bgAnimalSelected(){
   const code=document.getElementById('bg-animal').value;
   const a=DB.animals.find(x=>x.code===code);
-  // Pre-fill weight if animal has a known weight
   const wEl=document.getElementById('bg-weight');
   if(a&&(a.weight_final||a.weight)) wEl.value=a.weight_final||a.weight;
   bgCalc();
@@ -3455,14 +3445,12 @@ function bgCalc(){
 function addBudgetEntry(){
   const date=document.getElementById('bg-date').value;
   const animal_code=document.getElementById('bg-animal').value;
-  const vendor=document.getElementById('bg-vendor').value.trim();
-  const head=document.getElementById('bg-head').value;
+  const customer_id=parseInt(document.getElementById('bg-customer').value)||0;
   const isLump=document.querySelector('[name="bg-mode"]:checked').value==='lumpsum';
   const adm=parseFloat(document.getElementById('bg-admin').value)||0;
   const errors=[];
   if(!date) errors.push('Budget Date is required.');
-  if(!vendor) errors.push('Payee / Vendor is required.');
-  if(!head) errors.push('Budget Head is required.');
+  if(!customer_id) errors.push('Customer is required.');
   let w,r,car,amount;
   if(isLump){
     w=parseFloat(document.getElementById('bg-weight-lump').value)||0;
@@ -3484,7 +3472,7 @@ function addBudgetEntry(){
   DB.budget.push({id:Date.now(),date,animal_code:animal_code||'',
     animal_age:a?(a.age_type||''):'',
     animal_weight:w||0,
-    vendor,head,is_lumpsum:isLump,
+    customer_id,is_lumpsum:isLump,
     weight_at_entry:w,rate_per_kg:r,
     admin_charges:adm,carriage_charges:car,amount,
     notes:document.getElementById('bg-notes').value.trim()||''});
@@ -3495,13 +3483,11 @@ function addBudgetEntry(){
 function clearBudgetForm(){
   document.getElementById('bg-date').value=today();
   document.getElementById('bg-animal').value='';
-  document.getElementById('bg-vendor').value='';
-  document.getElementById('bg-head').value='';
+  document.getElementById('bg-customer').value='';
   document.getElementById('bg-admin').value='0';
   ['bg-weight','bg-rate','bg-carriage','bg-baseprice','bg-total',
    'bg-weight-lump','bg-lumpamt','bg-lumpcar','bg-lumptotal','bg-notes']
     .forEach(id=>document.getElementById(id).value='');
-  // Reset to weight mode
   document.querySelector('[name="bg-mode"][value="weight"]').checked=true;
   bgToggleMode();
 }
@@ -3516,27 +3502,29 @@ function renderBudgetRecords(){
   const entries=[...DB.budget].sort((a,b)=>a.date>b.date?-1:1);
   const tb=document.getElementById('budget-records-body');
   if(!entries.length){
-    tb.innerHTML='<tr><td colspan="14" class="empty">No budget entries yet.</td></tr>';
+    tb.innerHTML='<tr><td colspan="12" class="empty">No budget entries yet.</td></tr>';
     document.getElementById('budget-records-summary').innerHTML='';return;
   }
-  const byHead={};
-  entries.forEach(e=>{byHead[e.head]=(byHead[e.head]||0)+e.amount;});
   const grandTotal=entries.reduce((s,e)=>s+e.amount,0);
+  const grandBase=entries.reduce((s,e)=>s+(e.is_lumpsum?(e.amount-(e.carriage_charges||0)-(e.admin_charges||0)):(e.weight_at_entry||0)*(e.rate_per_kg||0)),0);
   const grandCarriage=entries.reduce((s,e)=>s+(e.carriage_charges||0),0);
   const grandAdmin=entries.reduce((s,e)=>s+(e.admin_charges||0),0);
-  document.getElementById('budget-records-summary').innerHTML=
-    Object.entries(byHead).map(([h,v])=>`<div class="stat"><div class="n" style="font-size:.85rem">${Rs(v)}</div><div class="l" style="font-size:.72rem">${h}</div></div>`).join('')+
-    `<div class="stat" style="border:2px solid #1a3a5c"><div class="n" style="font-size:.95rem;color:#1a3a5c">${Rs(grandTotal)}</div><div class="l">Total Budget</div></div>`;
+  // Budget Head summary section — fixed breakdown
+  document.getElementById('budget-records-summary').innerHTML=`
+    <div class="stat"><div class="n" style="font-size:.9rem">${Rs(grandBase)}</div><div class="l">Sale Price Total</div></div>
+    <div class="stat"><div class="n" style="font-size:.9rem">${Rs(grandCarriage)}</div><div class="l">Carriage Total</div></div>
+    <div class="stat"><div class="n" style="font-size:.9rem">${Rs(grandAdmin)}</div><div class="l">Admin Charges Total</div></div>
+    <div class="stat" style="border:2px solid #1a3a5c"><div class="n" style="font-size:.95rem;color:#1a3a5c">${Rs(grandTotal)}</div><div class="l">Grand Total</div></div>`;
   tb.innerHTML=entries.map((e,i)=>{
     const isLump=e.is_lumpsum;
     const baseAmt=isLump?(e.amount-(e.carriage_charges||0)-(e.admin_charges||0)):(e.weight_at_entry||0)*(e.rate_per_kg||0);
     const wt=e.weight_at_entry||e.animal_weight||0;
+    const custName=e.customer_id?cName(e.customer_id):(e.vendor||'-');
     return `<tr>
     <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
     <td>${fmtD(e.date)}</td>
     <td><strong>${e.animal_code||'-'}</strong></td>
-    <td style="font-size:.82rem">${e.vendor||'-'}</td>
-    <td><strong>${e.head}</strong></td>
+    <td>${custName}</td>
     <td style="font-size:.78rem;color:#555">${isLump?'Lump Sum':'Wt×Rate'}</td>
     <td>${wt?fmtN(wt,1)+' kg':'-'}</td>
     <td>${e.rate_per_kg?Rs(e.rate_per_kg):'-'}</td>
@@ -3548,8 +3536,10 @@ function renderBudgetRecords(){
     <td><button class="btn btn-danger btn-sm" onclick="deleteBudgetEntry(${e.id})">&#128465;</button></td>
   </tr>`;}).join('')+
   `<tr style="font-weight:700;background:#e0f2fe">
-    <td colspan="8" style="text-align:right;color:#1a3a5c">Grand Total (${entries.length} entries)</td>
-    <td></td><td>${grandCarriage>0?Rs(grandCarriage):'-'}</td><td>${grandAdmin>0?Rs(grandAdmin):'-'}</td>
+    <td colspan="7" style="text-align:right;color:#1a3a5c">Budget Head Total (${entries.length} entries)</td>
+    <td>${Rs(grandBase)}</td>
+    <td>${grandCarriage>0?Rs(grandCarriage):'-'}</td>
+    <td>${grandAdmin>0?Rs(grandAdmin):'-'}</td>
     <td>${Rs(grandTotal)}</td><td colspan="2"></td>
   </tr>`;
 }
@@ -3572,6 +3562,13 @@ function renderBudgeting(){
   [...DB.animals].sort((a,b)=>Number(a.code)-Number(b.code)||a.code.localeCompare(b.code)).forEach(a=>{
     const w=a.weight_final||a.weight||0;
     bgAsel.innerHTML+=`<option value="${a.code}"${a.code===curAval?' selected':''}>Code: ${a.code} | ${a.age_type||'?'} | ${w?w+' kg':'?'}</option>`;
+  });
+  // Populate customer dropdown
+  const bgCsel=document.getElementById('bg-customer');
+  const curCval=bgCsel.value;
+  bgCsel.innerHTML='<option value="">-- Select Customer --</option>';
+  [...DB.customers].sort((a,b)=>a.name.localeCompare(b.name)).forEach(c=>{
+    bgCsel.innerHTML+=`<option value="${c.id}"${c.id===parseInt(curCval)?' selected':''}>${c.name}</option>`;
   });
   renderBudgetRecords();
   document.getElementById('budget-summary').innerHTML=`
