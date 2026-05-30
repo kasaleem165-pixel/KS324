@@ -155,30 +155,55 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 <div id="LP">
 
   <div class="sec">
-    <div class="sh">Report Header</div>
-    <div class="fr">
-      <label>Branch</label>
-      <div class="crow">
-        <select id="sb" onchange="onBranch()"></select>
-        <button class="gbtn" title="Manage Branches" onclick="openM('branch')">&#9881;</button>
-      </div>
-    </div>
-    <div class="fr"><label>Report No.</label>
-      <input type="text" id="rno" placeholder="e.g. LMA-11/2025" oninput="renderRpt()">
-    </div>
+    <div class="sh">Branch &amp; Report Information</div>
+
     <div class="g2">
-      <div class="fr"><label>Prepared By</label>
-        <div class="crow">
-          <select id="spb" onchange="renderRpt()"></select>
-          <button class="gbtn" title="Manage Auditors" onclick="openM('prepby')">&#9881;</button>
-        </div>
+      <div class="fr"><label>Branch Code</label>
+        <input type="text" id="brcode" placeholder="e.g. 240" oninput="renderRpt()">
       </div>
-      <div class="fr"><label>Date</label>
+      <div class="fr"><label>Report No.</label>
+        <input type="text" id="rno" placeholder="e.g. LMA-11/2025" oninput="renderRpt()">
+      </div>
+    </div>
+
+    <div class="fr"><label>Branch Name</label>
+      <input type="text" id="brname" placeholder="e.g. LMA 11-FCC Branch Gulberg, Lahore" oninput="renderRpt()">
+    </div>
+
+    <div class="fr"><label>Region</label>
+      <input type="text" id="brregion" placeholder="e.g. Lahore" oninput="renderRpt()">
+    </div>
+
+    <div class="g2">
+      <div class="fr"><label>Audit Type</label>
+        <input type="text" id="brautype" placeholder="e.g. Routine Audit Visit" oninput="renderRpt()">
+      </div>
+      <div class="fr"><label>Report Date</label>
         <input type="date" id="rdt" oninput="renderRpt()">
       </div>
     </div>
+
     <div class="fr"><label>Audit Period</label>
       <input type="text" id="rper" placeholder="e.g. 1 Jan 2020 – 3 Feb 2025" oninput="renderRpt()">
+    </div>
+
+    <div class="fr"><label>Visit Dates</label>
+      <input type="text" id="brvisit" placeholder="e.g. 3 Feb 2025 to 21 Feb 2025" oninput="renderRpt()">
+    </div>
+
+    <div class="fr"><label>Previous Audit Report Date</label>
+      <input type="text" id="brprev" placeholder="e.g. 26 March 2020" oninput="renderRpt()">
+    </div>
+
+    <div class="fr"><label>Audit Framework</label>
+      <input type="text" id="brfwk" placeholder="e.g. COSO Internal Control – Integrated Framework" oninput="renderRpt()">
+    </div>
+
+    <div class="fr"><label>Prepared By</label>
+      <div class="crow">
+        <select id="spb" onchange="renderRpt()"></select>
+        <button class="gbtn" title="Manage Auditor Names" onclick="openM('prepby')">&#9881;</button>
+      </div>
     </div>
   </div>
 
@@ -309,12 +334,12 @@ var DB = JSON.parse(document.getElementById('audit-data').textContent);
 // ============================================================
 // STORAGE HELPERS
 // ============================================================
-var STORE_VER = 'v5';
+var STORE_VER = 'v6';
 function sg(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
 function ss(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 (function(){
   if(sg('bhs_v','')!==STORE_VER){
-    ['bhs_v','bhs_br','bhs_pb','bhs_ty','bhs_ca'].forEach(function(k){localStorage.removeItem(k);});
+    ['bhs_v','bhs_br','bhs_pb','bhs_ty','bhs_ca'].forEach(function(k){try{localStorage.removeItem(k);}catch(e){}});
     ss('bhs_v',STORE_VER);
   }
 })();
@@ -322,7 +347,6 @@ function ss(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 // ============================================================
 // INITIAL DATA  (populated from data bank)
 // ============================================================
-var DEF_BR=[{id:'LMA11_FCC_Gulberg_Lahore',code:'240',name:'LMA 11-FCC Branch Gulberg, Lahore'},{id:'Clifton_Campus_Karachi',code:'431',name:'Clifton Branch, Karachi'},{id:'Garden_Town_Lahore',code:'211',name:'Garden Town Branch, Lahore'}];
 var DEF_PB=['Internal Audit Team','Senior Auditor','Assistant Auditor','Regional Audit Officer'];
 var DEF_TY=['All Types'].concat(["New", "Repeated"]);
 var DEF_CA=['All Categories'].concat(["Branch Imprest, Payments & Accounts", "Cash and Bank", "Fixed Assets", "Library", "Others", "Recruitment, Payroll & Employee Record", "Safety & Security", "Science Laboratory", "Student Record"]);
@@ -330,7 +354,6 @@ var DEF_CA=['All Categories'].concat(["Branch Imprest, Payments & Accounts", "Ca
 // ============================================================
 // APP STATE
 // ============================================================
-var BRANCHES = sg('bhs_br', DEF_BR);
 var PREPBY   = sg('bhs_pb', DEF_PB);
 var TYPES    = sg('bhs_ty', DEF_TY);
 var CATS     = sg('bhs_ca', DEF_CA);
@@ -346,7 +369,6 @@ var curM     = null;
 // INIT
 // ============================================================
 window.onload = function() {
-  buildBrSel();
   buildSel('spb', PREPBY);
   buildSel('styp', TYPES);
   buildSel('scat', CATS);
@@ -363,17 +385,6 @@ function pad(n){return n<10?'0'+n:n;}
 // ============================================================
 // DROPDOWN BUILDERS
 // ============================================================
-function buildBrSel() {
-  var sel = document.getElementById('sb');
-  sel.innerHTML = '<option value="">— Select Branch —</option>';
-  for(var i=0;i<BRANCHES.length;i++){
-    var o=document.createElement('option');
-    o.value=BRANCHES[i].id;
-    o.textContent=BRANCHES[i].code+' - '+BRANCHES[i].name;
-    sel.appendChild(o);
-  }
-}
-
 function buildSel(id, arr) {
   var sel = document.getElementById(id);
   if(!sel) return;
@@ -387,13 +398,6 @@ function buildSel(id, arr) {
   for(var j=0;j<sel.options.length;j++){
     if(sel.options[j].value===prev){sel.value=prev;break;}
   }
-}
-
-function onBranch() {
-  var bid = document.getElementById('sb').value;
-  var mis = DB.campuses[bid];
-  if(mis && mis.audit_period) document.getElementById('rper').value=mis.audit_period;
-  renderRpt();
 }
 
 // ============================================================
@@ -593,13 +597,17 @@ function addCustom(){
 // REPORT RENDER
 // ============================================================
 function renderRpt(){
-  var bid=document.getElementById('sb').value;
-  var rno=document.getElementById('rno').value.trim();
-  var pb =document.getElementById('spb').value;
-  var dt =document.getElementById('rdt').value;
-  var per=document.getElementById('rper').value.trim();
-  var br =null; for(var i=0;i<BRANCHES.length;i++){if(BRANCHES[i].id===bid){br=BRANCHES[i];break;}}
-  var mis=DB.campuses[bid]||null;
+  var brcode  = document.getElementById('brcode').value.trim();
+  var brname  = document.getElementById('brname').value.trim();
+  var brregion= document.getElementById('brregion').value.trim();
+  var brautype= document.getElementById('brautype').value.trim();
+  var brvisit = document.getElementById('brvisit').value.trim();
+  var brprev  = document.getElementById('brprev').value.trim();
+  var brfwk   = document.getElementById('brfwk').value.trim();
+  var rno     = document.getElementById('rno').value.trim();
+  var pb      = document.getElementById('spb').value;
+  var dt      = document.getElementById('rdt').value;
+  var per     = document.getElementById('rper').value.trim();
 
   var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
@@ -608,7 +616,8 @@ function renderRpt(){
   var empty=document.getElementById('rpempty');
   var cont =document.getElementById('rpcont');
 
-  if(!all.length && !br){empty.style.display='block';cont.style.display='none';return;}
+  var hasHeader = brcode||brname||rno||pb||dt||per;
+  if(!all.length && !hasHeader){empty.style.display='block';cont.style.display='none';return;}
   empty.style.display='none'; cont.style.display='block';
 
   // Group by category
@@ -629,22 +638,26 @@ function renderRpt(){
   h+='<div class="rhdr">';
   h+='<div class="rlogo">Beaconhouse School System &nbsp;|&nbsp; Internal Audit</div>';
   h+='<h1>AUDIT REPORT</h1>';
-  if(br) h+='<h2>'+esc(br.code)+' – '+esc(br.name)+'</h2>';
+  if(brcode||brname) h+='<h2>'+(brcode?esc(brcode)+' – ':'')+esc(brname)+'</h2>';
   h+='<div class="rmeta">';
-  if(rno)h+='<div><strong>Report No.:</strong> '+esc(rno)+'</div>'; else h+='<div></div>';
-  if(dt) h+='<div><strong>Date:</strong> '+fmtDt(dt)+'</div>'; else h+='<div></div>';
-  if(pb) h+='<div><strong>Prepared By:</strong> '+esc(pb)+'</div>'; else h+='<div></div>';
-  if(per)h+='<div><strong>Audit Period:</strong> '+esc(per)+'</div>'; else h+='<div></div>';
+  if(rno) h+='<div><strong>Report No.:</strong> '+esc(rno)+'</div>'; else h+='<div></div>';
+  if(dt)  h+='<div><strong>Date:</strong> '+fmtDt(dt)+'</div>';     else h+='<div></div>';
+  if(pb)  h+='<div><strong>Prepared By:</strong> '+esc(pb)+'</div>'; else h+='<div></div>';
+  if(per) h+='<div><strong>Audit Period:</strong> '+esc(per)+'</div>'; else h+='<div></div>';
   h+='</div></div>';
 
-  if(mis){
+  // MIS box — show whenever any MIS field is filled
+  var misFields=[brname,brregion,brautype,per,brvisit,brprev,brfwk];
+  var hasMis=misFields.some(function(v){return !!v;});
+  if(hasMis){
     h+='<div class="misbox"><h3>Branch Information (MIS)</h3><div class="misg">';
-    h+='<div><strong>Branch:</strong> '+esc(mis.name)+'</div>';
-    h+='<div><strong>Audit Type:</strong> '+esc(mis.audit_type)+'</div>';
-    h+='<div><strong>Audit Period:</strong> '+esc(mis.audit_period)+'</div>';
-    h+='<div><strong>Visit Dates:</strong> '+esc(mis.visit_dates)+'</div>';
-    h+='<div><strong>Prev. Report:</strong> '+esc(mis.previous_report)+'</div>';
-    h+='<div><strong>Framework:</strong> '+esc(mis.framework)+'</div>';
+    if(brname)   h+='<div><strong>Branch:</strong> '+esc(brname)+'</div>';
+    if(brregion) h+='<div><strong>Region:</strong> '+esc(brregion)+'</div>';
+    if(brautype) h+='<div><strong>Audit Type:</strong> '+esc(brautype)+'</div>';
+    if(per)      h+='<div><strong>Audit Period:</strong> '+esc(per)+'</div>';
+    if(brvisit)  h+='<div><strong>Visit Dates:</strong> '+esc(brvisit)+'</div>';
+    if(brprev)   h+='<div><strong>Prev. Report:</strong> '+esc(brprev)+'</div>';
+    if(brfwk)    h+='<div><strong>Framework:</strong> '+esc(brfwk)+'</div>';
     h+='</div></div>';
   }
 
