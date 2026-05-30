@@ -986,6 +986,18 @@ function downloadSoftCopy(){
   var softHtml='<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n';
   softHtml+='<meta name="viewport" content="width=device-width,initial-scale=1">\n';
   softHtml+='<title>Audit Report – Auditee Copy'+(H.brcode?' ('+H.brcode+')':(H.brname?' ('+H.brname+')':''))+'</title>\n';
+  // Embed raw field values so they can be restored when loading back
+  var meta={
+    brcode:H.brcode, brname:H.brname, brregion:H.brregion, brautype:H.brautype,
+    rno:H.rno, pb:H.pb, brfwk:H.brfwk,
+    rdt:document.getElementById('rdt').value,
+    rper_from:document.getElementById('rper_from').value,
+    rper_to:document.getElementById('rper_to').value,
+    brvisit_from:document.getElementById('brvisit_from').value,
+    brvisit_to:document.getElementById('brvisit_to').value,
+    brprev:document.getElementById('brprev').value
+  };
+  softHtml+='<script type="application/json" id="report-meta">'+JSON.stringify(meta)+'<\/script>\n';
   softHtml+='<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">\n';
   softHtml+='<style>\n';
   softHtml+='*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}\n';
@@ -1087,6 +1099,28 @@ function loadAuditeeFile(evt){
         var id2=nm.slice(4);
         actMap[id2]=val;
       }
+    }
+    // Restore Branch & Report Information fields from embedded meta
+    var metaEl=doc.getElementById('report-meta');
+    if(metaEl){
+      try{
+        var m=JSON.parse(metaEl.textContent);
+        function setVal(id,v){var el=document.getElementById(id);if(el&&v!=null&&v!=='')el.value=v;}
+        setVal('brcode',m.brcode); setVal('brname',m.brname);
+        setVal('brregion',m.brregion); setVal('brautype',m.brautype);
+        setVal('rno',m.rno); setVal('brfwk',m.brfwk);
+        setVal('rdt',m.rdt);
+        setVal('rper_from',m.rper_from); setVal('rper_to',m.rper_to);
+        setVal('brvisit_from',m.brvisit_from); setVal('brvisit_to',m.brvisit_to);
+        setVal('brprev',m.brprev);
+        // Prepared By: set select if option exists, else add it
+        var spb=document.getElementById('spb');
+        if(spb&&m.pb){
+          var found=false;
+          for(var p=0;p<spb.options.length;p++){if(spb.options[p].value===m.pb){spb.value=m.pb;found=true;break;}}
+          if(!found){var opt=document.createElement('option');opt.value=m.pb;opt.textContent=m.pb;spb.appendChild(opt);spb.value=m.pb;}
+        }
+      }catch(ex){}
     }
     // Auto-select the observations that appeared in the returned file
     for(var j=0;j<loadedObs.length;j++) selIds[loadedObs[j]]=true;
