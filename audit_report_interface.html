@@ -145,8 +145,9 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 
 <div id="toolbar">
   <div class="brand">BHS <small>Internal Audit — Report Builder</small></div>
-  <button class="tbtn g" onclick="doPrint()">&#128424; Print / PDF</button>
-  <button class="tbtn s" onclick="doCopy()">&#128203; Copy</button>
+  <button class="tbtn g" onclick="downloadPDF()">&#128462; Download PDF</button>
+  <button class="tbtn g" style="background:#2a6040" onclick="downloadSoftCopy()">&#128233; Soft Copy (HTML)</button>
+  <button class="tbtn s" onclick="doCopy()">&#128203; Copy Text</button>
   <button class="tbtn r" onclick="doClear()">&#10005; Clear</button>
 </div>
 
@@ -184,15 +185,29 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
     </div>
 
     <div class="fr"><label>Audit Period</label>
-      <input type="text" id="rper" placeholder="e.g. 1 Jan 2020 – 3 Feb 2025" oninput="renderRpt()">
+      <div class="g2">
+        <div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">From</div>
+          <input type="date" id="rper_from" oninput="renderRpt()">
+        </div>
+        <div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">To</div>
+          <input type="date" id="rper_to" oninput="renderRpt()">
+        </div>
+      </div>
     </div>
 
     <div class="fr"><label>Visit Dates</label>
-      <input type="text" id="brvisit" placeholder="e.g. 3 Feb 2025 to 21 Feb 2025" oninput="renderRpt()">
+      <div class="g2">
+        <div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">From</div>
+          <input type="date" id="brvisit_from" oninput="renderRpt()">
+        </div>
+        <div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">To</div>
+          <input type="date" id="brvisit_to" oninput="renderRpt()">
+        </div>
+      </div>
     </div>
 
     <div class="fr"><label>Previous Audit Report Date</label>
-      <input type="text" id="brprev" placeholder="e.g. 26 March 2020" oninput="renderRpt()">
+      <input type="date" id="brprev" oninput="renderRpt()">
     </div>
 
     <div class="fr"><label>Audit Framework</label>
@@ -597,18 +612,36 @@ function addCustom(){
 // ============================================================
 // REPORT RENDER
 // ============================================================
+function fmtDt(s){
+  if(!s) return '';
+  var d=new Date(s); if(isNaN(d.getTime())) return s;
+  return d.toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
+}
+function fmtRange(from,to){
+  var f=fmtDt(from),t=fmtDt(to);
+  if(f&&t) return f+' to '+t;
+  return f||t;
+}
+function getHdrVals(){
+  return {
+    brcode  : document.getElementById('brcode').value.trim(),
+    brname  : document.getElementById('brname').value.trim(),
+    brregion: document.getElementById('brregion').value.trim(),
+    brautype: document.getElementById('brautype').value.trim(),
+    brvisit : fmtRange(document.getElementById('brvisit_from').value, document.getElementById('brvisit_to').value),
+    brprev  : fmtDt(document.getElementById('brprev').value),
+    brfwk   : document.getElementById('brfwk').value.trim(),
+    rno     : document.getElementById('rno').value.trim(),
+    pb      : document.getElementById('spb').value,
+    dt      : document.getElementById('rdt').value,
+    per     : fmtRange(document.getElementById('rper_from').value, document.getElementById('rper_to').value)
+  };
+}
 function renderRpt(){
-  var brcode  = document.getElementById('brcode').value.trim();
-  var brname  = document.getElementById('brname').value.trim();
-  var brregion= document.getElementById('brregion').value.trim();
-  var brautype= document.getElementById('brautype').value.trim();
-  var brvisit = document.getElementById('brvisit').value.trim();
-  var brprev  = document.getElementById('brprev').value.trim();
-  var brfwk   = document.getElementById('brfwk').value.trim();
-  var rno     = document.getElementById('rno').value.trim();
-  var pb      = document.getElementById('spb').value;
-  var dt      = document.getElementById('rdt').value;
-  var per     = document.getElementById('rper').value.trim();
+  var H=getHdrVals();
+  var brcode=H.brcode, brname=H.brname, brregion=H.brregion, brautype=H.brautype,
+      brvisit=H.brvisit, brprev=H.brprev, brfwk=H.brfwk,
+      rno=H.rno, pb=H.pb, dt=H.dt, per=H.per;
 
   var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
@@ -629,12 +662,6 @@ function renderRpt(){
     cats[c].push(all[a]);
   }
 
-  function fmtDt(s){
-    if(!s)return '';
-    var d=new Date(s); if(isNaN(d))return s;
-    return d.toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
-  }
-
   var h='';
   h+='<div class="rhdr">';
   h+='<div class="rlogo">Beaconhouse School System &nbsp;|&nbsp; Internal Audit</div>';
@@ -642,7 +669,7 @@ function renderRpt(){
   if(brcode||brname) h+='<h2>'+(brcode?esc(brcode)+' – ':'')+esc(brname)+'</h2>';
   h+='<div class="rmeta">';
   if(rno) h+='<div><strong>Report No.:</strong> '+esc(rno)+'</div>'; else h+='<div></div>';
-  if(dt)  h+='<div><strong>Date:</strong> '+fmtDt(dt)+'</div>';     else h+='<div></div>';
+  if(dt)  h+='<div><strong>Date:</strong> '+esc(fmtDt(dt))+'</div>'; else h+='<div></div>';
   if(pb)  h+='<div><strong>Prepared By:</strong> '+esc(pb)+'</div>'; else h+='<div></div>';
   if(per) h+='<div><strong>Audit Period:</strong> '+esc(per)+'</div>'; else h+='<div></div>';
   h+='</div></div>';
@@ -840,15 +867,26 @@ function addIt(key){
 // ============================================================
 // TOOLBAR
 // ============================================================
-function doPrint(){renderRpt();setTimeout(function(){window.print();},200);}
+function downloadPDF(){
+  renderRpt();
+  setTimeout(function(){
+    var prev=document.title;
+    var H=getHdrVals();
+    document.title='Audit Report'+(H.brcode?' – '+H.brcode:'')+(H.brname?' '+H.brname:'');
+    window.print();
+    document.title=prev;
+  },300);
+}
+
 function doCopy(){
   var c=document.getElementById('rpcont');
   if(!c||c.style.display==='none'){toast('Generate report first.');return;}
   navigator.clipboard.writeText(c.innerText||'').then(function(){toast('Copied to clipboard.');});
 }
+
 function doClear(){
   if(!confirm('Clear all selections?'))return;
-  selIds={}; annexMap={}; customs=[];
+  selIds={}; annexMap={}; avMap={}; actMap={}; customs=[];
   document.getElementById('qinp').value='';
   document.getElementById('styp').value='All Types';
   document.getElementById('scat').value='All Categories';
@@ -856,6 +894,165 @@ function doClear(){
   document.getElementById('rpempty').style.display='block';
   applyFilter();
   toast('Cleared.');
+}
+
+// ============================================================
+// SOFT COPY (HTML for auditee)
+// ============================================================
+function downloadSoftCopy(){
+  var cont=document.getElementById('rpcont');
+  if(!cont||cont.style.display==='none'){toast('Generate report first.');return;}
+
+  var H=getHdrVals();
+  var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
+  var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
+  var all=dbObs.concat(cuObs);
+  if(!all.length){toast('No observations selected.');return;}
+
+  var avMode=document.querySelector('input[name="avmode"]:checked');
+  var avVal=avMode?avMode.value:'auto';
+
+  // Group by category
+  var cats={}; var catOrder=[];
+  for(var a=0;a<all.length;a++){
+    var c=all[a].category||'Others'; if(!cats[c]){cats[c]=[];catOrder.push(c);} cats[c].push(all[a]);
+  }
+
+  var fname='AuditReport'+(H.brcode?'_'+H.brcode:'')+(H.brname?'_'+H.brname.replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_'):'')+'_AuditeeResponse.html';
+
+  // Build each observation block
+  function obsHtml(o, num){
+    var tc=(o.type||'new').toLowerCase();
+    var ax=annexMap[o.id]||o._annex||'';
+    var avStored=avMap[o.id]||'';
+    var bdr=tc==='repeated'?'#d06020':'#2070b8';
+    var h='<div style="border:1px solid #dde2ea;border-left:4px solid '+bdr+';border-radius:5px;margin-bottom:18px;overflow:hidden;page-break-inside:avoid">';
+    h+='<div style="display:flex;align-items:center;padding:8px 12px;background:#fafbfc;border-bottom:1px solid #dde2ea;gap:8px">';
+    h+='<span style="font-size:11px;font-weight:700;color:#6a7888">Obs. '+num+'</span>';
+    h+='<span style="flex:1;font-size:13px;font-weight:700;color:#1e2d40">'+esc(o.title)+'</span>';
+    h+='<span style="padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;'+(tc==='repeated'?'background:#fff0e6;color:#b04800;border:1px solid #f0b080':'background:#e6f0ff;color:#1050a0;border:1px solid #90b8e8')+'">'+esc(o.type||'New')+'</span>';
+    h+='</div>';
+    h+='<div style="padding:11px 13px">';
+    if(o.observation) h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Observation</div><div style="font-size:12.5px;line-height:1.65;color:#2a3a50;margin-bottom:10px">'+esc(o.observation)+'</div>';
+    if(o.recommendation) h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Recommendation</div><div style="font-size:12.5px;line-height:1.65;color:#2a3a50;margin-bottom:10px">'+esc(o.recommendation)+'</div>';
+    if(ax) h+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> '+esc(ax)+'</div>';
+    // Auditee Response — always blank in soft copy
+    h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Auditee Response</div>';
+    h+='<textarea name="resp_'+esc(o.id)+'" style="width:100%;border:1px dashed #b0c0d8;border-radius:4px;padding:7px 9px;font-family:Inter,sans-serif;font-size:12.5px;color:#2a3a50;background:#fffef0;resize:vertical;min-height:60px;outline:none" placeholder="Please enter auditee response here..."></textarea>';
+    // Audit View
+    if(avVal==='auto'&&o.audit_view) h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Audit View</div><div style="font-size:12.5px;line-height:1.65;color:#2a3a50;margin-bottom:8px">'+esc(o.audit_view)+'</div>';
+    else if(avVal==='manual'){
+      h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Audit View</div>';
+      h+='<div style="font-size:12.5px;line-height:1.65;color:#2a3a50;margin-bottom:8px">'+esc(avStored)+'</div>';
+    }
+    // Action Taken — blank in soft copy
+    h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Action Taken</div>';
+    h+='<textarea name="act_'+esc(o.id)+'" style="width:100%;border:1px dashed #b0c0d8;border-radius:4px;padding:7px 9px;font-family:Inter,sans-serif;font-size:12.5px;color:#2a3a50;background:#fffef0;resize:vertical;min-height:60px;outline:none" placeholder="Please describe action taken..."></textarea>';
+    h+='</div></div>';
+    return h;
+  }
+
+  // Build observation sections
+  var obsSection='';
+  var num=0;
+  for(var ci=0;ci<catOrder.length;ci++){
+    var cat=catOrder[ci];
+    obsSection+='<div style="margin-bottom:24px">';
+    obsSection+='<div style="font-family:Merriweather,serif;font-size:12px;font-weight:700;color:#1a3a5c;background:#edf2f8;border-left:4px solid #1a3a5c;padding:7px 12px;margin-bottom:10px;border-radius:0 4px 4px 0;text-transform:uppercase;letter-spacing:.4px">'+esc(cat)+'</div>';
+    var obsList=cats[cat];
+    for(var oi=0;oi<obsList.length;oi++){num++;obsSection+=obsHtml(obsList[oi],num);}
+    obsSection+='</div>';
+  }
+
+  // Build MIS box
+  var misHtml='';
+  if(H.brname||H.brregion||H.brautype||H.per||H.brvisit||H.brprev||H.brfwk){
+    misHtml='<div style="background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;padding:12px 14px;margin-bottom:18px">';
+    misHtml+='<div style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#1a3a5c;margin-bottom:8px">Branch Information (MIS)</div>';
+    misHtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:11.5px;color:#2a4060">';
+    if(H.brname)   misHtml+='<div><strong>Branch:</strong> '+esc(H.brname)+'</div>';
+    if(H.brregion) misHtml+='<div><strong>Region:</strong> '+esc(H.brregion)+'</div>';
+    if(H.brautype) misHtml+='<div><strong>Audit Type:</strong> '+esc(H.brautype)+'</div>';
+    if(H.per)      misHtml+='<div><strong>Audit Period:</strong> '+esc(H.per)+'</div>';
+    if(H.brvisit)  misHtml+='<div><strong>Visit Dates:</strong> '+esc(H.brvisit)+'</div>';
+    if(H.brprev)   misHtml+='<div><strong>Prev. Report:</strong> '+esc(H.brprev)+'</div>';
+    if(H.brfwk)    misHtml+='<div><strong>Framework:</strong> '+esc(H.brfwk)+'</div>';
+    misHtml+='</div></div>';
+  }
+
+  var softHtml='<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n';
+  softHtml+='<meta name="viewport" content="width=device-width,initial-scale=1">\n';
+  softHtml+='<title>Audit Report – Auditee Copy'+(H.brcode?' ('+H.brcode+')':(H.brname?' ('+H.brname+')':''))+'</title>\n';
+  softHtml+='<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">\n';
+  softHtml+='<style>\n';
+  softHtml+='*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}\n';
+  softHtml+='body{font-family:Inter,sans-serif;font-size:13.5px;color:#1e2d40;background:#f3f5f8;padding:20px}\n';
+  softHtml+='#wrap{max-width:860px;margin:0 auto}\n';
+  softHtml+='#notice{background:#fff3cd;border:1px solid #f0c040;border-radius:6px;padding:12px 16px;margin-bottom:20px;font-size:13px;line-height:1.6}\n';
+  softHtml+='#notice strong{color:#7a5000}\n';
+  softHtml+='#rp{background:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(26,58,92,.1);padding:30px 34px}\n';
+  softHtml+='textarea{font-family:Inter,sans-serif}\n';
+  softHtml+='#savebtn{display:block;width:100%;margin-top:24px;padding:13px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-family:Inter,sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px}\n';
+  softHtml+='#savebtn:hover{background:#2a5080}\n';
+  softHtml+='@media print{#notice,#savebtn{display:none!important}body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}}\n';
+  softHtml+='</style>\n</head>\n<body>\n<div id="wrap">\n';
+  softHtml+='<div id="notice"><strong>&#9432; Instructions for Auditee:</strong> Please read each observation carefully and type your response in the yellow-highlighted fields labelled <em>Auditee Response</em> and <em>Action Taken</em>. When finished, click the <strong>"Save with My Responses"</strong> button at the bottom to download the completed file and email it back to the auditor.</div>\n';
+  softHtml+='<div id="rp">\n';
+  // Report header
+  softHtml+='<div style="text-align:center;border-bottom:3px solid #1a3a5c;padding-bottom:16px;margin-bottom:20px">\n';
+  softHtml+='<div style="font-size:10px;font-weight:700;letter-spacing:2px;color:#c9962a;text-transform:uppercase;margin-bottom:6px">Beaconhouse School System &nbsp;|&nbsp; Internal Audit</div>\n';
+  softHtml+='<h1 style="font-family:Merriweather,serif;font-size:23px;font-weight:700;color:#1a3a5c">AUDIT REPORT</h1>\n';
+  if(H.brcode||H.brname) softHtml+='<h2 style="font-family:Merriweather,serif;font-size:14px;font-weight:400;color:#2a5080;margin-top:4px">'+(H.brcode?esc(H.brcode)+' – ':'')+esc(H.brname)+'</h2>\n';
+  softHtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;margin-top:13px;text-align:left;font-size:12px">\n';
+  if(H.rno) softHtml+='<div><strong style="color:#1a3a5c;display:inline-block;min-width:96px">Report No.:</strong> '+esc(H.rno)+'</div>';
+  if(H.dt)  softHtml+='<div><strong style="color:#1a3a5c;display:inline-block;min-width:96px">Date:</strong> '+esc(fmtDt(H.dt))+'</div>';
+  if(H.pb)  softHtml+='<div><strong style="color:#1a3a5c;display:inline-block;min-width:96px">Prepared By:</strong> '+esc(H.pb)+'</div>';
+  if(H.per) softHtml+='<div><strong style="color:#1a3a5c;display:inline-block;min-width:96px">Audit Period:</strong> '+esc(H.per)+'</div>';
+  softHtml+='</div></div>\n';
+  softHtml+=misHtml;
+  softHtml+=obsSection;
+  softHtml+='</div>\n'; // end #rp
+  // Save-with-responses button — inline JS in the soft copy
+  softHtml+='<button id="savebtn" onclick="saveResponses()">&#128190; Save with My Responses</button>\n';
+  softHtml+='</div>\n'; // end #wrap
+
+  // Inline JS for the save-responses feature
+  softHtml+='<script>\n';
+  softHtml+='function saveResponses(){\n';
+  softHtml+='  var tas=document.querySelectorAll("textarea");\n';
+  softHtml+='  var clone=document.documentElement.outerHTML;\n';
+  softHtml+='  for(var i=0;i<tas.length;i++){\n';
+  softHtml+='    var ta=tas[i];\n';
+  softHtml+='    var nm=ta.name||"";\n';
+  softHtml+='    var val=ta.value.replace(/\\\\/g,"\\\\\\\\").replace(/`/g,"\\\\`");\n';
+  softHtml+='    clone=clone.replace(\'name="\'+nm+\'" style=\',\'data-val="\'+encodeURIComponent(ta.value)+\'" name="\'+nm+\'" style=\');\n';
+  softHtml+='  }\n';
+  softHtml+='  // Re-inject values as defaultValue\n';
+  softHtml+='  clone=clone.replace(/<script>/g,"<scr"+"ipt>").replace(/<\\/script>/g,"</scr"+"ipt>");\n';
+  softHtml+='  // Build new doc\n';
+  softHtml+='  var parser=new DOMParser();\n';
+  softHtml+='  var doc=parser.parseFromString(clone,"text/html");\n';
+  softHtml+='  var newTas=doc.querySelectorAll("textarea[data-val]");\n';
+  softHtml+='  for(var j=0;j<newTas.length;j++){\n';
+  softHtml+='    newTas[j].textContent=decodeURIComponent(newTas[j].getAttribute("data-val"));\n';
+  softHtml+='    newTas[j].removeAttribute("data-val");\n';
+  softHtml+='  }\n';
+  softHtml+='  var out="<!DOCTYPE html>\\n"+doc.documentElement.outerHTML;\n';
+  softHtml+='  var blob=new Blob([out],{type:"text/html"});\n';
+  softHtml+='  var url=URL.createObjectURL(blob);\n';
+  softHtml+='  var a=document.createElement("a");\n';
+  softHtml+='  a.href=url; a.download=document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_Responded.html";\n';
+  softHtml+='  a.click(); URL.revokeObjectURL(url);\n';
+  softHtml+='}\n';
+  softHtml+='</scr'+'ipt>\n';
+  softHtml+='</body>\n</html>';
+
+  var blob=new Blob([softHtml],{type:'text/html'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url; a.download=fname; a.click();
+  URL.revokeObjectURL(url);
+  toast('Soft copy downloaded.');
 }
 
 // ============================================================
