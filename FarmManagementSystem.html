@@ -68,6 +68,12 @@
   .lookup-section-header { background:#f9fafb;padding:10px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:13px;color:#1a3a2a; }
   .lookup-section-body { padding:14px 16px;display:none; }
   .lookup-section-body.open { display:block; }
+  /* health record type buttons */
+  .htype-btn { padding:5px 13px;border-radius:20px;border:1.5px solid #d1d5db;background:#f9fafb;color:#374151;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s; }
+  .htype-btn.active { border-color:#3b82f6;background:#dbeafe;color:#1e40af; }
+  .health-filter-btn { padding:5px 13px;border-radius:20px;border:1.5px solid #d1d5db;background:#f9fafb;color:#374151;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s; }
+  .health-filter-btn.active { border-color:#ef4444;background:#fee2e2;color:#991b1b; }
+  .stage-suggest-box { background:#dcfce7;border:1.5px solid #16a34a;border-radius:8px;padding:8px 14px;margin-top:4px;font-size:13px;color:#166534;display:none; }
   @media(max-width:768px){ .sidebar{width:60px;} .sidebar-item span{display:none;} .grid-2,.grid-3{grid-template-columns:1fr;} }
 </style>
 </head>
@@ -254,10 +260,22 @@
     <div class="section-title"><i class="fas fa-heartbeat" style="color:#ef4444"></i> Health Records</div>
     <button class="btn-primary" onclick="openHealthModal()"><i class="fas fa-plus"></i> Add Record</button>
   </div>
+  <!-- Sub-type filter pills -->
+  <div class="card" style="margin-bottom:12px;padding:12px 16px;">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+      <span style="font-size:12px;font-weight:700;color:#374151;margin-right:4px;">Filter by Type:</span>
+      <button class="health-filter-btn active" onclick="filterHealthByType('')" id="hfilt-all">All Records</button>
+      <button class="health-filter-btn" onclick="filterHealthByType('Treatment')" id="hfilt-Treatment"><i class="fas fa-stethoscope"></i> Treatment</button>
+      <button class="health-filter-btn" onclick="filterHealthByType('Vaccination')" id="hfilt-Vaccination"><i class="fas fa-syringe"></i> Vaccination</button>
+      <button class="health-filter-btn" onclick="filterHealthByType('Deworming')" id="hfilt-Deworming"><i class="fas fa-pills"></i> Deworming</button>
+      <button class="health-filter-btn" onclick="filterHealthByType('Reproductive')" id="hfilt-Reproductive"><i class="fas fa-heart"></i> Reproductive</button>
+      <button class="health-filter-btn" onclick="filterHealthByType('Disease')" id="hfilt-Disease"><i class="fas fa-virus"></i> Disease</button>
+      <button class="health-filter-btn" onclick="filterHealthByType('Mortality')" id="hfilt-Mortality"><i class="fas fa-skull"></i> Mortality</button>
+    </div>
+  </div>
   <div class="card" style="margin-bottom:16px;padding:14px 20px;">
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
       <select class="form-control" style="width:200px;" id="filterHealthTag" onchange="renderHealth()"><option value="">All Animals</option></select>
-      <select class="form-control" style="width:170px;" id="filterHealthType" onchange="renderHealth()"><option value="">All Event Types</option></select>
       <input type="date" class="form-control" style="width:160px;" id="filterHealthFrom" onchange="renderHealth()">
       <input type="date" class="form-control" style="width:160px;" id="filterHealthTo" onchange="renderHealth()">
       <button class="btn-primary" onclick="clearHealthFilters()">Clear</button>
@@ -267,7 +285,7 @@
   <div id="healthDueAlert" style="margin-bottom:16px;"></div>
   <div class="card">
     <div style="overflow-x:auto;"><table>
-      <thead><tr><th>Date</th><th>Animal</th><th>Event Type</th><th>Description</th><th>Doctor/Vet</th><th>Cost (Rs)</th><th>Next Due</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Date</th><th>Animal</th><th>Type</th><th>Details</th><th>Doctor/Vet</th><th>Cost (Rs)</th><th>Next Due</th><th>Actions</th></tr></thead>
       <tbody id="healthTbody"></tbody>
     </table></div>
   </div>
@@ -421,7 +439,7 @@
     <div class="form-group"><label>Tag No *</label><input class="form-control" id="anTagNo" placeholder="e.g. B-001"></div>
     <div class="form-group">
       <div class="lbl-row"><label>Animal Type *</label><span class="manage-link" onclick="openQuickManage('animalTypes','anType',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
-      <select class="form-control" id="anType" onchange="updateBreedOptions()"><option value="">Select Type</option></select>
+      <select class="form-control" id="anType" onchange="updateBreedOptions();updateStageOptions()"><option value="">Select Type</option></select>
     </div>
     <div class="form-group">
       <div class="lbl-row"><label>Breed</label><span class="manage-link" onclick="openQuickManageBreed()"><i class="fas fa-pencil-alt"></i> manage</span></div>
@@ -432,11 +450,19 @@
         <option value="">Select Gender</option><option>Female</option><option>Male</option>
       </select>
     </div>
+    <div class="form-group"><label>Date of Birth</label><input type="date" class="form-control" id="anDOB" oninput="suggestStage()"></div>
     <div class="form-group">
       <div class="lbl-row"><label>Stage *</label><span class="manage-link" onclick="openQuickManageStages()"><i class="fas fa-pencil-alt"></i> manage</span></div>
       <select class="form-control" id="anStage"><option value="">Select Stage</option></select>
+      <div class="stage-suggest-box" id="stageSuggestion">
+        <i class="fas fa-magic"></i> Suggested: <b id="stageSuggestionText"></b>
+        <button onclick="applyStageSuggestion()" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:2px 10px;font-size:12px;cursor:pointer;margin-left:8px;">Apply</button>
+      </div>
     </div>
-    <div class="form-group"><label>Date of Birth</label><input type="date" class="form-control" id="anDOB"></div>
+    <div class="form-group"><label>Acquisition Type</label>
+      <select class="form-control" id="anAcqType"></select>
+    </div>
+    <div class="form-group"><label>Initial Weight (kg)</label><input type="number" class="form-control" id="anInitialWeight" min="0" step="0.1" placeholder="0.0"></div>
     <div class="form-group"><label>Mother Tag No</label><input class="form-control" id="anMotherID" placeholder="Optional"></div>
     <div class="form-group">
       <div class="lbl-row"><label>Source</label><span class="manage-link" onclick="openQuickManage('animalSources','anSource',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
@@ -448,9 +474,10 @@
     </div>
     <div class="form-group"><label>Pregnancy Date</label><input type="date" class="form-control" id="anPregnancyDate"></div>
     <div class="form-group"><label>Lactation No</label><input type="number" class="form-control" id="anLactationNo" min="0" placeholder="0"></div>
-    <div class="form-group"><label>Purchase Date</label><input type="date" class="form-control" id="anPurchaseDate"></div>
+    <div class="form-group"><label>Purchase / Entry Date</label><input type="date" class="form-control" id="anPurchaseDate"></div>
     <div class="form-group"><label>Purchase Amount (Rs)</label><input type="number" class="form-control" id="anPurchaseAmount" placeholder="0"></div>
     <div class="form-group"><label>Voucher No</label><input class="form-control" id="anVoucherNo"></div>
+    <div class="form-group"><label>Voucher Date</label><input type="date" class="form-control" id="anVoucherDate"></div>
   </div>
   <div class="form-group"><label>Medical History</label><textarea class="form-control" id="anMedical" rows="2" placeholder="Deworming dates, vaccinations..."></textarea></div>
   <div class="form-group"><label>Remarks</label><textarea class="form-control" id="anRemarks" rows="2"></textarea></div>
@@ -597,11 +624,11 @@
       </select>
     </div>
     <div class="form-group">
-      <div class="lbl-row"><label>Current Stage</label><span class="manage-link" onclick="openQuickManage('stagesFemale','ruleFromStage',()=>populateRuleStages())"><i class="fas fa-pencil-alt"></i> manage</span></div>
+      <div class="lbl-row"><label>Current Stage</label></div>
       <select class="form-control" id="ruleFromStage"></select>
     </div>
     <div class="form-group">
-      <div class="lbl-row"><label>Next Stage</label><span class="manage-link" onclick="openQuickManage('stagesMale','ruleToStage',()=>populateRuleStages())"><i class="fas fa-pencil-alt"></i> manage</span></div>
+      <div class="lbl-row"><label>Next Stage</label></div>
       <select class="form-control" id="ruleToStage"></select>
     </div>
     <div class="form-group"><label>Age at Transition (Months)</label>
@@ -649,27 +676,100 @@
 
 <!-- Health Modal -->
 <div class="modal-overlay" id="healthModal" style="display:none;">
-<div class="modal-box" style="max-width:580px;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+<div class="modal-box" style="max-width:620px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
     <div style="font-size:17px;font-weight:700;color:#1a3a2a;" id="healthModalTitle">Add Health Record</div>
     <button onclick="closeModal('healthModal')" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>
   </div>
   <input type="hidden" id="healthId">
+  <input type="hidden" id="healthRecordType" value="Treatment">
+  <!-- Record Type Selection -->
+  <div style="margin-bottom:14px;">
+    <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Record Type *</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+      <button class="htype-btn active" data-type="Treatment" onclick="setHealthType('Treatment')"><i class="fas fa-stethoscope"></i> Treatment</button>
+      <button class="htype-btn" data-type="Vaccination" onclick="setHealthType('Vaccination')"><i class="fas fa-syringe"></i> Vaccination</button>
+      <button class="htype-btn" data-type="Deworming" onclick="setHealthType('Deworming')"><i class="fas fa-pills"></i> Deworming</button>
+      <button class="htype-btn" data-type="Reproductive" onclick="setHealthType('Reproductive')"><i class="fas fa-heart"></i> Reproductive</button>
+      <button class="htype-btn" data-type="Disease" onclick="setHealthType('Disease')"><i class="fas fa-virus"></i> Disease</button>
+      <button class="htype-btn" data-type="Mortality" onclick="setHealthType('Mortality')"><i class="fas fa-skull"></i> Mortality</button>
+    </div>
+  </div>
+  <!-- Common base fields -->
   <div class="grid-2">
     <div class="form-group"><label>Animal (Tag No) *</label><select class="form-control" id="healthTag"></select></div>
     <div class="form-group"><label>Date *</label><input type="date" class="form-control" id="healthDate"></div>
-    <div class="form-group">
-      <div class="lbl-row"><label>Event Type *</label><span class="manage-link" onclick="openQuickManage('healthEventTypes','healthType',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
-      <select class="form-control" id="healthType"></select>
+  </div>
+  <!-- Treatment-specific -->
+  <div id="hf-treatment" class="htype-fields">
+    <div class="grid-2">
+      <div class="form-group">
+        <div class="lbl-row"><label>Disease / Condition</label><span class="manage-link" onclick="openQuickManage('diseaseNames','hDiseaseName',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+        <select class="form-control" id="hDiseaseName"></select>
+      </div>
+      <div class="form-group">
+        <div class="lbl-row"><label>Medicine Given</label><span class="manage-link" onclick="openQuickManage('medicineNames','hMedicineName',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+        <select class="form-control" id="hMedicineName"></select>
+      </div>
+      <div class="form-group"><label>Dosage</label><input class="form-control" id="hDosage" placeholder="e.g. 10ml twice daily"></div>
     </div>
+  </div>
+  <!-- Vaccination-specific -->
+  <div id="hf-vaccination" class="htype-fields" style="display:none;">
+    <div class="grid-2">
+      <div class="form-group">
+        <div class="lbl-row"><label>Vaccine Name *</label><span class="manage-link" onclick="openQuickManage('vaccineNames','hVaccineName',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+        <select class="form-control" id="hVaccineName"></select>
+      </div>
+      <div class="form-group"><label>Dose No.</label><input class="form-control" id="hDoseNo" placeholder="1st, 2nd, Booster..."></div>
+      <div class="form-group"><label>Batch / Lot No.</label><input class="form-control" id="hBatchNo" placeholder="Batch number"></div>
+    </div>
+  </div>
+  <!-- Deworming-specific -->
+  <div id="hf-deworming" class="htype-fields" style="display:none;">
+    <div class="grid-2">
+      <div class="form-group">
+        <div class="lbl-row"><label>Medicine Used</label><span class="manage-link" onclick="openQuickManage('medicineNames','hDewormMed',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+        <select class="form-control" id="hDewormMed"></select>
+      </div>
+      <div class="form-group"><label>Dosage</label><input class="form-control" id="hDewormDose" placeholder="e.g. 5ml per 50kg"></div>
+    </div>
+  </div>
+  <!-- Reproductive-specific -->
+  <div id="hf-reproductive" class="htype-fields" style="display:none;">
+    <div class="grid-2">
+      <div class="form-group">
+        <div class="lbl-row"><label>Reproductive Event *</label><span class="manage-link" onclick="openQuickManage('reproductiveEvents','hReproEvent',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+        <select class="form-control" id="hReproEvent"></select>
+      </div>
+      <div class="form-group"><label>Expected / Calving Date</label><input type="date" class="form-control" id="hExpectedDate"></div>
+      <div class="form-group"><label>Lactation No.</label><input type="number" class="form-control" id="hLactationNo" min="0" placeholder="0"></div>
+    </div>
+  </div>
+  <!-- Disease-specific -->
+  <div id="hf-disease" class="htype-fields" style="display:none;">
+    <div class="grid-2">
+      <div class="form-group">
+        <div class="lbl-row"><label>Disease Name</label><span class="manage-link" onclick="openQuickManage('diseaseNames','hDiseaseNameD',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+        <select class="form-control" id="hDiseaseNameD"></select>
+      </div>
+      <div class="form-group"><label>Symptoms</label><input class="form-control" id="hSymptoms" placeholder="Describe symptoms..."></div>
+    </div>
+  </div>
+  <!-- Mortality-specific -->
+  <div id="hf-mortality" class="htype-fields" style="display:none;">
+    <div class="form-group"><label>Cause of Death *</label><input class="form-control" id="hCauseOfDeath" placeholder="State cause of death..."></div>
+  </div>
+  <!-- Common: Doctor, Cost, Next Due, Notes -->
+  <div class="grid-2">
     <div class="form-group">
       <div class="lbl-row"><label>Doctor / Vet</label><span class="manage-link" onclick="openQuickManage('doctorNames','healthDoctor',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
       <select class="form-control" id="healthDoctor"></select>
     </div>
     <div class="form-group"><label>Cost (Rs)</label><input type="number" class="form-control" id="healthCost" min="0" placeholder="0"></div>
-    <div class="form-group"><label>Next Due Date</label><input type="date" class="form-control" id="healthNextDue"></div>
+    <div class="form-group" id="nextDueGroup"><label>Next Due Date</label><input type="date" class="form-control" id="healthNextDue"></div>
   </div>
-  <div class="form-group"><label>Description / Notes</label><textarea class="form-control" id="healthDesc" rows="2" placeholder="Details of treatment, vaccine batch, dosage..."></textarea></div>
+  <div class="form-group"><label>Notes / Description</label><textarea class="form-control" id="healthDesc" rows="2" placeholder="Additional notes..."></textarea></div>
   <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px;">
     <button class="btn-danger" onclick="closeModal('healthModal')">Cancel</button>
     <button class="btn-primary" onclick="saveHealth()"><i class="fas fa-save"></i> Save</button>
@@ -768,19 +868,48 @@ const LOOKUP_DEFAULTS = {
     Sheep:   ['Kajli','Lohi','Dumbi','Desi'],
     Other:   []
   },
-  stagesFemale:   ['Calf','Waccha','Heifer','Cow'],
-  stagesMale:     ['Calf','Waccha','Bull Calf','Ox','Bull'],
-  animalSources:  ['Purchased','Own Birth','Gifted','Transferred In'],
+  stagesFemale:   ['Calf','Heifer','Cow'],
+  stagesMale:     ['Calf','Bull Calf','Ox','Bull'],
+  animalSources:  ['Purchased','Born on Farm','Gifted','Transferred In'],
   animalStatuses: ['Active','Sold','Dead','Transferred'],
   feedCategories: ['Feed','Fertilizer','Medicine','Supplements','Other'],
-  feedUnits:      ['kg','bags','liters','pieces','tons','quintal'],
+  feedUnits:      ['kg','bags','liters','pieces','tons','quintal','Man','Kanal'],
   voucherTypes:   ['Purchase Bill','Cash Payment','Journal Voucher','Sales Invoice','Expense Voucher'],
   milkShifts:     ['Morning','Evening','Night'],
   milkUnits:      ['Liters','kg'],
-  healthEventTypes:['Deworming','FMD Vaccination','LSD Vaccination','Brucellosis Vaccination','Treatment','Check-up','Pregnancy Check','Surgery','Other'],
   doctorNames:    [],
+  vaccineNames:   ['FMD Vaccine','LSD Vaccine','Brucellosis Vaccine','Black Quarter Vaccine','Anthrax Vaccine','HS Vaccine','PPR Vaccine','Goat Pox Vaccine','Sheep Pox Vaccine'],
+  medicineNames:  ['Ivermectin','Albendazole','Fenbendazole','Oxytetracycline','Penicillin','Amoxicillin','Enrofloxacin','Dexamethasone','Calcium Borogluconate','Multivitamin'],
+  diseaseNames:   ['FMD (Foot & Mouth)','LSD (Lumpy Skin)','Mastitis','Pneumonia','Diarrhea','Bloat','Milk Fever','Ketosis','Brucellosis','Theileriosis','Anaplasmosis'],
+  reproductiveEvents: ['Heat Detection','Artificial Insemination','Natural Mating','Pregnancy Check (Positive)','Pregnancy Check (Negative)','Expected Calving','Calving','Abortion','Drying Off','Lactation Start'],
   expenseCategories:['Feed Purchase','Medicine','Vet Fees','Labor / Wages','Electricity','Fuel','Equipment','Repairs','Other'],
   paymentModes:   ['Cash','Bank Transfer','Cheque','Credit']
+};
+
+// ============================================================
+// ANIMAL LIFE STAGES — per type and gender (from Life Stage data)
+// ============================================================
+const ANIMAL_STAGES = {
+  Cow: {
+    Both:   [{stage:'Calf', minMonths:0, maxMonths:6}],
+    Male:   [{stage:'Bull Calf', minMonths:6, maxMonths:12},{stage:'Young Bull', minMonths:12, maxMonths:24},{stage:'Bull', minMonths:24},{stage:'Ox (Castrated)', minMonths:12, trigger:'castration'}],
+    Female: [{stage:'Heifer Calf', minMonths:6, maxMonths:12},{stage:'Heifer', minMonths:12},{stage:'Cow', minMonths:null, trigger:'calving'}]
+  },
+  Buffalo: {
+    Both:   [{stage:'Calf', minMonths:0, maxMonths:6}],
+    Male:   [{stage:'Male Calf', minMonths:6, maxMonths:12},{stage:'Young Bull', minMonths:12, maxMonths:30},{stage:'Buffalo Bull', minMonths:30}],
+    Female: [{stage:'Female Calf', minMonths:6, maxMonths:12},{stage:'Heifer', minMonths:12},{stage:'Buffalo Cow', minMonths:null, trigger:'calving'}]
+  },
+  Goat: {
+    Both:   [{stage:'Kid', minMonths:0, maxMonths:6}],
+    Male:   [{stage:'Buckling', minMonths:6, maxMonths:12},{stage:'Buck', minMonths:12},{stage:'Wether (Castrated)', minMonths:6, trigger:'castration'}],
+    Female: [{stage:'Doeling', minMonths:6, maxMonths:12},{stage:'Doe', minMonths:12}]
+  },
+  Sheep: {
+    Both:   [{stage:'Lamb', minMonths:0, maxMonths:6}],
+    Male:   [{stage:'Ram Lamb', minMonths:6, maxMonths:12},{stage:'Ram', minMonths:12},{stage:'Wether (Castrated)', minMonths:6, trigger:'castration'}],
+    Female: [{stage:'Ewe Lamb', minMonths:6, maxMonths:12},{stage:'Ewe', minMonths:12}]
+  }
 };
 
 function getLookups() {
@@ -812,19 +941,31 @@ let _qmAfter = null;     // callback after close
 function openQuickManage(lookupKey, targetSelId, afterFn) {
   _qmKey = lookupKey; _qmSelId = targetSelId; _qmAfter = afterFn;
   const labels = {
-    animalTypes:'Animal Types', stagesFemale:'Female Stages', stagesMale:'Male Stages',
+    animalTypes:'Animal Types', stagesFemale:'Custom Female Stages', stagesMale:'Custom Male Stages',
     animalSources:'Animal Sources', animalStatuses:'Animal Statuses',
-    feedCategories:'Feed Categories', feedUnits:'Feed Units', voucherTypes:'Voucher Types'
+    feedCategories:'Feed Categories', feedUnits:'Feed/Stock Units', voucherTypes:'Voucher Types',
+    vaccineNames:'Vaccine Names', medicineNames:'Medicine Names', diseaseNames:'Disease Names',
+    reproductiveEvents:'Reproductive Events', doctorNames:'Doctor / Vet Names',
+    milkShifts:'Milk Shifts', milkUnits:'Milk Units', expenseCategories:'Expense Categories', paymentModes:'Payment Modes'
   };
   const descs = {
     animalTypes:'Types of animals on your farm (e.g. Buffalo, Cow, Goat).',
-    stagesFemale:'Life stages for female animals (e.g. Calf, Heifer, Cow).',
-    stagesMale:'Life stages for male animals (e.g. Calf, Bull Calf, Ox).',
+    stagesFemale:'Custom stages for female animals of non-standard types.',
+    stagesMale:'Custom stages for male animals of non-standard types.',
     animalSources:'How the animal was acquired.',
     animalStatuses:'Current status of an animal.',
     feedCategories:'Categories for feed/stock items.',
-    feedUnits:'Units of measurement for feed (e.g. kg, bags).',
-    voucherTypes:'Types of payment/voucher documents.'
+    feedUnits:'Units of measurement for feed (e.g. kg, bags, Man, Kanal).',
+    voucherTypes:'Types of payment/voucher documents.',
+    vaccineNames:'Vaccine names used on your farm.',
+    medicineNames:'Medicines/drugs used for treatment or deworming.',
+    diseaseNames:'Disease names recorded on your farm.',
+    reproductiveEvents:'Types of reproductive events (Calving, AI, Pregnancy Check, etc.).',
+    doctorNames:'Names of veterinary doctors.',
+    milkShifts:'Milking time periods.',
+    milkUnits:'Units for recording milk quantity.',
+    expenseCategories:'Categories for farm expenses.',
+    paymentModes:'Payment methods used.'
   };
   document.getElementById('qmTitle').textContent = '⚙ Manage: ' + (labels[lookupKey]||lookupKey);
   document.getElementById('qmDescription').textContent = descs[lookupKey]||'';
@@ -846,12 +987,17 @@ function openQuickManageBreed() {
 }
 
 function openQuickManageStages() {
+  const type = document.getElementById('anType').value;
   const gender = document.getElementById('anGender').value || 'Female';
+  if (ANIMAL_STAGES[type]) {
+    toast(`Stages for ${type} are built-in from life stage data. Use Custom Stages in Setup for "Other" animal types.`, 'warn');
+    return;
+  }
   _qmKey = gender === 'Male' ? 'stagesMale' : 'stagesFemale';
   _qmSelId = 'anStage';
   _qmAfter = null;
-  document.getElementById('qmTitle').textContent = `⚙ Manage ${gender} Stages`;
-  document.getElementById('qmDescription').textContent = `Stage options for ${gender} animals.`;
+  document.getElementById('qmTitle').textContent = `⚙ Custom ${gender} Stages`;
+  document.getElementById('qmDescription').textContent = `Custom stages for ${gender} "${type||'Other'}" animals. Buffalo, Cow, Goat & Sheep use predefined stages.`;
   document.getElementById('qmNewItem').value = '';
   renderQmItems();
   openModal('quickManageModal');
@@ -922,7 +1068,7 @@ function refreshQmTarget() {
     populateSel('filterType', items, 'All Types', document.getElementById('filterType')&&document.getElementById('filterType').value);
     populateSel('ruleAnimalType', ['All',...items], null, document.getElementById('ruleAnimalType')&&document.getElementById('ruleAnimalType').value);
   } else if(_qmKey === 'stagesFemale' || _qmKey === 'stagesMale') {
-    const allStages = [...new Set([...getLookupList('stagesFemale'),...getLookupList('stagesMale')])];
+    const allStages = getAllStages();
     populateSel('filterStage', allStages, 'All Stages');
     populateSel('ruleFromStage', allStages, null);
     populateSel('ruleToStage', allStages, null);
@@ -936,6 +1082,18 @@ function refreshQmTarget() {
     populateSel('fdUnit', items, null, currentVal);
   } else if(_qmKey === 'voucherTypes') {
     populateSel('txVoucherType', items, null, currentVal);
+  } else if(_qmKey === 'vaccineNames') {
+    const lk = getLookups();
+    populateSel('hVaccineName', ['--Select--',...(lk.vaccineNames||[])], null, currentVal);
+  } else if(_qmKey === 'medicineNames') {
+    const lk = getLookups();
+    populateSel('hMedicineName', ['--Select--',...(lk.medicineNames||[])], null, currentVal);
+    populateSel('hDewormMed', ['--Select--',...(lk.medicineNames||[])], null);
+  } else if(_qmKey === 'diseaseNames') {
+    const lk = getLookups();
+    populateSel('hDiseaseName', ['--Select--',...(lk.diseaseNames||[])], null, currentVal);
+  } else if(_qmKey === 'reproductiveEvents') {
+    populateSel('hReproEvent', items, null, currentVal);
   } else {
     populateSel(_qmSelId, items, null, currentVal);
   }
@@ -949,6 +1107,7 @@ function refreshQmTarget() {
 function populateAllDropdowns() {
   const lk = getLookups();
   populateSel('anType', lk.animalTypes, 'Select Type');
+  populateSel('anAcqType', ['Purchased','Born on Farm'], null);
   populateSel('anSource', lk.animalSources, null);
   populateSel('anStatus', lk.animalStatuses, null);
   populateSel('fdCategory', lk.feedCategories, null);
@@ -956,16 +1115,21 @@ function populateAllDropdowns() {
   populateSel('txVoucherType', lk.voucherTypes, null);
   populateSel('milkShift', lk.milkShifts, null);
   populateSel('milkUnit', lk.milkUnits, null);
-  populateSel('healthType', lk.healthEventTypes, null);
-  populateSel('healthDoctor', lk.doctorNames.length ? lk.doctorNames : ['No Doctor / Self'], null);
+  const doctors = lk.doctorNames && lk.doctorNames.length ? lk.doctorNames : ['No Doctor / Self'];
+  populateSel('healthDoctor', doctors, null);
   populateSel('expCat', lk.expenseCategories, null);
   populateSel('expMode', lk.paymentModes, null);
   populateSel('filterMilkShift', lk.milkShifts, 'All Shifts');
-  populateSel('filterHealthType', lk.healthEventTypes, 'All Event Types');
   populateSel('filterExpCat', lk.expenseCategories, 'All Categories');
   populateSel('filterExpMode', lk.paymentModes, 'All Pay Modes');
+  // Health sub-module dropdowns
+  populateSel('hDiseaseName', ['--Select--',...(lk.diseaseNames||[])], null);
+  populateSel('hMedicineName', ['--Select--',...(lk.medicineNames||[])], null);
+  populateSel('hVaccineName', ['--Select--',...(lk.vaccineNames||[])], null);
+  populateSel('hDewormMed', ['--Select--',...(lk.medicineNames||[])], null);
+  populateSel('hReproEvent', lk.reproductiveEvents||[], null);
 
-  const allStages = [...new Set([...lk.stagesFemale,...lk.stagesMale])];
+  const allStages = getAllStages();
   populateSel('filterType', lk.animalTypes, 'All Types');
   populateSel('filterStage', allStages, 'All Stages');
   populateSel('filterStatus', lk.animalStatuses, 'All Status');
@@ -974,11 +1138,32 @@ function populateAllDropdowns() {
   populateSel('ruleToStage', allStages, null);
 }
 
-function populateRuleStages() {
+function getAllStages() {
+  const built = [];
+  Object.values(ANIMAL_STAGES).forEach(td => {
+    ['Both','Male','Female'].forEach(g => { if(td[g]) td[g].forEach(s => { if(!built.includes(s.stage)) built.push(s.stage); }); });
+  });
   const lk = getLookups();
-  const allStages = [...new Set([...lk.stagesFemale,...lk.stagesMale])];
+  [...(lk.stagesFemale||[]),...(lk.stagesMale||[])].forEach(s => { if(!built.includes(s)) built.push(s); });
+  return built;
+}
+
+function populateRuleStages() {
+  const allStages = getAllStages();
   populateSel('ruleFromStage', allStages, null);
   populateSel('ruleToStage', allStages, null);
+}
+
+function getAnimalStagesForTypeGender(type, gender) {
+  const typeData = ANIMAL_STAGES[type];
+  if (!typeData) {
+    const lk = getLookups();
+    return gender === 'Male' ? (lk.stagesMale||[]) : (lk.stagesFemale||[]);
+  }
+  const stages = [];
+  (typeData.Both||[]).forEach(s => stages.push(s.stage));
+  (typeData[gender]||[]).forEach(s => stages.push(s.stage));
+  return stages;
 }
 
 function updateBreedOptions() {
@@ -989,31 +1174,69 @@ function updateBreedOptions() {
 }
 
 function updateStageOptions() {
+  const type = document.getElementById('anType').value;
   const gender = document.getElementById('anGender').value;
-  const lk = getLookups();
-  const stages = gender === 'Male' ? lk.stagesMale : lk.stagesFemale;
+  const stages = getAnimalStagesForTypeGender(type, gender);
   populateSel('anStage', stages||[], 'Select Stage');
+  suggestStage();
+}
+
+function suggestStage() {
+  const type = document.getElementById('anType').value;
+  const gender = document.getElementById('anGender').value;
+  const dob = document.getElementById('anDOB').value;
+  const sugDiv = document.getElementById('stageSuggestion');
+  if (!sugDiv) return;
+  if (!type || !gender || !dob) { sugDiv.style.display='none'; return; }
+  const ageMonths = getAnimalAgeMonths(dob);
+  if (ageMonths === null) { sugDiv.style.display='none'; return; }
+  const typeData = ANIMAL_STAGES[type];
+  if (!typeData) { sugDiv.style.display='none'; return; }
+  const allStages = [
+    ...(typeData.Both||[]),
+    ...(typeData[gender]||[])
+  ].filter(s => s.minMonths !== null && !s.trigger);
+  let suggested = null;
+  allStages.forEach(s => {
+    if (ageMonths >= s.minMonths) {
+      if (!suggested || s.minMonths > suggested.minMonths) suggested = s;
+    }
+  });
+  if (suggested) {
+    document.getElementById('stageSuggestionText').textContent = suggested.stage;
+    sugDiv.style.display = 'block';
+  } else {
+    sugDiv.style.display = 'none';
+  }
+}
+
+function applyStageSuggestion() {
+  const stage = document.getElementById('stageSuggestionText').textContent;
+  if (stage) { document.getElementById('anStage').value = stage; toast('Stage applied: ' + stage); }
 }
 
 // ============================================================
 // LOOKUP SETUP SECTION RENDERER
 // ============================================================
 const LOOKUP_SECTIONS = [
-  { key:'animalTypes',   label:'Animal Types',     icon:'fa-horse',        desc:'Types of animals on your farm (Buffalo, Cow, Goat, Sheep, etc.)' },
-  { key:'__breeds__',    label:'Breeds',           icon:'fa-dna',          desc:'Breed names grouped by animal type' },
-  { key:'stagesFemale',  label:'Female Stages',    icon:'fa-venus',        desc:'Life stages for female animals (Calf, Heifer, Cow, etc.)' },
-  { key:'stagesMale',    label:'Male Stages',      icon:'fa-mars',         desc:'Life stages for male animals (Calf, Bull Calf, Ox, etc.)' },
-  { key:'animalSources', label:'Animal Sources',   icon:'fa-truck',        desc:'How an animal was acquired (Purchased, Own Birth, etc.)' },
-  { key:'animalStatuses',label:'Animal Statuses',  icon:'fa-tag',          desc:'Current status options (Active, Sold, Dead, etc.)' },
-  { key:'feedCategories',label:'Feed Categories',  icon:'fa-seedling',     desc:'Categories for stock items (Feed, Fertilizer, Medicine, etc.)' },
-  { key:'feedUnits',     label:'Feed Units',       icon:'fa-balance-scale',desc:'Units of measurement (kg, bags, liters, etc.)' },
-  { key:'voucherTypes',     label:'Voucher Types',       icon:'fa-file-invoice',  desc:'Document types for feed transactions.' },
-  { key:'milkShifts',       label:'Milk Shifts',         icon:'fa-clock',         desc:'Milking times (Morning, Evening, Night).' },
-  { key:'milkUnits',        label:'Milk Units',          icon:'fa-tint',          desc:'Units for milk measurement (Liters, kg).' },
-  { key:'healthEventTypes', label:'Health Event Types',  icon:'fa-heartbeat',     desc:'Types of health events (Deworming, Vaccination, Treatment, etc.).' },
-  { key:'doctorNames',      label:'Doctor / Vet Names',  icon:'fa-user-md',       desc:'Names of veterinary doctors you use.' },
-  { key:'expenseCategories',label:'Expense Categories',  icon:'fa-rupee-sign',    desc:'Categories for farm expenses (Feed, Labor, Electricity, etc.).' },
-  { key:'paymentModes',     label:'Payment Modes',       icon:'fa-wallet',        desc:'How expenses are paid (Cash, Bank Transfer, etc.).' },
+  { key:'animalTypes',   label:'Animal Types',        icon:'fa-horse',         desc:'Types of animals on your farm (Buffalo, Cow, Goat, Sheep, etc.)' },
+  { key:'__breeds__',    label:'Breeds',              icon:'fa-dna',           desc:'Breed names grouped by animal type' },
+  { key:'stagesFemale',  label:'Custom Female Stages',icon:'fa-venus',         desc:'Custom life stages for female animals of "Other" types. Buffalo, Cow, Goat & Sheep use built-in stages from life stage data.' },
+  { key:'stagesMale',    label:'Custom Male Stages',  icon:'fa-mars',          desc:'Custom life stages for male animals of "Other" types. Buffalo, Cow, Goat & Sheep use built-in stages.' },
+  { key:'animalSources', label:'Animal Sources',      icon:'fa-truck',         desc:'How an animal was acquired (Purchased, Born on Farm, etc.)' },
+  { key:'animalStatuses',label:'Animal Statuses',     icon:'fa-tag',           desc:'Current status options (Active, Sold, Dead, etc.)' },
+  { key:'feedCategories',label:'Feed Categories',     icon:'fa-seedling',      desc:'Categories for stock items (Feed, Fertilizer, Medicine, etc.)' },
+  { key:'feedUnits',     label:'Feed / Stock Units',  icon:'fa-balance-scale', desc:'Units of measurement (kg, bags, liters, Man, Kanal, etc.)' },
+  { key:'voucherTypes',  label:'Voucher Types',       icon:'fa-file-invoice',  desc:'Document types for feed transactions.' },
+  { key:'milkShifts',    label:'Milk Shifts',         icon:'fa-clock',         desc:'Milking times (Morning, Evening, Night).' },
+  { key:'milkUnits',     label:'Milk Units',          icon:'fa-tint',          desc:'Units for milk measurement (Liters, kg).' },
+  { key:'vaccineNames',  label:'Vaccine Names',       icon:'fa-syringe',       desc:'List of vaccines used on your farm (FMD, LSD, Brucellosis, etc.).' },
+  { key:'medicineNames', label:'Medicine / Drug Names',icon:'fa-pills',        desc:'Medicines used for treatment and deworming.' },
+  { key:'diseaseNames',  label:'Disease Names',       icon:'fa-virus',         desc:'Common diseases recorded on your farm.' },
+  { key:'reproductiveEvents',label:'Reproductive Events',icon:'fa-heart',      desc:'Types of reproductive events (Calving, AI, Pregnancy Check, etc.).' },
+  { key:'doctorNames',   label:'Doctor / Vet Names',  icon:'fa-user-md',       desc:'Names of veterinary doctors you use.' },
+  { key:'expenseCategories',label:'Expense Categories',icon:'fa-rupee-sign',   desc:'Categories for farm expenses (Feed, Labor, Electricity, etc.).' },
+  { key:'paymentModes',  label:'Payment Modes',       icon:'fa-wallet',        desc:'How expenses are paid (Cash, Bank Transfer, etc.).' },
 ];
 
 function renderLookupsSetup() {
@@ -1349,9 +1572,10 @@ function openAnimalModal(id) {
   populateAllDropdowns();
   updateBreedOptions();
   updateStageOptions();
-  ['anTagNo','anDOB','anMotherID','anPregnancyDate','anLactationNo','anPurchaseDate','anPurchaseAmount','anVoucherNo','anMedical','anRemarks'].forEach(f=>{const el=document.getElementById(f);if(el)el.value='';});
+  ['anTagNo','anDOB','anMotherID','anPregnancyDate','anLactationNo','anPurchaseDate','anPurchaseAmount','anVoucherNo','anVoucherDate','anInitialWeight','anMedical','anRemarks'].forEach(f=>{const el=document.getElementById(f);if(el)el.value='';});
   document.getElementById('animalId').value='';
   document.getElementById('animalModalTitle').textContent='Add Animal';
+  document.getElementById('stageSuggestion').style.display='none';
   if(id) {
     const a=dbFind('animals',id); if(!a) return;
     document.getElementById('animalModalTitle').textContent='Edit Animal';
@@ -1362,6 +1586,8 @@ function openAnimalModal(id) {
     document.getElementById('anGender').value=a.gender||''; updateStageOptions();
     document.getElementById('anStage').value=a.stage||'';
     document.getElementById('anDOB').value=a.dob||'';
+    document.getElementById('anAcqType').value=a.acqType||'Purchased';
+    document.getElementById('anInitialWeight').value=a.initialWeight||'';
     document.getElementById('anMotherID').value=a.motherId||'';
     document.getElementById('anSource').value=a.source||'';
     document.getElementById('anStatus').value=a.status||'';
@@ -1370,6 +1596,7 @@ function openAnimalModal(id) {
     document.getElementById('anPurchaseDate').value=a.purchaseDate||'';
     document.getElementById('anPurchaseAmount').value=a.purchaseAmount||'';
     document.getElementById('anVoucherNo').value=a.voucherNo||'';
+    document.getElementById('anVoucherDate').value=a.voucherDate||'';
     document.getElementById('anMedical').value=a.medicalHistory||'';
     document.getElementById('anRemarks').value=a.remarks||'';
   }
@@ -1383,11 +1610,15 @@ function saveAnimal() {
   const stage=document.getElementById('anStage').value;
   if(!tagNo||!animalType||!gender||!stage){toast('Please fill all required fields (*)','error');return;}
   const obj={tagNo,animalType,breed:document.getElementById('anBreed').value,gender,stage,
-    dob:document.getElementById('anDOB').value,motherId:document.getElementById('anMotherID').value,
+    dob:document.getElementById('anDOB').value,
+    acqType:document.getElementById('anAcqType').value,
+    initialWeight:document.getElementById('anInitialWeight').value,
+    motherId:document.getElementById('anMotherID').value,
     source:document.getElementById('anSource').value,status:document.getElementById('anStatus').value,
     pregnancyDate:document.getElementById('anPregnancyDate').value,lactationNo:document.getElementById('anLactationNo').value,
     purchaseDate:document.getElementById('anPurchaseDate').value,purchaseAmount:document.getElementById('anPurchaseAmount').value,
-    voucherNo:document.getElementById('anVoucherNo').value,medicalHistory:document.getElementById('anMedical').value,
+    voucherNo:document.getElementById('anVoucherNo').value,voucherDate:document.getElementById('anVoucherDate').value,
+    medicalHistory:document.getElementById('anMedical').value,
     remarks:document.getElementById('anRemarks').value,deferredUntil:null};
   const id=document.getElementById('animalId').value;
   if(id){dbUpdate('animals',id,obj);toast('Animal updated');}
@@ -1422,8 +1653,8 @@ function renderAnimals() {
       </td></tr>
     <tr id="ae_${a.id}" class="expand-row" style="display:none;"><td colspan="9">
       <div class="grid-3" style="gap:10px;">
-        <div><b>Source:</b> ${a.source||'—'}<br><b>Purchase Date:</b> ${a.purchaseDate||'—'}<br><b>Amount:</b> Rs ${Number(a.purchaseAmount||0).toLocaleString()}</div>
-        <div><b>Pregnancy Date:</b> ${a.pregnancyDate||'—'}<br><b>Lactation No:</b> ${a.lactationNo||'—'}<br><b>Mother ID:</b> ${a.motherId||'—'}</div>
+        <div><b>Acquisition:</b> ${a.acqType||'—'}<br><b>Source:</b> ${a.source||'—'}<br><b>Purchase Date:</b> ${a.purchaseDate||'—'}<br><b>Voucher No:</b> ${a.voucherNo||'—'} <b>Date:</b> ${a.voucherDate||'—'}<br><b>Amount:</b> Rs ${Number(a.purchaseAmount||0).toLocaleString()}<br><b>Initial Weight:</b> ${a.initialWeight||'—'} kg</div>
+        <div><b>Pregnancy Date:</b> ${a.pregnancyDate||'—'}<br><b>Lactation No:</b> ${a.lactationNo||'—'}<br><b>Mother ID:</b> ${a.motherId||'—'}<br><b>DOB:</b> ${a.dob||'—'}</div>
         <div><b>Medical:</b> ${a.medicalHistory||'—'}<br><b>Remarks:</b> ${a.remarks||'—'}<br><b>Deferred Until:</b> ${a.deferredUntil||'Not deferred'}</div>
       </div>
     </td></tr>`;
@@ -1727,7 +1958,7 @@ function printReport(type){
   else if(type==='weight-history') html=head('Weight History')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Tag No</th><th>Date</th><th>Weight (kg)</th><th>Remarks</th></tr></thead><tbody>`+weights.sort((a,b)=>a.tagNo.localeCompare(b.tagNo)).map(w=>`<tr><td>${w.tagNo}</td><td>${w.date}</td><td>${w.weight}</td><td>${w.remarks||''}</td></tr>`).join('')+`</tbody></table>`+foot;
   else if(type==='stage-transitions') html=head('Stage Transitions Log')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Tag No</th><th>From</th><th>To</th><th>Approved By</th></tr></thead><tbody>`+tLog.map(l=>`<tr><td>${l.date}</td><td>${l.tagNo}</td><td>${l.fromStage}</td><td>${l.toStage}</td><td>${l.approvedBy}</td></tr>`).join('')+`</tbody></table>`+foot;
   else if(type==='milk'){const milk=dbGet('milkRecords').sort((a,b)=>b.date.localeCompare(a.date));html=head('Milk Production Records')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Tag No</th><th>Shift</th><th>Qty</th><th>Unit</th><th>Remarks</th></tr></thead><tbody>`+milk.map(r=>`<tr><td>${r.date}</td><td>${r.tagNo}</td><td>${r.shift||''}</td><td>${r.qty}</td><td>${r.unit||'Liters'}</td><td>${r.remarks||''}</td></tr>`).join('')+`</tbody></table>`+foot;}
-  else if(type==='health'){const hr=dbGet('healthRecords').sort((a,b)=>b.date.localeCompare(a.date));html=head('Health Records')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Tag No</th><th>Event Type</th><th>Description</th><th>Doctor</th><th>Cost (Rs)</th><th>Next Due</th></tr></thead><tbody>`+hr.map(r=>`<tr><td>${r.date}</td><td>${r.tagNo}</td><td>${r.eventType}</td><td>${r.description||''}</td><td>${r.doctor||''}</td><td>Rs ${Number(r.cost||0).toLocaleString()}</td><td>${r.nextDue||''}</td></tr>`).join('')+`</tbody></table>`+foot;}
+  else if(type==='health'){const hr=dbGet('healthRecords').sort((a,b)=>b.date.localeCompare(a.date));html=head('Health Records')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Tag No</th><th>Type</th><th>Details</th><th>Doctor</th><th>Cost (Rs)</th><th>Next Due</th></tr></thead><tbody>`+hr.map(r=>`<tr><td>${r.date}</td><td>${r.tagNo}</td><td>${r.recordType||r.eventType||'Treatment'}</td><td>${getHealthDetail(r)}</td><td>${r.doctor||''}</td><td>Rs ${Number(r.cost||0).toLocaleString()}</td><td>${r.nextDue||''}</td></tr>`).join('')+`</tbody></table>`+foot;}
   else if(type==='expenses'){const exp=dbGet('expenses').sort((a,b)=>b.date.localeCompare(a.date));const total=exp.reduce((s,r)=>s+Number(r.amount||0),0);html=head('Expense Report')+`<p style="font-weight:700;">Total: Rs ${total.toLocaleString()}</p><table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (Rs)</th><th>Payment Mode</th><th>Reference</th></tr></thead><tbody>`+exp.map(r=>`<tr><td>${r.date}</td><td>${r.category}</td><td>${r.description||''}</td><td>Rs ${Number(r.amount||0).toLocaleString()}</td><td>${r.paymentMode||''}</td><td>${r.refNo||''}</td></tr>`).join('')+`</tbody></table>`+foot;}
   const win=window.open('','_blank');
   win.document.write(`<!DOCTYPE html><html><head><title>Report</title></head><body onload="window.print()">${html}</body></html>`);
@@ -1850,6 +2081,25 @@ function clearMilkFilters(){['filterMilkTag','filterMilkShift','filterMilkFrom',
 // ============================================================
 // HEALTH RECORDS MODULE
 // ============================================================
+let _healthTypeFilter = '';
+
+function setHealthType(type) {
+  document.getElementById('healthRecordType').value = type;
+  document.querySelectorAll('.htype-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+  document.querySelectorAll('.htype-fields').forEach(d => d.style.display = 'none');
+  const el = document.getElementById('hf-' + type.toLowerCase());
+  if (el) el.style.display = 'block';
+  document.getElementById('nextDueGroup').style.display = type === 'Mortality' ? 'none' : 'block';
+}
+
+function filterHealthByType(type) {
+  _healthTypeFilter = type;
+  document.querySelectorAll('.health-filter-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(type ? 'hfilt-' + type : 'hfilt-all');
+  if (btn) btn.classList.add('active');
+  renderHealth();
+}
+
 function populateHealthAnimalFilter() {
   const animals=dbGet('animals');
   const opts='<option value="">All Animals</option>'+animals.map(a=>`<option value="${a.tagNo}">${a.tagNo} (${a.animalType||''})</option>`).join('');
@@ -1857,46 +2107,119 @@ function populateHealthAnimalFilter() {
   document.getElementById('healthTag').innerHTML=animals.map(a=>`<option value="${a.tagNo}">${a.tagNo} - ${a.animalType||''} ${a.breed||''}</option>`).join('');
 }
 
+function clearHealthModalFields() {
+  ['healthDate','healthCost','healthNextDue','healthDesc','hDosage','hBatchNo','hDoseNo','hDewormDose','hSymptoms','hCauseOfDeath'].forEach(f=>{const el=document.getElementById(f);if(el)el.value='';});
+  const fd=document.getElementById('hExpectedDate'); if(fd) fd.value='';
+  const fl=document.getElementById('hLactationNo'); if(fl) fl.value='';
+}
+
 function openHealthModal(id) {
   populateAllDropdowns(); populateHealthAnimalFilter();
   document.getElementById('healthId').value='';
   document.getElementById('healthDate').value=new Date().toISOString().split('T')[0];
-  document.getElementById('healthCost').value=''; document.getElementById('healthNextDue').value=''; document.getElementById('healthDesc').value='';
+  clearHealthModalFields();
   document.getElementById('healthModalTitle').textContent='Add Health Record';
-  if(id){const r=dbFind('healthRecords',id);if(r){document.getElementById('healthId').value=id;document.getElementById('healthTag').value=r.tagNo;document.getElementById('healthDate').value=r.date;document.getElementById('healthType').value=r.eventType;document.getElementById('healthDoctor').value=r.doctor||'';document.getElementById('healthCost').value=r.cost||'';document.getElementById('healthNextDue').value=r.nextDue||'';document.getElementById('healthDesc').value=r.description||'';document.getElementById('healthModalTitle').textContent='Edit Health Record';}}
+  setHealthType('Treatment');
+  if(id){
+    const r=dbFind('healthRecords',id); if(!r) return;
+    document.getElementById('healthModalTitle').textContent='Edit Health Record';
+    document.getElementById('healthId').value=id;
+    document.getElementById('healthTag').value=r.tagNo||'';
+    document.getElementById('healthDate').value=r.date||'';
+    const rType = r.recordType || (r.eventType ? 'Treatment' : 'Treatment');
+    setHealthType(rType);
+    document.getElementById('healthDoctor').value=r.doctor||'';
+    document.getElementById('healthCost').value=r.cost||'';
+    document.getElementById('healthNextDue').value=r.nextDue||'';
+    document.getElementById('healthDesc').value=r.description||'';
+    // Type-specific fields
+    if(rType==='Treatment'){if(r.diseaseName)document.getElementById('hDiseaseName').value=r.diseaseName;if(r.medicineName)document.getElementById('hMedicineName').value=r.medicineName;if(r.dosage)document.getElementById('hDosage').value=r.dosage;}
+    if(rType==='Vaccination'){if(r.vaccineName)document.getElementById('hVaccineName').value=r.vaccineName;if(r.doseNo)document.getElementById('hDoseNo').value=r.doseNo;if(r.batchNo)document.getElementById('hBatchNo').value=r.batchNo;}
+    if(rType==='Deworming'){if(r.dewormMed)document.getElementById('hDewormMed').value=r.dewormMed;if(r.dewormDose)document.getElementById('hDewormDose').value=r.dewormDose;}
+    if(rType==='Reproductive'){if(r.reproEvent)document.getElementById('hReproEvent').value=r.reproEvent;if(r.expectedDate)document.getElementById('hExpectedDate').value=r.expectedDate;if(r.lactationNo)document.getElementById('hLactationNo').value=r.lactationNo;}
+    if(rType==='Disease'){const lk=getLookups();populateSel('hDiseaseNameD',['--Select--',...(lk.diseaseNames||[])],null,r.diseaseName||'');if(r.symptoms)document.getElementById('hSymptoms').value=r.symptoms;}
+    if(rType==='Mortality'){if(r.causeOfDeath)document.getElementById('hCauseOfDeath').value=r.causeOfDeath;}
+  }
+  // Populate disease dropdown for Disease sub-type
+  const lk=getLookups();
+  populateSel('hDiseaseNameD',['--Select--',...(lk.diseaseNames||[])],null);
   openModal('healthModal');
 }
 
 function saveHealth() {
   const tagNo=document.getElementById('healthTag').value;
   const date=document.getElementById('healthDate').value;
-  const eventType=document.getElementById('healthType').value;
-  if(!tagNo||!date||!eventType){toast('Please fill all required fields','error');return;}
-  const obj={tagNo,date,eventType,doctor:document.getElementById('healthDoctor').value,cost:Number(document.getElementById('healthCost').value)||0,nextDue:document.getElementById('healthNextDue').value,description:document.getElementById('healthDesc').value};
+  const recordType=document.getElementById('healthRecordType').value;
+  if(!tagNo||!date){toast('Please select Animal and Date','error');return;}
+  if(recordType==='Vaccination'&&!document.getElementById('hVaccineName').value){toast('Please select Vaccine Name','error');return;}
+  if(recordType==='Reproductive'&&!document.getElementById('hReproEvent').value){toast('Please select Reproductive Event','error');return;}
+  if(recordType==='Mortality'&&!document.getElementById('hCauseOfDeath').value.trim()){toast('Please enter Cause of Death','error');return;}
+  const obj={tagNo,date,recordType,
+    doctor:document.getElementById('healthDoctor').value,
+    cost:Number(document.getElementById('healthCost').value)||0,
+    nextDue:recordType==='Mortality'?'':document.getElementById('healthNextDue').value,
+    description:document.getElementById('healthDesc').value,
+    // Treatment
+    diseaseName:document.getElementById('hDiseaseName').value,
+    medicineName:document.getElementById('hMedicineName').value,
+    dosage:document.getElementById('hDosage').value,
+    // Vaccination
+    vaccineName:document.getElementById('hVaccineName').value,
+    doseNo:document.getElementById('hDoseNo').value,
+    batchNo:document.getElementById('hBatchNo').value,
+    // Deworming
+    dewormMed:document.getElementById('hDewormMed').value,
+    dewormDose:document.getElementById('hDewormDose').value,
+    // Reproductive
+    reproEvent:document.getElementById('hReproEvent').value,
+    expectedDate:document.getElementById('hExpectedDate').value,
+    lactationNo:document.getElementById('hLactationNo').value,
+    // Disease
+    symptoms:document.getElementById('hSymptoms').value,
+    // Mortality
+    causeOfDeath:document.getElementById('hCauseOfDeath').value
+  };
+  // Disease tab uses hDiseaseNameD
+  if(recordType==='Disease') obj.diseaseName=document.getElementById('hDiseaseNameD').value;
   const id=document.getElementById('healthId').value;
   if(id){dbUpdate('healthRecords',id,obj);toast('Record updated');}else{dbAdd('healthRecords',obj);toast('Health record saved');}
   closeModal('healthModal'); renderHealth(); renderHealthDue();
 }
 
+const HEALTH_TYPE_COLORS = {Treatment:'badge-blue',Vaccination:'badge-green',Deworming:'badge-purple',Reproductive:'badge-yellow',Disease:'badge-red',Mortality:'badge-red'};
+
+function getHealthDetail(r) {
+  const t = r.recordType||'Treatment';
+  if(t==='Treatment') return [r.diseaseName&&r.diseaseName!=='--Select--'?r.diseaseName:'',r.medicineName&&r.medicineName!=='--Select--'?'Med: '+r.medicineName:'',r.dosage?'Dose: '+r.dosage:''].filter(Boolean).join(' | ')||r.description||'—';
+  if(t==='Vaccination') return [r.vaccineName&&r.vaccineName!=='--Select--'?r.vaccineName:'',r.doseNo?'Dose: '+r.doseNo:'',r.batchNo?'Batch: '+r.batchNo:''].filter(Boolean).join(' | ')||r.description||'—';
+  if(t==='Deworming') return [r.dewormMed&&r.dewormMed!=='--Select--'?r.dewormMed:'',r.dewormDose?r.dewormDose:''].filter(Boolean).join(' | ')||r.description||'—';
+  if(t==='Reproductive') return [r.reproEvent||'',r.expectedDate?'Expected: '+r.expectedDate:'',r.lactationNo?'Lac#'+r.lactationNo:''].filter(Boolean).join(' | ')||r.description||'—';
+  if(t==='Disease') return [r.diseaseName&&r.diseaseName!=='--Select--'?r.diseaseName:'',r.symptoms?r.symptoms:''].filter(Boolean).join(' | ')||r.description||'—';
+  if(t==='Mortality') return r.causeOfDeath||r.description||'—';
+  return r.description||r.eventType||'—';
+}
+
 function renderHealth() {
   let list=dbGet('healthRecords');
   const tag=(document.getElementById('filterHealthTag')||{}).value||'';
-  const type=(document.getElementById('filterHealthType')||{}).value||'';
   const from=(document.getElementById('filterHealthFrom')||{}).value||'';
   const to=(document.getElementById('filterHealthTo')||{}).value||'';
   if(tag) list=list.filter(r=>r.tagNo===tag);
-  if(type) list=list.filter(r=>r.eventType===type);
+  if(_healthTypeFilter) list=list.filter(r=>(r.recordType||'Treatment')===_healthTypeFilter);
   if(from) list=list.filter(r=>r.date>=from);
   if(to) list=list.filter(r=>r.date<=to);
   list=list.slice().sort((a,b)=>b.date.localeCompare(a.date));
   const tbody=document.getElementById('healthTbody');
   if(!list.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:30px;">No health records found.</td></tr>';return;}
   tbody.innerHTML=list.map(r=>{
+    const rType=r.recordType||r.eventType||'Treatment';
     const isDue=r.nextDue&&r.nextDue<=new Date().toISOString().split('T')[0];
+    const color=HEALTH_TYPE_COLORS[rType]||'badge-blue';
     return `<tr>
       <td>${r.date}</td><td><b>${r.tagNo}</b></td>
-      <td><span class="badge badge-blue">${r.eventType||'—'}</span></td>
-      <td>${r.description||'—'}</td><td>${r.doctor||'—'}</td>
+      <td><span class="badge ${color}" style="font-size:10px;">${rType}</span></td>
+      <td style="font-size:12px;">${getHealthDetail(r)}</td>
+      <td>${r.doctor||'—'}</td>
       <td>Rs ${Number(r.cost||0).toLocaleString()}</td>
       <td style="color:${isDue?'#dc2626':'inherit'};font-weight:${isDue?'700':'400'}">${r.nextDue||'—'}${isDue?' ⚠':''}</td>
       <td>
@@ -1914,11 +2237,11 @@ function renderHealthDue() {
   const c=document.getElementById('healthDueAlert');
   if(!due.length){c.innerHTML='';return;}
   c.innerHTML=`<div class="alert-banner"><b><i class="fas fa-bell"></i> ${due.length} health event(s) due within 14 days:</b><br><br>`+
-    due.map(r=>`<span style="margin-right:12px;">• <b>${r.tagNo}</b> — ${r.eventType} due <b>${r.nextDue}</b>${r.nextDue<=today?' <span style="color:#dc2626">(OVERDUE)</span>':''}</span>`).join('')+'</div>';
+    due.map(r=>`<span style="margin-right:12px;">• <b>${r.tagNo}</b> — ${r.recordType||r.eventType||'Event'} due <b>${r.nextDue}</b>${r.nextDue<=today?' <span style="color:#dc2626">(OVERDUE)</span>':''}</span>`).join('')+'</div>';
 }
 
 function deleteHealth(id){confirm2('Delete Record','Delete this health record?',()=>{dbDelete('healthRecords',id);renderHealth();renderHealthDue();toast('Deleted','warn');});}
-function clearHealthFilters(){['filterHealthTag','filterHealthType','filterHealthFrom','filterHealthTo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});renderHealth();}
+function clearHealthFilters(){['filterHealthTag','filterHealthFrom','filterHealthTo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});_healthTypeFilter='';document.querySelectorAll('.health-filter-btn').forEach(b=>b.classList.remove('active'));const a=document.getElementById('hfilt-all');if(a)a.classList.add('active');renderHealth();}
 
 // ============================================================
 // EXPENSES MODULE
@@ -1986,14 +2309,43 @@ function deleteExpense(id){confirm2('Delete Expense','Delete this expense record
 function clearExpFilters(){['filterExpCat','filterExpMode','filterExpFrom','filterExpTo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});renderExpenses();}
 
 // ============================================================
-// FIRST-RUN CLEAN SLATE
+// FIRST-RUN CLEAN SLATE + DEFAULT SEED
 // ============================================================
 function ensureCleanSlate(){
-  if(!localStorage.getItem('fms_clean_v3')){
-    ['fms_animals','fms_feed','fms_transactions','fms_weights',
-     'fms_transitionRules','fms_transitionLog','fms_setup','fms_feedCategories'].forEach(k=>localStorage.removeItem(k));
-    localStorage.setItem('fms_clean_v3','1');
+  if(!localStorage.getItem('fms_clean_v4')){
+    Object.keys(localStorage).filter(k=>k.startsWith('fms_')).forEach(k=>localStorage.removeItem(k));
+    localStorage.setItem('fms_clean_v4','1');
+    seedDefaultTransitionRules();
   }
+}
+
+function seedDefaultTransitionRules(){
+  if(dbGet('transitionRules').length) return;
+  const rules = [
+    // Cow/Cattle
+    {animalType:'Cow',gender:'Female',fromStage:'Calf',toStage:'Heifer Calf',ageMonths:6,warnDays:7},
+    {animalType:'Cow',gender:'Male',fromStage:'Calf',toStage:'Bull Calf',ageMonths:6,warnDays:7},
+    {animalType:'Cow',gender:'Female',fromStage:'Heifer Calf',toStage:'Heifer',ageMonths:12,warnDays:7},
+    {animalType:'Cow',gender:'Male',fromStage:'Bull Calf',toStage:'Young Bull',ageMonths:12,warnDays:7},
+    {animalType:'Cow',gender:'Male',fromStage:'Young Bull',toStage:'Bull',ageMonths:24,warnDays:14},
+    // Buffalo
+    {animalType:'Buffalo',gender:'Female',fromStage:'Calf',toStage:'Female Calf',ageMonths:6,warnDays:7},
+    {animalType:'Buffalo',gender:'Male',fromStage:'Calf',toStage:'Male Calf',ageMonths:6,warnDays:7},
+    {animalType:'Buffalo',gender:'Female',fromStage:'Female Calf',toStage:'Heifer',ageMonths:12,warnDays:7},
+    {animalType:'Buffalo',gender:'Male',fromStage:'Male Calf',toStage:'Young Bull',ageMonths:12,warnDays:7},
+    {animalType:'Buffalo',gender:'Male',fromStage:'Young Bull',toStage:'Buffalo Bull',ageMonths:30,warnDays:14},
+    // Goat
+    {animalType:'Goat',gender:'Female',fromStage:'Kid',toStage:'Doeling',ageMonths:6,warnDays:7},
+    {animalType:'Goat',gender:'Male',fromStage:'Kid',toStage:'Buckling',ageMonths:6,warnDays:7},
+    {animalType:'Goat',gender:'Female',fromStage:'Doeling',toStage:'Doe',ageMonths:12,warnDays:7},
+    {animalType:'Goat',gender:'Male',fromStage:'Buckling',toStage:'Buck',ageMonths:12,warnDays:7},
+    // Sheep
+    {animalType:'Sheep',gender:'Female',fromStage:'Lamb',toStage:'Ewe Lamb',ageMonths:6,warnDays:7},
+    {animalType:'Sheep',gender:'Male',fromStage:'Lamb',toStage:'Ram Lamb',ageMonths:6,warnDays:7},
+    {animalType:'Sheep',gender:'Female',fromStage:'Ewe Lamb',toStage:'Ewe',ageMonths:12,warnDays:7},
+    {animalType:'Sheep',gender:'Male',fromStage:'Ram Lamb',toStage:'Ram',ageMonths:12,warnDays:7},
+  ];
+  rules.forEach(r => dbAdd('transitionRules', r));
 }
 
 // ============================================================
