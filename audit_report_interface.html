@@ -99,7 +99,19 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 .oax{display:flex;align-items:center;gap:7px;margin:8px 0;padding:7px 0;border-top:1px solid #eee;font-size:12px}
 .oax strong{font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px}
 
-/* MODAL */
+/* ANNEXURES */
+.anxitem{border:1px solid var(--gbor);border-radius:5px;margin-bottom:6px;overflow:hidden}
+.anxhdr{display:flex;align-items:center;gap:6px;padding:7px 10px;background:#f5f7fa;cursor:pointer;user-select:none}
+.anxhdr:hover{background:#edf2f8}
+.anxlbl{font-size:11px;font-weight:700;color:var(--navy);white-space:nowrap}
+.anxtit{flex:1;font-size:11.5px;color:var(--gtxt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.anxbody{padding:10px;border-top:1px solid var(--gbor);background:#fff}
+.anxfile{background:#f5f7fa;border:1px solid var(--gbor);border-radius:4px;padding:7px 9px;margin-bottom:6px}
+.dropzone{border:2px dashed #b0c8e0;border-radius:5px;padding:14px;text-align:center;color:var(--gtxt);font-size:12px;cursor:pointer;margin-top:8px;transition:.15s}
+.dropzone:hover{border-color:var(--navylt);background:#f0f5fb;color:var(--navy)}
+.dropzone.drag{border-color:var(--gold);background:#fffbe8}
+
+
 #movl{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:center;justify-content:center}
 #movl.show{display:flex}
 .mbox{background:#fff;border-radius:8px;width:460px;max-width:95vw;max-height:84vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.28)}
@@ -311,6 +323,12 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
     </div>
   </div>
 
+  <div class="sec">
+    <div class="sh">Annexures</div>
+    <div id="anxlist"><div style="font-size:11.5px;color:var(--gtxt);padding:4px 0">No annexures added yet.</div></div>
+    <button style="width:100%;margin-top:8px;padding:7px;background:var(--navy);color:#fff;border:none;border-radius:4px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer" onclick="addAnnex()">&#10133; Add Annexure</button>
+  </div>
+
   <button id="genbtn" onclick="renderRpt()">&#9889; Generate / Refresh Report</button>
 </div>
 
@@ -382,6 +400,7 @@ var avMap    = {};   // {obsId: manual audit view text}
 var actMap   = {};   // {obsId: action taken text}
 var respMap  = {};   // {obsId: auditee response text}
 var customs  = [];
+var annexures= [];   // [{id,label,title,open,files:[{name,type,dataUrl}]}]
 var cOpen    = false;
 var curM     = null;
 
@@ -739,6 +758,7 @@ function renderRpt(){
     h+='</div>';
   }
 
+  h+=buildAnnexHtml(false);
   cont.innerHTML=h;
 }
 
@@ -889,7 +909,8 @@ function doCopy(){
 
 function doClear(){
   if(!confirm('Clear all selections?'))return;
-  selIds={}; annexMap={}; avMap={}; actMap={}; respMap={}; customs=[];
+  selIds={}; annexMap={}; avMap={}; actMap={}; respMap={}; customs=[]; annexures=[];
+  renderAnnexList();
   document.getElementById('qinp').value='';
   document.getElementById('styp').value='All Types';
   document.getElementById('scat').value='All Categories';
@@ -995,7 +1016,8 @@ function downloadSoftCopy(){
     rper_to:document.getElementById('rper_to').value,
     brvisit_from:document.getElementById('brvisit_from').value,
     brvisit_to:document.getElementById('brvisit_to').value,
-    brprev:document.getElementById('brprev').value
+    brprev:document.getElementById('brprev').value,
+    annexures:annexures
   };
   softHtml+='<script type="application/json" id="report-meta">'+JSON.stringify(meta)+'<\/script>\n';
   softHtml+='<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">\n';
@@ -1026,6 +1048,7 @@ function downloadSoftCopy(){
   softHtml+='</div></div>\n';
   softHtml+=misHtml;
   softHtml+=obsSection;
+  softHtml+=buildAnnexHtml(true);
   softHtml+='</div>\n'; // end #rp
   // Save-with-responses button — inline JS in the soft copy
   softHtml+='<button id="savebtn" onclick="saveResponses()">&#128190; Save with My Responses</button>\n';
@@ -1068,6 +1091,149 @@ function downloadSoftCopy(){
   a.href=url; a.download=fname; a.click();
   URL.revokeObjectURL(url);
   toast('Soft copy downloaded.');
+}
+
+// ============================================================
+// ANNEXURE MANAGER
+// ============================================================
+var ANX_LABELS=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T'];
+
+function renderAnnexList(){
+  var el=document.getElementById('anxlist'); if(!el) return;
+  if(!annexures.length){el.innerHTML='<div style="font-size:11.5px;color:var(--gtxt);padding:4px 0">No annexures added yet.</div>';return;}
+  var h='';
+  for(var i=0;i<annexures.length;i++){
+    var a=annexures[i];
+    h+='<div class="anxitem" id="anxi-'+a.id+'">';
+    h+='<div class="anxhdr" onclick="toggleAnx(\''+a.id+'\')">';
+    h+='<span class="anxlbl">'+esc(a.label||('Annex-'+(i+1)))+'</span>';
+    h+='<span class="anxtit">'+esc(a.title||'(no title)')+'</span>';
+    h+='<span style="font-size:10px;color:var(--gtxt);margin-right:4px">'+(a.files?a.files.length:0)+' file(s)</span>';
+    h+='<button class="odl" onclick="event.stopPropagation();delAnnex(\''+a.id+'\')">&#10005;</button></div>';
+    h+='<div class="anxbody" id="anxb-'+a.id+'" style="display:'+(a.open?'block':'none')+'">';
+    h+='<div class="g2" style="margin-bottom:8px">';
+    h+='<div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">Label</div>';
+    h+='<input type="text" style="width:100%;border:1px solid var(--gbor);border-radius:3px;padding:4px 7px;font-family:Inter,sans-serif;font-size:12px;outline:none" value="'+esc(a.label)+'" placeholder="e.g. Annexure-A" oninput="updateAnx(\''+a.id+'\',\'label\',this.value)"></div>';
+    h+='<div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">Title / Description</div>';
+    h+='<input type="text" style="width:100%;border:1px solid var(--gbor);border-radius:3px;padding:4px 7px;font-family:Inter,sans-serif;font-size:12px;outline:none" value="'+esc(a.title)+'" placeholder="e.g. Detail of overdue books" oninput="updateAnx(\''+a.id+'\',\'title\',this.value)"></div>';
+    h+='</div>';
+    if(a.files&&a.files.length){
+      for(var f=0;f<a.files.length;f++){
+        var fi=a.files[f];
+        var isImg=fi.type&&fi.type.indexOf('image/')===0;
+        h+='<div class="anxfile">';
+        if(isImg) h+='<img src="'+fi.dataUrl+'" style="max-width:100%;max-height:120px;object-fit:contain;border-radius:3px;margin-bottom:5px;display:block">';
+        h+='<div style="display:flex;align-items:center;gap:5px">';
+        h+='<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(fi.name)+'">&#128196; '+esc(fi.name)+'</span>';
+        h+='<button class="mib d" onclick="removeFile(\''+a.id+'\','+f+')">Remove</button></div></div>';
+      }
+    }
+    h+='<div class="dropzone" id="dz-'+a.id+'" onclick="triggerFU(\''+a.id+'\')" ondragover="dzOver(event,\''+a.id+'\')" ondragleave="dzLeave(\''+a.id+'\')" ondrop="dzDrop(event,\''+a.id+'\')">&#128206; Click or drag files here<br><span style="font-size:10px">Images&nbsp;·&nbsp;PDF&nbsp;·&nbsp;Excel&nbsp;·&nbsp;Word&nbsp;·&nbsp;any file</span></div>';
+    h+='<input type="file" id="fu-'+a.id+'" multiple style="display:none" onchange="handleFiles(\''+a.id+'\',this)">';
+    h+='</div></div>';
+  }
+  el.innerHTML=h;
+}
+
+function addAnnex(){
+  var id='ANX'+Date.now();
+  var lbl='Annexure-'+(ANX_LABELS[annexures.length]||String(annexures.length+1));
+  annexures.push({id:id,label:lbl,title:'',open:true,files:[]});
+  renderAnnexList(); renderRpt();
+}
+
+function delAnnex(id){
+  annexures=annexures.filter(function(a){return a.id!==id;});
+  renderAnnexList(); renderRpt();
+}
+
+function toggleAnx(id){
+  for(var i=0;i<annexures.length;i++){if(annexures[i].id===id){annexures[i].open=!annexures[i].open;break;}}
+  var b=document.getElementById('anxb-'+id);
+  if(b) b.style.display=b.style.display==='none'?'block':'none';
+}
+
+function updateAnx(id,key,val){
+  for(var i=0;i<annexures.length;i++){if(annexures[i].id===id){annexures[i][key]=val;break;}}
+  // Update header label/title in DOM without full re-render
+  var hdr=document.getElementById('anxi-'+id);
+  if(hdr){
+    var lbEl=hdr.querySelector('.anxlbl'); if(lbEl&&key==='label') lbEl.textContent=val||('Annex-'+(i+1));
+    var ttEl=hdr.querySelector('.anxtit'); if(ttEl&&key==='title') ttEl.textContent=val||'(no title)';
+  }
+  renderRpt();
+}
+
+function triggerFU(id){var el=document.getElementById('fu-'+id);if(el)el.click();}
+
+function dzOver(e,id){e.preventDefault();var d=document.getElementById('dz-'+id);if(d)d.className='dropzone drag';}
+function dzLeave(id){var d=document.getElementById('dz-'+id);if(d)d.className='dropzone';}
+function dzDrop(e,id){e.preventDefault();dzLeave(id);processFileList(id,e.dataTransfer.files);}
+
+function handleFiles(id,input){processFileList(id,input.files);input.value='';}
+
+function processFileList(id,files){
+  if(!files||!files.length) return;
+  var anx=null; for(var i=0;i<annexures.length;i++){if(annexures[i].id===id){anx=annexures[i];break;}} if(!anx) return;
+  var rem=files.length;
+  for(var j=0;j<files.length;j++){
+    (function(file){
+      if(file.size>15*1024*1024){toast(file.name+' exceeds 15 MB limit.');rem--;if(!rem){renderAnnexList();renderRpt();}return;}
+      var reader=new FileReader();
+      reader.onload=function(e){
+        anx.files.push({name:file.name,type:file.type||'application/octet-stream',dataUrl:e.target.result});
+        rem--; if(!rem){renderAnnexList();renderRpt();}
+      };
+      reader.readAsDataURL(file);
+    })(files[j]);
+  }
+}
+
+function removeFile(id,idx){
+  for(var i=0;i<annexures.length;i++){if(annexures[i].id===id){annexures[i].files.splice(idx,1);break;}}
+  renderAnnexList(); renderRpt();
+}
+
+// Build annexures HTML block (used in report preview, soft copy, final report)
+function buildAnnexHtml(inline){
+  // inline=true: use inline styles only (for soft/final copy)
+  // inline=false: use CSS classes (for live preview)
+  if(!annexures.length) return '';
+  var navy='#1a3a5c', gbor='#dde2ea', gtxt='#6a7888';
+  var h='<div style="margin-top:32px;border-top:3px solid '+navy+';padding-top:20px">';
+  h+='<h2 style="font-family:Merriweather,serif;font-size:16px;font-weight:700;color:'+navy+';margin-bottom:20px;text-align:center;letter-spacing:1px">ANNEXURES</h2>';
+  for(var i=0;i<annexures.length;i++){
+    var a=annexures[i];
+    h+='<div style="margin-bottom:28px;page-break-inside:avoid">';
+    h+='<div style="font-family:Merriweather,serif;font-size:13px;font-weight:700;color:'+navy+';border-bottom:2px solid '+gbor+';padding-bottom:6px;margin-bottom:12px">';
+    h+=esc(a.label||('Annexure-'+(i+1)));
+    if(a.title) h+=' &mdash; '+esc(a.title);
+    h+='</div>';
+    if(!a.files||!a.files.length){
+      h+='<p style="font-size:12px;color:'+gtxt+';font-style:italic">No files attached.</p>';
+    } else {
+      for(var f=0;f<a.files.length;f++){
+        var fi=a.files[f];
+        var isImg=fi.type&&fi.type.indexOf('image/')===0;
+        var isPdf=fi.type&&fi.type==='application/pdf';
+        h+='<div style="margin-bottom:14px">';
+        if(isImg){
+          h+='<div style="font-size:11px;color:'+gtxt+';margin-bottom:4px">'+esc(fi.name)+'</div>';
+          h+='<img src="'+fi.dataUrl+'" style="max-width:100%;border:1px solid '+gbor+';border-radius:4px;display:block">';
+        } else if(isPdf){
+          h+='<div style="font-size:11px;color:'+gtxt+';margin-bottom:6px">'+esc(fi.name)+'</div>';
+          h+='<embed src="'+fi.dataUrl+'" type="application/pdf" style="width:100%;height:500px;border:1px solid '+gbor+';border-radius:4px">';
+          h+='<div style="margin-top:5px"><a href="'+fi.dataUrl+'" download="'+esc(fi.name)+'" style="font-size:12px;color:'+navy+'">&#8595; Download PDF</a></div>';
+        } else {
+          h+='<a href="'+fi.dataUrl+'" download="'+esc(fi.name)+'" style="display:inline-flex;align-items:center;gap:8px;padding:9px 14px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12.5px;font-weight:600;color:'+navy+';text-decoration:none">&#128196; '+esc(fi.name)+'</a>';
+        }
+        h+='</div>';
+      }
+    }
+    h+='</div>';
+  }
+  h+='</div>';
+  return h;
 }
 
 // ============================================================
@@ -1119,6 +1285,11 @@ function loadAuditeeFile(evt){
           var found=false;
           for(var p=0;p<spb.options.length;p++){if(spb.options[p].value===m.pb){spb.value=m.pb;found=true;break;}}
           if(!found){var opt=document.createElement('option');opt.value=m.pb;opt.textContent=m.pb;spb.appendChild(opt);spb.value=m.pb;}
+        }
+        // Restore annexures
+        if(m.annexures&&m.annexures.length){
+          annexures=m.annexures;
+          renderAnnexList();
         }
       }catch(ex){}
     }
@@ -1231,6 +1402,7 @@ function finalizeReport(){
   finalHtml+=misHtml;
   finalHtml+='<p style="font-size:12px;color:#6a7888;margin-bottom:16px">Total Observations: <strong>'+num+'</strong></p>';
   finalHtml+=obsSection;
+  finalHtml+=buildAnnexHtml(true);
   finalHtml+='</div>\n</div>\n</body>\n</html>';
 
   var blob=new Blob([finalHtml],{type:'text/html'});
