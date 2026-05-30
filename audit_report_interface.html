@@ -183,6 +183,27 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
   </div>
 
   <div class="sec">
+    <div class="sh">Report Options</div>
+    <div class="fr">
+      <label style="margin-bottom:5px">Audit View in Report</label>
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:500;cursor:pointer">
+          <input type="radio" name="avmode" id="av_auto" value="auto" checked onchange="renderRpt()">
+          From Data Bank
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:500;cursor:pointer">
+          <input type="radio" name="avmode" id="av_manual" value="manual" onchange="renderRpt()">
+          Type Manually
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:500;cursor:pointer">
+          <input type="radio" name="avmode" id="av_none" value="none" onchange="renderRpt()">
+          Hide
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
     <div class="sh">Filter Observations</div>
     <div class="fr"><label>Observation Type</label>
       <div class="crow">
@@ -316,6 +337,7 @@ var CATS     = sg('bhs_ca', DEF_CA);
 
 var selIds   = {};   // {obsId: true}
 var annexMap = {};   // {obsId: "text"}
+var avMap    = {};   // {obsId: manual audit view text}
 var customs  = [];
 var cOpen    = false;
 var curM     = null;
@@ -648,9 +670,13 @@ function renderRpt(){
       h+='<span class="otl">'+esc(o.title)+' <span class="badge '+tc+'">'+esc(o.type)+'</span></span>';
       h+='<button class="odl" onclick="remObs(\''+o.id+'\')">&#10005;</button></div>';
       h+='<div class="ocb">';
+      var avMode=document.querySelector('input[name="avmode"]:checked');
+      var avVal=avMode?avMode.value:'auto';
+      var avStored=avMap[o.id]||'';
       if(o.observation) h+='<div class="osl">Observation</div><div class="ost">'+esc(o.observation)+'</div>';
       if(o.recommendation) h+='<div class="osl">Recommendation</div><div class="ost">'+esc(o.recommendation)+'</div>';
-      if(o.audit_view) h+='<div class="osl">Audit View</div><div class="ost">'+esc(o.audit_view)+'</div>';
+      if(avVal==='auto'&&o.audit_view) h+='<div class="osl">Audit View</div><div class="ost">'+esc(o.audit_view)+'</div>';
+      else if(avVal==='manual') h+='<div class="osl">Audit View</div><textarea class="oresp" id="av-'+o.id+'" placeholder="Type audit view here..." oninput="avMap[\''+o.id+'\']=this.value">'+esc(avStored)+'</textarea>';
       if(ax) h+='<div class="oax"><strong>Annexure Data:</strong> '+esc(ax)+'</div>';
       h+='<div class="osl">Auditee Response</div>';
       h+='<textarea class="oresp" id="r-'+o.id+'" placeholder="Enter auditee response...">'+esc(resp)+'</textarea>';
