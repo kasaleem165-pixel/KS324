@@ -2312,10 +2312,11 @@ function clearExpFilters(){['filterExpCat','filterExpMode','filterExpFrom','filt
 // FIRST-RUN CLEAN SLATE + DEFAULT SEED
 // ============================================================
 function ensureCleanSlate(){
-  if(!localStorage.getItem('fms_clean_v4')){
+  if(!localStorage.getItem('fms_clean_v5')){
     Object.keys(localStorage).filter(k=>k.startsWith('fms_')).forEach(k=>localStorage.removeItem(k));
-    localStorage.setItem('fms_clean_v4','1');
+    localStorage.setItem('fms_clean_v5','1');
     seedDefaultTransitionRules();
+    seedAnimalData();
   }
 }
 
@@ -2346,6 +2347,160 @@ function seedDefaultTransitionRules(){
     {animalType:'Sheep',gender:'Male',fromStage:'Ram Lamb',toStage:'Ram',ageMonths:12,warnDays:7},
   ];
   rules.forEach(r => dbAdd('transitionRules', r));
+}
+
+// ── Animal Stock as on 30-05-2026 (imported from List_of_Available_Animals.xlsx) ──
+function seedAnimalData(){
+  if(dbGet('animals').length) return;
+  // Mothers (confirmed from calving records): 2,5,6,26,39,122,123 → stage=Cow/Buffalo Cow
+  const animals = [
+    // ── Buffalo ──
+    {tagNo:'26', animalType:'Buffalo', breed:'Nili Ravi', gender:'Female', stage:'Buffalo Cow',
+     dob:'2019-07-01', acqType:'Born on Farm', source:'Born on Farm',
+     status:'Active', purchaseDate:'2019-07-01', purchaseAmount:'',
+     remarks:'Small Katti #26 (Lahore Wali). Confirmed mother of Tag 61.'},
+
+    {tagNo:'61', animalType:'Buffalo', breed:'Nili Ravi', gender:'Female', stage:'Heifer',
+     dob:'2022-11-06', acqType:'Born on Farm', source:'Born on Farm',
+     status:'Active', purchaseDate:'2022-11-06', purchaseAmount:'',
+     motherId:'26', remarks:'Katti #61 borne by Buffalo (Old Katti) #26.'},
+
+    // ── Cows (confirmed mothers — stage=Cow) ──
+    {tagNo:'2', animalType:'Cow', breed:'Desi', gender:'Female', stage:'Cow',
+     dob:'2017-07-01', acqType:'Purchased', source:'Purchased',
+     status:'Active', purchaseDate:'2019-07-01', purchaseAmount:'',
+     remarks:'Red Cow purchased 2019, age ~2 years at purchase. Mother of Tags 39 & 145.'},
+
+    {tagNo:'5', animalType:'Cow', breed:'Desi', gender:'Female', stage:'Cow',
+     dob:'', acqType:'Purchased', source:'Purchased',
+     status:'Active', purchaseDate:'2019-07-01', purchaseAmount:'',
+     remarks:'Multanan Cow #5. Purchased from Kot Abdul Malik with a Wacchi. Mother of Tag 170.'},
+
+    {tagNo:'6', animalType:'Cow', breed:'Desi', gender:'Female', stage:'Cow',
+     dob:'2019-07-01', acqType:'Born on Farm', source:'Born on Farm',
+     status:'Active', purchaseDate:'2019-07-01', purchaseAmount:'',
+     motherId:'', remarks:'Wacchi borne by Red Cow. Mother of Tags 110 & 193.'},
+
+    {tagNo:'39', animalType:'Cow', breed:'Desi', gender:'Female', stage:'Cow',
+     dob:'2021-10-10', acqType:'Born on Farm', source:'Born on Farm',
+     status:'Active', purchaseDate:'2021-10-10', purchaseAmount:'',
+     motherId:'2', remarks:'Wacchi borne by Red Cow (#2). Mother of Tag 161.'},
+
+    {tagNo:'122', animalType:'Cow', breed:'Desi', gender:'Female', stage:'Cow',
+     dob:'', acqType:'Purchased', source:'Purchased',
+     status:'Active', purchaseDate:'2025-04-06', purchaseAmount:'145000',
+     remarks:'Red Color Cow purchased at Taragarh. Mother of Tag 171.'},
+
+    {tagNo:'123', animalType:'Cow', breed:'Desi', gender:'Female', stage:'Cow',
+     dob:'', acqType:'Purchased', source:'Purchased',
+     status:'Active', purchaseDate:'2025-04-06', purchaseAmount:'120000',
+     remarks:'Cow purchased from Adil, age 4 years. Mother of Tag 179.'},
+
+    // ── Heifers / Young Females ──
+    {tagNo:'98', animalType:'Cow', breed:'Desi', gender:'Female', stage:'Heifer',
+     dob:'2024-02-03', acqType:'Born on Farm', source:'Born on Farm',
+     status:'Active', purchaseDate:'2024-02-03', purchaseAmount:'',
+     motherId:'', remarks:'Wacchi #98 borne by Red Cow.'},
+
+    {tagNo:'110', animalType:'Cow', breed:'Desi', gender:'Female', stage:'Heifer Calf',
+     dob:'2024-08-24', acqType:'Born on Farm', source:'Born on Farm',
+     status:'Active', purchaseDate:'2024-08-24', purchaseAmount:'',
+     motherId:'6', remarks:'Wacchi borne by Cow #6.'},
+
+    // ── Young Female Calves ──
+    {tagNo:'179', animalType:'Cow', breed:'Desi', gender:'Female', stage:'Calf',
+     dob:'2026-03-29', acqType:'Born on Farm', source:'Born on Farm',
+     status:'Active', purchaseDate:'2026-03-29', purchaseAmount:'',
+     motherId:'123', remarks:'Wacchi borne by Adil Cow #123.'},
+
+    {tagNo:'193', animalType:'Cow', breed:'Desi', gender:'Female', stage:'Calf',
+     dob:'2026-05-18', acqType:'Born on Farm', source:'Born on Farm',
+     status:'Active', purchaseDate:'2026-05-18', purchaseAmount:'',
+     motherId:'6', remarks:'Wacchi borne by White Ablaq Cow #6.'},
+
+    // ── Male Calves (born on farm) ──
+    {tagNo:'145', animalType:'Cow', breed:'Desi', gender:'Male', stage:'Bull Calf',
+     dob:'2025-06-16', acqType:'Born on Farm', source:'Born on Farm',
+     status:'Active', purchaseDate:'2025-06-16', purchaseAmount:'',
+     motherId:'2', remarks:'Waccha #145 borne by Laal Cow #2.'},
+
+    {tagNo:'161', animalType:'Cow', breed:'Nuqra', gender:'Male', stage:'Calf',
+     dob:'2025-12-29', acqType:'Born on Farm', source:'Born on Farm',
+     status:'Active', purchaseDate:'2025-12-29', purchaseAmount:'',
+     motherId:'39', remarks:'Waccha Nuqra #161 borne by Cow #39.'},
+
+    {tagNo:'170', animalType:'Cow', breed:'Desi', gender:'Male', stage:'Calf',
+     dob:'2026-02-22', acqType:'Born on Farm', source:'Born on Farm',
+     status:'Active', purchaseDate:'2026-02-22', purchaseAmount:'',
+     motherId:'5', remarks:'Waccha #170 borne by Multanan Cow #5.'},
+
+    {tagNo:'171', animalType:'Cow', breed:'Desi', gender:'Male', stage:'Calf',
+     dob:'2026-03-13', acqType:'Born on Farm', source:'Born on Farm',
+     status:'Active', purchaseDate:'2026-03-13', purchaseAmount:'',
+     motherId:'122', remarks:'Waccha #171 borne by Marasion Wali Cow #122.'},
+
+    // ── Young Bulls (purchased) ──
+    {tagNo:'147', animalType:'Cow', breed:'Desi', gender:'Male', stage:'Young Bull',
+     dob:'', acqType:'Purchased', source:'Purchased',
+     status:'Active', purchaseDate:'2025-08-13', purchaseAmount:'111000',
+     remarks:'Waccha from batch of 8, purchased from Ludan Mandi.'},
+
+    {tagNo:'148', animalType:'Cow', breed:'Desi', gender:'Male', stage:'Young Bull',
+     dob:'', acqType:'Purchased', source:'Purchased',
+     status:'Active', purchaseDate:'2025-08-13', purchaseAmount:'113000',
+     remarks:'Waccha from batch of 8, purchased from Ludan Mandi.'},
+
+    {tagNo:'169', animalType:'Cow', breed:'Desi', gender:'Male', stage:'Young Bull',
+     dob:'', acqType:'Purchased', source:'Purchased',
+     status:'Active', purchaseDate:'2026-02-15', purchaseAmount:'158000',
+     remarks:'Waccha from batch of 3 purchased.'},
+
+    {tagNo:'172', animalType:'Cow', breed:'Desi', gender:'Male', stage:'Young Bull',
+     dob:'', acqType:'Purchased', source:'Purchased',
+     status:'Active', purchaseDate:'2026-03-24', purchaseAmount:'',
+     remarks:'Batch of 3 Wacchas purchased from 35 Chak.'},
+
+    {tagNo:'173', animalType:'Cow', breed:'Desi', gender:'Male', stage:'Young Bull',
+     dob:'', acqType:'Purchased', source:'Purchased',
+     status:'Active', purchaseDate:'2026-03-24', purchaseAmount:'',
+     remarks:'Batch of 3 Wacchas purchased from 35 Chak.'},
+
+    {tagNo:'174', animalType:'Cow', breed:'Desi', gender:'Male', stage:'Young Bull',
+     dob:'', acqType:'Purchased', source:'Purchased',
+     status:'Active', purchaseDate:'2026-03-24', purchaseAmount:'',
+     remarks:'Batch of 3 Wacchas purchased from 35 Chak.'},
+
+    {tagNo:'175', animalType:'Cow', breed:'Desi', gender:'Male', stage:'Young Bull',
+     dob:'', acqType:'Purchased', source:'Purchased',
+     status:'Active', purchaseDate:'2026-03-25', purchaseAmount:'',
+     remarks:'Waccha purchased from Taragarh Tibba.'},
+
+    {tagNo:'180', animalType:'Cow', breed:'Desi', gender:'Male', stage:'Young Bull',
+     dob:'', acqType:'Purchased', source:'Purchased',
+     status:'Active', purchaseDate:'2026-04-05', purchaseAmount:'75000',
+     remarks:'Calf purchased from Kaka Rasheed.'},
+
+    {tagNo:'181', animalType:'Cow', breed:'Desi', gender:'Male', stage:'Young Bull',
+     dob:'', acqType:'Purchased', source:'Purchased',
+     status:'Active', purchaseDate:'2026-04-14', purchaseAmount:'115000',
+     remarks:'White colour Waccha purchased from Tahir Dealer.'},
+
+    {tagNo:'184', animalType:'Cow', breed:'Desi', gender:'Male', stage:'Young Bull',
+     dob:'', acqType:'Purchased', source:'Purchased',
+     status:'Active', purchaseDate:'2026-05-01', purchaseAmount:'161000',
+     remarks:'Waccha 230 Kg purchased from Waseem Abbas.'},
+
+    {tagNo:'185', animalType:'Cow', breed:'Desi', gender:'Male', stage:'Young Bull',
+     dob:'', acqType:'Purchased', source:'Purchased',
+     status:'Active', purchaseDate:'2026-05-03', purchaseAmount:'140000',
+     remarks:'Batch of 4 Wacchas purchased from Tughran Basti.'},
+
+    {tagNo:'190', animalType:'Cow', breed:'Desi', gender:'Male', stage:'Young Bull',
+     dob:'', acqType:'Purchased', source:'Purchased',
+     status:'Active', purchaseDate:'2026-05-05', purchaseAmount:'135000',
+     remarks:'Waccha purchased from Taragarh by Mustafa Bhai.'},
+  ];
+  animals.forEach(a => dbAdd('animals', {...a, deferredUntil:null, voucherNo:'', voucherDate:'', initialWeight:'', lactationNo:'', pregnancyDate:'', medicalHistory:''}));
 }
 
 // ============================================================
