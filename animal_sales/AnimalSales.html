@@ -2304,9 +2304,9 @@ function renderSaleLedger(){
 
   // Build grouped-by-customer ledger
   const head=document.getElementById('saleledger-head');
-  head.innerHTML='<tr><th>S#</th><th>Photo</th>'+th('Invoice No.','saleledger','receipt_no')+th('Date','saleledger','sale_date')+th('Animal','saleledger','animal_code')+th('Age','saleledger','age_type')+th('Wt(kg)','saleledger','weight_at_sale')+th('Rate/kg','saleledger','rate_per_kg')+th('Sale Price','saleledger','sp')+th('Total Sale','saleledger','amount')+th('Customer','saleledger','customerName')+'<th>Received</th><th>Discount</th><th>Balance</th></tr>';
+  head.innerHTML='<tr><th>S#</th><th>Photo</th>'+th('Invoice No.','saleledger','receipt_no')+th('Date','saleledger','sale_date')+th('Animal','saleledger','animal_code')+th('Age','saleledger','age_type')+th('Wt(kg)','saleledger','weight_at_sale')+th('Rate/kg','saleledger','rate_per_kg')+th('Sale Price','saleledger','sp')+th('Carriage','saleledger','carriage_charges')+th('Admin','saleledger','admin_charges')+th('Total Sale','saleledger','amount')+th('Customer','saleledger','customerName')+'<th>Received</th><th>Discount</th><th>Balance</th><th></th></tr>';
   const tb=document.getElementById('saleledger-body');
-  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="14" class="empty">No sales yet.</td></tr>`;return;}
+  if(!DB.sales.length){tb.innerHTML=`<tr><td colspan="17" class="empty">No sales yet.</td></tr>`;return;}
 
   let html='';
   let sno=0;
@@ -2316,15 +2316,15 @@ function renderSaleLedger(){
     const c=DB.customers.find(x=>x.id===cid)||{name:'Unknown'};
     const rawSales=DB.sales.filter(s=>s.customer_id===cid).map(s=>{const sp=s.is_lumpsum?(s.amount-(s.carriage_charges||0)):s.weight_at_sale*s.rate_per_kg;const a2=DB.animals.find(x=>x.code===s.animal_code)||{};return Object.assign({},s,{sp,age_type:a2.age_type||'',customerName:cName(s.customer_id)});});
     const slCol=SORT.saleledger.col,slDir=SORT.saleledger.dir;
-    const slNumCols=['weight_at_sale','rate_per_kg','sp','amount'];
+    const slNumCols=['weight_at_sale','rate_per_kg','sp','carriage_charges','admin_charges','amount'];
     const custSales=slNumCols.includes(slCol)?[...rawSales].sort((a,b)=>slDir==='asc'?(a[slCol]||0)-(b[slCol]||0):(b[slCol]||0)-(a[slCol]||0)):sortArr(rawSales,slCol,slDir);
     const custPaid=DB.payments.filter(p=>p.customer_id===cid).reduce((s,p)=>s+(p.amount||0),0);
     const custDisc=DB.payments.filter(p=>p.customer_id===cid).reduce((s,p)=>s+(p.discount||0),0);
     const custTotal=custSales.reduce((s,x)=>s+x.amount,0);
     const custBal=custTotal-custPaid-custDisc;
     // Customer header row
-    html+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700">
-      <td colspan="14" style="padding:7px 10px">&#9654; ${c.name}
+    html+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;user-select:none" onclick="void(0)">
+      <td colspan="17" style="padding:7px 10px">&#9654; ${c.name}
         <span style="font-weight:400;font-size:.78rem;margin-left:12px;opacity:.85">
           ${custSales.length} sale${custSales.length>1?'s':''} &nbsp;|&nbsp; Billed: ${Rs(custTotal)} &nbsp;|&nbsp; Received: ${Rs(custPaid)} &nbsp;|&nbsp; Balance: ${Rs(custBal)}
         </span>
@@ -2350,6 +2350,8 @@ function renderSaleLedger(){
         <td>${fmtN(s.weight_at_sale,1)}</td>
         <td>${fmtN(s.rate_per_kg)}</td>
         <td>${Rs(sp)}</td>
+        <td>${car>0?Rs(car):'-'}</td>
+        <td>${(s.admin_charges||0)>0?Rs(s.admin_charges||0):'-'}</td>
         <td><strong>${Rs(s.amount)}</strong></td>
         <td>${s.customerName||cName(s.customer_id)}</td>
         <td></td><td></td>
@@ -2360,6 +2362,8 @@ function renderSaleLedger(){
     html+=`<tr style="background:#f0f9ff;font-weight:700;font-size:.82rem;border-top:2px solid #bae6fd">
       <td colspan="8" style="color:#1a3a5c">Subtotal — ${c.name}</td>
       <td>${Rs(custSales.reduce((s,x)=>s+(x.sp!==undefined?x.sp:x.weight_at_sale*x.rate_per_kg),0))}</td>
+      <td>${Rs(custSales.reduce((s,x)=>s+(x.carriage_charges||0),0))}</td>
+      <td>${Rs(custSales.reduce((s,x)=>s+(x.admin_charges||0),0))}</td>
       <td>${Rs(custTotal)}</td>
       <td></td>
       <td style="color:#059669">${Rs(custPaid)}</td>
@@ -2371,6 +2375,8 @@ function renderSaleLedger(){
   html+=`<tr style="background:#1a3a5c;color:#fff;font-weight:700;font-size:.85rem;border-top:3px solid #0f2540">
     <td colspan="8">GRAND TOTAL</td>
     <td>${Rs(totalSalePrice)}</td>
+    <td>${Rs(totalCarriage)}</td>
+    <td>${Rs(DB.sales.reduce((s,x)=>s+(x.admin_charges||0),0))}</td>
     <td>${Rs(totalAmount)}</td>
     <td></td>
     <td>${Rs(totalPaid)}</td>
