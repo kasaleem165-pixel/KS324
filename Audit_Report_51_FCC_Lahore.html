@@ -113,6 +113,13 @@
   .scrolltable{overflow-x:auto;max-height:400px;overflow-y:auto}
   footer{background:var(--primary);color:#7fb3d3;text-align:center;padding:1.5rem;font-size:.78rem;margin-top:3rem}
   footer strong{color:#fff}
+  /* KPI back-banner (floating, appears after clicking Detail from KPI modal) */
+  #kpi-back-banner{position:fixed;bottom:1.4rem;right:1.4rem;z-index:9000;
+    background:var(--primary);color:#fff;padding:.55rem 1.1rem;border-radius:24px;
+    font-size:.82rem;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.25);
+    display:flex;align-items:center;gap:.4rem;transition:background .2s;white-space:nowrap}
+  #kpi-back-banner:hover{background:var(--accent)}
+
   /* Interactive KPI tiles */
   .kpi-btn{cursor:pointer;transition:transform .15s,box-shadow .15s;position:relative}
   .kpi-btn:hover{transform:translateY(-3px);box-shadow:0 6px 18px rgba(0,0,0,.13)}
@@ -2366,15 +2373,40 @@ var RISK_LABELS = {high:"High Risk",mh:"Medium-High",lm:"Low-Medium",low:"Low Ri
 var RISK_COLORS = {high:"var(--high)",mh:"var(--mh)",lm:"var(--lm)",low:"var(--low)"};
 var RISK_BG    = {high:"#fdecea",mh:"#fef3e2",lm:"#eaf4fb",low:"#e9f7ef"};
 
-// Helper functions called by KPI modal buttons — avoids quote-escaping issues
+var _lastKpiFilter = null; // remember which KPI tile was last clicked
+
+// Remove any existing KPI back-banner
+function _removeKpiBanner(){
+  var old = document.getElementById('kpi-back-banner');
+  if(old) old.parentNode.removeChild(old);
+}
+
+// Show a sticky back-banner so user can return to the KPI modal
+function _showKpiBanner(filter){
+  _removeKpiBanner();
+  var label = filter==='resolved' ? '&#10004; Resolved This Cycle'
+            : filter==='unresolved' ? 'All Unresolved'
+            : RISK_LABELS[filter]+' Observations';
+  var banner = document.createElement('div');
+  banner.id = 'kpi-back-banner';
+  banner.innerHTML = '&#8592; Back to <strong>'+label+'</strong>';
+  banner.onclick = function(){ openKpiModal(filter); _removeKpiBanner(); };
+  document.body.appendChild(banner);
+}
+
+// Helper functions called by KPI modal buttons
 function kpiDetail(obsId){
+  var filter = _lastKpiFilter;
   closeModal();
   setTimeout(function(){
     var b = document.getElementById('btn-'+obsId);
     if(b){
       var synRow = document.getElementById('syn-row-'+obsId);
       if(synRow) synRow.scrollIntoView({behavior:'smooth', block:'center'});
-      setTimeout(function(){ b.click(); }, 400);
+      setTimeout(function(){
+        b.click();
+        if(filter) _showKpiBanner(filter);
+      }, 400);
     }
   }, 350);
 }
@@ -2384,6 +2416,8 @@ function kpiReport(obsId){
 }
 
 function openKpiModal(filter){
+  _lastKpiFilter = filter;
+  _removeKpiBanner();
   var filtered, title;
   if(filter==='resolved'){
     filtered = OBS_INDEX.filter(function(o){return o.resolved;});
@@ -2434,7 +2468,11 @@ function closeModal(){
   document.getElementById('repModal').classList.remove('active');
   document.body.style.overflow='';
 }
-document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){ closeModal(); _removeKpiBanner(); }});
+// Remove the back-banner when user navigates back to the synopsis/dashboard themselves
+document.querySelectorAll('a[href="#synopsis"],.topnav a[href="#synopsis"]').forEach(function(a){
+  a.addEventListener('click', function(){ setTimeout(_removeKpiBanner, 100); });
+});
 
 </script>
 </body></html>
