@@ -109,6 +109,8 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 .ocb{padding:11px 13px}
 .osl{font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--navy);margin-bottom:3px}
 .ost{font-size:12.5px;line-height:1.6;color:#2a3a50;margin-bottom:9px}
+.oedit{width:100%;box-sizing:border-box;font-size:12.5px;line-height:1.6;color:#2a3a50;font-family:'Inter',sans-serif;border:1px dashed #b0c4de;border-radius:4px;padding:6px 8px;margin-bottom:9px;min-height:60px;resize:vertical;background:#fafcff;transition:border-color .2s}
+.oedit:focus{border-color:#4a7fc1;background:#fff;outline:none}
 .oresp{width:100%;border:1px dashed #b0c0d8;border-radius:4px;padding:6px 9px;font-family:'Inter',sans-serif;font-size:12.5px;color:#2a3a50;background:#fafcff;resize:vertical;min-height:46px;outline:none}
 .oax{display:flex;align-items:center;gap:7px;margin:8px 0;padding:7px 0;border-top:1px solid #eee;font-size:12px}
 .oax strong{font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px}
@@ -414,6 +416,7 @@ var avMap    = {};   // {obsId: manual audit view text}
 var actMap   = {};   // {obsId: action taken text}
 var respMap  = {};   // {obsId: auditee response text}
 var assessMap= {};   // {obsId: 'agreed'|'resolved'|'partial'|'notresolved'}
+var obsEdits = {};   // {obsId: {observation, recommendation}} — auditor edits to obs text
 var responseLoaded = false;
 var customs  = [];
 var annexures= [];   // [{id,label,title,open,files:[{name,type,dataUrl}]}]
@@ -822,10 +825,14 @@ function renderRpt(){
       var avStored=avMap[o.id]||'';
       var actStored=actMap[o.id]||'';
 
-      // 1. Observation
-      if(o.observation) h+='<div class="osl">Observation</div><div class="ost">'+esc(o.observation)+'</div>';
-      // 2. Recommendation
-      if(o.recommendation) h+='<div class="osl">Recommendation</div><div class="ost">'+esc(o.recommendation)+'</div>';
+      // 1. Observation (editable)
+      var obsText=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:o.observation||'';
+      h+='<div class="osl">Observation</div>';
+      h+='<textarea class="oedit" id="oe-'+o.id+'" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].observation=this.value">'+esc(obsText)+'</textarea>';
+      // 2. Recommendation (editable)
+      var recText=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
+      h+='<div class="osl">Recommendation</div>';
+      h+='<textarea class="oedit" id="re-'+o.id+'" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].recommendation=this.value">'+esc(recText)+'</textarea>';
       // 3. Annexure Data (if set)
       if(ax) h+='<div class="oax"><strong>Annexure Data:</strong> '+esc(ax)+'</div>';
       // 4. Auditee Response — blank when Hide mode, pre-filled from respMap otherwise
@@ -1030,7 +1037,7 @@ function doCopy(){
 
 function doClear(){
   if(!confirm('Clear all selections?'))return;
-  selIds={}; annexMap={}; avMap={}; actMap={}; respMap={}; assessMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; avMap={}; actMap={}; respMap={}; assessMap={}; obsEdits={}; customs=[]; annexures=[];
   responseLoaded=false;
   renderAnnexList();
   document.getElementById('qinp').value='';
@@ -1079,8 +1086,12 @@ function downloadSoftCopy(){
     h+='<span style="padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;'+(tc==='repeated'?'background:#fff0e6;color:#b04800;border:1px solid #f0b080':'background:#e6f0ff;color:#1050a0;border:1px solid #90b8e8')+'">'+esc(o.type||'New')+'</span>';
     h+='</div>';
     h+='<div style="padding:11px 13px">';
-    if(o.observation) h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Observation</div><div style="font-size:12.5px;line-height:1.65;color:#2a3a50;margin-bottom:10px">'+esc(o.observation)+'</div>';
-    if(o.recommendation) h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Recommendation</div><div style="font-size:12.5px;line-height:1.65;color:#2a3a50;margin-bottom:10px">'+esc(o.recommendation)+'</div>';
+    var scObsText=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:o.observation||'';
+    var scRecText=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
+    var scOeEl=document.getElementById('oe-'+o.id); if(scOeEl) scObsText=scOeEl.value;
+    var scReEl=document.getElementById('re-'+o.id); if(scReEl) scRecText=scReEl.value;
+    if(scObsText) h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Observation</div><div style="font-size:12.5px;line-height:1.65;color:#2a3a50;margin-bottom:10px">'+esc(scObsText)+'</div>';
+    if(scRecText) h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Recommendation</div><div style="font-size:12.5px;line-height:1.65;color:#2a3a50;margin-bottom:10px">'+esc(scRecText)+'</div>';
     if(ax) h+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> '+esc(ax)+'</div>';
     // Auditee Response — always blank in soft copy
     h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Auditee Response</div>';
@@ -1511,6 +1522,11 @@ function finalizeReport(){
     var avEl=document.getElementById('av-'+o.id)||document.getElementById('av-ta-'+o.id); if(avEl) avStored=avEl.value||avStored;
     var actEl=document.getElementById('act-'+o.id)||document.getElementById('act-ta-'+o.id); if(actEl) actStored=actEl.value||actStored;
     var aStatus=assessMap[o.id]||'';
+    // Use auditor-edited observation/recommendation text if available
+    var obsText=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:o.observation||'';
+    var recText=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
+    var oeEl=document.getElementById('oe-'+o.id); if(oeEl) obsText=oeEl.value;
+    var reEl=document.getElementById('re-'+o.id); if(reEl) recText=reEl.value;
     var bdr=tc==='repeated'?'#d06020':'#2070b8';
     var h='<div style="border:1px solid #dde2ea;border-left:4px solid '+bdr+';border-radius:5px;margin-bottom:18px;overflow:hidden;page-break-inside:avoid">';
     h+='<div style="display:flex;align-items:center;padding:8px 12px;background:#fafbfc;border-bottom:1px solid #dde2ea;gap:8px">';
@@ -1518,8 +1534,8 @@ function finalizeReport(){
     h+='<span style="flex:1;font-size:13px;font-weight:700;color:#1e2d40">'+esc(o.title)+'</span>';
     h+='<span style="padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;'+(tc==='repeated'?'background:#fff0e6;color:#b04800;border:1px solid #f0b080':'background:#e6f0ff;color:#1050a0;border:1px solid #90b8e8')+'">'+esc(o.type||'New')+'</span>';
     h+='</div><div style="padding:11px 13px">';
-    if(o.observation)    h+=sl('Observation')+st(o.observation);
-    if(o.recommendation) h+=sl('Recommendation')+st(o.recommendation);
+    if(obsText) h+=sl('Observation')+st(obsText);
+    if(recText) h+=sl('Recommendation')+st(recText);
     if(ax)               h+='<div style="display:flex;align-items:center;gap:7px;margin:8px 0;padding:7px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> '+esc(ax)+'</div>';
     if(respStored)       h+=sl('Auditee Response')+st(respStored);
     if(responseLoaded&&aStatus){
