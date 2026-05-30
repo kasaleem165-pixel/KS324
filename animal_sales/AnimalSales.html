@@ -954,7 +954,7 @@ input[readonly]{background:#f8fafc}
 <script>
 // ══════════════════════════ DATA LAYER ══════════════════════════
 const STORE='animal_sales_db';
-let DB={animals:[],customers:[],sales:[],payments:[],banks:[],budget:[],settings:{rate_per_kg:780,admin_charges:30000,num_persons:7}};
+let DB={animals:[],customers:[],sales:[],payments:[],banks:[],budget:[],settings:{rate_per_kg:780,admin_charges:0,num_persons:7}};
 
 const SORT={animals:{col:'code',dir:'asc'},customers:{col:'name',dir:'asc'},sales:{col:'receipt_no',dir:'desc'},payments:{col:'receipt_no',dir:'desc'},stock:{col:'code',dir:'asc'},locrpt:{col:'location',dir:'asc'},wacchart:{col:'sale_date',dir:'desc'},saleledger:{col:'receipt_no',dir:'asc'},custledger_s:{col:'receipt_no',dir:'asc'},custledger_p:{col:'pay_date',dir:'asc'}};
 function sortToggle(tbl,col){if(SORT[tbl].col===col){SORT[tbl].dir=SORT[tbl].dir==='asc'?'desc':'asc';}else{SORT[tbl].col=col;SORT[tbl].dir='asc';}const fn={animals:renderAnimals,customers:renderCustomers,sales:renderSales,payments:renderPayments,locrpt:renderLocationReport,wacchart:renderWacchaReport,saleledger:renderSaleLedger,custledger_s:renderInlineLedger,custledger_p:renderInlineLedger}[tbl];if(fn)fn();}
@@ -1058,7 +1058,7 @@ const SEED_ANIMALS=[
   {code:"191",purchase_date:"2026-05-07",description:"1 Waccha purchased from Hafiz Tahir Dealer (White Cheena)",age_type:"Dondha",weight_final:281,admin_charges:30000,assigned_customer:null,status:"available"},
   {code:"192",purchase_date:"2026-05-08",description:"1 Waccha purchased from Hafiz Tahir Dealer (Red Sahiwal)",age_type:"Dondha",weight_final:254,admin_charges:30000,assigned_customer:null,status:"available"}
 ];
-const SEED_SETTINGS={rate_per_kg:780,admin_charges:30000,num_persons:7};
+const SEED_SETTINGS={rate_per_kg:780,admin_charges:0,num_persons:7};
 
 function save(){localStorage.setItem(STORE,JSON.stringify(DB));}
 function load(){
@@ -1144,6 +1144,19 @@ function load(){
         }
       });
       DB.settings._adminInAmount2026=true;
+    }
+    // Zero out all admin charges — admin is no longer charged
+    if(!DB.settings._adminZero2026){
+      DB.sales.forEach(s=>{
+        const adm=s.admin_charges||0;
+        if(adm>0){
+          s.amount=s.is_lumpsum?(s.amount-adm):((s.weight_at_sale*s.rate_per_kg)+(s.carriage_charges||0));
+          s.admin_charges=0;
+        }
+      });
+      DB.animals.forEach(a=>{a.admin_charges=0;});
+      DB.settings.admin_charges=0;
+      DB.settings._adminZero2026=true;
     }
     // Backfill sale locations: Lahore for all, Taragarh for animal 164
     if(!DB.settings._loc20260527){
