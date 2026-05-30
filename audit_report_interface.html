@@ -52,6 +52,8 @@ html,body{height:100%;font-family:'Inter',sans-serif;font-size:13.5px;color:#1e2
 .risub{font-size:11px;color:var(--gtxt);margin-top:2px}
 .rscore{width:100%;height:3px;background:#e0e7ef;border-radius:2px;margin-top:4px}
 .rscorebar{height:100%;background:var(--navylt);border-radius:2px}
+.rsnippet{font-size:11px;color:#555;line-height:1.4;margin-top:4px;padding:4px 6px;background:#f7f9fc;border-left:2px solid var(--navylt);border-radius:0 3px 3px 0}
+.rsnippet mark{background:#fff176;color:inherit;padding:0 1px;border-radius:2px;font-weight:600}
 .badge{display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-left:3px}
 .badge.repeated{background:#fff0e6;color:#b04800;border:1px solid #f0b080}
 .badge.new{background:#e6f0ff;color:#1050a0;border:1px solid #90b8e8}
@@ -497,6 +499,8 @@ function renderList(obs, toks, showScore) {
       inner += '<div class="risub">'+esc(o.category)+' <span class="badge '+tc+'">'+esc(o.type)+'</span></div>';
       if(showScore){
         inner += '<div class="rscore"><div class="rscorebar" style="width:'+pct+'%"></div></div>';
+        var snip = getSnippet(o.observation||'', toks) || getSnippet(o.recommendation||'', toks);
+        if(snip) inner += '<div class="rsnippet">'+snip+'</div>';
       }
       inner += '</div></div>';
 
@@ -599,6 +603,22 @@ function hlText(safe, toks) {
     safe=out;
   }
   return safe;
+}
+
+// Returns a short highlighted snippet from raw text around first token match
+function getSnippet(raw, toks) {
+  if(!raw||!toks||!toks.length) return '';
+  var lo = raw.toLowerCase();
+  var best = -1;
+  for(var i=0;i<toks.length;i++){
+    var idx = lo.indexOf(toks[i]);
+    if(idx>=0 && (best<0 || idx<best)) best=idx;
+  }
+  if(best<0) return '';
+  var start = Math.max(0, best-60);
+  var end   = Math.min(raw.length, best+120);
+  var snip  = (start>0?'…':'')+raw.slice(start,end)+(end<raw.length?'…':'');
+  return hlText(esc(snip), toks);
 }
 
 // ============================================================
