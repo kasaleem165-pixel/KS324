@@ -54,6 +54,18 @@ html,body{height:100%;font-family:'Inter',sans-serif;font-size:13.5px;color:#1e2
 .rscorebar{height:100%;background:var(--navylt);border-radius:2px}
 .rsnippet{font-size:11px;color:#555;line-height:1.4;margin-top:4px;padding:4px 6px;background:#f7f9fc;border-left:2px solid var(--navylt);border-radius:0 3px 3px 0}
 .rsnippet mark{background:#fff176;color:inherit;padding:0 1px;border-radius:2px;font-weight:600}
+.assess-box{margin:12px 0;padding:10px 14px;background:#eef4ff;border:1.5px solid #4a7fc1;border-radius:6px}
+.assess-title{font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:8px}
+.assess-radios{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.assess-radios label{font-size:11.5px;display:flex;align-items:center;gap:4px;cursor:pointer;padding:4px 9px;border-radius:4px;border:1px solid #b0c4de;background:#fff;white-space:nowrap}
+.assess-radios label:hover{background:#dce9ff}
+.assess-agreed{margin:6px 0;padding:8px 12px;background:#e6f7e6;border-left:3px solid #3a8a3a;border-radius:0 4px 4px 0;font-size:12px;color:#2a5a2a;font-weight:600}
+.suggest-btn{font-size:11px;padding:3px 10px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-bottom:6px;font-family:inherit}
+.suggest-btn:hover{background:#2a5a8c}
+.suggest-list{background:#fff;border:1px solid #b0c4de;border-radius:4px;padding:6px;margin-bottom:6px;max-height:130px;overflow-y:auto}
+.suggest-item{font-size:11px;padding:5px 6px;cursor:pointer;border-radius:3px;color:#1a3a5c;line-height:1.4;border-bottom:1px solid #eee}
+.suggest-item:hover{background:#dce9ff}
+.suggest-item strong{color:#4a7fc1;display:block;margin-bottom:2px}
 .badge{display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-left:3px}
 .badge.repeated{background:#fff0e6;color:#b04800;border:1px solid #f0b080}
 .badge.new{background:#e6f0ff;color:#1050a0;border:1px solid #90b8e8}
@@ -401,6 +413,8 @@ var annexMap = {};   // {obsId: "text"}
 var avMap    = {};   // {obsId: manual audit view text}
 var actMap   = {};   // {obsId: action taken text}
 var respMap  = {};   // {obsId: auditee response text}
+var assessMap= {};   // {obsId: 'agreed'|'resolved'|'partial'|'notresolved'}
+var responseLoaded = false;
 var customs  = [];
 var annexures= [];   // [{id,label,title,open,files:[{name,type,dataUrl}]}]
 var cOpen    = false;
@@ -622,6 +636,56 @@ function getSnippet(raw, toks) {
 }
 
 // ============================================================
+// AUDITOR ASSESSMENT
+// ============================================================
+function setAssess(id, val) {
+  assessMap[id] = val;
+  var agrBlk=document.getElementById('agr-blk-'+id);
+  var actBlk=document.getElementById('act-blk-'+id);
+  var avBlk =document.getElementById('av-blk-'+id);
+  if(agrBlk) agrBlk.style.display=(val==='agreed')?'block':'none';
+  if(actBlk) actBlk.style.display=(val==='resolved')?'block':'none';
+  if(avBlk)  avBlk.style.display =(val==='partial'||val==='notresolved')?'block':'none';
+}
+
+function toggleSuggest(id, type) {
+  var box=document.getElementById('sug-list-'+type+'-'+id);
+  if(!box) return;
+  if(box.style.display!=='none'){box.style.display='none';return;}
+  // Find the current observation
+  var obs=null;
+  for(var i=0;i<DB.observations.length;i++){if(DB.observations[i].id===id){obs=DB.observations[i];break;}}
+  if(!obs){for(var ci=0;ci<customs.length;ci++){if(customs[ci].id===id){obs=customs[ci];break;}}}
+  if(!obs) return;
+  var toks=tokenize((obs.title||'')+' '+(obs.observation||'')+' '+(obs.category||''));
+  var scored=[];
+  for(var i=0;i<DB.observations.length;i++){
+    var o=DB.observations[i];
+    if(o.id===id||!o.audit_view) continue;
+    var s=scoreObs(o,toks);
+    if(s>0) scored.push({o:o,s:s});
+  }
+  scored.sort(function(a,b){return b.s-a.s;});
+  scored=scored.slice(0,4);
+  if(!scored.length){alert('No similar historical observations found in the database.');return;}
+  box.innerHTML='';
+  for(var j=0;j<scored.length;j++){
+    (function(item){
+      var d=document.createElement('div');
+      d.className='suggest-item';
+      d.innerHTML='<strong>'+esc(item.o.title)+'</strong>'+esc((item.o.audit_view).slice(0,100))+(item.o.audit_view.length>100?'…':'');
+      d.onclick=function(){
+        var ta=document.getElementById(type+'-ta-'+id);
+        if(ta){ta.value=item.o.audit_view;if(type==='act')actMap[id]=item.o.audit_view;else avMap[id]=item.o.audit_view;}
+        box.style.display='none';
+      };
+      box.appendChild(d);
+    })(scored[j]);
+  }
+  box.style.display='block';
+}
+
+// ============================================================
 // CUSTOM OBS
 // ============================================================
 function toggleC(){
@@ -767,12 +831,39 @@ function renderRpt(){
       // 4. Auditee Response — blank when Hide mode, pre-filled from respMap otherwise
       h+='<div class="osl">Auditee Response</div>';
       h+='<textarea class="oresp" id="r-'+o.id+'" placeholder="Enter auditee response..." oninput="respMap[\''+o.id+'\']=this.value">'+esc(avVal==='none'?'':resp)+'</textarea>';
-      // 5. Audit View — after Auditee Response
-      if(avVal==='auto'&&o.audit_view) h+='<div class="osl">Audit View</div><div class="ost">'+esc(o.audit_view)+'</div>';
-      else if(avVal==='manual') h+='<div class="osl">Audit View</div><textarea class="oresp" id="av-'+o.id+'" placeholder="Type audit view here..." oninput="avMap[\''+o.id+'\']=this.value">'+esc(avStored)+'</textarea>';
-      // 6. Action Taken — always present
-      h+='<div class="osl">Action Taken</div>';
-      h+='<textarea class="oresp" id="act-'+o.id+'" placeholder="Enter action taken..." oninput="actMap[\''+o.id+'\']=this.value">'+esc(actStored)+'</textarea>';
+      // 5 & 6: Assessment-driven (after response load) or original mode
+      if(responseLoaded){
+        var aStatus=assessMap[o.id]||'';
+        h+='<div class="assess-box">';
+        h+='<div class="assess-title">&#128203; Auditor Assessment</div>';
+        h+='<div class="assess-radios">';
+        h+='<label><input type="radio" name="asr-'+o.id+'" value="agreed" onclick="setAssess(\''+o.id+'\',\'agreed\')"'+(aStatus==='agreed'?' checked':'')+'>  Agreed by Auditee</label>';
+        h+='<label><input type="radio" name="asr-'+o.id+'" value="resolved" onclick="setAssess(\''+o.id+'\',\'resolved\')"'+(aStatus==='resolved'?' checked':'')+'>  Resolved</label>';
+        h+='<label><input type="radio" name="asr-'+o.id+'" value="partial" onclick="setAssess(\''+o.id+'\',\'partial\')"'+(aStatus==='partial'?' checked':'')+'>  Partially Resolved</label>';
+        h+='<label><input type="radio" name="asr-'+o.id+'" value="notresolved" onclick="setAssess(\''+o.id+'\',\'notresolved\')"'+(aStatus==='notresolved'?' checked':'')+'>  Not Resolved</label>';
+        h+='</div>';
+        h+='<div id="agr-blk-'+o.id+'" style="display:'+(aStatus==='agreed'?'block':'none')+'">';
+        h+='<div class="assess-agreed">&#10003; Status: Accepted by Auditee &#8212; Auditee has acknowledged the observation and committed to corrective action.</div>';
+        h+='</div>';
+        h+='<div id="act-blk-'+o.id+'" style="display:'+(aStatus==='resolved'?'block':'none')+'">';
+        h+='<div class="osl">Action Taken</div>';
+        h+='<button class="suggest-btn" onclick="toggleSuggest(\''+o.id+'\',\'act\')">&#128269; Suggest from Database</button>';
+        h+='<div class="suggest-list" id="sug-list-act-'+o.id+'" style="display:none"></div>';
+        h+='<textarea class="oresp" id="act-ta-'+o.id+'" placeholder="Describe how the observation was resolved..." oninput="actMap[\''+o.id+'\']=this.value">'+esc(actStored)+'</textarea>';
+        h+='</div>';
+        h+='<div id="av-blk-'+o.id+'" style="display:'+((aStatus==='partial'||aStatus==='notresolved')?'block':'none')+'">';
+        h+='<div class="osl">Audit View</div>';
+        h+='<button class="suggest-btn" onclick="toggleSuggest(\''+o.id+'\',\'av\')">&#128269; Suggest from Database</button>';
+        h+='<div class="suggest-list" id="sug-list-av-'+o.id+'" style="display:none"></div>';
+        h+='<textarea class="oresp" id="av-ta-'+o.id+'" placeholder="Describe what remains outstanding or why the response is insufficient..." oninput="avMap[\''+o.id+'\']=this.value">'+esc(avStored)+'</textarea>';
+        h+='</div>';
+        h+='</div>';
+      } else {
+        if(avVal==='auto'&&o.audit_view) h+='<div class="osl">Audit View</div><div class="ost">'+esc(o.audit_view)+'</div>';
+        else if(avVal==='manual') h+='<div class="osl">Audit View</div><textarea class="oresp" id="av-'+o.id+'" placeholder="Type audit view here..." oninput="avMap[\''+o.id+'\']=this.value">'+esc(avStored)+'</textarea>';
+        h+='<div class="osl">Action Taken</div>';
+        h+='<textarea class="oresp" id="act-'+o.id+'" placeholder="Enter action taken..." oninput="actMap[\''+o.id+'\']=this.value">'+esc(actStored)+'</textarea>';
+      }
       // 7. Linked Annexures (auto-derived)
       var lnkAnx=getLinkedAnnexures(o.id);
       if(lnkAnx.length){
@@ -939,7 +1030,8 @@ function doCopy(){
 
 function doClear(){
   if(!confirm('Clear all selections?'))return;
-  selIds={}; annexMap={}; avMap={}; actMap={}; respMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; avMap={}; actMap={}; respMap={}; assessMap={}; customs=[]; annexures=[];
+  responseLoaded=false;
   renderAnnexList();
   document.getElementById('qinp').value='';
   document.getElementById('styp').value='All Types';
@@ -1376,6 +1468,7 @@ function loadAuditeeFile(evt){
       }catch(ex){}
     }
     // Auto-select the observations that appeared in the returned file
+    responseLoaded = true;
     for(var j=0;j<loadedObs.length;j++) selIds[loadedObs[j]]=true;
     applyFilter();
     renderRpt();
@@ -1415,8 +1508,9 @@ function finalizeReport(){
     var actStored=actMap[o.id]||'';
     // Read live values from DOM if report is visible
     var rEl=document.getElementById('r-'+o.id); if(rEl) respStored=rEl.value||respStored;
-    var avEl=document.getElementById('av-'+o.id); if(avEl) avStored=avEl.value||avStored;
-    var actEl=document.getElementById('act-'+o.id); if(actEl) actStored=actEl.value||actStored;
+    var avEl=document.getElementById('av-'+o.id)||document.getElementById('av-ta-'+o.id); if(avEl) avStored=avEl.value||avStored;
+    var actEl=document.getElementById('act-'+o.id)||document.getElementById('act-ta-'+o.id); if(actEl) actStored=actEl.value||actStored;
+    var aStatus=assessMap[o.id]||'';
     var bdr=tc==='repeated'?'#d06020':'#2070b8';
     var h='<div style="border:1px solid #dde2ea;border-left:4px solid '+bdr+';border-radius:5px;margin-bottom:18px;overflow:hidden;page-break-inside:avoid">';
     h+='<div style="display:flex;align-items:center;padding:8px 12px;background:#fafbfc;border-bottom:1px solid #dde2ea;gap:8px">';
@@ -1428,11 +1522,18 @@ function finalizeReport(){
     if(o.recommendation) h+=sl('Recommendation')+st(o.recommendation);
     if(ax)               h+='<div style="display:flex;align-items:center;gap:7px;margin:8px 0;padding:7px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> '+esc(ax)+'</div>';
     if(respStored)       h+=sl('Auditee Response')+st(respStored);
-    if(avVal!=='none'){
-      var av=avVal==='auto'?o.audit_view:avStored;
-      if(av)             h+=sl('Audit View')+st(av);
+    if(responseLoaded&&aStatus){
+      h+='<div style="margin:8px 0;padding:6px 10px;background:#eef4ff;border:1px solid #4a7fc1;border-radius:4px;font-size:11px;font-weight:700;color:#1a3a5c">Auditor Assessment: '+(aStatus==='agreed'?'Agreed by Auditee':aStatus==='resolved'?'Resolved':aStatus==='partial'?'Partially Resolved':'Not Resolved')+'</div>';
+      if(aStatus==='agreed') h+='<div style="padding:8px 12px;background:#e6f7e6;border-left:3px solid #3a8a3a;border-radius:0 4px 4px 0;font-size:12px;color:#2a5a2a;font-weight:600;margin-bottom:6px">&#10003; Accepted by Auditee</div>';
+      if(aStatus==='resolved'&&actStored) h+=sl('Action Taken')+st(actStored);
+      if((aStatus==='partial'||aStatus==='notresolved')&&avStored) h+=sl('Audit View')+st(avStored);
+    } else {
+      if(avVal!=='none'){
+        var av=avVal==='auto'?o.audit_view:avStored;
+        if(av)           h+=sl('Audit View')+st(av);
+      }
+      if(actStored)      h+=sl('Action Taken')+st(actStored);
     }
-    if(actStored)        h+=sl('Action Taken')+st(actStored);
     h+='</div></div>';
     return h;
   }
