@@ -1280,10 +1280,13 @@ function nextPayRcp(){
 
 // customer balance helpers
 function custTotals(cid){
-  const ts=DB.sales.filter(s=>s.customer_id===cid).reduce((a,s)=>a+s.amount,0);
+  const sales=DB.sales.filter(s=>s.customer_id===cid);
+  const ts=sales.reduce((a,s)=>a+s.amount,0);
+  const tc=sales.reduce((a,s)=>a+(s.carriage_charges||0),0);
+  const ta=sales.reduce((a,s)=>a+(s.admin_charges||0),0);
   const tp=DB.payments.filter(p=>p.customer_id===cid).reduce((a,p)=>a+(p.amount||0),0);
   const td=DB.payments.filter(p=>p.customer_id===cid).reduce((a,p)=>a+(p.discount||0),0);
-  return {ts,tp,td,balance:ts-tp-td};
+  return {ts,tc,ta,tp,td,balance:ts-tp-td};
 }
 
 // ══════════════════════════ DASHBOARD ══════════════════════════
@@ -1916,28 +1919,29 @@ function clearCustomerForm(){['c-name','c-phone','c-address'].forEach(id=>docume
 
 function renderCustomers(){
   const head=document.getElementById('customers-head');
-  head.innerHTML='<tr>'+'<th>S#</th>'+th('Name','customers','name')+th('Phone','customers','phone')+'<th>Address</th>'+th('Total Sales','customers','ts')+th('Received','customers','tp')+th('Discount','customers','td')+th('Balance','customers','balance')+'<th></th></tr>';
+  head.innerHTML='<tr>'+'<th>S#</th>'+th('Name','customers','name')+th('Phone','customers','phone')+'<th>Address</th>'+th('Carriage','customers','tc')+th('Admin','customers','ta')+th('Total Sales','customers','ts')+th('Received','customers','tp')+th('Discount','customers','td')+th('Balance','customers','balance')+'<th></th></tr>';
   const tb=document.getElementById('customers-body');
-  if(!DB.customers.length){tb.innerHTML=`<tr><td colspan="9" class="empty">No customers yet.</td></tr>`;return;}
+  if(!DB.customers.length){tb.innerHTML=`<tr><td colspan="11" class="empty">No customers yet.</td></tr>`;return;}
   const custQ=(document.getElementById('cust-search')||{value:''}).value.trim().toLowerCase();
-  // Attach computed totals for sorting
-  const withTotals=DB.customers.map(c=>{const t=custTotals(c.id);return Object.assign({},c,{ts:t.ts,tp:t.tp,td:t.td,balance:t.balance});});
+  const withTotals=DB.customers.map(c=>{const t=custTotals(c.id);return Object.assign({},c,{ts:t.ts,tc:t.tc,ta:t.ta,tp:t.tp,td:t.td,balance:t.balance});});
   const col=SORT.customers.col;
   const dir=SORT.customers.dir;
   let list;
-  if(['ts','tp','td','balance'].includes(col)){
+  if(['ts','tc','ta','tp','td','balance'].includes(col)){
     list=[...withTotals].sort((a,b)=>dir==='asc'?a[col]-b[col]:b[col]-a[col]);
   } else {
     list=sortArr(withTotals,col,dir);
   }
   list=list.filter(c=>!custQ||[c.name,c.phone||'',c.address||''].join(' ').toLowerCase().includes(custQ));
-  const gts=list.reduce((s,c)=>s+c.ts,0),gtp=list.reduce((s,c)=>s+c.tp,0),gtd=list.reduce((s,c)=>s+c.td,0),gtb=list.reduce((s,c)=>s+c.balance,0);
+  const gts=list.reduce((s,c)=>s+c.ts,0),gtc=list.reduce((s,c)=>s+c.tc,0),gta=list.reduce((s,c)=>s+c.ta,0),gtp=list.reduce((s,c)=>s+c.tp,0),gtd=list.reduce((s,c)=>s+c.td,0),gtb=list.reduce((s,c)=>s+c.balance,0);
   tb.innerHTML=list.map((c,i)=>{
-    const {ts,tp,td,balance}=custTotals(c.id);
+    const {ts,tc,ta,tp,td,balance}=custTotals(c.id);
     return `<tr class="clickable-row" onclick="showLedger(${c.id})">
       <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
       <td><strong>${c.name}</strong></td><td>${c.phone||'-'}</td>
       <td>${c.address||'-'}</td>
+      <td>${tc>0?Rs(tc):'-'}</td>
+      <td>${ta>0?Rs(ta):'-'}</td>
       <td>${Rs(ts)}</td>
       <td style="color:#059669">${Rs(tp)}</td>
       <td style="color:#7c3aed">${Rs(td)}</td>
@@ -1948,7 +1952,7 @@ function renderCustomers(){
         <button class="btn btn-light btn-sm" onclick="openCustomerEdit(${c.id})">&#9998; Edit</button>
       </td>
     </tr>`;
-  }).join('')+`<tr style="font-weight:700;background:#e0f2fe"><td colspan="4" style="text-align:right;color:#1a3a5c">Grand Total (${list.length})</td><td>${Rs(gts)}</td><td style="color:#059669">${Rs(gtp)}</td><td style="color:#7c3aed">${Rs(gtd)}</td><td style="color:${gtb>0?'#d97706':'#059669'}">${Rs(gtb)}</td><td></td></tr>`;
+  }).join('')+`<tr style="font-weight:700;background:#e0f2fe"><td colspan="4" style="text-align:right;color:#1a3a5c">Grand Total (${list.length})</td><td>${gtc>0?Rs(gtc):'-'}</td><td>${gta>0?Rs(gta):'-'}</td><td>${Rs(gts)}</td><td style="color:#059669">${Rs(gtp)}</td><td style="color:#7c3aed">${Rs(gtd)}</td><td style="color:${gtb>0?'#d97706':'#059669'}">${Rs(gtb)}</td><td></td></tr>`;
 }
 
 // ══════════════════════════ EDIT ANIMAL ══════════════════════════
