@@ -1919,27 +1919,29 @@ function clearCustomerForm(){['c-name','c-phone','c-address'].forEach(id=>docume
 
 function renderCustomers(){
   const head=document.getElementById('customers-head');
-  head.innerHTML='<tr>'+'<th>S#</th>'+th('Name','customers','name')+th('Phone','customers','phone')+'<th>Address</th>'+th('Carriage','customers','tc')+th('Admin','customers','ta')+th('Total Sales','customers','ts')+th('Received','customers','tp')+th('Discount','customers','td')+th('Balance','customers','balance')+'<th></th></tr>';
+  head.innerHTML='<tr>'+'<th>S#</th>'+th('Name','customers','name')+th('Phone','customers','phone')+'<th>Address</th><th>Animals</th>'+th('Carriage','customers','tc')+th('Admin','customers','ta')+th('Total Sales','customers','ts')+th('Received','customers','tp')+th('Discount','customers','td')+th('Balance','customers','balance')+'<th></th></tr>';
   const tb=document.getElementById('customers-body');
-  if(!DB.customers.length){tb.innerHTML=`<tr><td colspan="11" class="empty">No customers yet.</td></tr>`;return;}
+  if(!DB.customers.length){tb.innerHTML=`<tr><td colspan="12" class="empty">No customers yet.</td></tr>`;return;}
   const custQ=(document.getElementById('cust-search')||{value:''}).value.trim().toLowerCase();
-  const withTotals=DB.customers.map(c=>{const t=custTotals(c.id);return Object.assign({},c,{ts:t.ts,tc:t.tc,ta:t.ta,tp:t.tp,td:t.td,balance:t.balance});});
+  const withTotals=DB.customers.map(c=>{const t=custTotals(c.id);const na=DB.sales.filter(s=>s.customer_id===c.id).length;return Object.assign({},c,{ts:t.ts,tc:t.tc,ta:t.ta,tp:t.tp,td:t.td,balance:t.balance,na});});
   const col=SORT.customers.col;
   const dir=SORT.customers.dir;
   let list;
-  if(['ts','tc','ta','tp','td','balance'].includes(col)){
+  if(['ts','tc','ta','tp','td','balance','na'].includes(col)){
     list=[...withTotals].sort((a,b)=>dir==='asc'?a[col]-b[col]:b[col]-a[col]);
   } else {
     list=sortArr(withTotals,col,dir);
   }
   list=list.filter(c=>!custQ||[c.name,c.phone||'',c.address||''].join(' ').toLowerCase().includes(custQ));
-  const gts=list.reduce((s,c)=>s+c.ts,0),gtc=list.reduce((s,c)=>s+c.tc,0),gta=list.reduce((s,c)=>s+c.ta,0),gtp=list.reduce((s,c)=>s+c.tp,0),gtd=list.reduce((s,c)=>s+c.td,0),gtb=list.reduce((s,c)=>s+c.balance,0);
+  const gts=list.reduce((s,c)=>s+c.ts,0),gtc=list.reduce((s,c)=>s+c.tc,0),gta=list.reduce((s,c)=>s+c.ta,0),gtp=list.reduce((s,c)=>s+c.tp,0),gtd=list.reduce((s,c)=>s+c.td,0),gtb=list.reduce((s,c)=>s+c.balance,0),gna=list.reduce((s,c)=>s+c.na,0);
   tb.innerHTML=list.map((c,i)=>{
     const {ts,tc,ta,tp,td,balance}=custTotals(c.id);
+    const na=DB.sales.filter(s=>s.customer_id===c.id).length;
     return `<tr class="clickable-row" onclick="showLedger(${c.id})">
       <td style="color:#94a3b8;font-size:.75rem">${i+1}</td>
       <td><strong>${c.name}</strong></td><td>${c.phone||'-'}</td>
       <td>${c.address||'-'}</td>
+      <td style="text-align:center;font-weight:600;color:#1a3a5c">${na||'-'}</td>
       <td>${tc>0?Rs(tc):'-'}</td>
       <td>${ta>0?Rs(ta):'-'}</td>
       <td>${Rs(ts)}</td>
@@ -1952,7 +1954,7 @@ function renderCustomers(){
         <button class="btn btn-light btn-sm" onclick="openCustomerEdit(${c.id})">&#9998; Edit</button>
       </td>
     </tr>`;
-  }).join('')+`<tr style="font-weight:700;background:#e0f2fe"><td colspan="4" style="text-align:right;color:#1a3a5c">Grand Total (${list.length})</td><td>${gtc>0?Rs(gtc):'-'}</td><td>${gta>0?Rs(gta):'-'}</td><td>${Rs(gts)}</td><td style="color:#059669">${Rs(gtp)}</td><td style="color:#7c3aed">${Rs(gtd)}</td><td style="color:${gtb>0?'#d97706':'#059669'}">${Rs(gtb)}</td><td></td></tr>`;
+  }).join('')+`<tr style="font-weight:700;background:#e0f2fe"><td colspan="4" style="text-align:right;color:#1a3a5c">Grand Total (${list.length})</td><td style="text-align:center">${gna}</td><td>${gtc>0?Rs(gtc):'-'}</td><td>${gta>0?Rs(gta):'-'}</td><td>${Rs(gts)}</td><td style="color:#059669">${Rs(gtp)}</td><td style="color:#7c3aed">${Rs(gtd)}</td><td style="color:${gtb>0?'#d97706':'#059669'}">${Rs(gtb)}</td><td></td></tr>`;
 }
 
 // ══════════════════════════ EDIT ANIMAL ══════════════════════════
@@ -3733,12 +3735,13 @@ function exportPaymentsExcel(){
 function exportCustomersExcel(){
   const withTotals=DB.customers.map(c=>{
     const {ts,tc,ta,tp,td,balance}=custTotals(c.id);
-    return Object.assign({},c,{ts,tc,ta,tp,td,balance});
+    const na=DB.sales.filter(s=>s.customer_id===c.id).length;
+    return Object.assign({},c,{ts,tc,ta,tp,td,balance,na});
   });
   const list=sortArr(withTotals,SORT.customers.col,SORT.customers.dir);
-  const headers=['Customer Name','Phone','Address','Carriage (Rs.)','Admin Charges (Rs.)','Total Sales (Rs.)','Received (Rs.)','Discount (Rs.)','Balance Due (Rs.)'];
+  const headers=['Customer Name','Phone','Address','Animals','Carriage (Rs.)','Admin Charges (Rs.)','Total Sales (Rs.)','Received (Rs.)','Discount (Rs.)','Balance Due (Rs.)'];
   const rows=list.map(c=>[
-    c.name,c.phone||'',c.address||'',
+    c.name,c.phone||'',c.address||'',c.na||0,
     c.tc>0?c.tc.toFixed(0):'',
     c.ta>0?c.ta.toFixed(0):'',
     c.ts.toFixed(0),c.tp.toFixed(0),c.td.toFixed(0),c.balance.toFixed(0)
