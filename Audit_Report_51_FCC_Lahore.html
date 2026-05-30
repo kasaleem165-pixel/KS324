@@ -113,6 +113,22 @@
   .scrolltable{overflow-x:auto;max-height:400px;overflow-y:auto}
   footer{background:var(--primary);color:#7fb3d3;text-align:center;padding:1.5rem;font-size:.78rem;margin-top:3rem}
   footer strong{color:#fff}
+  /* Interactive KPI tiles */
+  .kpi-btn{cursor:pointer;transition:transform .15s,box-shadow .15s;position:relative}
+  .kpi-btn:hover{transform:translateY(-3px);box-shadow:0 6px 18px rgba(0,0,0,.13)}
+  .kpi-btn:active{transform:translateY(0)}
+  .kpi-hint{font-size:.62rem;color:var(--muted);margin-top:.25rem;letter-spacing:.3px}
+  .kpi.red.kpi-btn:hover .kpi-hint{color:var(--high)}
+  .kpi.org.kpi-btn:hover .kpi-hint{color:var(--mh)}
+  .kpi.blu.kpi-btn:hover .kpi-hint{color:var(--lm)}
+  .kpi.grn.kpi-btn:hover .kpi-hint{color:var(--low)}
+
+  /* KPI filter modal list */
+  .kpi-obs-list{display:flex;flex-direction:column;gap:.5rem}
+  .kpi-obs-item{border-radius:8px;padding:.6rem .9rem;display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;font-size:.88rem;border:1px solid var(--border)}
+  .kpi-obs-item .obs-num-sm{background:var(--primary);color:#fff;border-radius:5px;padding:.15rem .5rem;font-size:.72rem;font-weight:700;white-space:nowrap}
+  .kpi-obs-item .obs-cat{font-size:.7rem;color:var(--muted);flex-basis:100%}
+
   /* "View as in Report" button */
   .rep-btn{background:var(--primary);color:#fff;border:none;border-radius:20px;padding:.28rem .85rem;font-size:.76rem;font-weight:600;cursor:pointer;letter-spacing:.3px;transition:background .2s}
   .rep-btn:hover{background:var(--accent)}
@@ -174,14 +190,15 @@
   to read the Finding, Recommendation, Auditee Response and Audit View inline — without leaving this page.
   Use <strong>&#128196; View as Written in Report</strong> inside the panel to read the verbatim text from the original audit report,
   and <strong>&#8593; Back to Synopsis</strong> to return to this exact row (highlighted in gold).
+  <strong>Click any risk tile below</strong> to view all observations in that category.
 </p>
 <div class="kpi-row">
-  <div class="kpi red"><div class="num">3</div><div class="lbl">High Risk</div></div>
-  <div class="kpi org"><div class="num">14</div><div class="lbl">Medium-High</div></div>
-  <div class="kpi blu"><div class="num">15</div><div class="lbl">Low-Medium</div></div>
-  <div class="kpi grn"><div class="num">5</div><div class="lbl">Low Risk</div></div>
-  <div class="kpi" style="border-top:3px solid var(--primary)"><div class="num" style="color:var(--primary)">36</div><div class="lbl">Total Unresolved</div></div>
-  <div class="kpi" style="border-top:3px solid var(--low)"><div class="num" style="color:var(--low)">36</div><div class="lbl">Resolved This Cycle</div></div>
+  <div class="kpi red kpi-btn" onclick="openKpiModal('high')" title="Click to view High Risk observations"><div class="num">3</div><div class="lbl">High Risk</div><div class="kpi-hint">click to view</div></div>
+  <div class="kpi org kpi-btn" onclick="openKpiModal('mh')" title="Click to view Medium-High observations"><div class="num">14</div><div class="lbl">Medium-High</div><div class="kpi-hint">click to view</div></div>
+  <div class="kpi blu kpi-btn" onclick="openKpiModal('lm')" title="Click to view Low-Medium observations"><div class="num">15</div><div class="lbl">Low-Medium</div><div class="kpi-hint">click to view</div></div>
+  <div class="kpi grn kpi-btn" onclick="openKpiModal('low')" title="Click to view Low Risk observations"><div class="num">5</div><div class="lbl">Low Risk</div><div class="kpi-hint">click to view</div></div>
+  <div class="kpi kpi-btn" style="border-top:3px solid var(--primary)" onclick="openKpiModal('unresolved')" title="Click to view all unresolved observations"><div class="num" style="color:var(--primary)">36</div><div class="lbl">Total Unresolved</div><div class="kpi-hint">click to view</div></div>
+  <div class="kpi kpi-btn" style="border-top:3px solid var(--low)" onclick="openKpiModal('resolved')" title="Click to view resolved observations"><div class="num" style="color:var(--low)">6</div><div class="lbl">Resolved This Cycle</div><div class="kpi-hint">click to view</div></div>
 </div>
 <div class="card">
   <div style="font-weight:700;color:var(--primary);margin-bottom:.8rem">Observation Resolution Summary</div>
@@ -201,6 +218,34 @@
     <li><a href="#obs-2-3" class="full-obs-link" data-syn="syn-row-2-3" style="color:var(--high);font-weight:700">&#8594; 2.3 All 3 Quotations Provided by Selected Vendor</a></li>
     <li><a href="#obs-2-25" class="full-obs-link" data-syn="syn-row-2-25" style="color:var(--high);font-weight:700">&#8594; 2.25 Ex-Armed Forces Personnel not Provided by Security Company</a></li>
   </ul>
+</div>
+
+<div id="analysis" style="margin-bottom:1.2rem">
+  <div class="section-title" style="font-size:1.1rem">E. Analysis of Observations &amp; Controls (COSO Framework)</div>
+  <div class="card" style="font-size:.9rem"><p>Observations are analysed per the COSO Internal Control — Integrated Framework across three components: <strong>Control Environment (CE)</strong>, <strong>Control Activities (CA)</strong>, and <strong>Monitoring</strong>. Risk tiers:</p>
+  <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.8rem">
+    <span class="risk high">High — Immediate action required</span>
+    <span class="risk mh">Medium-High — Priority attention</span>
+    <span class="risk lm">Low-Medium — Planned action</span>
+    <span class="risk low">Low — Monitor &amp; review</span>
+  </div></div>
+</div>
+
+<div id="matrix" style="margin-bottom:1.2rem">
+  <div class="section-title" style="font-size:1.1rem">F. Sensitivity Matrix</div>
+  <div class="card"><div class="matrix-wrap"><table class="matrix">
+  <tr><td class="axis" colspan="2" rowspan="2"></td><td class="axis" colspan="3">LIKELIHOOD / NON-COMPLIANCE</td></tr>
+  <tr><td class="axis">HIGH</td><td class="axis">MEDIUM</td><td class="axis">LOW</td></tr>
+  <tr><td class="axis" rowspan="3">IMPACT</td><td class="axis">HIGH</td>
+    <td class="cell-high">&#128308; HIGH RISK<br><small>2.1, 2.3, 2.25</small></td>
+    <td class="cell-mh">&#128992; MED-HIGH<br><small>1.1,1.3,1.5,1.11,1.12,1.14,2.7&#8211;2.10,2.14,2.15,2.19,2.24</small></td>
+    <td class="cell-lm">&#128994; LOW-MED<br><small>1.2,1.4,1.6,1.8,1.9,2.2,2.5,2.6,2.11&#8211;13,2.16&#8211;18,2.21&#8211;23,2.26,2.27</small></td>
+  </tr>
+  <tr><td class="axis">MEDIUM</td><td class="cell-mh">&#128992;</td><td class="cell-lm">&#128994;</td><td class="cell-low">&#128995; LOW</td></tr>
+  <tr><td class="axis">LOW</td><td class="cell-lm">&#128994;</td><td class="cell-low">&#128995;</td>
+    <td class="cell-low">&#128995; LOW<br><small>1.7,1.10,1.13,2.4,2.20</small></td>
+  </tr>
+  </table></div></div>
 </div>
 
 <div class="card"><div style="font-weight:700;color:var(--primary);margin-bottom:.8rem">Section 1 — Repeated (Unresolved) Observations <span style="font-weight:400;font-size:.8rem;color:var(--muted)">(15 observations)</span></div>
@@ -1012,29 +1057,6 @@
 </div></div>
 <a href="#synopsis" class="back-link">&#8593; Back to Synopsis</a></div>
 
-<div class="section" id="analysis"><div class="section-title">E. Analysis of Observations &amp; Controls</div>
-<div class="card" style="font-size:.9rem"><p>Observations analysed per COSO (CE, CA, Monitoring). Risk tiers:</p>
-<div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.8rem">
-  <span class="risk high">High — Immediate action</span><span class="risk mh">Medium-High — Priority</span>
-  <span class="risk lm">Low-Medium — Planned action</span><span class="risk low">Low — Monitor</span>
-</div></div>
-<a href="#synopsis" class="back-link">&#8593; Back to Synopsis</a></div>
-
-<div class="section" id="matrix"><div class="section-title">F. Sensitivity Matrix</div>
-<div class="card"><div class="matrix-wrap"><table class="matrix">
-<tr><td class="axis" colspan="2" rowspan="2"></td><td class="axis" colspan="3">LIKELIHOOD / NON-COMPLIANCE</td></tr>
-<tr><td class="axis">HIGH</td><td class="axis">MEDIUM</td><td class="axis">LOW</td></tr>
-<tr><td class="axis" rowspan="3">IMPACT</td><td class="axis">HIGH</td>
-  <td class="cell-high">&#128308; HIGH RISK<br><small>2.1, 2.3, 2.25</small></td>
-  <td class="cell-mh">&#128992; MED-HIGH<br><small>1.1,1.3,1.5,1.11,1.12,1.14,2.7&#8211;2.10,2.14,2.15,2.19,2.24</small></td>
-  <td class="cell-lm">&#128994; LOW-MED<br><small>1.2,1.4,1.6,1.8,1.9,2.2,2.5,2.6,2.11&#8211;13,2.16&#8211;18,2.21&#8211;23,2.26,2.27</small></td>
-</tr>
-<tr><td class="axis">MEDIUM</td><td class="cell-mh">&#128992;</td><td class="cell-lm">&#128994;</td><td class="cell-low">&#128995; LOW</td></tr>
-<tr><td class="axis">LOW</td><td class="cell-lm">&#128994;</td><td class="cell-low">&#128995;</td>
-  <td class="cell-low">&#128995; LOW<br><small>1.7,1.10,1.13,2.4,2.20</small></td>
-</tr>
-</table></div></div>
-<a href="#synopsis" class="back-link">&#8593; Back to Synopsis</a></div>
 <hr class="sec-divider" style="max-width:1100px;margin:2rem auto">
 
 <div class="section" id="repeated-obs"><div class="section-title">Section 1 — Repeated (Unresolved) Observations</div>
@@ -2292,6 +2314,93 @@ document.addEventListener('click',function(e){
   hlRow.classList.remove('syn-highlight');
   hlRow = null;
 });
+
+
+// ── KPI observation index ──────────────────────────────────────────────────────
+var OBS_INDEX = [
+  {id:"1-1",num:"1.1",title:"Expenditure Exceeded the Budgeted Amount",cat:"Branch Imprest, Payments & Accounts",risk:"mh",resolved:false},
+  {id:"1-2",num:"1.2",title:"Savings in Student Expenditure",cat:"Branch Imprest, Payments & Accounts",risk:"lm",resolved:false},
+  {id:"1-3",num:"1.3",title:"Delay in Deposit of Withholding Tax",cat:"Branch Imprest, Payments & Accounts",risk:"mh",resolved:false},
+  {id:"1-4",num:"1.4",title:"Delayed Reimbursement of Claims by RO",cat:"Branch Imprest, Payments & Accounts",risk:"lm",resolved:false},
+  {id:"1-5",num:"1.5",title:"Track Record of Quotations not Maintained",cat:"Branch Imprest, Payments & Accounts",risk:"mh",resolved:true},
+  {id:"1-6",num:"1.6",title:"Delay in Finalization of Final Settlement Claims",cat:"Recruitment, Payroll & HR",risk:"lm",resolved:false},
+  {id:"1-7",num:"1.7",title:"Missing Approval for Blood Relatives Employed",cat:"Recruitment, Payroll & HR",risk:"low",resolved:false},
+  {id:"1-8",num:"1.8",title:"Livery Items Provided with Delays",cat:"Recruitment, Payroll & HR",risk:"lm",resolved:false},
+  {id:"1-9",num:"1.9",title:"Delay in Confirmation of Employees",cat:"Recruitment, Payroll & HR",risk:"lm",resolved:false},
+  {id:"1-10",num:"1.10",title:"Registration Fee Deposited with Delay",cat:"Students' Record",risk:"low",resolved:false},
+  {id:"1-11",num:"1.11",title:"Un-Numbered Fixed Assets",cat:"Fixed Assets",risk:"mh",resolved:true},
+  {id:"1-12",num:"1.12",title:"High Book-to-Child Ratio in Library",cat:"Library",risk:"mh",resolved:false},
+  {id:"1-13",num:"1.13",title:"Demolition Register not Prepared",cat:"Others",risk:"low",resolved:false},
+  {id:"1-14",num:"1.14",title:"Discrepancies in Sports Register",cat:"Others",risk:"mh",resolved:false},
+  {id:"1-15",num:"1.15",title:"Generator Log Book not Validated by BH",cat:"Others",risk:"lm",resolved:true},
+  {id:"2-1",num:"2.1",title:"Vendors Registration not Completed",cat:"Branch Imprest, Payments & Accounts",risk:"high",resolved:false},
+  {id:"2-2",num:"2.2",title:"List of Preferred Vendors not Available",cat:"Branch Imprest, Payments & Accounts",risk:"lm",resolved:true},
+  {id:"2-3",num:"2.3",title:"All 3 Quotations Provided by Selected Vendor",cat:"Branch Imprest, Payments & Accounts",risk:"high",resolved:false},
+  {id:"2-4",num:"2.4",title:"Cheque Number Not Recorded in BPV",cat:"Cash & Bank",risk:"low",resolved:false},
+  {id:"2-5",num:"2.5",title:"Negative Balance in Principal Bank Account",cat:"Cash & Bank",risk:"lm",resolved:false},
+  {id:"2-6",num:"2.6",title:"Cash in Hand Exceeding Limit",cat:"Cash & Bank",risk:"lm",resolved:false},
+  {id:"2-7",num:"2.7",title:"Short Office Hours",cat:"Recruitment, Payroll & HR",risk:"mh",resolved:false},
+  {id:"2-8",num:"2.8",title:"Departure Attendance Not Marked",cat:"Recruitment, Payroll & HR",risk:"mh",resolved:false},
+  {id:"2-9",num:"2.9",title:"Employees Not Registered in EOBI",cat:"Recruitment, Payroll & HR",risk:"mh",resolved:true},
+  {id:"2-10",num:"2.10",title:"Record for Livery Issued not Maintained",cat:"Recruitment, Payroll & HR",risk:"mh",resolved:false},
+  {id:"2-11",num:"2.11",title:"Incomplete Employees' Files",cat:"Recruitment, Payroll & HR",risk:"lm",resolved:false},
+  {id:"2-12",num:"2.12",title:"Branch Accountant File Maintained at Branch",cat:"Recruitment, Payroll & HR",risk:"lm",resolved:true},
+  {id:"2-13",num:"2.13",title:"Incomplete Students' Files",cat:"Students' Records",risk:"lm",resolved:false},
+  {id:"2-14",num:"2.14",title:"Reason for Reg. Fee Waiver not Mentioned",cat:"Students' Records",risk:"mh",resolved:false},
+  {id:"2-15",num:"2.15",title:"Memorandum Records of FA not as per Policy",cat:"Fixed Assets",risk:"mh",resolved:false},
+  {id:"2-16",num:"2.16",title:"Out of Order Assets Found in Branch",cat:"Fixed Assets",risk:"lm",resolved:false},
+  {id:"2-17",num:"2.17",title:"Un-Matched Assets Found in Branch",cat:"Fixed Assets",risk:"lm",resolved:false},
+  {id:"2-18",num:"2.18",title:"Bar Code Labelling on Books Incomplete",cat:"Library",risk:"lm",resolved:false},
+  {id:"2-19",num:"2.19",title:"Books Not Accessed in Library Module (KOHA)",cat:"Library",risk:"mh",resolved:false},
+  {id:"2-20",num:"2.20",title:"Torn-Out Books in Branch Library",cat:"Library",risk:"low",resolved:false},
+  {id:"2-21",num:"2.21",title:"File for Librarian Meeting Minutes Missing",cat:"Library",risk:"lm",resolved:false},
+  {id:"2-22",num:"2.22",title:"Clearance Forms File not Maintained",cat:"Library",risk:"lm",resolved:false},
+  {id:"2-23",num:"2.23",title:"File for Overdue Book Reminders Missing",cat:"Library",risk:"lm",resolved:false},
+  {id:"2-24",num:"2.24",title:"Discrepancies with Library Module (KOHA)",cat:"Library — IT Systems",risk:"mh",resolved:false},
+  {id:"2-25",num:"2.25",title:"Ex-Armed Forces Personnel not Provided by Security Company",cat:"Safety & Security",risk:"high",resolved:false},
+  {id:"2-26",num:"2.26",title:"Discrepancies in Printed Stationery Register",cat:"Others",risk:"lm",resolved:false},
+  {id:"2-27",num:"2.27",title:"Discrepancies in Teaching Aid Register",cat:"Others",risk:"lm",resolved:false}
+];
+
+var RISK_LABELS = {high:"High Risk",mh:"Medium-High",lm:"Low-Medium",low:"Low Risk"};
+var RISK_COLORS = {high:"var(--high)",mh:"var(--mh)",lm:"var(--lm)",low:"var(--low)"};
+var RISK_BG    = {high:"#fdecea",mh:"#fef3e2",lm:"#eaf4fb",low:"#e9f7ef"};
+
+function openKpiModal(filter){
+  var filtered, title, accentColor;
+  if(filter==='resolved'){
+    filtered = OBS_INDEX.filter(function(o){return o.resolved;});
+    title = '&#10004; Resolved This Cycle ('+filtered.length+' observations)';
+    accentColor = 'var(--low)';
+  } else if(filter==='unresolved'){
+    filtered = OBS_INDEX.filter(function(o){return !o.resolved;});
+    title = 'Total Unresolved ('+filtered.length+' observations)';
+    accentColor = 'var(--primary)';
+  } else {
+    filtered = OBS_INDEX.filter(function(o){return o.risk===filter;});
+    title = RISK_LABELS[filter]+' Observations ('+filtered.length+')';
+    accentColor = RISK_COLORS[filter];
+  }
+
+  var rows = filtered.map(function(o){
+    var badge = filter==='resolved'?'<span class="risk '+o.risk+'">'+RISK_LABELS[o.risk]+'</span> ':
+                filter==='unresolved'?'<span class="risk '+o.risk+'">'+RISK_LABELS[o.risk]+'</span> ':'';
+    var resolvedBadge = o.resolved ? '<span style="color:var(--low);font-size:.7rem;font-weight:700;margin-left:.4rem">&#10004; Resolved</span>':'';
+    return '<div class="kpi-obs-item" style="background:'+RISK_BG[o.risk]+';border-color:'+RISK_COLORS[o.risk]+'">'
+      +'<span class="obs-num-sm">'+o.num+'</span>'
+      +badge+'<span style="flex:1;font-weight:600">'+o.title+resolvedBadge+'</span>'
+      +'<div class="obs-cat">'+o.cat+'</div>'
+      +'<div style="margin-top:.3rem;display:flex;gap:.5rem;flex-wrap:wrap">'
+      +'<button class="det-btn" onclick="closeModal();setTimeout(function(){var b=document.getElementById('btn-'+o.id+'');if(b){b.scrollIntoView({behavior:'smooth',block:'center'});b.click();}},300)" style="font-size:.7rem;padding:.2rem .6rem">&#9660; Detail</button>'
+      +'<button class="rep-btn" onclick="closeModal();setTimeout(function(){openReportModal(''+o.id+'');},300)" style="font-size:.7rem;padding:.2rem .6rem">&#128196; View as in Report</button>'
+      +'</div></div>';
+  }).join('');
+
+  document.getElementById('modalTitle').innerHTML = title;
+  document.getElementById('modalBody').innerHTML = '<div class="kpi-obs-list">'+rows+'</div>';
+  document.getElementById('repModal').classList.add('active');
+  document.body.style.overflow='hidden';
+}
 
 
 function openReportModal(obsId){
