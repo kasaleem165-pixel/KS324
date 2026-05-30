@@ -361,6 +361,7 @@ var CATS     = sg('bhs_ca', DEF_CA);
 var selIds   = {};   // {obsId: true}
 var annexMap = {};   // {obsId: "text"}
 var avMap    = {};   // {obsId: manual audit view text}
+var actMap   = {};   // {obsId: action taken text}
 var customs  = [];
 var cOpen    = false;
 var curM     = null;
@@ -686,13 +687,23 @@ function renderRpt(){
       var avMode=document.querySelector('input[name="avmode"]:checked');
       var avVal=avMode?avMode.value:'auto';
       var avStored=avMap[o.id]||'';
+      var actStored=actMap[o.id]||'';
+
+      // 1. Observation
       if(o.observation) h+='<div class="osl">Observation</div><div class="ost">'+esc(o.observation)+'</div>';
+      // 2. Recommendation
       if(o.recommendation) h+='<div class="osl">Recommendation</div><div class="ost">'+esc(o.recommendation)+'</div>';
+      // 3. Annexure Data (if set)
+      if(ax) h+='<div class="oax"><strong>Annexure Data:</strong> '+esc(ax)+'</div>';
+      // 4. Auditee Response — blank when Hide mode, pre-filled otherwise
+      h+='<div class="osl">Auditee Response</div>';
+      h+='<textarea class="oresp" id="r-'+o.id+'" placeholder="Enter auditee response...">'+esc(avVal==='none'?'':resp)+'</textarea>';
+      // 5. Audit View — after Auditee Response
       if(avVal==='auto'&&o.audit_view) h+='<div class="osl">Audit View</div><div class="ost">'+esc(o.audit_view)+'</div>';
       else if(avVal==='manual') h+='<div class="osl">Audit View</div><textarea class="oresp" id="av-'+o.id+'" placeholder="Type audit view here..." oninput="avMap[\''+o.id+'\']=this.value">'+esc(avStored)+'</textarea>';
-      if(ax) h+='<div class="oax"><strong>Annexure Data:</strong> '+esc(ax)+'</div>';
-      h+='<div class="osl">Auditee Response</div>';
-      h+='<textarea class="oresp" id="r-'+o.id+'" placeholder="Enter auditee response...">'+esc(resp)+'</textarea>';
+      // 6. Action Taken — always present
+      h+='<div class="osl">Action Taken</div>';
+      h+='<textarea class="oresp" id="act-'+o.id+'" placeholder="Enter action taken..." oninput="actMap[\''+o.id+'\']=this.value">'+esc(actStored)+'</textarea>';
       h+='</div></div>';
     }
     h+='</div>';
