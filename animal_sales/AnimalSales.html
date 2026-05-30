@@ -3723,15 +3723,15 @@ function exportPaymentsExcel(){
 
 function exportCustomersExcel(){
   const withTotals=DB.customers.map(c=>{
-    const {ts,tp,td,balance}=custTotals(c.id);
-    return Object.assign({},c,{ts,tp,td,balance});
+    const {ts,tc,ta,tp,td,balance}=custTotals(c.id);
+    return Object.assign({},c,{ts,tc,ta,tp,td,balance});
   });
   const list=sortArr(withTotals,SORT.customers.col,SORT.customers.dir);
-  const headers=['Customer Name','Phone','Admin Charges (Rs.)','Address','Total Sales (Rs.)','Received (Rs.)','Discount (Rs.)','Balance Due (Rs.)'];
+  const headers=['Customer Name','Phone','Address','Carriage (Rs.)','Admin Charges (Rs.)','Total Sales (Rs.)','Received (Rs.)','Discount (Rs.)','Balance Due (Rs.)'];
   const rows=list.map(c=>[
-    c.name,c.phone||'',
-    c.admin_charges!=null?c.admin_charges.toFixed(0):'',
-    c.address||'',
+    c.name,c.phone||'',c.address||'',
+    c.tc>0?c.tc.toFixed(0):'',
+    c.ta>0?c.ta.toFixed(0):'',
     c.ts.toFixed(0),c.tp.toFixed(0),c.td.toFixed(0),c.balance.toFixed(0)
   ]);
   exportCSV(headers,rows,'Customers');
