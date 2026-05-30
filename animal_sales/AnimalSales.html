@@ -578,9 +578,12 @@ input[readonly]{background:#f8fafc}
     <div id="budget-flash"></div>
     <div class="form-grid" style="margin-top:12px">
       <div class="fg"><label>Animal Code <span style="font-weight:400;color:#aaa">(optional)</span></label>
-        <select id="bg-animal" onchange="bgAnimalSelected()">
-          <option value="">-- Select Animal --</option>
-        </select></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select id="bg-animal" onchange="bgAnimalSelected()" style="flex:1">
+            <option value="">-- Select Animal --</option>
+          </select>
+          <button class="btn btn-light btn-sm" onclick="show('animals')" title="Add new animal" style="white-space:nowrap;flex-shrink:0">＋ New</button>
+        </div></div>
       <div class="fg"><label>Customer *</label>
         <div style="display:flex;gap:6px;align-items:center">
           <select id="bg-customer"><option value="">-- Select Customer --</option></select>
@@ -607,7 +610,7 @@ input[readonly]{background:#f8fafc}
         <input id="bg-rate" type="number" step="1" oninput="bgCalc()"></div>
       <div class="fg"><label>Admin Charges (Rs.)</label>
         <input id="bg-admin" type="number" step="1" oninput="bgCalc()" placeholder="e.g. 30000" value="0"></div>
-      <div class="fg"><label>Carriage / Transport (Rs.)</label>
+      <div class="fg" id="bg-carriage-row"><label>Carriage / Transport (Rs.)</label>
         <input id="bg-carriage" type="number" step="1" oninput="bgCalc()" placeholder="e.g. 5000"></div>
       <div class="fg" id="bg-baseprice-row"><label>Base Amount (Rs.) <span style="font-weight:400;font-size:.8rem;color:#888">Wt × Rate</span></label>
         <input id="bg-baseprice" readonly style="color:#1a3a5c"></div>
@@ -621,7 +624,7 @@ input[readonly]{background:#f8fafc}
       <div class="fg" id="bg-lumpcar-row" style="display:none"><label>Carriage / Transport (Rs.)</label>
         <input id="bg-lumpcar" type="number" step="1" placeholder="e.g. 4000" oninput="bgCalc()"></div>
       <div class="fg" id="bg-lumptotal-row" style="display:none"><label>Total Amount (Rs.)</label>
-        <input id="bg-lumptotal" readonly style="font-weight:700;font-size:1rem;background:#f8fafc" placeholder="Auto-calculated"></div>
+        <input id="bg-lumptotal" readonly style="font-weight:700;font-size:1.1rem;background:#1a3a5c;color:#fff;border-color:#1a3a5c;border-radius:8px;padding:10px 12px;letter-spacing:.02em" placeholder="Auto-calculated"></div>
       <div class="fg full"><label>Notes</label>
         <input id="bg-notes" placeholder="Optional description"></div>
     </div>
@@ -3411,7 +3414,7 @@ function bgAnimalSelected(){
 
 function bgToggleMode(){
   const isLump=document.querySelector('[name="bg-mode"]:checked').value==='lumpsum';
-  ['bg-weight-row','bg-rate-row','bg-baseprice-row','bg-total-row'].forEach(id=>{
+  ['bg-weight-row','bg-rate-row','bg-carriage-row','bg-baseprice-row','bg-total-row'].forEach(id=>{
     document.getElementById(id).style.display=isLump?'none':'';
   });
   ['bg-lumpsum-row','bg-lumpamt-row','bg-lumpcar-row','bg-lumptotal-row'].forEach(id=>{
