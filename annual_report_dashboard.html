@@ -294,6 +294,9 @@
   .ob-item.caution  { background: #fce4ec; color: #880e4f; }
   .ob-item.black    { background: #ede9fe; color: #4c1d95; }
   .ob-item.transfer { background: #cffafe; color: #164e63; }
+  .ob-item[onclick] { cursor: pointer; border: 2px solid transparent; transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s; }
+  .ob-item[onclick]:hover { transform: translateY(-3px); box-shadow: 0 6px 18px rgba(0,0,0,0.13); }
+  .ob-item[onclick].active-filter { border-color: currentColor; box-shadow: 0 0 0 3px rgba(0,0,0,0.12); transform: translateY(-2px); }
   .ob-total-row {
     display: flex; align-items: center; justify-content: flex-end; gap: 10px;
     border-top: 2px solid #e8edf2; padding-top: 12px; margin-top: 4px;
@@ -560,41 +563,31 @@
     <div class="kpi-card amber"><div class="kpi-label">Total Disciplinary Outcomes</div><div class="kpi-value">79</div><div class="kpi-sub">Avg 2.9 actions per case</div></div>
   </div>
 
-  <div class="outcome-breakdown">
-    <h3>How 79 Outcomes Are Composed — All 7 Action Types</h3>
-    <div class="ob-subtitle">Each type counted separately. Every disciplinary action issued across all 27 investigations is listed here.</div>
-    <div class="ob-grid">
-      <div class="ob-item resign">  <div class="ob-num">19</div><div class="ob-lbl">End of Service<br>(Resign / Term.)</div></div>
-      <div class="ob-item recover"> <div class="ob-num">24</div><div class="ob-lbl">Recoveries<br>(Assets &amp; Funds)</div></div>
-      <div class="ob-item warning"> <div class="ob-num">16</div><div class="ob-lbl">Warning<br>Letters</div></div>
-      <div class="ob-item advice">  <div class="ob-num">9</div> <div class="ob-lbl">Letters of<br>Advice</div></div>
-      <div class="ob-item caution"> <div class="ob-num">3</div> <div class="ob-lbl">Letters of<br>Caution</div></div>
-      <div class="ob-item black">   <div class="ob-num">6</div> <div class="ob-lbl">Vendor<br>Blacklistings</div></div>
-      <div class="ob-item transfer"><div class="ob-num">2</div> <div class="ob-lbl">Transfers</div></div>
-    </div>
-    <div class="ob-total-row">
-      <span class="ob-addends">19 &nbsp;+&nbsp; 24 &nbsp;+&nbsp; 16 &nbsp;+&nbsp; 9 &nbsp;+&nbsp; 3 &nbsp;+&nbsp; 6 &nbsp;+&nbsp; 2</span>
-      <span class="ob-total-val">= 79 Total</span>
-    </div>
-  </div>
-
-  <!-- ── INVESTIGATIONS SUB-DASHBOARD ── -->
+  <!-- ── INVESTIGATIONS SUB-DASHBOARD (merged with outcome breakdown) ── -->
   <div class="inv-dashboard">
     <div class="inv-dashboard-header">
       <div>
         <h3>🔍 All Investigations &amp; Outcomes — FY 2024</h3>
-        <div class="inv-meta">27 assignments &nbsp;|&nbsp; 79 total disciplinary actions &nbsp;|&nbsp; ~2.9 actions per case on average &nbsp;·&nbsp; <em>Click any outcome below to filter cases</em></div>
-      </div>
-      <div class="inv-stat-pills">
-        <div class="inv-stat-pill" onclick="filterInvestigations('resign')" title="Show only End of Service cases">🔴 End of Service <span>19</span></div>
-        <div class="inv-stat-pill" onclick="filterInvestigations('recover')" title="Show only Recovery cases">🔵 Recovery <span>24</span></div>
-        <div class="inv-stat-pill" onclick="filterInvestigations('warning')" title="Show only Warning Letter cases">🟡 Warning Letter <span>16</span></div>
-        <div class="inv-stat-pill" onclick="filterInvestigations('advice')" title="Show only Letter of Advice cases">🟢 Letter of Advice <span>9</span></div>
-        <div class="inv-stat-pill" onclick="filterInvestigations('caution')" title="Show only Letter of Caution cases">🟣 Letter of Caution <span>3</span></div>
-        <div class="inv-stat-pill" onclick="filterInvestigations('black')" title="Show only Blacklisting cases">⚫ Blacklisting <span>6</span></div>
-        <div class="inv-stat-pill" onclick="filterInvestigations('transfer')" title="Show only Transfer cases">🔄 Transfer <span>2</span></div>
+        <div class="inv-meta">27 assignments &nbsp;|&nbsp; 79 total disciplinary actions &nbsp;|&nbsp; ~2.9 actions per case &nbsp;·&nbsp; <em>Click any outcome tile below to filter cases</em></div>
       </div>
     </div>
+
+    <!-- Outcome breakdown tiles — each tile is a clickable filter -->
+    <div class="ob-subtitle" style="padding:12px 18px 4px;font-size:0.78rem;color:#64748b;">Each type counted separately across all 27 investigations. Click a tile to filter the case list below.</div>
+    <div class="ob-grid" style="padding:4px 18px 0;">
+      <div class="ob-item resign"   onclick="filterInvestigations('resign')"   title="Filter: End of Service">  <div class="ob-num">19</div><div class="ob-lbl">End of Service<br>(Resign / Term.)</div></div>
+      <div class="ob-item recover"  onclick="filterInvestigations('recover')"  title="Filter: Recoveries">      <div class="ob-num">24</div><div class="ob-lbl">Recoveries<br>(Assets &amp; Funds)</div></div>
+      <div class="ob-item warning"  onclick="filterInvestigations('warning')"  title="Filter: Warning Letters">  <div class="ob-num">16</div><div class="ob-lbl">Warning<br>Letters</div></div>
+      <div class="ob-item advice"   onclick="filterInvestigations('advice')"   title="Filter: Letters of Advice"><div class="ob-num">9</div> <div class="ob-lbl">Letters of<br>Advice</div></div>
+      <div class="ob-item caution"  onclick="filterInvestigations('caution')"  title="Filter: Letters of Caution"><div class="ob-num">3</div><div class="ob-lbl">Letters of<br>Caution</div></div>
+      <div class="ob-item black"    onclick="filterInvestigations('black')"    title="Filter: Vendor Blacklistings"><div class="ob-num">6</div><div class="ob-lbl">Vendor<br>Blacklistings</div></div>
+      <div class="ob-item transfer" onclick="filterInvestigations('transfer')" title="Filter: Transfers">        <div class="ob-num">2</div> <div class="ob-lbl">Transfers</div></div>
+    </div>
+    <div class="ob-total-row" style="padding:6px 18px 14px;">
+      <span class="ob-addends">19 &nbsp;+&nbsp; 24 &nbsp;+&nbsp; 16 &nbsp;+&nbsp; 9 &nbsp;+&nbsp; 3 &nbsp;+&nbsp; 6 &nbsp;+&nbsp; 2</span>
+      <span class="ob-total-val">= 79 Total Outcomes</span>
+    </div>
+
     <!-- Active filter indicator strip (hidden until a filter is applied) -->
     <div class="inv-filter-strip" id="inv-filter-strip" style="display:none;">
       Showing: <span class="inv-filter-active-badge" id="inv-filter-badge">—</span>
@@ -2769,10 +2762,10 @@ function filterInvestigations(type) {
   const blocks = document.querySelectorAll('.inv-region-block');
   const strip  = document.getElementById('inv-filter-strip');
   const badge  = document.getElementById('inv-filter-badge');
-  const pills  = document.querySelectorAll('.inv-stat-pill');
+  const tiles  = document.querySelectorAll('.ob-item[onclick]');
 
-  // Clear active state on all pills
-  pills.forEach(p => p.classList.remove('active'));
+  // Clear active state on all tiles
+  tiles.forEach(t => t.classList.remove('active-filter'));
 
   if (!type) {
     // Reset — show everything
@@ -2782,10 +2775,10 @@ function filterInvestigations(type) {
     return;
   }
 
-  // Mark active pill
-  pills.forEach(p => {
-    if (p.getAttribute('onclick') && p.getAttribute('onclick').includes("'" + type + "'")) {
-      p.classList.add('active');
+  // Mark active tile
+  tiles.forEach(t => {
+    if (t.getAttribute('onclick') && t.getAttribute('onclick').includes("'" + type + "'")) {
+      t.classList.add('active-filter');
     }
   });
 
