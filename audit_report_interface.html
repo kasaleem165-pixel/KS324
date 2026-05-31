@@ -7632,7 +7632,7 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
       </div>
       <div class="g2">
         <div class="fr"><label>Category</label>
-          <input type="text" id="ccat" placeholder="e.g. Fixed Assets">
+          <select id="ccat"></select>
         </div>
         <div class="fr"><label>Type</label>
           <select id="ctyp"><option>New</option><option>Repeated</option></select>
@@ -7745,6 +7745,7 @@ window.onload = function() {
   buildSel('spb', PREPBY);
   buildSel('styp', TYPES);
   buildSel('scat', CATS);
+  buildCatSel();
   var d = new Date();
   document.getElementById('rdt').value = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
   document.getElementById('qinp').addEventListener('keydown', function(e){
@@ -7766,6 +7767,23 @@ function buildSel(id, arr) {
   for(var i=0;i<arr.length;i++){
     var o=document.createElement('option');
     o.value=arr[i]; o.textContent=arr[i];
+    sel.appendChild(o);
+  }
+  for(var j=0;j<sel.options.length;j++){
+    if(sel.options[j].value===prev){sel.value=prev;break;}
+  }
+}
+
+// Populate the custom-observation category dropdown from defined CATS (excluding "All Categories")
+function buildCatSel() {
+  var sel = document.getElementById('ccat');
+  if(!sel) return;
+  var prev = sel.value;
+  sel.innerHTML = '';
+  for(var i=0;i<CATS.length;i++){
+    if(CATS[i]==='All Categories') continue;
+    var o=document.createElement('option');
+    o.value=CATS[i]; o.textContent=CATS[i];
     sel.appendChild(o);
   }
   for(var j=0;j<sel.options.length;j++){
@@ -7796,9 +7814,7 @@ function applyFilter() {
   var p = document.getElementById('obs-prompt');
   if(p) p.style.display = 'none';
 
-  // Require at least one active filter
-  var hasFilter = typeF!=='All Types' || catF!=='All Categories' || toks.length>0;
-  if(!hasFilter){showPrompt();return;}
+  // No longer block on "All" — show all when no specific filter is set
 
   var res = [];
   for(var i=0;i<DB.observations.length;i++){
@@ -8048,7 +8064,7 @@ function addCustom(){
   customs.push(o);
   selIds[o.id]=true;
   if(o._annex) annexMap[o.id]=o._annex;
-  ['ctit','ccat','cobs','crec','cav','cannex'].forEach(function(id){document.getElementById(id).value='';});
+  ['ctit','cobs','crec','cav','cannex'].forEach(function(id){document.getElementById(id).value='';});
   toast('Custom observation added.');
   renderRpt();
 }
@@ -8308,7 +8324,7 @@ function getArr(k){return k==='prepby'?PREPBY:k==='type'?TYPES:CATS;}
 function saveArr(k,a){
   if(k==='prepby'){PREPBY=a;ss('bhs_pb',a);buildSel('spb',a);}
   else if(k==='type'){TYPES=a;ss('bhs_ty',a);buildSel('styp',a);}
-  else{CATS=a;ss('bhs_ca',a);buildSel('scat',a);}
+  else{CATS=a;ss('bhs_ca',a);buildSel('scat',a);buildCatSel();}
 }
 
 function renderListM(b, key){
