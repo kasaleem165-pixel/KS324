@@ -3237,11 +3237,12 @@ function renderInlineLedger(){
   const c=DB.customers.find(x=>x.id===cid); if(!c){cont.innerHTML='';return;}
   const sales=DB.sales.filter(s=>s.customer_id===cid);
   const pays=DB.payments.filter(p=>p.customer_id===cid);
-  const {ts,tp,td,balance}=custTotals(cid);
+  const {ts,tc,ta,tp,td,balance}=custTotals(cid);
   const totalSalePrice=sales.reduce((sum,s)=>sum+(s.is_lumpsum?(s.amount-(s.carriage_charges||0)-(s.admin_charges||0)):s.weight_at_sale*s.rate_per_kg),0);
 
   let html=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px">
     <div class="stat"><div class="n">${Rs(totalSalePrice)}</div><div class="l">Sale Price</div></div>
+    <div class="stat"><div class="n" style="color:#b45309">${Rs(tc)}</div><div class="l">Carriage</div></div>
     <div class="stat"><div class="n">${Rs(ts)}</div><div class="l">Total Billed</div></div>
     <div class="stat"><div class="n" style="color:#059669">${Rs(tp)}</div><div class="l">Received</div></div>
     <div class="stat"><div class="n" style="color:#7c3aed">${Rs(td)}</div><div class="l">Discount</div></div>
@@ -3252,18 +3253,19 @@ function renderInlineLedger(){
   html+=`<p style="font-weight:700;color:#1a3a5c;margin:15px 0 7px">Sales</p>`;
   if(sales.length){
     const sCol=SORT.custledger_s.col, sDir=SORT.custledger_s.dir;
-    const numColsS=['weight_at_sale','rate_per_kg','sp','carriage_charges','amount'];
+    const numColsS=['weight_at_sale','rate_per_kg','sp','carriage_charges','admin_charges','amount'];
     const salesC=sales.map(s=>{const sp=s.is_lumpsum?(s.amount-(s.carriage_charges||0)-(s.admin_charges||0)):s.weight_at_sale*s.rate_per_kg;return Object.assign({},s,{sp});});
     const sortedSales=numColsS.includes(sCol)?[...salesC].sort((a,b)=>sDir==='asc'?(a[sCol]||0)-(b[sCol]||0):(b[sCol]||0)-(a[sCol]||0)):sortArr(salesC,sCol,sDir);
     const grandSP=sortedSales.reduce((sum,s)=>sum+s.sp,0);
     const grandTotal=sortedSales.reduce((sum,s)=>sum+(s.amount||0),0);
     const grandCar=sortedSales.reduce((sum,s)=>sum+(s.carriage_charges||0),0);
+    const grandAdm=sortedSales.reduce((sum,s)=>sum+(s.admin_charges||0),0);
     function thS(label,col){return `<th class="sortable${SORT.custledger_s.col===col?' sort-'+SORT.custledger_s.dir:''}" onclick="sortToggle('custledger_s','${col}')" style="cursor:pointer">${label}</th>`;}
-    html+=`<div class="tbl-wrap"><table><thead><tr><th>S#</th>${thS('Invoice No.','receipt_no')}${thS('Date','sale_date')}${thS('Animal','animal_code')}${thS('Weight','weight_at_sale')}${thS('Rate/kg','rate_per_kg')}${thS('Sale Price','sp')}${thS('Carriage','carriage_charges')}${thS('Total','amount')}<th></th></tr></thead><tbody>`;
+    html+=`<div class="tbl-wrap"><table><thead><tr><th>S#</th>${thS('Invoice No.','receipt_no')}${thS('Date','sale_date')}${thS('Animal','animal_code')}${thS('Weight','weight_at_sale')}${thS('Rate/kg','rate_per_kg')}${thS('Sale Price','sp')}${thS('Carriage','carriage_charges')}${thS('Admin','admin_charges')}${thS('Total','amount')}<th></th></tr></thead><tbody>`;
     sortedSales.forEach((s,i)=>{
-      html+=`<tr><td style="color:#94a3b8;font-size:.75rem">${i+1}</td><td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td><td>${s.animal_code}</td><td>${s.weight_at_sale?fmtN(s.weight_at_sale,1)+' kg':'-'}</td><td>${s.is_lumpsum?'Lump Sum':Rs(s.rate_per_kg)+'/kg'}</td><td>${Rs(s.sp)}</td><td>${s.carriage_charges?Rs(s.carriage_charges):'-'}</td><td><strong>${Rs(s.amount)}</strong></td><td><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Invoice</button> <button class="btn btn-light btn-sm" onclick="openSaleEdit('${s.receipt_no}')">&#9998; Edit</button></td></tr>`;
+      html+=`<tr><td style="color:#94a3b8;font-size:.75rem">${i+1}</td><td>${s.receipt_no}</td><td>${fmtD(s.sale_date)}</td><td>${s.animal_code}</td><td>${s.weight_at_sale?fmtN(s.weight_at_sale,1)+' kg':'-'}</td><td>${s.is_lumpsum?'Lump Sum':Rs(s.rate_per_kg)+'/kg'}</td><td>${Rs(s.sp)}</td><td>${(s.carriage_charges||0)>0?Rs(s.carriage_charges):'-'}</td><td>${(s.admin_charges||0)>0?Rs(s.admin_charges):'-'}</td><td><strong>${Rs(s.amount)}</strong></td><td><button class="btn btn-primary btn-sm" onclick="showReceipt('${s.receipt_no}')">Invoice</button> <button class="btn btn-light btn-sm" onclick="openSaleEdit('${s.receipt_no}')">&#9998; Edit</button></td></tr>`;
     });
-    html+=`<tr style="font-weight:700;background:#e0f2fe"><td colspan="6" style="text-align:right;color:#1a3a5c">Total (${sortedSales.length})</td><td style="color:#0f766e">${Rs(grandSP)}</td><td style="color:#b45309">${Rs(grandCar)}</td><td style="color:#1d4ed8">${Rs(grandTotal)}</td><td></td></tr></tbody></table></div>`;
+    html+=`<tr style="font-weight:700;background:#e0f2fe"><td colspan="6" style="text-align:right;color:#1a3a5c">Total (${sortedSales.length})</td><td style="color:#0f766e">${Rs(grandSP)}</td><td style="color:#b45309">${Rs(grandCar)}</td><td style="color:#7c3aed">${Rs(grandAdm)}</td><td style="color:#1d4ed8">${Rs(grandTotal)}</td><td></td></tr></tbody></table></div>`;
   } else html+=`<p style="color:#aaa;font-style:italic">No sales yet.</p>`;
 
   // Payments section with sorting
