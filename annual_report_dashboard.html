@@ -1000,7 +1000,7 @@
 
       <div class="collapsible-header" onclick="toggleCollapse(this)">
         <h4>🔴 ROS – KG 1 Campus, Jauhar (425) | Attendance Fraud &amp; Asset Misuse</h4>
-        <span class="arrow">▼</span>
+        <span class="arrow">▶</span>
       </div>
       <div class="collapsible-body">
         <div style="padding:16px;">
@@ -1012,7 +1012,7 @@
 
       <div class="collapsible-header" onclick="toggleCollapse(this)">
         <h4>🔴 ROS – Newlands Karachi (458) | Fraud &amp; Misappropriation in School Funds</h4>
-        <span class="arrow">▼</span>
+        <span class="arrow">▶</span>
       </div>
       <div class="collapsible-body">
         <div style="padding:16px;">
@@ -1024,7 +1024,7 @@
 
       <div class="collapsible-header" onclick="toggleCollapse(this)">
         <h4>🔴 ROS – Main Campus Quetta (471) | Blank Letter Heads, Fake Vendors</h4>
-        <span class="arrow">▼</span>
+        <span class="arrow">▶</span>
       </div>
       <div class="collapsible-body">
         <div style="padding:16px;">
@@ -1036,7 +1036,7 @@
 
       <div class="collapsible-header" onclick="toggleCollapse(this)">
         <h4>🔴 RON – BSS-320/F10-4 Islamabad | Fund Misuse &amp; Record Manipulation</h4>
-        <span class="arrow">▼</span>
+        <span class="arrow">▶</span>
       </div>
       <div class="collapsible-body">
         <div style="padding:16px;">
@@ -1048,7 +1048,7 @@
 
       <div class="collapsible-header" onclick="toggleCollapse(this)">
         <h4>🔴 FHS – Ambiance Karachi | Cash Misappropriation &amp; Invoice Manipulation</h4>
-        <span class="arrow">▼</span>
+        <span class="arrow">▶</span>
       </div>
       <div class="collapsible-body">
         <div style="padding:16px;">
@@ -1078,22 +1078,23 @@
     <div class="kpi-card red"><div class="kpi-label">Total Observations</div><div class="kpi-value">2,264</div><div class="kpi-sub">Across all regions</div></div>
   </div>
 
+  <div class="chart-card" style="margin-bottom:18px;">
+    <h3>Observations by Audit Area — All 3 Regions Compared</h3>
+    <canvas id="chart-ba-combined" style="max-height:340px;"></canvas>
+  </div>
+
   <div class="chart-grid">
     <div class="chart-card">
-      <h3>Observations by Audit Area (ROC – 12 Branches)</h3>
-      <canvas id="chart-ba-roc"></canvas>
-    </div>
-    <div class="chart-card">
-      <h3>Observations by Audit Area (RON – 10 Branches)</h3>
-      <canvas id="chart-ba-ron"></canvas>
-    </div>
-    <div class="chart-card">
-      <h3>Observations by Audit Area (ROS – 16 Branches)</h3>
-      <canvas id="chart-ba-ros"></canvas>
-    </div>
-    <div class="chart-card">
-      <h3>Risk Level Distribution – ROC (705 Observations)</h3>
+      <h3>Risk Level Distribution – ROC (705 obs)</h3>
       <canvas id="chart-risk-roc"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Risk Level Distribution – RON (553 obs)</h3>
+      <canvas id="chart-risk-ron-ba"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Risk Level Distribution – ROS (976 obs)</h3>
+      <canvas id="chart-risk-ros-ba"></canvas>
     </div>
   </div>
 
@@ -2489,10 +2490,10 @@ function showRegion(id) {
 }
 
 function toggleCollapse(header) {
-  const body = header.nextElementSibling;
+  const body  = header.nextElementSibling;
   const arrow = header.querySelector('.arrow');
   body.classList.toggle('open');
-  arrow.style.transform = body.classList.contains('open') ? 'rotate(180deg)' : '';
+  arrow.textContent = body.classList.contains('open') ? '▼' : '▶';
 }
 
 // ─── Color Palettes ─────────────────────────────────────────
@@ -2613,21 +2614,27 @@ makeMultiBar('chart-outcome-types',
 );
 
 // ─── BRANCH AUDIT CHARTS ─────────────────────────────────────
-const BA_LABELS = ['Branch\nImprest', 'Cash &\nBank', 'Fixed\nAssets', 'Library &\nLab', 'HR &\nPayroll', 'Safety &\nSecurity', 'Students\nRecord', 'Others'];
+const BA_LABELS = ['Branch Imprest', 'Cash & Bank', 'Fixed Assets', 'Library & Lab', 'HR & Payroll', 'Safety & Security', 'Students Record', 'Others'];
 
-makeBar('chart-ba-roc', BA_LABELS, [153, 41, 111, 86, 128, 51, 56, 79],
-  { label: 'Observations (ROC)', colors: [COLORS.primary,'#2d5986','#3a6fa3','#4a8ec2','#5dadd9','#74c6e8','#93d7f0','#b5e8f8'] }
-);
-makeBar('chart-ba-ron', BA_LABELS, [131, 25, 78, 46, 141, 9, 92, 31],
-  { label: 'Observations (RON)', colors: [COLORS.info,'#0d8fa0','#10a8bc','#14c3d8','#44d4e6','#6fdef0','#9de9f7','#c5f4fc'] }
-);
-makeBar('chart-ba-ros', BA_LABELS, [187, 13, 124, 145, 176, 121, 119, 91],
-  { label: 'Observations (ROS)', colors: [COLORS.secondary,'#d63050','#e05572','#ea7990','#f29dae','#f7bcca','#fbdae3','#fff0f3'] }
-);
+makeMultiBar('chart-ba-combined', BA_LABELS, [
+  { label: 'ROC – 12 Branches', data: [153, 41, 111,  86, 128,  51,  56, 79], backgroundColor: COLORS.primary },
+  { label: 'RON – 10 Branches', data: [131, 25,  78,  46, 141,   9,  92, 31], backgroundColor: COLORS.info },
+  { label: 'ROS – 16 Branches', data: [187, 13, 124, 145, 176, 121, 119, 91], backgroundColor: COLORS.secondary },
+]);
 
 makeDoughnut('chart-risk-roc',
   ['High Risk (45)', 'Med-High (220)', 'Low-Med (322)', 'Low (118)'],
   [45, 220, 322, 118],
+  ['#c8102e','#f0a500','#17a2b8','#28a745']
+);
+makeDoughnut('chart-risk-ron-ba',
+  ['High Risk (21)', 'Med-High (285)', 'Low-Med (241)', 'Low (6)'],
+  [21, 285, 241, 6],
+  ['#c8102e','#f0a500','#17a2b8','#28a745']
+);
+makeDoughnut('chart-risk-ros-ba',
+  ['High Risk (89)', 'Med-High (278)', 'Low-Med (550)', 'Low (59)'],
+  [89, 278, 550, 59],
   ['#c8102e','#f0a500','#17a2b8','#28a745']
 );
 
