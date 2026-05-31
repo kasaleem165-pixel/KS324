@@ -218,8 +218,13 @@
     background: #f0f4f8; padding: 10px 20px; font-size: 0.78rem;
     font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.8px;
     display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; user-select: none; transition: background 0.15s;
   }
+  .inv-region-label:hover { background: #e2e8f0; }
   .inv-region-label .reg-stats { font-size: 0.75rem; color: #666; font-weight: 500; text-transform: none; }
+  .region-toggle-icon { font-size: 0.8rem; margin-left: 10px; transition: transform 0.2s; flex-shrink: 0; }
+  .inv-region-block.region-collapsed .region-toggle-icon { transform: rotate(-90deg); }
+  .region-row-hidden { display: none !important; }
   .inv-case-row {
     display: grid;
     grid-template-columns: 28px 1fr auto;
@@ -597,9 +602,9 @@
 
     <!-- ROC -->
     <div class="inv-region-block">
-      <div class="inv-region-label">
-        ROC — Region Central &nbsp;·&nbsp; 4 assignments
-        <span class="reg-stats">6 total outcomes &nbsp;|&nbsp; Avg 1.5 / case</span>
+      <div class="inv-region-label" onclick="toggleRegionBlock(this)">
+        <span>ROC — Region Central &nbsp;·&nbsp; 4 assignments &nbsp;<span class="reg-stats">6 total outcomes &nbsp;|&nbsp; Avg 1.5 / case</span></span>
+        <span class="region-toggle-icon">▼</span>
       </div>
       <div class="inv-case-row">
         <div class="inv-case-icon">🔶</div>
@@ -650,9 +655,9 @@
 
     <!-- RON -->
     <div class="inv-region-block">
-      <div class="inv-region-label">
-        RON — Region North &nbsp;·&nbsp; 10 assignments
-        <span class="reg-stats">15 total outcomes &nbsp;|&nbsp; Avg 1.5 / case</span>
+      <div class="inv-region-label" onclick="toggleRegionBlock(this)">
+        <span>RON — Region North &nbsp;·&nbsp; 10 assignments &nbsp;<span class="reg-stats">15 total outcomes &nbsp;|&nbsp; Avg 1.5 / case</span></span>
+        <span class="region-toggle-icon">▼</span>
       </div>
       <div class="inv-case-row">
         <div class="inv-case-icon">🔴</div>
@@ -773,9 +778,9 @@
 
     <!-- ROS -->
     <div class="inv-region-block">
-      <div class="inv-region-label">
-        ROS — Region South &nbsp;·&nbsp; 12 assignments
-        <span class="reg-stats">54 total outcomes &nbsp;|&nbsp; Avg 4.5 / case</span>
+      <div class="inv-region-label" onclick="toggleRegionBlock(this)">
+        <span>ROS — Region South &nbsp;·&nbsp; 12 assignments &nbsp;<span class="reg-stats">54 total outcomes &nbsp;|&nbsp; Avg 4.5 / case</span></span>
+        <span class="region-toggle-icon">▼</span>
       </div>
       <div class="inv-case-row">
         <div class="inv-case-icon">🔴</div>
@@ -927,9 +932,9 @@
 
     <!-- FHS -->
     <div class="inv-region-block">
-      <div class="inv-region-label">
-        FHS &nbsp;·&nbsp; 1 assignment
-        <span class="reg-stats">4 total outcomes</span>
+      <div class="inv-region-label" onclick="toggleRegionBlock(this)">
+        <span>FHS &nbsp;·&nbsp; 1 assignment &nbsp;<span class="reg-stats">4 total outcomes</span></span>
+        <span class="region-toggle-icon">▼</span>
       </div>
       <div class="inv-case-row">
         <div class="inv-case-icon">🔴</div>
@@ -2237,9 +2242,10 @@
         </thead>
         <tbody>
           <!-- ═══ ESL / Beaconhouse School System (8 items) ═══ -->
-          <tr style="background:#1e40af;color:#fff;">
+          <tr class="policy-group-header" style="background:#1e40af;color:#fff;" onclick="togglePolicyGroup(this)">
             <td colspan="4" style="padding:8px 12px;font-weight:700;font-size:0.85rem;letter-spacing:0.04em;">
               🏫 ESL – Beaconhouse School System &nbsp;|&nbsp; 8 New Documents &nbsp;·&nbsp; 7 Completed &nbsp;·&nbsp; 1 In Process
+              <span class="policy-toggle-icon">▼</span>
             </td>
           </tr>
           <tr>
@@ -2292,9 +2298,10 @@
           </tr>
 
           <!-- ═══ BT – Beaconhouse Technology (2 items) ═══ -->
-          <tr style="background:#b45309;color:#fff;">
+          <tr class="policy-group-header" style="background:#b45309;color:#fff;" onclick="togglePolicyGroup(this)">
             <td colspan="4" style="padding:8px 12px;font-weight:700;font-size:0.85rem;letter-spacing:0.04em;">
               💻 BT – Beaconhouse Technology &nbsp;|&nbsp; 2 New Documents &nbsp;·&nbsp; Both In Process
+              <span class="policy-toggle-icon">▼</span>
             </td>
           </tr>
           <tr>
@@ -2311,9 +2318,10 @@
           </tr>
 
           <!-- ═══ Homebridge (4 items) ═══ -->
-          <tr style="background:#0369a1;color:#fff;">
+          <tr class="policy-group-header" style="background:#0369a1;color:#fff;" onclick="togglePolicyGroup(this)">
             <td colspan="4" style="padding:8px 12px;font-weight:700;font-size:0.85rem;letter-spacing:0.04em;">
               🏠 Homebridge &nbsp;|&nbsp; 4 New Documents &nbsp;·&nbsp; All Pending Approval (New Entity)
+              <span class="policy-toggle-icon">▼</span>
             </td>
           </tr>
           <tr>
@@ -2775,6 +2783,16 @@ function filterInvestigations(type) {
     return;
   }
 
+  // Expand all collapsed region blocks so filtered rows are visible
+  blocks.forEach(function(b) {
+    if (b.classList.contains('region-collapsed')) {
+      b.querySelectorAll('.inv-case-row').forEach(r => r.classList.remove('region-row-hidden'));
+      b.classList.remove('region-collapsed');
+      const icon = b.querySelector('.region-toggle-icon');
+      if (icon) icon.textContent = '▼';
+    }
+  });
+
   // Mark active tile
   tiles.forEach(t => {
     if (t.getAttribute('onclick') && t.getAttribute('onclick').includes("'" + type + "'")) {
@@ -2829,6 +2847,25 @@ function togglePolicyGroup(headerRow) {
   }
   headerRow.classList.toggle('collapsed', isOpen);
 }
+
+function toggleRegionBlock(label) {
+  const block  = label.closest('.inv-region-block');
+  const isOpen = !block.classList.contains('region-collapsed');
+  block.querySelectorAll('.inv-case-row').forEach(function(r) {
+    r.classList.toggle('region-row-hidden', isOpen);
+  });
+  block.classList.toggle('region-collapsed', isOpen);
+}
+
+// Collapse all groups on page load
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.policy-group-header').forEach(function(h) {
+    togglePolicyGroup(h);
+  });
+  document.querySelectorAll('.inv-region-label[onclick]').forEach(function(lbl) {
+    toggleRegionBlock(lbl);
+  });
+});
 </script>
 </body>
 </html>
