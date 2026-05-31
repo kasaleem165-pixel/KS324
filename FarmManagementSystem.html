@@ -341,10 +341,10 @@
 <div class="tab-content" id="tab-reports">
   <div class="section-title" style="margin-bottom:20px;"><i class="fas fa-chart-bar" style="color:#2d5c3e"></i> Reports</div>
   <div class="grid-3" style="margin-bottom:20px;">
-    <div class="card" style="text-align:center;cursor:pointer;" onclick="printReport('animal-register')">
+    <div class="card" style="text-align:center;cursor:pointer;" onclick="openAnimalReportFilter()">
       <i class="fas fa-horse" style="font-size:32px;color:#2d5c3e;margin-bottom:10px;display:block;"></i>
       <div style="font-weight:700;margin-bottom:4px;">Animal Register</div>
-      <div style="font-size:12px;color:#6b7280;">Full list of all animals</div>
+      <div style="font-size:12px;color:#6b7280;">Filtered list of all animals</div>
     </div>
     <div class="card" style="text-align:center;cursor:pointer;" onclick="printReport('feed-summary')">
       <i class="fas fa-warehouse" style="font-size:32px;color:#f59e0b;margin-bottom:10px;display:block;"></i>
@@ -883,6 +883,51 @@
 </div>
 </div>
 
+<!-- ANIMAL REGISTER FILTER MODAL -->
+<div class="modal-overlay" id="animalReportFilterModal" style="display:none;">
+<div class="modal-box" style="max-width:480px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div style="font-size:16px;font-weight:700;"><i class="fas fa-filter" style="color:#2d5c3e;margin-right:8px;"></i>Animal Register — Filter Report</div>
+    <button onclick="closeModal('animalReportFilterModal')" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>
+  </div>
+  <div style="font-size:12px;color:#6b7280;margin-bottom:14px;">Leave a filter blank to include all values.</div>
+  <div class="grid-2">
+    <div class="form-group">
+      <label>Animal Type</label>
+      <select class="form-control" id="arfType"><option value="">All Types</option></select>
+    </div>
+    <div class="form-group">
+      <label>Gender</label>
+      <select class="form-control" id="arfGender">
+        <option value="">All Genders</option>
+        <option>Male</option>
+        <option>Female</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Stage</label>
+      <select class="form-control" id="arfStage"><option value="">All Stages</option></select>
+    </div>
+    <div class="form-group">
+      <label>Breed</label>
+      <select class="form-control" id="arfBreed"><option value="">All Breeds</option></select>
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select class="form-control" id="arfStatus"><option value="">All Statuses</option></select>
+    </div>
+    <div class="form-group">
+      <label>Acquisition Type</label>
+      <select class="form-control" id="arfAcqType"><option value="">All Acquisition Types</option></select>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:8px;">
+    <button class="btn-primary" onclick="generateAnimalReport()"><i class="fas fa-print"></i> Generate Report</button>
+    <button class="btn-danger" onclick="closeModal('animalReportFilterModal')">Cancel</button>
+  </div>
+</div>
+</div>
+
 <script>
 // ============================================================
 // DATA LAYER
@@ -1322,6 +1367,10 @@ const LOOKUP_SECTIONS = [
 function renderLookupsSetup() {
   const lk = getLookups();
   const container = document.getElementById('lookupsSetupContainer');
+  // Save which sections are open and current scroll position before rebuild
+  const openIds = [];
+  container.querySelectorAll('.lookup-section-body.open').forEach(el => openIds.push(el.id));
+  const scrollY = window.scrollY || document.documentElement.scrollTop;
   container.innerHTML = LOOKUP_SECTIONS.map(sec => {
     if(sec.key === '__breeds__') return renderBreedSetupSection(lk);
     const items = lk[sec.key] || [];
@@ -1349,6 +1398,9 @@ function renderLookupsSetup() {
       </div>
     </div>`;
   }).join('');
+  // Restore open sections and scroll position
+  openIds.forEach(id => { const el = document.getElementById(id); if(el) el.classList.add('open'); });
+  window.scrollTo(0, scrollY);
 }
 
 function renderBreedSetupSection(lk) {
@@ -2105,8 +2157,61 @@ function deleteTransitionRule(id){confirm2('Delete Rule','Delete this transition
 // ============================================================
 // REPORTS
 // ============================================================
-function printReport(type){
-  const animals=dbGet('animals'),feed=dbGet('feed'),txs=dbGet('transactions'),weights=dbGet('weights'),tLog=dbGet('transitionLog');
+function openAnimalReportFilter() {
+  const lk = getLookups();
+  // Populate Type
+  const typeEl = document.getElementById('arfType');
+  typeEl.innerHTML = '<option value="">All Types</option>' + (lk.animalTypes||[]).map(t=>`<option>${t}</option>`).join('');
+  // Populate Stage (all stages across all types)
+  const stageEl = document.getElementById('arfStage');
+  stageEl.innerHTML = '<option value="">All Stages</option>' + getAllStages().map(s=>`<option>${s}</option>`).join('');
+  // Populate Breed (all breeds flattened)
+  const breedEl = document.getElementById('arfBreed');
+  const allBreeds = [];
+  Object.values(lk.breeds||{}).forEach(arr => arr.forEach(b => { if(!allBreeds.includes(b)) allBreeds.push(b); }));
+  allBreeds.sort();
+  breedEl.innerHTML = '<option value="">All Breeds</option>' + allBreeds.map(b=>`<option>${b}</option>`).join('');
+  // Populate Status
+  const statusEl = document.getElementById('arfStatus');
+  statusEl.innerHTML = '<option value="">All Statuses</option>' + (lk.animalStatuses||[]).map(s=>`<option>${s}</option>`).join('');
+  // Populate Acquisition Type
+  const acqEl = document.getElementById('arfAcqType');
+  acqEl.innerHTML = '<option value="">All Acquisition Types</option>' + (lk.acquisitionTypes||[]).map(a=>`<option>${a}</option>`).join('');
+  openModal('animalReportFilterModal');
+}
+
+function generateAnimalReport() {
+  const type    = document.getElementById('arfType').value;
+  const gender  = document.getElementById('arfGender').value;
+  const stage   = document.getElementById('arfStage').value;
+  const breed   = document.getElementById('arfBreed').value;
+  const status  = document.getElementById('arfStatus').value;
+  const acqType = document.getElementById('arfAcqType').value;
+
+  let animals = dbGet('animals');
+  if(type)    animals = animals.filter(a => a.animalType === type);
+  if(gender)  animals = animals.filter(a => a.gender === gender);
+  if(stage)   animals = animals.filter(a => a.stage === stage);
+  if(breed)   animals = animals.filter(a => a.breed === breed);
+  if(status)  animals = animals.filter(a => a.status === status);
+  if(acqType) animals = animals.filter(a => a.acquisitionType === acqType);
+
+  // Build human-readable filter description
+  const parts = [];
+  if(type)    parts.push(`Type: ${type}`);
+  if(gender)  parts.push(`Gender: ${gender}`);
+  if(stage)   parts.push(`Stage: ${stage}`);
+  if(breed)   parts.push(`Breed: ${breed}`);
+  if(status)  parts.push(`Status: ${status}`);
+  if(acqType) parts.push(`Acquisition: ${acqType}`);
+  const filterDesc = parts.length ? parts.join(' | ') : null;
+
+  closeModal('animalReportFilterModal');
+  printReport('animal-register', animals, filterDesc);
+}
+
+function printReport(type, customAnimals, filterDesc){
+  const animals=customAnimals||dbGet('animals'),feed=dbGet('feed'),txs=dbGet('transactions'),weights=dbGet('weights'),tLog=dbGet('transitionLog');
   const today=new Date().toLocaleDateString('en-PK');
   const farmName=DB.getObj('setup',{farmName:'Farm Management System'}).farmName;
   const head=(title)=>`<div style="font-family:Arial;padding:20px;max-width:900px;margin:0 auto;">
@@ -2114,10 +2219,11 @@ function printReport(type){
       <h2 style="color:#1a3a2a;margin:0;">${farmName}</h2>
       <h3 style="color:#2d5c3e;margin:4px 0;">${title}</h3>
       <div style="color:#6b7280;font-size:12px;">Generated: ${today}</div>
+      ${filterDesc?`<div style="color:#2d5c3e;font-size:12px;margin-top:4px;">Filter: ${filterDesc}</div>`:''}
     </div>`;
-  const foot=`<div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:20px;border-top:1px solid #e5e7eb;padding-top:10px;">Farm Management System</div></div>`;
+  const foot=`<div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:20px;border-top:1px solid #e5e7eb;padding-top:10px;">Farm Management System &mdash; ${animals.length||0} record(s) shown</div></div>`;
   let html='';
-  if(type==='animal-register') html=head('Animal Register')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Photo</th><th>Tag No</th><th>Type</th><th>Breed</th><th>Gender</th><th>Stage</th><th>DOB</th><th>Status</th><th>Purchase Amount</th></tr></thead><tbody>`+animals.map(a=>`<tr><td style="text-align:center;">${a.photo?`<img src="${a.photo}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;">`:''}</td><td>${a.tagNo}</td><td>${a.animalType||''}</td><td>${a.breed||''}</td><td>${a.gender||''}</td><td>${a.stage||''}</td><td>${a.dob||''}</td><td>${a.status||''}</td><td>Rs ${Number(a.purchaseAmount||0).toLocaleString()}</td></tr>`).join('')+`</tbody></table>`+foot;
+  if(type==='animal-register') html=head('Animal Register')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Photo</th><th>Tag No</th><th>Type</th><th>Breed</th><th>Gender</th><th>Stage</th><th>DOB</th><th>Status</th><th>Acquisition</th><th>Purchase Amount</th></tr></thead><tbody>`+animals.map(a=>`<tr><td style="text-align:center;">${a.photo?`<img src="${a.photo}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;">`:''}</td><td>${a.tagNo}</td><td>${a.animalType||''}</td><td>${a.breed||''}</td><td>${a.gender||''}</td><td>${a.stage||''}</td><td>${a.dob||''}</td><td>${a.status||''}</td><td>${a.acquisitionType||''}</td><td>Rs ${Number(a.purchaseAmount||0).toLocaleString()}</td></tr>`).join('')+`</tbody></table>`+foot;
   else if(type==='feed-summary') html=head('Feed Stock Summary')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Item</th><th>Category</th><th>Unit</th><th>Opening</th><th>Received</th><th>Issued</th><th>Current</th><th>Reorder</th><th>Status</th></tr></thead><tbody>`+feed.map(f=>{const r=txs.filter(t=>t.itemId===f.id&&t.txType==='Purchase').reduce((s,t)=>s+Number(t.qty||0),0);const i=txs.filter(t=>t.itemId===f.id&&t.txType==='Issue').reduce((s,t)=>s+Number(t.qty||0),0);const c=Number(f.openingStock||0)+r-i;return `<tr style="${c<=Number(f.reorderLevel||0)?'background:#fff5f5':''}"><td>${f.itemName}</td><td>${f.category}</td><td>${f.unit}</td><td>${f.openingStock}</td><td>${r}</td><td>${i}</td><td><b>${c}</b></td><td>${f.reorderLevel}</td><td>${c<=Number(f.reorderLevel||0)?'⚠ LOW':'OK'}</td></tr>`}).join('')+`</tbody></table>`+foot;
   else if(type==='transactions') html=head('Transaction Ledger')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Voucher No</th><th>Item</th><th>Type</th><th>Qty</th><th>Amount</th><th>Narration</th></tr></thead><tbody>`+txs.map(t=>{const item=feed.find(f=>f.id===t.itemId)||{};return `<tr><td>${t.date}</td><td>${t.voucherNo||''}</td><td>${item.itemName||''}</td><td>${t.txType}</td><td>${t.qty} ${item.unit||''}</td><td>Rs ${Number(t.amount||0).toLocaleString()}</td><td>${t.narration||''}</td></tr>`}).join('')+`</tbody></table>`+foot;
   else if(type==='weight-history') html=head('Weight History')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Tag No</th><th>Date</th><th>Weight (kg)</th><th>Remarks</th></tr></thead><tbody>`+weights.sort((a,b)=>a.tagNo.localeCompare(b.tagNo)).map(w=>`<tr><td>${w.tagNo}</td><td>${w.date}</td><td>${w.weight}</td><td>${w.remarks||''}</td></tr>`).join('')+`</tbody></table>`+foot;
