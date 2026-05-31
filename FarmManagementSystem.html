@@ -1870,13 +1870,14 @@ function renderAnimals() {
       if (_anSortCol === 'age') {
         va = a.dob ? getAnimalAgeMonths(a.dob) : -1;
         vb = b.dob ? getAnimalAgeMonths(b.dob) : -1;
+        return _anSortDir === 'asc' ? va - vb : vb - va;
       } else {
-        va = (a[_anSortCol] || '').toString().toLowerCase();
-        vb = (b[_anSortCol] || '').toString().toLowerCase();
+        va = (a[_anSortCol] || '').toString();
+        vb = (b[_anSortCol] || '').toString();
+        // Natural sort handles mixed alphanumeric tags like 2, 5, 26, 110 correctly
+        const cmp = va.localeCompare(vb, undefined, { numeric: true, sensitivity: 'base' });
+        return _anSortDir === 'asc' ? cmp : -cmp;
       }
-      if (va < vb) return _anSortDir === 'asc' ? -1 : 1;
-      if (va > vb) return _anSortDir === 'asc' ? 1 : -1;
-      return 0;
     });
   }
   // Update sort indicators on headers
