@@ -202,6 +202,17 @@
   .inv-case-row.hidden-by-filter { display: none; }
   .inv-region-block.all-hidden { display: none; }
   .inv-region-block { border-bottom: 2px solid #eef2f7; }
+
+  /* ─── COLLAPSIBLE POLICY GROUP HEADERS ───────────────────── */
+  .policy-group-header { cursor: pointer; user-select: none; transition: opacity 0.15s; }
+  .policy-group-header:hover { opacity: 0.88; }
+  .policy-toggle-icon {
+    float: right; font-size: 0.85rem; line-height: 1.4;
+    background: rgba(255,255,255,0.22); border-radius: 4px;
+    padding: 1px 7px; transition: transform 0.2s;
+  }
+  .policy-group-header.collapsed .policy-toggle-icon { transform: rotate(-90deg); }
+  .policy-row-hidden { display: none; }
   .inv-region-block:last-child { border-bottom: none; }
   .inv-region-label {
     background: #f0f4f8; padding: 10px 20px; font-size: 0.78rem;
@@ -2015,9 +2026,10 @@
         </thead>
         <tbody>
           <!-- ═══ ESL / Beaconhouse School System (22 items) ═══ -->
-          <tr style="background:#1e40af;color:#fff;">
+          <tr class="policy-group-header" style="background:#1e40af;color:#fff;" onclick="togglePolicyGroup(this)">
             <td colspan="4" style="padding:8px 12px;font-weight:700;font-size:0.85rem;letter-spacing:0.04em;">
               🏫 ESL – Beaconhouse School System &nbsp;|&nbsp; 22 Revisions &nbsp;·&nbsp; 19 Completed &nbsp;·&nbsp; 3 In Process
+              <span class="policy-toggle-icon">▼</span>
             </td>
           </tr>
           <tr>
@@ -2154,9 +2166,10 @@
           </tr>
 
           <!-- ═══ FHS – Faletti's Heritage Suites (3 items) ═══ -->
-          <tr style="background:#7c3aed;color:#fff;">
+          <tr class="policy-group-header" style="background:#7c3aed;color:#fff;" onclick="togglePolicyGroup(this)">
             <td colspan="4" style="padding:8px 12px;font-weight:700;font-size:0.85rem;letter-spacing:0.04em;">
               🏨 FHS – Faletti's Heritage Suites &nbsp;|&nbsp; 3 Revisions &nbsp;·&nbsp; All Completed
+              <span class="policy-toggle-icon">▼</span>
             </td>
           </tr>
           <tr>
@@ -2179,9 +2192,10 @@
           </tr>
 
           <!-- ═══ BIC – Beaconhouse International College (2 items) ═══ -->
-          <tr style="background:#0f766e;color:#fff;">
+          <tr class="policy-group-header" style="background:#0f766e;color:#fff;" onclick="togglePolicyGroup(this)">
             <td colspan="4" style="padding:8px 12px;font-weight:700;font-size:0.85rem;letter-spacing:0.04em;">
               🎓 BIC – Beaconhouse International College &nbsp;|&nbsp; 2 Revisions &nbsp;·&nbsp; All Completed
+              <span class="policy-toggle-icon">▼</span>
             </td>
           </tr>
           <tr>
@@ -2198,9 +2212,10 @@
           </tr>
 
           <!-- ═══ BT – Beaconhouse Technology (1 item) ═══ -->
-          <tr style="background:#b45309;color:#fff;">
+          <tr class="policy-group-header" style="background:#b45309;color:#fff;" onclick="togglePolicyGroup(this)">
             <td colspan="4" style="padding:8px 12px;font-weight:700;font-size:0.85rem;letter-spacing:0.04em;">
               💻 BT – Beaconhouse Technology &nbsp;|&nbsp; 1 Revision &nbsp;·&nbsp; In Process
+              <span class="policy-toggle-icon">▼</span>
             </td>
           </tr>
           <tr>
@@ -2807,6 +2822,19 @@ function filterInvestigations(type) {
   const matchCount = document.querySelectorAll('.inv-case-row:not(.hidden-by-filter)').length;
   badge.textContent = (labels[type] || type) + ' — ' + matchCount + ' case(s)';
   strip.style.display = 'flex';
+}
+
+function togglePolicyGroup(headerRow) {
+  const tbody  = headerRow.closest('tbody');
+  const rows   = Array.from(tbody.querySelectorAll('tr'));
+  const start  = rows.indexOf(headerRow) + 1;
+  const isOpen = !headerRow.classList.contains('collapsed');
+
+  for (let i = start; i < rows.length; i++) {
+    if (rows[i].querySelector('td[colspan="4"]')) break; // next group header
+    rows[i].classList.toggle('policy-row-hidden', isOpen);
+  }
+  headerRow.classList.toggle('collapsed', isOpen);
 }
 </script>
 </body>
