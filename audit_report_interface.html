@@ -7602,7 +7602,10 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
   <div class="sec">
     <div class="sh">Search Hint</div>
     <textarea id="qinp" rows="3" placeholder="Type keywords e.g: vendor registration not done&#10;attendance not marked&#10;fixed assets untraced"></textarea>
-    <button style="width:100%;margin-top:7px;padding:8px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer" onclick="applyFilter()">&#128269; Search / Filter</button>
+  </div>
+
+  <div style="padding:10px 14px;background:#edf2f8;border-bottom:2px solid var(--gbor)">
+    <button style="width:100%;padding:9px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px" onclick="applyFilter()">&#128269; Search / Filter</button>
   </div>
 
   <div class="sec" style="flex:1">
@@ -7614,7 +7617,10 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
       <button onclick="selAll(true)">Select All</button>
       <button onclick="selAll(false)">Deselect All</button>
     </div>
-    <div id="nores">No observations match your filter/search.</div>
+    <div id="obs-prompt" style="text-align:center;padding:20px 12px;color:var(--gtxt);font-size:12px;line-height:1.6">
+      &#128269; Select a <strong>Type</strong> or <strong>Category</strong> filter,<br>or type keywords in <strong>Search Hint</strong>,<br>then click <strong>Search / Filter</strong>.
+    </div>
+    <div id="nores" style="display:none">No observations match your filter/search.</div>
     <div id="rlist"></div>
   </div>
 
@@ -7744,7 +7750,7 @@ window.onload = function() {
   document.getElementById('qinp').addEventListener('keydown', function(e){
     if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();applyFilter();}
   });
-  applyFilter(); // show all observations on load
+  showPrompt(); // show prompt until user searches
 };
 
 function pad(n){return n<10?'0'+n:n;}
@@ -7768,13 +7774,31 @@ function buildSel(id, arr) {
 }
 
 // ============================================================
-// FILTER / SEARCH  (shows ALL obs on load; narrows with filters)
+// FILTER / SEARCH  (requires active filter before showing obs)
 // ============================================================
+function showPrompt() {
+  var list = document.getElementById('rlist');
+  list.innerHTML = '';
+  document.getElementById('nores').style.display = 'none';
+  document.getElementById('rcount').textContent = '';
+  document.getElementById('selbtns').style.display = 'none';
+  var p = document.getElementById('obs-prompt');
+  if(p) p.style.display = 'block';
+}
+
 function applyFilter() {
   var typeF = document.getElementById('styp').value;
   var catF  = document.getElementById('scat').value;
   var q     = document.getElementById('qinp').value.trim();
   var toks  = q ? tokenize(q) : [];
+
+  // Hide prompt once user searches
+  var p = document.getElementById('obs-prompt');
+  if(p) p.style.display = 'none';
+
+  // Require at least one active filter
+  var hasFilter = typeF!=='All Types' || catF!=='All Categories' || toks.length>0;
+  if(!hasFilter){showPrompt();return;}
 
   var res = [];
   for(var i=0;i<DB.observations.length;i++){
@@ -7796,6 +7820,7 @@ function applyFilter() {
 function renderList(obs, toks, showScore) {
   var list = document.getElementById('rlist');
   list.innerHTML = '';
+  var pr = document.getElementById('obs-prompt'); if(pr) pr.style.display = 'none';
   document.getElementById('nores').style.display = obs.length ? 'none' : 'block';
   document.getElementById('rcount').textContent = '(' + obs.length + ' observations)';
   document.getElementById('selbtns').style.display = obs.length ? 'flex' : 'none';
@@ -8356,7 +8381,8 @@ function doClear(){
   document.getElementById('scat').value='All Categories';
   document.getElementById('rpcont').style.display='none';
   document.getElementById('rpempty').style.display='block';
-  applyFilter();
+  document.getElementById('qinp').value='';
+  showPrompt();
   toast('Cleared.');
 }
 
