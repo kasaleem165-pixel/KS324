@@ -41,6 +41,10 @@
   select.form-control { background:#fff; }
   table { width:100%;border-collapse:collapse; }
   th { background:#f9fafb;padding:10px 12px;text-align:left;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:2px solid #e5e7eb; }
+  th.sortable { cursor:pointer;user-select:none; }
+  th.sortable:hover { background:#e9f5ec;color:#1a3a2a; }
+  th.sort-asc::after { content:' ▲';font-size:10px;color:#2d5c3e; }
+  th.sort-desc::after { content:' ▼';font-size:10px;color:#2d5c3e; }
   td { padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6; }
   tr:hover > td { background:#f9fafb; }
   .expand-row td { background:#f0fdf4!important;padding:16px 20px; }
@@ -159,8 +163,15 @@
   <div class="card">
     <div style="overflow-x:auto;"><table id="animalTable">
       <thead><tr>
-        <th></th><th style="width:44px;"></th><th>Tag No</th><th>Type</th><th>Breed</th><th>Gender</th>
-        <th>Stage</th><th>Age</th><th>Status</th><th>Actions</th>
+        <th></th><th style="width:44px;"></th>
+        <th class="sortable" id="sth_tagNo" onclick="sortAnimals('tagNo')">Tag No</th>
+        <th class="sortable" id="sth_animalType" onclick="sortAnimals('animalType')">Type</th>
+        <th class="sortable" id="sth_breed" onclick="sortAnimals('breed')">Breed</th>
+        <th class="sortable" id="sth_gender" onclick="sortAnimals('gender')">Gender</th>
+        <th class="sortable" id="sth_stage" onclick="sortAnimals('stage')">Stage</th>
+        <th class="sortable" id="sth_age" onclick="sortAnimals('age')">Age</th>
+        <th class="sortable" id="sth_status" onclick="sortAnimals('status')">Status</th>
+        <th>Actions</th>
       </tr></thead>
       <tbody id="animalTbody"></tbody>
     </table></div>
@@ -468,7 +479,7 @@
       <select class="form-control" id="anBreed"><option value="">Select Breed</option></select>
     </div>
     <div class="form-group"><label>Gender *</label>
-      <select class="form-control" id="anGender" onchange="updateStageOptions()">
+      <select class="form-control" id="anGender" onchange="updateStageOptions();updateAnimalGenderFields()">
         <option value="">Select Gender</option><option>Female</option><option>Male</option>
       </select>
     </div>
@@ -494,8 +505,8 @@
       <div class="lbl-row"><label>Status</label><span class="manage-link" onclick="openQuickManage('animalStatuses','anStatus',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
       <select class="form-control" id="anStatus"></select>
     </div>
-    <div class="form-group"><label>Pregnancy Date</label><input type="date" class="form-control" id="anPregnancyDate"></div>
-    <div class="form-group"><label>Lactation No</label><input type="number" class="form-control" id="anLactationNo" min="0" placeholder="0"></div>
+    <div class="form-group" id="anFieldPregnancy"><label>Pregnancy Date</label><input type="date" class="form-control" id="anPregnancyDate"></div>
+    <div class="form-group" id="anFieldLactation"><label>Lactation No</label><input type="number" class="form-control" id="anLactationNo" min="0" placeholder="0"></div>
     <div class="form-group"><label>Purchase / Entry Date</label><input type="date" class="form-control" id="anPurchaseDate"></div>
     <div class="form-group"><label>Purchase Amount (Rs)</label><input type="number" class="form-control" id="anPurchaseAmount" placeholder="0"></div>
     <div class="form-group"><label>Voucher No</label><input class="form-control" id="anVoucherNo"></div>
@@ -890,39 +901,41 @@
     <div style="font-size:16px;font-weight:700;"><i class="fas fa-filter" style="color:#2d5c3e;margin-right:8px;"></i>Animal Register — Filter Report</div>
     <button onclick="closeModal('animalReportFilterModal')" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>
   </div>
-  <div style="font-size:12px;color:#6b7280;margin-bottom:14px;">Leave a filter blank to include all values.</div>
+  <div style="font-size:12px;color:#6b7280;margin-bottom:14px;">Leave a filter blank to include all values. Each dropdown updates based on selections above it.</div>
   <div class="grid-2">
     <div class="form-group">
       <label>Animal Type</label>
-      <select class="form-control" id="arfType"><option value="">All Types</option></select>
+      <select class="form-control" id="arfType" onchange="arfCascade()"><option value="">All Types</option></select>
     </div>
     <div class="form-group">
       <label>Gender</label>
-      <select class="form-control" id="arfGender">
+      <select class="form-control" id="arfGender" onchange="arfCascade()">
         <option value="">All Genders</option>
-        <option>Male</option>
         <option>Female</option>
+        <option>Male</option>
       </select>
     </div>
     <div class="form-group">
       <label>Stage</label>
-      <select class="form-control" id="arfStage"><option value="">All Stages</option></select>
+      <select class="form-control" id="arfStage" onchange="arfCascade()"><option value="">All Stages</option></select>
     </div>
     <div class="form-group">
       <label>Breed</label>
-      <select class="form-control" id="arfBreed"><option value="">All Breeds</option></select>
+      <select class="form-control" id="arfBreed" onchange="arfCascade()"><option value="">All Breeds</option></select>
     </div>
     <div class="form-group">
       <label>Status</label>
-      <select class="form-control" id="arfStatus"><option value="">All Statuses</option></select>
+      <select class="form-control" id="arfStatus" onchange="arfCascade()"><option value="">All Statuses</option></select>
     </div>
     <div class="form-group">
       <label>Acquisition Type</label>
       <select class="form-control" id="arfAcqType"><option value="">All Acquisition Types</option></select>
     </div>
   </div>
+  <div style="font-size:13px;color:#2d5c3e;font-weight:600;margin-bottom:10px;" id="arfMatchCount"></div>
   <div style="display:flex;gap:10px;margin-top:8px;">
     <button class="btn-primary" onclick="generateAnimalReport()"><i class="fas fa-print"></i> Generate Report</button>
+    <button style="background:#f3f4f6;border:1.5px solid #d1d5db;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;" onclick="arfReset()"><i class="fas fa-times"></i> Reset</button>
     <button class="btn-danger" onclick="closeModal('animalReportFilterModal')">Cancel</button>
   </div>
 </div>
@@ -1760,6 +1773,7 @@ function openAnimalModal(id) {
   document.getElementById('animalModalTitle').textContent='Add Animal';
   document.getElementById('stageSuggestion').style.display='none';
   _anPhotoData = null; setPhotoPreview(null); document.getElementById('anPhoto').value='';
+  updateAnimalGenderFields();
   if(id) {
     const a=dbFind('animals',id); if(!a) return;
     document.getElementById('animalModalTitle').textContent='Edit Animal';
@@ -1767,7 +1781,7 @@ function openAnimalModal(id) {
     document.getElementById('anTagNo').value=a.tagNo||'';
     document.getElementById('anType').value=a.animalType||''; updateBreedOptions();
     document.getElementById('anBreed').value=a.breed||'';
-    document.getElementById('anGender').value=a.gender||''; updateStageOptions();
+    document.getElementById('anGender').value=a.gender||''; updateStageOptions(); updateAnimalGenderFields();
     document.getElementById('anStage').value=a.stage||'';
     document.getElementById('anDOB').value=a.dob||'';
     document.getElementById('anAcqType').value=a.acqType||'Purchased';
@@ -1815,6 +1829,29 @@ function saveAnimal() {
   closeModal('animalModal'); renderAnimals();
 }
 
+// ---- Animal table sort state ----
+let _anSortCol = null;
+let _anSortDir = 'asc';
+
+function sortAnimals(col) {
+  if (_anSortCol === col) {
+    _anSortDir = _anSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    _anSortCol = col;
+    _anSortDir = 'asc';
+  }
+  renderAnimals();
+}
+
+function updateAnimalGenderFields() {
+  const gender = (document.getElementById('anGender')||{}).value;
+  const isFemale = gender === 'Female';
+  const preg = document.getElementById('anFieldPregnancy');
+  const lact = document.getElementById('anFieldLactation');
+  if (preg) preg.style.display = (gender === '' || isFemale) ? '' : 'none';
+  if (lact) lact.style.display = (gender === '' || isFemale) ? '' : 'none';
+}
+
 function renderAnimals() {
   let list=dbGet('animals');
   const search=(document.getElementById('animalSearch')||{}).value||'';
@@ -1825,6 +1862,31 @@ function renderAnimals() {
   if(fType) list=list.filter(a=>a.animalType===fType);
   if(fStage) list=list.filter(a=>a.stage===fStage);
   if(fStatus) list=list.filter(a=>a.status===fStatus);
+
+  // Apply column sort
+  if (_anSortCol) {
+    list = list.slice().sort((a, b) => {
+      let va, vb;
+      if (_anSortCol === 'age') {
+        va = a.dob ? getAnimalAgeMonths(a.dob) : -1;
+        vb = b.dob ? getAnimalAgeMonths(b.dob) : -1;
+      } else {
+        va = (a[_anSortCol] || '').toString().toLowerCase();
+        vb = (b[_anSortCol] || '').toString().toLowerCase();
+      }
+      if (va < vb) return _anSortDir === 'asc' ? -1 : 1;
+      if (va > vb) return _anSortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+  // Update sort indicators on headers
+  ['tagNo','animalType','breed','gender','stage','age','status'].forEach(c => {
+    const th = document.getElementById('sth_' + c);
+    if (!th) return;
+    th.classList.remove('sort-asc','sort-desc');
+    if (_anSortCol === c) th.classList.add(_anSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+  });
+
   const tbody=document.getElementById('animalTbody');
   if(!list.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:30px;">No animals found.</td></tr>';return;}
   tbody.innerHTML=list.map(a=>{
@@ -1850,7 +1912,7 @@ function renderAnimals() {
         <div style="flex:1;min-width:260px;">
           <div class="grid-3" style="gap:10px;">
             <div><b>Acquisition:</b> ${a.acqType||'—'}<br><b>Source:</b> ${a.source||'—'}<br><b>Purchase Date:</b> ${a.purchaseDate||'—'}<br><b>Voucher No:</b> ${a.voucherNo||'—'} <b>Date:</b> ${a.voucherDate||'—'}<br><b>Amount:</b> Rs ${Number(a.purchaseAmount||0).toLocaleString()}<br><b>Initial Weight:</b> ${a.initialWeight||'—'} kg</div>
-            <div><b>Pregnancy Date:</b> ${a.pregnancyDate||'—'}<br><b>Lactation No:</b> ${a.lactationNo||'—'}<br><b>Mother ID:</b> ${a.motherId||'—'}<br><b>DOB:</b> ${a.dob||'—'}</div>
+            <div>${a.gender==='Female'?`<b>Pregnancy Date:</b> ${a.pregnancyDate||'—'}<br><b>Lactation No:</b> ${a.lactationNo||'—'}<br>`:''}${a.gender==='Male'?`<b>Purpose:</b> ${a.stage||'—'}<br>`:''}  <b>Mother ID:</b> ${a.motherId||'—'}<br><b>DOB:</b> ${a.dob||'—'}</div>
             <div><b>Medical:</b> ${a.medicalHistory||'—'}<br><b>Remarks:</b> ${a.remarks||'—'}<br><b>Deferred Until:</b> ${a.deferredUntil||'Not deferred'}</div>
           </div>
         </div>
@@ -2158,26 +2220,69 @@ function deleteTransitionRule(id){confirm2('Delete Rule','Delete this transition
 // REPORTS
 // ============================================================
 function openAnimalReportFilter() {
+  // Populate Type from lookups (always full list)
   const lk = getLookups();
-  // Populate Type
   const typeEl = document.getElementById('arfType');
   typeEl.innerHTML = '<option value="">All Types</option>' + (lk.animalTypes||[]).map(t=>`<option>${t}</option>`).join('');
-  // Populate Stage (all stages across all types)
-  const stageEl = document.getElementById('arfStage');
-  stageEl.innerHTML = '<option value="">All Stages</option>' + getAllStages().map(s=>`<option>${s}</option>`).join('');
-  // Populate Breed (all breeds flattened)
-  const breedEl = document.getElementById('arfBreed');
-  const allBreeds = [];
-  Object.values(lk.breeds||{}).forEach(arr => arr.forEach(b => { if(!allBreeds.includes(b)) allBreeds.push(b); }));
-  allBreeds.sort();
-  breedEl.innerHTML = '<option value="">All Breeds</option>' + allBreeds.map(b=>`<option>${b}</option>`).join('');
-  // Populate Status
-  const statusEl = document.getElementById('arfStatus');
-  statusEl.innerHTML = '<option value="">All Statuses</option>' + (lk.animalStatuses||[]).map(s=>`<option>${s}</option>`).join('');
-  // Populate Acquisition Type
-  const acqEl = document.getElementById('arfAcqType');
-  acqEl.innerHTML = '<option value="">All Acquisition Types</option>' + (lk.acquisitionTypes||[]).map(a=>`<option>${a}</option>`).join('');
+  // Reset all other filters then cascade-populate
+  ['arfType','arfGender','arfStage','arfBreed','arfStatus','arfAcqType'].forEach(id => { document.getElementById(id).value = ''; });
+  arfCascade();
   openModal('animalReportFilterModal');
+}
+
+function arfReset() {
+  ['arfType','arfGender','arfStage','arfBreed','arfStatus','arfAcqType'].forEach(id => { document.getElementById(id).value = ''; });
+  arfCascade();
+}
+
+function arfCascade() {
+  const lk = getLookups();
+  const selVal = id => document.getElementById(id).value;
+  const setOpts = (id, values, allLabel, keepVal) => {
+    const el = document.getElementById(id);
+    const prev = keepVal !== undefined ? keepVal : el.value;
+    el.innerHTML = `<option value="">${allLabel}</option>` + values.map(v=>`<option${v===prev?' selected':''}>${v}</option>`).join('');
+  };
+
+  // Type: full list always
+  const typeEl = document.getElementById('arfType');
+  const prevType = typeEl.value;
+  typeEl.innerHTML = '<option value="">All Types</option>' + (lk.animalTypes||[]).map(t=>`<option${t===prevType?' selected':''}>${t}</option>`).join('');
+
+  // Start filtering from full animals list
+  let pool = dbGet('animals');
+  const type = selVal('arfType');
+  if (type) pool = pool.filter(a => a.animalType === type);
+
+  // Gender: static options, apply filter
+  const gender = selVal('arfGender');
+  if (gender) pool = pool.filter(a => a.gender === gender);
+
+  // Stage: derived from type+gender pool
+  const stages = [...new Set(pool.map(a=>a.stage).filter(Boolean))].sort();
+  setOpts('arfStage', stages, 'All Stages');
+  const stage = selVal('arfStage');
+  if (stage) pool = pool.filter(a => a.stage === stage);
+
+  // Breed: derived from type+gender+stage pool
+  const breeds = [...new Set(pool.map(a=>a.breed).filter(Boolean))].sort();
+  setOpts('arfBreed', breeds, 'All Breeds');
+  const breed = selVal('arfBreed');
+  if (breed) pool = pool.filter(a => a.breed === breed);
+
+  // Status: derived from above pool
+  const statuses = [...new Set(pool.map(a=>a.status).filter(Boolean))].sort();
+  setOpts('arfStatus', statuses, 'All Statuses');
+  const status = selVal('arfStatus');
+  if (status) pool = pool.filter(a => a.status === status);
+
+  // Acquisition Type: derived from above pool
+  const acqTypes = [...new Set(pool.map(a=>a.acqType||a.acquisitionType).filter(Boolean))].sort();
+  setOpts('arfAcqType', acqTypes, 'All Acquisition Types');
+
+  // Show match count
+  const countEl = document.getElementById('arfMatchCount');
+  if (countEl) countEl.textContent = `${pool.length} animal(s) match current filters`;
 }
 
 function generateAnimalReport() {
@@ -2194,7 +2299,7 @@ function generateAnimalReport() {
   if(stage)   animals = animals.filter(a => a.stage === stage);
   if(breed)   animals = animals.filter(a => a.breed === breed);
   if(status)  animals = animals.filter(a => a.status === status);
-  if(acqType) animals = animals.filter(a => a.acquisitionType === acqType);
+  if(acqType) animals = animals.filter(a => (a.acqType||a.acquisitionType) === acqType);
 
   // Build human-readable filter description
   const parts = [];
@@ -2223,7 +2328,7 @@ function printReport(type, customAnimals, filterDesc){
     </div>`;
   const foot=`<div style="text-align:center;color:#9ca3af;font-size:11px;margin-top:20px;border-top:1px solid #e5e7eb;padding-top:10px;">Farm Management System &mdash; ${animals.length||0} record(s) shown</div></div>`;
   let html='';
-  if(type==='animal-register') html=head('Animal Register')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Photo</th><th>Tag No</th><th>Type</th><th>Breed</th><th>Gender</th><th>Stage</th><th>DOB</th><th>Status</th><th>Acquisition</th><th>Purchase Amount</th></tr></thead><tbody>`+animals.map(a=>`<tr><td style="text-align:center;">${a.photo?`<img src="${a.photo}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;">`:''}</td><td>${a.tagNo}</td><td>${a.animalType||''}</td><td>${a.breed||''}</td><td>${a.gender||''}</td><td>${a.stage||''}</td><td>${a.dob||''}</td><td>${a.status||''}</td><td>${a.acquisitionType||''}</td><td>Rs ${Number(a.purchaseAmount||0).toLocaleString()}</td></tr>`).join('')+`</tbody></table>`+foot;
+  if(type==='animal-register') html=head('Animal Register')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Photo</th><th>Tag No</th><th>Type</th><th>Breed</th><th>Gender</th><th>Stage</th><th>DOB</th><th>Status</th><th>Acquisition</th><th>Purchase Amount</th></tr></thead><tbody>`+animals.map(a=>`<tr><td style="text-align:center;">${a.photo?`<img src="${a.photo}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;">`:''}</td><td>${a.tagNo}</td><td>${a.animalType||''}</td><td>${a.breed||''}</td><td>${a.gender||''}</td><td>${a.stage||''}</td><td>${a.dob||''}</td><td>${a.status||''}</td><td>${a.acqType||a.acquisitionType||''}</td><td>Rs ${Number(a.purchaseAmount||0).toLocaleString()}</td></tr>`).join('')+`</tbody></table>`+foot;
   else if(type==='feed-summary') html=head('Feed Stock Summary')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Item</th><th>Category</th><th>Unit</th><th>Opening</th><th>Received</th><th>Issued</th><th>Current</th><th>Reorder</th><th>Status</th></tr></thead><tbody>`+feed.map(f=>{const r=txs.filter(t=>t.itemId===f.id&&t.txType==='Purchase').reduce((s,t)=>s+Number(t.qty||0),0);const i=txs.filter(t=>t.itemId===f.id&&t.txType==='Issue').reduce((s,t)=>s+Number(t.qty||0),0);const c=Number(f.openingStock||0)+r-i;return `<tr style="${c<=Number(f.reorderLevel||0)?'background:#fff5f5':''}"><td>${f.itemName}</td><td>${f.category}</td><td>${f.unit}</td><td>${f.openingStock}</td><td>${r}</td><td>${i}</td><td><b>${c}</b></td><td>${f.reorderLevel}</td><td>${c<=Number(f.reorderLevel||0)?'⚠ LOW':'OK'}</td></tr>`}).join('')+`</tbody></table>`+foot;
   else if(type==='transactions') html=head('Transaction Ledger')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Voucher No</th><th>Item</th><th>Type</th><th>Qty</th><th>Amount</th><th>Narration</th></tr></thead><tbody>`+txs.map(t=>{const item=feed.find(f=>f.id===t.itemId)||{};return `<tr><td>${t.date}</td><td>${t.voucherNo||''}</td><td>${item.itemName||''}</td><td>${t.txType}</td><td>${t.qty} ${item.unit||''}</td><td>Rs ${Number(t.amount||0).toLocaleString()}</td><td>${t.narration||''}</td></tr>`}).join('')+`</tbody></table>`+foot;
   else if(type==='weight-history') html=head('Weight History')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Tag No</th><th>Date</th><th>Weight (kg)</th><th>Remarks</th></tr></thead><tbody>`+weights.sort((a,b)=>a.tagNo.localeCompare(b.tagNo)).map(w=>`<tr><td>${w.tagNo}</td><td>${w.date}</td><td>${w.weight}</td><td>${w.remarks||''}</td></tr>`).join('')+`</tbody></table>`+foot;
