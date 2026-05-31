@@ -2783,22 +2783,12 @@ function filterInvestigations(type) {
   tiles.forEach(t => t.classList.remove('active-filter'));
 
   if (!type) {
-    // Reset — show everything
+    // Reset — show everything, keep regions in their current collapse state
     rows.forEach(r => r.classList.remove('hidden-by-filter'));
     blocks.forEach(b => b.classList.remove('all-hidden'));
     strip.style.display = 'none';
     return;
   }
-
-  // Expand all collapsed region blocks so filtered rows are visible
-  blocks.forEach(function(b) {
-    if (b.classList.contains('region-collapsed')) {
-      b.querySelectorAll('.inv-case-row').forEach(r => r.classList.remove('region-row-hidden'));
-      b.classList.remove('region-collapsed');
-      const icon = b.querySelector('.region-toggle-icon');
-      if (icon) icon.textContent = '▼';
-    }
-  });
 
   // Mark active tile
   tiles.forEach(t => {
@@ -2807,24 +2797,16 @@ function filterInvestigations(type) {
     }
   });
 
-  // Filter case rows
+  // Filter case rows (regions stay in their collapsed/expanded state — user controls that)
   rows.forEach(row => {
     const hasType = row.querySelector('.out-chip.' + type);
-    if (hasType) {
-      row.classList.remove('hidden-by-filter');
-    } else {
-      row.classList.add('hidden-by-filter');
-    }
+    row.classList.toggle('hidden-by-filter', !hasType);
   });
 
-  // Hide region blocks where all rows are hidden
+  // Hide entire region blocks that have zero matching cases; reveal those that do
   blocks.forEach(block => {
-    const visible = block.querySelectorAll('.inv-case-row:not(.hidden-by-filter)');
-    if (visible.length === 0) {
-      block.classList.add('all-hidden');
-    } else {
-      block.classList.remove('all-hidden');
-    }
+    const matchCount = block.querySelectorAll('.inv-case-row:not(.hidden-by-filter)').length;
+    block.classList.toggle('all-hidden', matchCount === 0);
   });
 
   // Show filter strip with active badge
@@ -2838,7 +2820,7 @@ function filterInvestigations(type) {
     transfer: '🔄 Transfer'
   };
   const matchCount = document.querySelectorAll('.inv-case-row:not(.hidden-by-filter)').length;
-  badge.textContent = (labels[type] || type) + ' — ' + matchCount + ' case(s)';
+  badge.textContent = (labels[type] || type) + ' — ' + matchCount + ' case(s) · expand a region below to view';
   strip.style.display = 'flex';
 }
 
