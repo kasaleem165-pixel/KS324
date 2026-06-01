@@ -7671,7 +7671,7 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
     <button style="width:100%;margin-top:8px;padding:7px;background:var(--navy);color:#fff;border:none;border-radius:4px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer" onclick="addAnnex()">&#10133; Add Annexure</button>
   </div>
 
-  <button id="genbtn" onclick="renderRpt()">&#9889; Generate / Refresh Report</button>
+  <button id="genbtn" onclick="confirmAndGenerate()">&#9889; Generate / Refresh Report</button>
 </div>
 
 <!-- RIGHT PANEL -->
@@ -7762,6 +7762,20 @@ window.onload = function() {
   document.getElementById('qinp').addEventListener('keydown', function(e){
     if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();applyFilter();}
   });
+  // Apply persisted observation text overrides to in-memory DB
+  var stored=sg('bhs_obs_overrides',{});
+  var okeys=Object.keys(stored);
+  for(var oi=0;oi<okeys.length;oi++){
+    var oid=okeys[oi];
+    var ov=stored[oid];
+    for(var di=0;di<DB.observations.length;di++){
+      if(DB.observations[di].id===oid){
+        if(ov.observation!=null) DB.observations[di].observation=ov.observation;
+        if(ov.recommendation!=null) DB.observations[di].recommendation=ov.recommendation;
+        break;
+      }
+    }
+  }
   showPrompt(); // show prompt until user searches
 };
 
@@ -7913,15 +7927,20 @@ function renderList(obs, toks, showScore) {
 function cbChg(e, id) {
   e.stopPropagation();
   var checked = e.target.checked;
+  // Track pending change — reverse checkbox visually, store as pending
+  e.target.checked = !checked; // revert until confirmed at Generate
   var title = '';
   for(var i=0;i<DB.observations.length;i++){if(DB.observations[i].id===id){title=DB.observations[i].title;break;}}
   if(!title) for(var ci=0;ci<customs.length;ci++){if(customs[ci].id===id){title=customs[ci].title;break;}}
-  var msg = checked
-    ? 'Add observation to report?\n\n"' + title + '"'
-    : 'Remove observation from report?\n\n"' + title + '"';
-  if(!confirm(msg)){ e.target.checked = !checked; return; }
-  var div = document.getElementById('ri-'+id);
-  handleSel(id, checked, div);
+  // pendingSel: {id: {checked, title}}
+  if(!window.pendingSel) window.pendingSel={};
+  if(window.pendingSel[id] && window.pendingSel[id].checked===checked){
+    // toggled back to original — cancel pending
+    delete window.pendingSel[id];
+  } else {
+    window.pendingSel[id]={checked:checked, title:title};
+  }
+  updateGenBtn();
 }
 
 function handleSel(id, checked, div) {
@@ -8182,6 +8201,105 @@ function getHdrVals(){
     per     : fmtRange(document.getElementById('rper_from').value, document.getElementById('rper_to').value)
   };
 }
+
+// ============================================================
+// PENDING SELECTION & GENERATE CONFIRM
+// ============================================================
+window.pendingSel = {};
+
+function updateGenBtn(){
+  var btn = document.getElementById('genbtn');
+  if(!btn) return;
+  var ids = Object.keys(window.pendingSel);
+  if(ids.length){
+    var adds=0,rems=0;
+    for(var i=0;i<ids.length;i++){ if(window.pendingSel[ids[i]].checked) adds++; else rems++; }
+    var parts=[];
+    if(adds) parts.push(adds+' addition'+(adds>1?'s':''));
+    if(rems) parts.push(rems+' removal'+(rems>1?'s':''));
+    btn.textContent = '⚡ Generate Report — '+parts.join(', ')+' pending';
+    btn.style.background='#c07000';
+  } else {
+    btn.textContent = '⚡ Generate / Refresh Report';
+    btn.style.background='';
+  }
+}
+
+function confirmAndGenerate(){
+  var ids = Object.keys(window.pendingSel);
+  if(!ids.length){ renderRpt(); return; }
+
+  // Build summary message
+  var addList=[], remList=[];
+  for(var i=0;i<ids.length;i++){
+    var p=window.pendingSel[ids[i]];
+    if(p.checked) addList.push(p.title); else remList.push(p.title);
+  }
+  var msg='Apply the following changes to the report?\n\n';
+  if(addList.length){
+    msg+='ADD ('+addList.length+'):\n';
+    for(var a=0;a<addList.length;a++) msg+='  + '+addList[a]+'\n';
+    msg+='\n';
+  }
+  if(remList.length){
+    msg+='REMOVE ('+remList.length+'):\n';
+    for(var r=0;r<remList.length;r++) msg+='  − '+remList[r]+'\n';
+  }
+  if(!confirm(msg)) return;
+
+  // Apply all pending changes
+  for(var j=0;j<ids.length;j++){
+    var id=ids[j];
+    var chk=window.pendingSel[id].checked;
+    // Update checkbox visually
+    var cb=document.getElementById('cb-'+id);
+    if(cb) cb.checked=chk;
+    var div=document.getElementById('ri-'+id);
+    handleSel(id,chk,div);
+  }
+  window.pendingSel={};
+  updateGenBtn();
+
+  // Flush obsEdits back into DB (in-memory + localStorage)
+  flushObsEditsToDb();
+
+  renderRpt();
+}
+
+function flushObsEditsToDb(){
+  var editIds=Object.keys(obsEdits);
+  if(!editIds.length) return;
+  // Load persisted overrides or start fresh
+  var stored=sg('bhs_obs_overrides',{});
+  for(var i=0;i<editIds.length;i++){
+    var id=editIds[i];
+    var ed=obsEdits[id];
+    // Update in-memory DB
+    for(var j=0;j<DB.observations.length;j++){
+      if(DB.observations[j].id===id){
+        if(ed.observation!=null) DB.observations[j].observation=ed.observation;
+        if(ed.recommendation!=null) DB.observations[j].recommendation=ed.recommendation;
+        break;
+      }
+    }
+    // Update customs
+    for(var ci=0;ci<customs.length;ci++){
+      if(customs[ci].id===id){
+        if(ed.observation!=null) customs[ci].observation=ed.observation;
+        if(ed.recommendation!=null) customs[ci].recommendation=ed.recommendation;
+        break;
+      }
+    }
+    // Persist override
+    if(!stored[id]) stored[id]={};
+    if(ed.observation!=null) stored[id].observation=ed.observation;
+    if(ed.recommendation!=null) stored[id].recommendation=ed.recommendation;
+  }
+  ss('bhs_obs_overrides', stored);
+  // Clear obsEdits since edits are now the DB baseline
+  obsEdits={};
+}
+
 function renderRpt(){
   var H=getHdrVals();
   var brcode=H.brcode, brname=H.brname, brregion=H.brregion, brautype=H.brautype,
