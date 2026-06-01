@@ -104,6 +104,7 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 .misg strong{color:var(--navy)}
 .catg{margin-bottom:24px}
 .cattl{font-family:'Merriweather',serif;font-size:12px;font-weight:700;color:var(--navy);background:#edf2f8;border-left:4px solid var(--navy);padding:7px 12px;margin-bottom:10px;border-radius:0 4px 4px 0;text-transform:uppercase;letter-spacing:.4px}
+.sectitle{font-family:'Merriweather',serif;font-size:14px;font-weight:700;color:#fff;background:var(--navy);padding:10px 16px;margin-bottom:16px;border-radius:4px;letter-spacing:.3px}
 .oc{border:1px solid var(--gbor);border-left-width:4px;border-radius:5px;margin-bottom:12px;overflow:hidden}
 .oc.repeated{border-left-color:var(--orange)}.oc.new{border-left-color:var(--bluenew)}
 .och{display:flex;align-items:center;padding:8px 12px;background:#fafbfc;border-bottom:1px solid var(--gbor);gap:7px}
@@ -8167,12 +8168,26 @@ function renderRpt(){
   if(!all.length && !hasHeader){empty.style.display='block';cont.style.display='none';return;}
   empty.style.display='none'; cont.style.display='block';
 
-  // Group by category
-  var cats={}; var catOrder=[];
+  // Group by section (Repeated first, then New), then by category within each section
+  var sections = [
+    {key:'repeated', label:'1. Repeated Observations (Un-Resolved)', obs:[]},
+    {key:'new',      label:'2. New Observations',                    obs:[]}
+  ];
   for(var a=0;a<all.length;a++){
-    var c=all[a].category||'Others';
-    if(!cats[c]){cats[c]=[];catOrder.push(c);}
-    cats[c].push(all[a]);
+    var effT=(obsTypeMap[all[a].id]||all[a].type||'New').toLowerCase();
+    if(effT==='repeated') sections[0].obs.push(all[a]);
+    else sections[1].obs.push(all[a]);
+  }
+
+  // Build category sub-groups within each section
+  function buildCatGroups(obsList){
+    var cats={}; var catOrder=[];
+    for(var i=0;i<obsList.length;i++){
+      var c=obsList[i].category||'Others';
+      if(!cats[c]){cats[c]=[];catOrder.push(c);}
+      cats[c].push(obsList[i]);
+    }
+    return {cats:cats,catOrder:catOrder};
   }
 
   var h='';
@@ -8208,13 +8223,17 @@ function renderRpt(){
   }
 
   var num=0;
-  for(var ci=0;ci<catOrder.length;ci++){
-    var cat=catOrder[ci];
-    h+='<div class="catg"><div class="cattl">'+esc(cat)+'</div>';
-    var obs=cats[cat];
-    for(var oi=0;oi<obs.length;oi++){
-      num++;
-      var o=obs[oi];
+  for(var si=0;si<sections.length;si++){
+    if(!sections[si].obs.length) continue;
+    h+='<div class="sectitle">'+esc(sections[si].label)+'</div>';
+    var grp=buildCatGroups(sections[si].obs);
+    for(var ci=0;ci<grp.catOrder.length;ci++){
+      var cat=grp.catOrder[ci];
+      h+='<div class="catg"><div class="cattl">'+esc(cat)+'</div>';
+      var obs=grp.cats[cat];
+      for(var oi=0;oi<obs.length;oi++){
+        num++;
+        var o=obs[oi];
       var effType=obsTypeMap[o.id]||o.type||'New';
       var tc=effType.toLowerCase();
       var ax=annexMap[o.id]||o._annex||'';
@@ -8284,14 +8303,17 @@ function renderRpt(){
         h+='<div class="oax"><strong>Annexure Ref:</strong> <span style="color:var(--navy);font-weight:600">'+esc(lnkLabels)+'</span></div>';
       }
       h+='</div></div>';
+      }
+      h+='</div>';
     }
-    h+='</div>';
   }
 
-  // Build obsNumMap for annexure back-references
+  // Build obsNumMap for annexure back-references (sequential across all sections)
   var obsNumMap={};
   var n2=0;
-  for(var ci2=0;ci2<catOrder.length;ci2++){var ob2=cats[catOrder[ci2]];for(var oi2=0;oi2<ob2.length;oi2++){n2++;obsNumMap[ob2[oi2].id]=n2;}}
+  for(var si2=0;si2<sections.length;si2++){
+    for(var oi2=0;oi2<sections[si2].obs.length;oi2++){n2++;obsNumMap[sections[si2].obs[oi2].id]=n2;}
+  }
   h+=buildAnnexHtml(false,obsNumMap);
   cont.innerHTML=h;
 }
@@ -8471,11 +8493,16 @@ function downloadSoftCopy(){
   var avMode=document.querySelector('input[name="avmode"]:checked');
   var avVal=avMode?avMode.value:'auto';
 
-  // Group by category
-  var cats={}; var catOrder=[];
+  // Group by section then category
+  var scSections=[
+    {key:'repeated',label:'1. Repeated Observations (Un-Resolved)',obs:[]},
+    {key:'new',     label:'2. New Observations',                   obs:[]}
+  ];
   for(var a=0;a<all.length;a++){
-    var c=all[a].category||'Others'; if(!cats[c]){cats[c]=[];catOrder.push(c);} cats[c].push(all[a]);
+    var effTsc=(obsTypeMap[all[a].id]||all[a].type||'New').toLowerCase();
+    if(effTsc==='repeated') scSections[0].obs.push(all[a]); else scSections[1].obs.push(all[a]);
   }
+  function scCatGroups(obsList){var cats={};var catOrder=[];for(var i=0;i<obsList.length;i++){var c=obsList[i].category||'Others';if(!cats[c]){cats[c]=[];catOrder.push(c);}cats[c].push(obsList[i]);}return{cats:cats,catOrder:catOrder};}
 
   var fname='AuditReport'+(H.brcode?'_'+H.brcode:'')+(H.brname?'_'+H.brname.replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_'):'')+'_AuditeeResponse.html';
 
@@ -8516,16 +8543,23 @@ function downloadSoftCopy(){
     return h;
   }
 
-  // Build observation sections
+  // Build observation sections (Repeated first, then New)
   var obsSection='';
   var num=0;
-  for(var ci=0;ci<catOrder.length;ci++){
-    var cat=catOrder[ci];
-    obsSection+='<div style="margin-bottom:24px">';
-    obsSection+='<div style="font-family:Merriweather,serif;font-size:12px;font-weight:700;color:#1a3a5c;background:#edf2f8;border-left:4px solid #1a3a5c;padding:7px 12px;margin-bottom:10px;border-radius:0 4px 4px 0;text-transform:uppercase;letter-spacing:.4px">'+esc(cat)+'</div>';
-    var obsList=cats[cat];
-    for(var oi=0;oi<obsList.length;oi++){num++;obsSection+=obsHtml(obsList[oi],num);}
-    obsSection+='</div>';
+  var sectHd='font-family:Merriweather,serif;font-size:14px;font-weight:700;color:#fff;background:#1a3a5c;padding:10px 16px;margin-bottom:16px;border-radius:4px;letter-spacing:.3px';
+  var catHd='font-family:Merriweather,serif;font-size:12px;font-weight:700;color:#1a3a5c;background:#edf2f8;border-left:4px solid #1a3a5c;padding:7px 12px;margin-bottom:10px;border-radius:0 4px 4px 0;text-transform:uppercase;letter-spacing:.4px';
+  for(var si=0;si<scSections.length;si++){
+    if(!scSections[si].obs.length) continue;
+    obsSection+='<div style="'+sectHd+'">'+esc(scSections[si].label)+'</div>';
+    var grp=scCatGroups(scSections[si].obs);
+    for(var ci=0;ci<grp.catOrder.length;ci++){
+      var cat=grp.catOrder[ci];
+      obsSection+='<div style="margin-bottom:24px">';
+      obsSection+='<div style="'+catHd+'">'+esc(cat)+'</div>';
+      var obsList=grp.cats[cat];
+      for(var oi=0;oi<obsList.length;oi++){num++;obsSection+=obsHtml(obsList[oi],num);}
+      obsSection+='</div>';
+    }
   }
 
   // Build MIS box
@@ -8908,10 +8942,17 @@ function finalizeReport(){
   var avMode=document.querySelector('input[name="avmode"]:checked');
   var avVal=avMode?avMode.value:'auto';
 
-  var cats={}; var catOrder=[];
+  var finSections=[
+    {key:'repeated',label:'1. Repeated Observations (Un-Resolved)',obs:[]},
+    {key:'new',     label:'2. New Observations',                   obs:[]}
+  ];
   for(var a=0;a<all.length;a++){
-    var c=all[a].category||'Others'; if(!cats[c]){cats[c]=[];catOrder.push(c);} cats[c].push(all[a]);
+    var effTfin=(obsTypeMap[all[a].id]||all[a].type||'New').toLowerCase();
+    if(effTfin==='repeated') finSections[0].obs.push(all[a]); else finSections[1].obs.push(all[a]);
   }
+  function finCatGroups(ol){var cats={};var co=[];for(var i=0;i<ol.length;i++){var c=ol[i].category||'Others';if(!cats[c]){cats[c]=[];co.push(c);}cats[c].push(ol[i]);}return{cats:cats,catOrder:co};}
+  var sectHdFin='font-family:Merriweather,serif;font-size:14px;font-weight:700;color:#fff;background:#1a3a5c;padding:10px 16px;margin-bottom:16px;border-radius:4px;letter-spacing:.3px';
+  var catHdFin='font-family:Merriweather,serif;font-size:12px;font-weight:700;color:#1a3a5c;background:#edf2f8;border-left:4px solid #1a3a5c;padding:7px 12px;margin-bottom:10px;border-radius:0 4px 4px 0;text-transform:uppercase;letter-spacing:.4px';
 
   var fname='FINAL_AuditReport'+(H.brcode?'_'+H.brcode:'')+(H.brname?'_'+H.brname.replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_'):'')+'_'+new Date().toISOString().slice(0,10)+'.html';
 
@@ -8963,13 +9004,18 @@ function finalizeReport(){
   }
 
   var obsSection=''; var num=0;
-  for(var ci=0;ci<catOrder.length;ci++){
-    var cat=catOrder[ci];
-    obsSection+='<div style="margin-bottom:24px">';
-    obsSection+='<div style="font-family:Merriweather,serif;font-size:12px;font-weight:700;color:#1a3a5c;background:#edf2f8;border-left:4px solid #1a3a5c;padding:7px 12px;margin-bottom:10px;border-radius:0 4px 4px 0;text-transform:uppercase;letter-spacing:.4px">'+esc(cat)+'</div>';
-    var obsList=cats[cat];
-    for(var oi=0;oi<obsList.length;oi++){num++;obsSection+=obsHtmlFinal(obsList[oi],num);}
-    obsSection+='</div>';
+  for(var si=0;si<finSections.length;si++){
+    if(!finSections[si].obs.length) continue;
+    obsSection+='<div style="'+sectHdFin+'">'+esc(finSections[si].label)+'</div>';
+    var grp=finCatGroups(finSections[si].obs);
+    for(var ci=0;ci<grp.catOrder.length;ci++){
+      var cat=grp.catOrder[ci];
+      obsSection+='<div style="margin-bottom:24px">';
+      obsSection+='<div style="'+catHdFin+'">'+esc(cat)+'</div>';
+      var obsList=grp.cats[cat];
+      for(var oi=0;oi<obsList.length;oi++){num++;obsSection+=obsHtmlFinal(obsList[oi],num);}
+      obsSection+='</div>';
+    }
   }
 
   var misHtml='';
