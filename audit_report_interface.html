@@ -51,6 +51,8 @@ html,body{height:100%;font-family:'Inter',sans-serif;font-size:13.5px;color:#1e2
 .ri{padding:8px 10px;border:1px solid var(--gbor);border-radius:5px;margin-bottom:5px;cursor:pointer;background:#fff;transition:.12s}
 .ri:hover{border-color:var(--navylt);background:#f0f5fb}
 .ri.on{border-color:var(--navy);background:#eaf0f8}
+.ri.pending-add{border-color:#c07000;background:#fff8ec;outline:2px dashed #c07000}
+.ri.pending-rem{border-color:#8b1a1a;background:#fff0f0;outline:2px dashed #8b1a1a}
 .ritop{display:flex;gap:7px;align-items:flex-start}
 .ricb{margin-top:2px;flex-shrink:0;accent-color:var(--navy);cursor:pointer;width:14px;height:14px}
 .rimeta{flex:1}
@@ -7911,12 +7913,13 @@ function renderList(obs, toks, showScore) {
 
       div.innerHTML = inner;
 
-      // Click anywhere on row to toggle
+      // Click anywhere on row to toggle (goes through pending system)
       div.addEventListener('click', function(e){
         if(e.target.tagName==='INPUT') return;
         var cb = document.getElementById('cb-'+o.id);
-        cb.checked = !cb.checked;
-        handleSel(o.id, cb.checked, div);
+        var newState = !cb.checked;
+        cb.checked = newState;
+        queuePending(o.id, newState);
       });
 
       list.appendChild(div);
@@ -7926,20 +7929,30 @@ function renderList(obs, toks, showScore) {
 
 function cbChg(e, id) {
   e.stopPropagation();
-  var checked = e.target.checked;
-  // Track pending change — reverse checkbox visually, store as pending
-  e.target.checked = !checked; // revert until confirmed at Generate
+  queuePending(id, e.target.checked);
+}
+
+function queuePending(id, checked) {
   var title = '';
   for(var i=0;i<DB.observations.length;i++){if(DB.observations[i].id===id){title=DB.observations[i].title;break;}}
   if(!title) for(var ci=0;ci<customs.length;ci++){if(customs[ci].id===id){title=customs[ci].title;break;}}
-  // pendingSel: {id: {checked, title}}
-  if(!window.pendingSel) window.pendingSel={};
-  if(window.pendingSel[id] && window.pendingSel[id].checked===checked){
-    // toggled back to original — cancel pending
+
+  // If this undoes a previous pending — the desired state matches current committed state
+  var committedOn = !!selIds[id];
+  if(checked === committedOn){
+    // Back to original — remove from pending, restore row appearance
     delete window.pendingSel[id];
+    var div = document.getElementById('ri-'+id);
+    if(div) div.className = 'ri' + (committedOn ? ' on' : '');
   } else {
-    window.pendingSel[id]={checked:checked, title:title};
+    window.pendingSel[id] = {checked:checked, title:title};
+    // Visually mark the row as pending
+    var div = document.getElementById('ri-'+id);
+    if(div) div.className = 'ri' + (checked ? ' pending-add' : ' pending-rem');
   }
+  // Keep checkbox in the desired state (not reverted)
+  var cb = document.getElementById('cb-'+id);
+  if(cb) cb.checked = checked;
   updateGenBtn();
 }
 
@@ -7977,7 +7990,7 @@ function selAll(state) {
   for(var i=0;i<items.length;i++){
     var id = items[i].id.replace('ri-','');
     var cb = document.getElementById('cb-'+id);
-    if(cb && cb.checked!==state){ cb.checked=state; handleSel(id,state,items[i]); }
+    if(cb && cb.checked!==state){ cb.checked=state; queuePending(id,state); }
   }
 }
 
@@ -8227,7 +8240,11 @@ function updateGenBtn(){
 
 function confirmAndGenerate(){
   var ids = Object.keys(window.pendingSel);
-  if(!ids.length){ renderRpt(); return; }
+  if(!ids.length){
+    flushObsEditsToDb();
+    renderRpt();
+    return;
+  }
 
   // Build summary message
   var addList=[], remList=[];
@@ -8245,15 +8262,26 @@ function confirmAndGenerate(){
     msg+='REMOVE ('+remList.length+'):\n';
     for(var r=0;r<remList.length;r++) msg+='  − '+remList[r]+'\n';
   }
-  if(!confirm(msg)) return;
 
-  // Apply all pending changes
+  if(!confirm(msg)){
+    // CANCEL — revert all pending checkboxes and row styles back to committed state
+    for(var ci=0;ci<ids.length;ci++){
+      var rid=ids[ci];
+      var committedOn=!!selIds[rid];
+      var cb=document.getElementById('cb-'+rid);
+      if(cb) cb.checked=committedOn;
+      var div=document.getElementById('ri-'+rid);
+      if(div) div.className='ri'+(committedOn?' on':'');
+    }
+    window.pendingSel={};
+    updateGenBtn();
+    return;
+  }
+
+  // OK — apply all pending changes
   for(var j=0;j<ids.length;j++){
     var id=ids[j];
     var chk=window.pendingSel[id].checked;
-    // Update checkbox visually
-    var cb=document.getElementById('cb-'+id);
-    if(cb) cb.checked=chk;
     var div=document.getElementById('ri-'+id);
     handleSel(id,chk,div);
   }
