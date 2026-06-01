@@ -7520,30 +7520,32 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
         <input type="text" id="brautype" placeholder="e.g. Routine Audit Visit" oninput="renderRpt()">
       </div>
       <div class="fr"><label>Report Date</label>
-        <input type="date" id="rdt" oninput="renderRpt()">
+        <input type="date" id="rdt" oninput="validateDates();renderRpt()">
       </div>
     </div>
 
     <div class="fr"><label>Audit Period</label>
       <div class="g2">
         <div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">From</div>
-          <input type="date" id="rper_from" oninput="renderRpt()">
+          <input type="date" id="rper_from" oninput="validateDates();renderRpt()">
         </div>
         <div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">To</div>
-          <input type="date" id="rper_to" oninput="renderRpt()">
+          <input type="date" id="rper_to" oninput="validateDates();renderRpt()">
         </div>
       </div>
+      <div id="err_per" style="display:none;color:#c0392b;font-size:11px;margin-top:3px">&#9888; Audit Period To date must not be after Visit From date.</div>
     </div>
 
     <div class="fr"><label>Visit Dates</label>
       <div class="g2">
         <div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">From</div>
-          <input type="date" id="brvisit_from" oninput="renderRpt()">
+          <input type="date" id="brvisit_from" oninput="validateDates();renderRpt()">
         </div>
         <div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">To</div>
-          <input type="date" id="brvisit_to" oninput="renderRpt()">
+          <input type="date" id="brvisit_to" oninput="validateDates();renderRpt()">
         </div>
       </div>
+      <div id="err_rdt" style="display:none;color:#c0392b;font-size:11px;margin-top:3px">&#9888; Report Date must not be before the Visit From date.</div>
     </div>
 
     <div class="fr"><label>Previous Audit Report Date</label>
@@ -7586,16 +7588,10 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
   <div class="sec">
     <div class="sh">Filter Observations</div>
     <div class="fr"><label>Observation Type</label>
-      <div class="crow">
-        <select id="styp" onchange="applyFilter()"></select>
-        <button class="gbtn" title="Manage Types" onclick="openM('type')">&#9881;</button>
-      </div>
+      <select id="styp" onchange="applyFilter()"></select>
     </div>
     <div class="fr"><label>Category</label>
-      <div class="crow">
-        <select id="scat" onchange="applyFilter()"></select>
-        <button class="gbtn" title="Manage Categories" onclick="openM('cat')">&#9881;</button>
-      </div>
+      <select id="scat" onchange="applyFilter()"></select>
     </div>
   </div>
 
@@ -7715,7 +7711,7 @@ function ss(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 // INITIAL DATA  (populated from data bank)
 // ============================================================
 var DEF_PB=['Internal Audit Team','Senior Auditor','Assistant Auditor','Regional Audit Officer'];
-var DEF_TY=['All Types'].concat(["New", "Repeated"]);
+var DEF_TY=["All Types","New","Repeated"]; // "All Types" kept as default value only
 var DEF_CA=['All Categories'].concat(["Branch Imprest, Payments & Accounts", "Cash and Bank", "Fixed Assets", "Library", "Others", "Recruitment, Payroll & Employee Record", "Safety & Security", "Science Laboratory", "Student Record"]);
 
 // ============================================================
@@ -7727,6 +7723,7 @@ var CATS     = sg('bhs_ca', DEF_CA);
 
 var selIds   = {};   // {obsId: true}
 var annexMap = {};   // {obsId: "text"}
+var obsTypeMap = {}; // {obsId: 'New'|'Repeated'} — per-report type override
 var avMap    = {};   // {obsId: manual audit view text}
 var actMap   = {};   // {obsId: action taken text}
 var respMap  = {};   // {obsId: auditee response text}
@@ -7766,7 +7763,9 @@ function buildSel(id, arr) {
   sel.innerHTML = '';
   for(var i=0;i<arr.length;i++){
     var o=document.createElement('option');
-    o.value=arr[i]; o.textContent=arr[i];
+    o.value=arr[i];
+    // Show friendlier label for "All" options
+    o.textContent=(arr[i]==='All Types'?'— All Types —':arr[i]==='All Categories'?'— All Categories —':arr[i]);
     sel.appendChild(o);
   }
   for(var j=0;j<sel.options.length;j++){
@@ -7872,9 +7871,14 @@ function renderList(obs, toks, showScore) {
       inner += '</div></div>';
 
       if(selIds[o.id]){
-        inner += '<div class="axrow" id="ax-'+o.id+'">';
-        inner += '<label>Annexure Data:</label>';
-        inner += '<input type="text" value="'+esc(axv)+'" placeholder="e.g. Annexure-A, Jan 2025" oninput="setAx(\''+o.id+'\',this.value)" onclick="event.stopPropagation()">';
+        var curType = obsTypeMap[o.id] || o.type || 'New';
+        inner += '<div class="axrow" style="flex-wrap:wrap;gap:6px" id="ax-'+o.id+'">';
+        inner += '<label style="font-size:11px;font-weight:700;color:var(--navy);white-space:nowrap">Type:</label>';
+        inner += '<label style="display:flex;align-items:center;gap:3px;font-size:11.5px;cursor:pointer;padding:2px 8px;border-radius:12px;border:1px solid #90b8e8;background:'+(curType==='New'?'#2070b8':'#fff')+';color:'+(curType==='New'?'#fff':'#555')+'" onclick="event.stopPropagation()">';
+        inner += '<input type="radio" name="otyp-'+o.id+'" value="New" style="display:none" '+(curType==='New'?'checked':'')+' onchange="setObsType(\''+o.id+'\',\'New\')"> New</label>';
+        inner += '<label style="display:flex;align-items:center;gap:3px;font-size:11.5px;cursor:pointer;padding:2px 8px;border-radius:12px;border:1px solid #f0b080;background:'+(curType==='Repeated'?'#d06020':'#fff')+';color:'+(curType==='Repeated'?'#fff':'#555')+'" onclick="event.stopPropagation()">';
+        inner += '<input type="radio" name="otyp-'+o.id+'" value="Repeated" style="display:none" '+(curType==='Repeated'?'checked':'')+' onchange="setObsType(\''+o.id+'\',\'Repeated\')"> Repeated</label>';
+        inner += '<input type="text" style="flex:1;min-width:100px" value="'+esc(axv)+'" placeholder="Annexure Data (optional)" oninput="setAx(\''+o.id+'\',this.value)" onclick="event.stopPropagation()">';
         inner += '</div>';
       }
 
@@ -7986,6 +7990,63 @@ function getSnippet(raw, toks) {
   var end   = Math.min(raw.length, best+120);
   var snip  = (start>0?'…':'')+raw.slice(start,end)+(end<raw.length?'…':'');
   return hlText(esc(snip), toks);
+}
+
+function setObsType(id, val) {
+  obsTypeMap[id] = val;
+  // Refresh the row styling
+  var ri = document.getElementById('ri-'+id);
+  if(ri){
+    ri.className = 'ri on';
+    // re-render just the type badge in the subtitle
+    var sub = ri.querySelector('.risub');
+    if(sub){
+      var cat = sub.textContent.split(' ')[0]; // rough extract — full re-render is cleaner
+    }
+  }
+  renderRpt();
+  // Re-render the list item to update pill colours without full filter re-run
+  var listEl = document.getElementById('rlist');
+  if(listEl){
+    var axRow = document.getElementById('ax-'+id);
+    if(axRow){
+      var newLabel = axRow.querySelector('input[name="otyp-'+id+'"][value="New"]');
+      var repLabel = newLabel ? newLabel.parentElement : null;
+      var newPill  = newLabel ? newLabel.closest('label') : null;
+      // Update pill colours in-place
+      axRow.querySelectorAll('label[style]').forEach(function(lbl){
+        var inp = lbl.querySelector('input[type=radio]');
+        if(!inp) return;
+        var isNew = inp.value==='New';
+        var active = inp.value===val;
+        lbl.style.background = active ? (isNew?'#2070b8':'#d06020') : '#fff';
+        lbl.style.color = active ? '#fff' : '#555';
+      });
+    }
+  }
+}
+
+// ============================================================
+// DATE VALIDATION
+// ============================================================
+function validateDates() {
+  var visitFrom = document.getElementById('brvisit_from').value;
+  var perTo     = document.getElementById('rper_to').value;
+  var rdt       = document.getElementById('rdt').value;
+
+  // Audit Period To must not be after Visit From
+  var errPer = document.getElementById('err_per');
+  if(errPer){
+    errPer.style.display = (perTo && visitFrom && perTo > visitFrom) ? 'block' : 'none';
+    document.getElementById('rper_to').style.borderColor = (perTo && visitFrom && perTo > visitFrom) ? '#c0392b' : '';
+  }
+
+  // Report Date must not be before Visit From
+  var errRdt = document.getElementById('err_rdt');
+  if(errRdt){
+    errRdt.style.display = (rdt && visitFrom && rdt < visitFrom) ? 'block' : 'none';
+    document.getElementById('rdt').style.borderColor = (rdt && visitFrom && rdt < visitFrom) ? '#c0392b' : '';
+  }
 }
 
 // ============================================================
@@ -8162,12 +8223,13 @@ function renderRpt(){
     for(var oi=0;oi<obs.length;oi++){
       num++;
       var o=obs[oi];
-      var tc=(o.type||'new').toLowerCase();
+      var effType=obsTypeMap[o.id]||o.type||'New';
+      var tc=effType.toLowerCase();
       var ax=annexMap[o.id]||o._annex||'';
       var resp=respMap[o.id]!=null?respMap[o.id]:(o.typical_response||'');
       h+='<div class="oc '+tc+'">';
       h+='<div class="och"><span class="onum">Obs. '+num+'</span>';
-      h+='<span class="otl">'+esc(o.title)+' <span class="badge '+tc+'">'+esc(o.type)+'</span></span>';
+      h+='<span class="otl">'+esc(o.title)+' <span class="badge '+tc+'">'+esc(effType)+'</span></span>';
       h+='<button class="odl" onclick="remObs(\''+o.id+'\')">&#10005;</button></div>';
       h+='<div class="ocb">';
       var avMode=document.querySelector('input[name="avmode"]:checked');
@@ -8389,7 +8451,7 @@ function doCopy(){
 
 function doClear(){
   if(!confirm('Clear all selections?'))return;
-  selIds={}; annexMap={}; avMap={}; actMap={}; respMap={}; assessMap={}; obsEdits={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; avMap={}; actMap={}; respMap={}; assessMap={}; obsEdits={}; customs=[]; annexures=[];
   responseLoaded=false;
   renderAnnexList();
   document.getElementById('qinp').value='';
@@ -8428,7 +8490,8 @@ function downloadSoftCopy(){
 
   // Build each observation block
   function obsHtml(o, num){
-    var tc=(o.type||'new').toLowerCase();
+    var effType=obsTypeMap[o.id]||o.type||'New';
+    var tc=effType.toLowerCase();
     var ax=annexMap[o.id]||o._annex||'';
     var avStored=avMap[o.id]||'';
     var bdr=tc==='repeated'?'#d06020':'#2070b8';
@@ -8436,7 +8499,7 @@ function downloadSoftCopy(){
     h+='<div style="display:flex;align-items:center;padding:8px 12px;background:#fafbfc;border-bottom:1px solid #dde2ea;gap:8px">';
     h+='<span style="font-size:11px;font-weight:700;color:#6a7888">Obs. '+num+'</span>';
     h+='<span style="flex:1;font-size:13px;font-weight:700;color:#1e2d40">'+esc(o.title)+'</span>';
-    h+='<span style="padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;'+(tc==='repeated'?'background:#fff0e6;color:#b04800;border:1px solid #f0b080':'background:#e6f0ff;color:#1050a0;border:1px solid #90b8e8')+'">'+esc(o.type||'New')+'</span>';
+    h+='<span style="padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;'+(tc==='repeated'?'background:#fff0e6;color:#b04800;border:1px solid #f0b080':'background:#e6f0ff;color:#1050a0;border:1px solid #90b8e8')+'">'+esc(effType)+'</span>';
     h+='</div>';
     h+='<div style="padding:11px 13px">';
     var scObsText=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:o.observation||'';
@@ -8865,7 +8928,8 @@ function finalizeReport(){
   function st(text){return '<div style="font-size:12.5px;line-height:1.65;color:#2a3a50;white-space:pre-wrap">'+esc(text)+'</div>';}
 
   function obsHtmlFinal(o,num){
-    var tc=(o.type||'new').toLowerCase();
+    var effType=obsTypeMap[o.id]||o.type||'New';
+    var tc=effType.toLowerCase();
     var ax=annexMap[o.id]||o._annex||'';
     var avStored=avMap[o.id]||o.audit_view||'';
     var respStored=respMap[o.id]!=null?respMap[o.id]:(o.typical_response||'');
@@ -8885,7 +8949,7 @@ function finalizeReport(){
     h+='<div style="display:flex;align-items:center;padding:8px 12px;background:#fafbfc;border-bottom:1px solid #dde2ea;gap:8px">';
     h+='<span style="font-size:11px;font-weight:700;color:#6a7888">Obs. '+num+'</span>';
     h+='<span style="flex:1;font-size:13px;font-weight:700;color:#1e2d40">'+esc(o.title)+'</span>';
-    h+='<span style="padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;'+(tc==='repeated'?'background:#fff0e6;color:#b04800;border:1px solid #f0b080':'background:#e6f0ff;color:#1050a0;border:1px solid #90b8e8')+'">'+esc(o.type||'New')+'</span>';
+    h+='<span style="padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;'+(tc==='repeated'?'background:#fff0e6;color:#b04800;border:1px solid #f0b080':'background:#e6f0ff;color:#1050a0;border:1px solid #90b8e8')+'">'+esc(effType)+'</span>';
     h+='</div><div style="padding:11px 13px">';
     if(obsText) h+=sl('Observation')+st(obsText);
     if(recText) h+=sl('Recommendation')+st(recText);
