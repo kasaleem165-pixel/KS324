@@ -7520,17 +7520,17 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
         <input type="text" id="brautype" placeholder="e.g. Routine Audit Visit" oninput="renderRpt()">
       </div>
       <div class="fr"><label>Report Date</label>
-        <input type="date" id="rdt" oninput="validateDates();renderRpt()">
+        <input type="date" id="rdt" onchange="validateDates();renderRpt()">
       </div>
     </div>
 
     <div class="fr"><label>Audit Period</label>
       <div class="g2">
         <div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">From</div>
-          <input type="date" id="rper_from" oninput="validateDates();renderRpt()">
+          <input type="date" id="rper_from" onchange="validateDates();renderRpt()">
         </div>
         <div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">To</div>
-          <input type="date" id="rper_to" oninput="validateDates();renderRpt()">
+          <input type="date" id="rper_to" onchange="validateDates();renderRpt()">
         </div>
       </div>
       <div id="err_per" style="display:none;color:#c0392b;font-size:11px;margin-top:3px">&#9888; Audit Period To date must not be after Visit From date.</div>
@@ -7539,17 +7539,17 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
     <div class="fr"><label>Visit Dates</label>
       <div class="g2">
         <div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">From</div>
-          <input type="date" id="brvisit_from" oninput="validateDates();renderRpt()">
+          <input type="date" id="brvisit_from" onchange="validateDates();renderRpt()">
         </div>
         <div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">To</div>
-          <input type="date" id="brvisit_to" oninput="validateDates();renderRpt()">
+          <input type="date" id="brvisit_to" onchange="validateDates();renderRpt()">
         </div>
       </div>
       <div id="err_rdt" style="display:none;color:#c0392b;font-size:11px;margin-top:3px">&#9888; Report Date must not be before the Visit From date.</div>
     </div>
 
     <div class="fr"><label>Previous Audit Report Date</label>
-      <input type="date" id="brprev" oninput="renderRpt()">
+      <input type="date" id="brprev" onchange="renderRpt()">
     </div>
 
     <div class="fr"><label>Audit Framework</label>
@@ -7587,9 +7587,6 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 
   <div class="sec">
     <div class="sh">Filter Observations</div>
-    <div class="fr"><label>Observation Type</label>
-      <select id="styp" onchange="applyFilter()"></select>
-    </div>
     <div class="fr"><label>Category</label>
       <select id="scat" onchange="applyFilter()"></select>
     </div>
@@ -7740,7 +7737,6 @@ var curM     = null;
 // ============================================================
 window.onload = function() {
   buildSel('spb', PREPBY);
-  buildSel('styp', TYPES);
   buildSel('scat', CATS);
   buildCatSel();
   var d = new Date();
@@ -7804,7 +7800,7 @@ function showPrompt() {
 }
 
 function applyFilter() {
-  var typeF = document.getElementById('styp').value;
+  var typeF = 'All Types'; // Observation Type filter removed from UI
   var catF  = document.getElementById('scat').value;
   var q     = document.getElementById('qinp').value.trim();
   var toks  = q ? tokenize(q) : [];
@@ -7862,7 +7858,7 @@ function renderList(obs, toks, showScore) {
       inner += '<input type="checkbox" class="ricb" id="cb-'+o.id+'"'+chk+' onclick="cbChg(event,\''+o.id+'\')">';
       inner += '<div class="rimeta">';
       inner += '<div class="ritl">'+hlText(esc(o.title),toks)+'</div>';
-      inner += '<div class="risub">'+esc(o.category)+' <span class="badge '+tc+'">'+esc(o.type)+'</span></div>';
+      inner += '<div class="risub">'+esc(o.category)+'</div>';
       if(showScore){
         inner += '<div class="rscore"><div class="rscorebar" style="width:'+pct+'%"></div></div>';
         var snip = getSnippet(o.observation||'', toks) || getSnippet(o.recommendation||'', toks);
@@ -7872,13 +7868,12 @@ function renderList(obs, toks, showScore) {
 
       if(selIds[o.id]){
         var curType = obsTypeMap[o.id] || o.type || 'New';
-        inner += '<div class="axrow" style="flex-wrap:wrap;gap:6px" id="ax-'+o.id+'">';
-        inner += '<label style="font-size:11px;font-weight:700;color:var(--navy);white-space:nowrap">Type:</label>';
-        inner += '<label style="display:flex;align-items:center;gap:3px;font-size:11.5px;cursor:pointer;padding:2px 8px;border-radius:12px;border:1px solid #90b8e8;background:'+(curType==='New'?'#2070b8':'#fff')+';color:'+(curType==='New'?'#fff':'#555')+'" onclick="event.stopPropagation()">';
-        inner += '<input type="radio" name="otyp-'+o.id+'" value="New" style="display:none" '+(curType==='New'?'checked':'')+' onchange="setObsType(\''+o.id+'\',\'New\')"> New</label>';
-        inner += '<label style="display:flex;align-items:center;gap:3px;font-size:11.5px;cursor:pointer;padding:2px 8px;border-radius:12px;border:1px solid #f0b080;background:'+(curType==='Repeated'?'#d06020':'#fff')+';color:'+(curType==='Repeated'?'#fff':'#555')+'" onclick="event.stopPropagation()">';
-        inner += '<input type="radio" name="otyp-'+o.id+'" value="Repeated" style="display:none" '+(curType==='Repeated'?'checked':'')+' onchange="setObsType(\''+o.id+'\',\'Repeated\')"> Repeated</label>';
-        inner += '<input type="text" style="flex:1;min-width:100px" value="'+esc(axv)+'" placeholder="Annexure Data (optional)" oninput="setAx(\''+o.id+'\',this.value)" onclick="event.stopPropagation()">';
+        inner += '<div style="display:flex;gap:6px;margin-top:6px;padding-top:6px;border-top:1px solid #eef2f7" id="ax-'+o.id+'">';
+        inner += '<span style="font-size:11px;font-weight:700;color:var(--navy);line-height:26px;white-space:nowrap">Type:</span>';
+        inner += '<label style="display:flex;align-items:center;gap:3px;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;border:1.5px solid #2070b8;background:'+(curType==='New'?'#2070b8':'#fff')+';color:'+(curType==='New'?'#fff':'#2070b8')+'" onclick="event.stopPropagation()">';
+        inner += '<input type="radio" name="otyp-'+o.id+'" value="New" style="display:none" '+(curType==='New'?'checked':'')+' onchange="setObsType(\''+o.id+'\',\'New\')">New</label>';
+        inner += '<label style="display:flex;align-items:center;gap:3px;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;border:1.5px solid #d06020;background:'+(curType==='Repeated'?'#d06020':'#fff')+';color:'+(curType==='Repeated'?'#fff':'#d06020')+'" onclick="event.stopPropagation()">';
+        inner += '<input type="radio" name="otyp-'+o.id+'" value="Repeated" style="display:none" '+(curType==='Repeated'?'checked':'')+' onchange="setObsType(\''+o.id+'\',\'Repeated\')">Repeated</label>';
         inner += '</div>';
       }
 
@@ -8455,7 +8450,6 @@ function doClear(){
   responseLoaded=false;
   renderAnnexList();
   document.getElementById('qinp').value='';
-  document.getElementById('styp').value='All Types';
   document.getElementById('scat').value='All Categories';
   document.getElementById('rpcont').style.display='none';
   document.getElementById('rpempty').style.display='block';
