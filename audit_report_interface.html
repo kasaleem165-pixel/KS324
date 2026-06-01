@@ -21,6 +21,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;font-size:13.5px;color:#1e2
 .tbtn.soft{background:#1a7a4a;color:#fff}
 .tbtn.load{background:#5b3fa0;color:#fff}
 .tbtn.fin{background:#b84000;color:#fff}
+.tbtn.draft{background:#156d5a;color:#fff}
 .tbtn.cp{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.35)}
 .tbtn.r{background:#8b1a1a;color:#fff}
 
@@ -60,6 +61,20 @@ html,body{height:100%;font-family:'Inter',sans-serif;font-size:13.5px;color:#1e2
 .rsnippet{font-size:11px;color:#555;line-height:1.4;margin-top:4px;padding:4px 6px;background:#f7f9fc;border-left:2px solid var(--navylt);border-radius:0 3px 3px 0}
 .rsnippet mark{background:#fff176;color:inherit;padding:0 1px;border-radius:2px;font-weight:600}
 .assess-box{margin:12px 0;padding:10px 14px;background:#eef4ff;border:1.5px solid #4a7fc1;border-radius:6px}
+.dmodal-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center}
+.dmodal{background:#fff;border-radius:10px;padding:28px 28px 20px;width:480px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.22);font-family:'Inter',sans-serif}
+.dmodal h3{margin:0 0 6px;font-size:15px;color:var(--navy)}
+.dmodal p{margin:0 0 14px;font-size:12px;color:#555}
+.dmodal .cat-check-list{max-height:260px;overflow-y:auto;border:1px solid #d8e4f0;border-radius:6px;padding:8px 10px;margin-bottom:14px}
+.dmodal .cat-check-list label{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px;color:#2a3a50;cursor:pointer;border-bottom:1px solid #f0f4f8}
+.dmodal .cat-check-list label:last-child{border-bottom:none}
+.dmodal .cat-check-list input[type=checkbox]{width:15px;height:15px;accent-color:var(--navy)}
+.dmodal-row{display:flex;gap:10px;justify-content:flex-end;margin-top:4px}
+.dmodal-row button{padding:7px 16px;border:none;border-radius:5px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.dmodal-row .dm-sel-all{background:#e8edf5;color:var(--navy)}
+.dmodal-row .dm-cancel{background:#e8edf5;color:#444}
+.dmodal-row .dm-combined{background:#156d5a;color:#fff}
+.dmodal-row .dm-individual{background:var(--navy);color:#fff}
 .assess-title{font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:8px}
 .assess-radios{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
 .assess-radios label{font-size:11.5px;display:flex;align-items:center;gap:4px;cursor:pointer;padding:4px 9px;border-radius:4px;border:1px solid #b0c4de;background:#fff;white-space:nowrap}
@@ -7485,6 +7500,7 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
   <div class="brand">BHS <small>Internal Audit — Report Builder</small></div>
   <button class="tbtn pdf" onclick="downloadPDF()">&#128462; PDF</button>
   <button class="tbtn soft" onclick="downloadSoftCopy()">&#128233; Auditee Copy</button>
+  <button class="tbtn draft" onclick="showDraftModal()">&#128196; Draft by Category</button>
   <button class="tbtn load" onclick="triggerLoad()">&#128193; Load Response</button>
   <button class="tbtn fin" onclick="finalizeReport()">&#9989; Finalize &amp; Save</button>
   <button class="tbtn cp" onclick="doCopy()">&#128203; Copy</button>
@@ -7534,7 +7550,8 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
           <input type="date" id="rper_to" onchange="validateDates();renderRpt()">
         </div>
       </div>
-      <div id="err_per" style="display:none;color:#c0392b;font-size:11px;margin-top:3px">&#9888; Audit Period To date must not be after Visit From date.</div>
+      <div id="err_per" style="display:none;color:#c0392b;font-size:11px;margin-top:3px">&#9888; Audit Period To must not be later than Visit From date.</div>
+      <div id="err_per_rdt" style="display:none;color:#c0392b;font-size:11px;margin-top:3px">&#9888; Audit Period To must not be later than Report Date.</div>
     </div>
 
     <div class="fr"><label>Visit Dates</label>
@@ -7895,8 +7912,16 @@ function renderList(obs, toks, showScore) {
 
 function cbChg(e, id) {
   e.stopPropagation();
+  var checked = e.target.checked;
+  var title = '';
+  for(var i=0;i<DB.observations.length;i++){if(DB.observations[i].id===id){title=DB.observations[i].title;break;}}
+  if(!title) for(var ci=0;ci<customs.length;ci++){if(customs[ci].id===id){title=customs[ci].title;break;}}
+  var msg = checked
+    ? 'Add observation to report?\n\n"' + title + '"'
+    : 'Remove observation from report?\n\n"' + title + '"';
+  if(!confirm(msg)){ e.target.checked = !checked; return; }
   var div = document.getElementById('ri-'+id);
-  handleSel(id, e.target.checked, div);
+  handleSel(id, checked, div);
 }
 
 function handleSel(id, checked, div) {
@@ -8029,10 +8054,16 @@ function validateDates() {
 
   // Audit Period To must not be after Visit From
   var errPer = document.getElementById('err_per');
-  if(errPer){
-    errPer.style.display = (perTo && visitFrom && perTo > visitFrom) ? 'block' : 'none';
-    document.getElementById('rper_to').style.borderColor = (perTo && visitFrom && perTo > visitFrom) ? '#c0392b' : '';
-  }
+  var perAfterVisit = (perTo && visitFrom && perTo > visitFrom);
+  if(errPer) errPer.style.display = perAfterVisit ? 'block' : 'none';
+
+  // Audit Period To must not be later than Report Date
+  var errPerRdt = document.getElementById('err_per_rdt');
+  var perAfterRdt = (perTo && rdt && perTo > rdt);
+  if(errPerRdt) errPerRdt.style.display = perAfterRdt ? 'block' : 'none';
+
+  // Highlight rper_to if either condition triggered
+  document.getElementById('rper_to').style.borderColor = (perAfterVisit || perAfterRdt) ? '#c0392b' : '';
 
   // Report Date must not be before Visit From
   var errRdt = document.getElementById('err_rdt');
@@ -8475,6 +8506,155 @@ function doClear(){
   document.getElementById('qinp').value='';
   showPrompt();
   toast('Cleared.');
+}
+
+// ============================================================
+// DRAFT BY CATEGORY
+// ============================================================
+function showDraftModal() {
+  var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
+  var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
+  var all=dbObs.concat(cuObs);
+  if(!all.length){alert('No observations selected. Please select observations first.');return;}
+
+  // Collect unique categories preserving order
+  var catSeen={}, catOrder=[];
+  for(var i=0;i<all.length;i++){
+    var c=all[i].category||'Others';
+    if(!catSeen[c]){catSeen[c]=true;catOrder.push(c);}
+  }
+
+  var checks='';
+  for(var ci=0;ci<catOrder.length;ci++){
+    checks+='<label><input type="checkbox" id="dcat-'+ci+'" checked><span>'+esc(catOrder[ci])+'</span></label>';
+  }
+
+  var el=document.createElement('div');
+  el.className='dmodal-bg';
+  el.id='draftModal';
+  el.innerHTML=
+    '<div class="dmodal">'+
+    '<h3>&#128196; Draft Report by Category</h3>'+
+    '<p>Select categories to include. You can download them as one combined part or as separate files per category.</p>'+
+    '<div class="cat-check-list">'+checks+'</div>'+
+    '<div class="dmodal-row">'+
+    '<button class="dm-sel-all" onclick="draftToggleAll()">Toggle All</button>'+
+    '<button class="dm-cancel" onclick="closeDraftModal()">Cancel</button>'+
+    '<button class="dm-combined" onclick="downloadDraft(false,'+JSON.stringify(catOrder)+')">&#128230; Combined</button>'+
+    '<button class="dm-individual" onclick="downloadDraft(true,'+JSON.stringify(catOrder)+')">&#128195; Individual Files</button>'+
+    '</div></div>';
+  document.body.appendChild(el);
+}
+
+function closeDraftModal(){var m=document.getElementById('draftModal');if(m)m.parentNode.removeChild(m);}
+
+function draftToggleAll(){
+  var checks=document.querySelectorAll('#draftModal input[type=checkbox]');
+  var anyUnchecked=false;
+  for(var i=0;i<checks.length;i++){if(!checks[i].checked){anyUnchecked=true;break;}}
+  for(var i=0;i<checks.length;i++){checks[i].checked=anyUnchecked;}
+}
+
+function downloadDraft(individual, allCats){
+  var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
+  var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
+  var allObs=dbObs.concat(cuObs);
+
+  // Determine selected categories
+  var selCats=[];
+  for(var ci=0;ci<allCats.length;ci++){
+    var chk=document.getElementById('dcat-'+ci);
+    if(chk&&chk.checked) selCats.push(allCats[ci]);
+  }
+  if(!selCats.length){alert('Please select at least one category.');return;}
+
+  closeDraftModal();
+
+  var H=getHdrVals();
+
+  // Group observations by section then category
+  function buildDraftHtml(cats){
+    var sections=[
+      {key:'repeated',label:'1. Repeated Observations (Un-Resolved)',obs:[]},
+      {key:'new',label:'2. New Observations',obs:[]}
+    ];
+    for(var a=0;a<allObs.length;a++){
+      var o=allObs[a];
+      var oc=o.category||'Others';
+      if(cats.indexOf(oc)<0) continue;
+      var effT=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
+      if(effT==='repeated') sections[0].obs.push(o); else sections[1].obs.push(o);
+    }
+    var h='<div style="font-family:Georgia,serif;max-width:820px;margin:0 auto;padding:30px">';
+    h+='<div style="text-align:center;border-bottom:3px solid #1a3a5c;padding-bottom:14px;margin-bottom:20px">';
+    h+='<div style="font-size:12px;letter-spacing:1px;color:#888;text-transform:uppercase">Beaconhouse School System &mdash; Internal Audit</div>';
+    h+='<h1 style="font-size:22px;color:#1a3a5c;margin:6px 0 4px">AUDIT REPORT</h1>';
+    if(H.brname) h+='<h2 style="font-size:16px;color:#2a4a6c;margin:0">'+esc(H.brname)+'</h2>';
+    if(cats.length===1) h+='<div style="font-size:12px;color:#555;margin-top:6px">Category: <strong>'+esc(cats[0])+'</strong></div>';
+    else h+='<div style="font-size:12px;color:#555;margin-top:6px">Categories: <strong>'+cats.map(esc).join(', ')+'</strong></div>';
+    h+='</div>';
+    var num=0;
+    for(var si=0;si<sections.length;si++){
+      if(!sections[si].obs.length) continue;
+      h+='<div style="font-family:Arial,sans-serif;font-size:14px;font-weight:700;color:#fff;background:#1a3a5c;padding:10px 16px;margin:18px 0 12px;border-radius:4px">'+esc(sections[si].label)+'</div>';
+      var catMap={};var catOrd=[];
+      for(var oi=0;oi<sections[si].obs.length;oi++){
+        var cat=sections[si].obs[oi].category||'Others';
+        if(!catMap[cat]){catMap[cat]=[];catOrd.push(cat);}
+        catMap[cat].push(sections[si].obs[oi]);
+      }
+      for(var cii=0;cii<catOrd.length;cii++){
+        h+='<div style="font-size:13px;font-weight:700;color:#1a3a5c;padding:7px 0 4px;border-bottom:2px solid #c8a84b;margin-bottom:10px">'+esc(catOrd[cii])+'</div>';
+        var obsArr=catMap[catOrd[cii]];
+        for(var oii=0;oii<obsArr.length;oii++){
+          num++;
+          var o=obsArr[oii];
+          var obsText=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:o.observation||'';
+          var recText=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
+          var resp=respMap[o.id]!=null?respMap[o.id]:(o.typical_response||'');
+          h+='<div style="background:#f8fafd;border:1px solid #c5d5e8;border-radius:6px;padding:14px 16px;margin-bottom:14px">';
+          h+='<div style="font-weight:700;color:#1a3a5c;margin-bottom:8px">Obs. '+num+': '+esc(o.title)+'</div>';
+          h+='<div style="font-size:11.5px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Observation</div>';
+          h+='<div style="font-size:13px;line-height:1.6;color:#2a3a50;margin-bottom:10px;white-space:pre-wrap">'+esc(obsText)+'</div>';
+          h+='<div style="font-size:11.5px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Recommendation</div>';
+          h+='<div style="font-size:13px;line-height:1.6;color:#2a3a50;margin-bottom:10px;white-space:pre-wrap">'+esc(recText)+'</div>';
+          if(resp){
+            h+='<div style="font-size:11.5px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Auditee Response</div>';
+            h+='<div style="font-size:13px;line-height:1.6;color:#2a3a50;white-space:pre-wrap">'+esc(resp)+'</div>';
+          }
+          h+='</div>';
+        }
+      }
+    }
+    if(num===0) h+='<p style="color:#888;text-align:center">No observations in selected categories.</p>';
+    h+='</div>';
+    return h;
+  }
+
+  function triggerDownload(html, filename){
+    var full='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+filename+'</title></head><body>'+html+'</body></html>';
+    var blob=new Blob([full],{type:'text/html'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=filename+'.html';
+    a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+  }
+
+  var brSlug=(H.brname||'Branch').replace(/[^a-zA-Z0-9]+/g,'_').substring(0,30);
+
+  if(!individual){
+    // One combined file with all selected categories
+    triggerDownload(buildDraftHtml(selCats), 'Draft_Report_'+brSlug);
+  } else {
+    // One file per category
+    for(var sci=0;sci<selCats.length;sci++){
+      (function(cat){
+        var catSlug=cat.replace(/[^a-zA-Z0-9]+/g,'_').substring(0,30);
+        triggerDownload(buildDraftHtml([cat]), 'Draft_'+brSlug+'_'+catSlug);
+      })(selCats[sci]);
+    }
+  }
 }
 
 // ============================================================
