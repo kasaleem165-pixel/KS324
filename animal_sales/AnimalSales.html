@@ -742,6 +742,7 @@ input[readonly]{background:#f8fafc}
     </div>
     <div class="form-actions">
       <button class="btn btn-success" onclick="saveSaleEdit()">Save Changes</button>
+      <button class="btn btn-light" onclick="refreshCurrentView()" style="background:#e0f2fe;color:#1a3a5c;border:1px solid #bae6fd">&#8635; Refresh Screen</button>
       <button class="btn btn-light" onclick="closeModal('editsale-overlay')">Cancel</button>
     </div>
   </div>
@@ -820,6 +821,7 @@ input[readonly]{background:#f8fafc}
     </div>
     <div class="form-actions">
       <button class="btn btn-success" onclick="saveAnimalEdit()">Save Changes</button>
+      <button class="btn btn-light" onclick="refreshCurrentView()" style="background:#e0f2fe;color:#1a3a5c;border:1px solid #bae6fd">&#8635; Refresh Screen</button>
       <button class="btn btn-light" onclick="closeModal('editanimal-overlay')">Cancel</button>
     </div>
   </div>
@@ -845,6 +847,7 @@ input[readonly]{background:#f8fafc}
     </div>
     <div class="form-actions">
       <button class="btn btn-success" onclick="saveCustomerEdit()">Save Changes</button>
+      <button class="btn btn-light" onclick="refreshCurrentView()" style="background:#e0f2fe;color:#1a3a5c;border:1px solid #bae6fd">&#8635; Refresh Screen</button>
       <button class="btn btn-light" onclick="closeModal('editcust-overlay')">Cancel</button>
     </div>
   </div>
@@ -944,8 +947,9 @@ input[readonly]{background:#f8fafc}
       <div class="fg"><label>Notes</label>
         <input id="ep-notes" placeholder="Optional remarks"></div>
     </div>
-    <div style="display:flex;gap:10px;margin-top:16px">
+    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
       <button class="btn btn-success" onclick="savePaymentEdit()">Save Changes</button>
+      <button class="btn btn-light" onclick="refreshCurrentView()" style="background:#e0f2fe;color:#1a3a5c;border:1px solid #bae6fd">&#8635; Refresh Screen</button>
       <button class="btn btn-light" onclick="closeModal('editpay-overlay')">Cancel</button>
     </div>
   </div>
@@ -1107,6 +1111,19 @@ const SEED_ANIMALS=[
 const SEED_SETTINGS={rate_per_kg:780,admin_charges:0,num_persons:7};
 
 function save(){localStorage.setItem(STORE,JSON.stringify(DB));}
+
+function refreshCurrentView(){
+  const pages=['dashboard','animals','customers','sale','reports','budgeting','settings'];
+  const active=pages.find(p=>document.getElementById('page-'+p)?.classList.contains('active'))||'';
+  if(active==='dashboard') renderDashboard();
+  else if(active==='animals') renderAnimals();
+  else if(active==='customers') renderCustomers();
+  else if(active==='reports'){
+    const rptMap={sales:renderSales,saleledger:renderSaleLedger,payments:renderPayments,location:renderLocationReport,waccha:renderWacchaReport,custledger:renderInlineLedger,bankwise:renderBankwiseReport,senderwise:renderSenderwiseReport};
+    Object.entries(rptMap).forEach(([k,fn])=>{const el=document.getElementById('rsect-'+k);if(el&&el.style.display!=='none')fn();});
+  }
+  else if(active==='budgeting') renderBudgeting();
+}
 
 // ══════════════════════════ FAVOURITES ══════════════════════════
 const FAV_OPTIONS=[
@@ -2125,7 +2142,7 @@ function saveAnimalEdit(){
   a.assigned_customer=custVal?parseInt(custVal):null;
   save();
   closeModal('editanimal-overlay');
-  renderAnimals();
+  refreshCurrentView();
   flash('animal-flash',`Animal ${code} updated successfully.`);
 }
 
@@ -2152,8 +2169,7 @@ function saveCustomerEdit(){
   c.address=document.getElementById('ec-address').value||'';
   save();
   closeModal('editcust-overlay');
-  renderCustomers();
-  // refresh sale dropdowns so updated admin charge takes effect
+  refreshCurrentView();
   if(document.getElementById('page-sale').classList.contains('active')) initSaleForm();
 }
 
@@ -2688,7 +2704,7 @@ function saveSaleEdit(){
 
   save();
   closeModal('editsale-overlay');
-  renderSales();
+  refreshCurrentView();
   flash('sale-flash','Sale '+rno+' updated successfully.','ok');
 }
 
@@ -2922,8 +2938,7 @@ function savePaymentEdit(){
   p.notes=document.getElementById('ep-notes').value||'';
   save();
   closeModal('editpay-overlay');
-  renderPayments();
-  renderCustomers();
+  refreshCurrentView();
   flash('','','');
 }
 
