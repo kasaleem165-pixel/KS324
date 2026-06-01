@@ -7904,11 +7904,24 @@ function handleSel(id, checked, div) {
     div.className = 'ri' + (checked?' on':'');
     var ax = document.getElementById('ax-'+id);
     if(checked && !ax){
+      var curType = obsTypeMap[id];
+      // Find the obs to get its default type
+      if(!curType){
+        for(var i=0;i<DB.observations.length;i++){if(DB.observations[i].id===id){curType=DB.observations[i].type||'New';break;}}
+        if(!curType) for(var ci=0;ci<customs.length;ci++){if(customs[ci].id===id){curType=customs[ci].type||'New';break;}}
+        obsTypeMap[id]=curType;
+      }
       var row = document.createElement('div');
-      row.className='axrow'; row.id='ax-'+id;
-      row.innerHTML='<label>Annexure Data:</label><input type="text" value="'+esc(annexMap[id]||'')+'" placeholder="e.g. Annexure-A, Jan 2025" oninput="setAx(\''+id+'\',this.value)" onclick="event.stopPropagation()">';
+      row.style.cssText='display:flex;gap:6px;margin-top:6px;padding-top:6px;border-top:1px solid #eef2f7';
+      row.id='ax-'+id;
+      row.innerHTML=
+        '<span style="font-size:11px;font-weight:700;color:var(--navy);line-height:26px;white-space:nowrap">Type:</span>'+
+        '<label style="display:flex;align-items:center;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;border:1.5px solid #2070b8;background:'+(curType==='New'?'#2070b8':'#fff')+';color:'+(curType==='New'?'#fff':'#2070b8')+'" onclick="event.stopPropagation()">'+
+        '<input type="radio" name="otyp-'+id+'" value="New" style="display:none" '+(curType==='New'?'checked':'')+' onchange="setObsType(\''+id+'\',\'New\')">New</label>'+
+        '<label style="display:flex;align-items:center;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;border:1.5px solid #d06020;background:'+(curType==='Repeated'?'#d06020':'#fff')+';color:'+(curType==='Repeated'?'#fff':'#d06020')+'" onclick="event.stopPropagation()">'+
+        '<input type="radio" name="otyp-'+id+'" value="Repeated" style="display:none" '+(curType==='Repeated'?'checked':'')+' onchange="setObsType(\''+id+'\',\'Repeated\')">Repeated</label>';
       div.appendChild(row);
-    } else if(!checked && ax){ ax.parentNode.removeChild(ax); }
+    } else if(!checked && ax){ ax.parentNode.removeChild(ax); delete obsTypeMap[id]; }
   }
 }
 
@@ -7989,36 +8002,20 @@ function getSnippet(raw, toks) {
 
 function setObsType(id, val) {
   obsTypeMap[id] = val;
-  // Refresh the row styling
-  var ri = document.getElementById('ri-'+id);
-  if(ri){
-    ri.className = 'ri on';
-    // re-render just the type badge in the subtitle
-    var sub = ri.querySelector('.risub');
-    if(sub){
-      var cat = sub.textContent.split(' ')[0]; // rough extract — full re-render is cleaner
+  // Update pill colours in-place without re-rendering the list
+  var axRow = document.getElementById('ax-'+id);
+  if(axRow){
+    var labels = axRow.querySelectorAll('label');
+    for(var i=0;i<labels.length;i++){
+      var inp = labels[i].querySelector('input[type=radio]');
+      if(!inp) continue;
+      var isNew = inp.value==='New';
+      var active = inp.value===val;
+      labels[i].style.background = active ? (isNew?'#2070b8':'#d06020') : '#fff';
+      labels[i].style.color = active ? '#fff' : (isNew?'#2070b8':'#d06020');
     }
   }
   renderRpt();
-  // Re-render the list item to update pill colours without full filter re-run
-  var listEl = document.getElementById('rlist');
-  if(listEl){
-    var axRow = document.getElementById('ax-'+id);
-    if(axRow){
-      var newLabel = axRow.querySelector('input[name="otyp-'+id+'"][value="New"]');
-      var repLabel = newLabel ? newLabel.parentElement : null;
-      var newPill  = newLabel ? newLabel.closest('label') : null;
-      // Update pill colours in-place
-      axRow.querySelectorAll('label[style]').forEach(function(lbl){
-        var inp = lbl.querySelector('input[type=radio]');
-        if(!inp) return;
-        var isNew = inp.value==='New';
-        var active = inp.value===val;
-        lbl.style.background = active ? (isNew?'#2070b8':'#d06020') : '#fff';
-        lbl.style.color = active ? '#fff' : '#555';
-      });
-    }
-  }
 }
 
 // ============================================================
