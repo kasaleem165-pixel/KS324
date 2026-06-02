@@ -8850,7 +8850,10 @@ function renderRpt(){
 }
 
 function remObs(id){
-  // Route through pending system so confirmAndGenerate() shows the confirmation
+  var title='this observation';
+  for(var i=0;i<DB.observations.length;i++){if(DB.observations[i].id===id){title='"'+DB.observations[i].title+'"';break;}}
+  for(var j=0;j<customs.length;j++){if(customs[j].id===id){title='"'+customs[j].title+'"';break;}}
+  if(!confirm('Remove '+title+' from the report?\n\nThis will mark it for removal. Click Generate / Refresh Report to confirm the change.')){return;}
   queuePending(id, false);
 }
 
@@ -8887,6 +8890,7 @@ function clearRptSel(){
 function bulkRemObs(){
   var ids=Object.keys(_rptSel);
   if(!ids.length) return;
+  if(!confirm('Remove '+ids.length+' selected observation(s) from the report?\n\nThey will be marked for removal. Click Generate / Refresh Report to confirm the change.')){return;}
   for(var i=0;i<ids.length;i++){
     queuePending(ids[i], false);
   }
