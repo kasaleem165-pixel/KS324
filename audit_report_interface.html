@@ -22,6 +22,35 @@ html,body{height:100%;font-family:'Inter',sans-serif;font-size:13.5px;color:#1e2
 .tbtn.load{background:#5b3fa0;color:#fff}
 .tbtn.fin{background:#b84000;color:#fff}
 .tbtn.draft{background:#156d5a;color:#fff}
+.tbtn.save{background:#1a3a5c;color:#fff}
+/* Version History Modal */
+.vh-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center}
+.vh-box{background:#fff;border-radius:10px;width:560px;max-width:96vw;font-family:'Inter',sans-serif;box-shadow:0 8px 32px rgba(0,0,0,.25);overflow:hidden}
+.vh-head{background:var(--navy);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+.vh-head h3{margin:0;font-size:14px;font-weight:700}
+.vh-head button{background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1}
+.vh-body{padding:16px 20px}
+.vh-body p{margin:0 0 12px;font-size:12px;color:#555}
+.vh-list{border:1px solid #d8e4f0;border-radius:6px;overflow:hidden;margin-bottom:14px}
+.vh-row{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid #eef2f7;gap:10px}
+.vh-row:last-child{border-bottom:none}
+.vh-row:hover{background:#f5f8fd}
+.vh-ver{font-size:12px;font-weight:700;color:var(--navy);min-width:60px}
+.vh-ts{font-size:11px;color:#666;flex:1}
+.vh-obs{font-size:11px;color:#888}
+.vh-btns{display:flex;gap:6px}
+.vh-btn{font-size:11px;padding:4px 10px;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:600}
+.vh-btn.load{background:#1a3a5c;color:#fff}
+.vh-btn.exp{background:#1a7a4a;color:#fff}
+.vh-btn.del{background:#8b1a1a;color:#fff}
+.vh-empty{padding:20px;text-align:center;color:#aaa;font-size:13px}
+.vh-foot{display:flex;gap:10px;padding:0 20px 18px;flex-wrap:wrap}
+.vh-foot button{padding:8px 16px;border:none;border-radius:5px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.vh-save-now{background:var(--navy);color:#fff}
+.vh-imp{background:#5b3fa0;color:#fff}
+.vh-close-btn{background:#e8edf5;color:#444;margin-left:auto}
+.vh-autosave{font-size:11px;color:#888;display:flex;align-items:center;gap:6px;padding:0 20px 12px}
+.vh-dot{width:8px;height:8px;border-radius:50%;background:#2ecc71;display:inline-block}
 .tbtn.cp{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.35)}
 .tbtn.r{background:#8b1a1a;color:#fff}
 
@@ -7500,6 +7529,7 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 
 <div id="toolbar">
   <div class="brand">BHS <small>Internal Audit — Report Builder</small></div>
+  <button class="tbtn save" onclick="showVersionHistory()">&#128190; Save / Versions</button>
   <button class="tbtn pdf" onclick="downloadPDF()">&#128462; PDF</button>
   <button class="tbtn soft" onclick="downloadSoftCopy()">&#128233; Auditee Copy</button>
   <button class="tbtn draft" onclick="showDraftModal()">&#128196; Draft by Category</button>
@@ -7509,6 +7539,7 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
   <button class="tbtn r" onclick="doClear()">&#10005; Clear</button>
 </div>
 <input type="file" id="fileinp" accept=".html" style="display:none" onchange="loadAuditeeFile(event)">
+<input type="file" id="sessioninp" accept=".json" style="display:none" onchange="importSessionFile(event)">
 
 <div id="main">
 <!-- LEFT PANEL -->
@@ -7776,6 +7807,17 @@ window.onload = function() {
         if(ov.recommendation!=null) DB.observations[di].recommendation=ov.recommendation;
         break;
       }
+    }
+  }
+  // Auto-restore latest saved session if available
+  var sessions=sg(VH_KEY,[]);
+  if(sessions.length){
+    sessions.sort(function(a,b){return (b.ver||0)-(a.ver||0);});
+    var latest=sessions[0];
+    var hasWork=latest.selCount>0||(latest.formData&&latest.formData.brname);
+    if(hasWork){
+      restoreSession(latest);
+      toast('Session restored: Version '+latest.ver+' ('+fmtTs(latest.ts)+')');
     }
   }
   showPrompt(); // show prompt until user searches
@@ -8224,6 +8266,242 @@ function getHdrVals(){
     per     : fmtRange(document.getElementById('rper_from').value, document.getElementById('rper_to').value)
   };
 }
+
+// ============================================================
+// SESSION SAVE / VERSION HISTORY  (max 6 versions in localStorage)
+// ============================================================
+var MAX_VERSIONS = 6;
+var VH_KEY = 'bhs_sessions';
+
+function captureSession() {
+  // Collect all form field values
+  var fields = ['brcode','rno','brname','brregion','brautype','rdt',
+                'rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk','spb'];
+  var formData = {};
+  for(var i=0;i<fields.length;i++){
+    var el=document.getElementById(fields[i]);
+    if(el) formData[fields[i]]=el.value;
+  }
+  var avEl=document.querySelector('input[name="avmode"]:checked');
+  formData.avmode = avEl ? avEl.value : 'auto';
+
+  return {
+    ts       : new Date().toISOString(),
+    formData : formData,
+    selIds   : selIds,
+    obsTypeMap: obsTypeMap,
+    annexMap : annexMap,
+    avMap    : avMap,
+    actMap   : actMap,
+    respMap  : respMap,
+    assessMap: assessMap,
+    obsEdits : obsEdits,
+    customs  : customs
+  };
+}
+
+function restoreSession(sess) {
+  if(!sess) return;
+  // Restore form fields
+  var fd = sess.formData || {};
+  var fields = ['brcode','rno','brname','brregion','brautype','rdt',
+                'rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk','spb'];
+  for(var i=0;i<fields.length;i++){
+    var el=document.getElementById(fields[i]);
+    if(el && fd[fields[i]]!=null) el.value=fd[fields[i]];
+  }
+  if(fd.avmode){
+    var av=document.getElementById('av_'+fd.avmode);
+    if(av) av.checked=true;
+  }
+  // Restore state maps
+  selIds    = sess.selIds    || {};
+  obsTypeMap= sess.obsTypeMap|| {};
+  annexMap  = sess.annexMap  || {};
+  avMap     = sess.avMap     || {};
+  actMap    = sess.actMap    || {};
+  respMap   = sess.respMap   || {};
+  assessMap = sess.assessMap || {};
+  obsEdits  = sess.obsEdits  || {};
+  customs   = sess.customs   || [];
+  window.pendingSel = {};
+  updateGenBtn();
+  validateDates();
+  renderRpt();
+}
+
+function saveVersion() {
+  var sessions = sg(VH_KEY, []);
+  var sess = captureSession();
+  var selCount = Object.keys(selIds).length;
+  // Count pending adds too
+  var pids=Object.keys(window.pendingSel||{});
+  for(var pi=0;pi<pids.length;pi++){if(window.pendingSel[pids[pi]].checked)selCount++;}
+  sess.selCount = selCount;
+  // Auto-increment version number
+  var maxVer = 0;
+  for(var i=0;i<sessions.length;i++){if((sessions[i].ver||0)>maxVer)maxVer=sessions[i].ver||0;}
+  sess.ver = maxVer + 1;
+
+  var deleted = null;
+  if(sessions.length >= MAX_VERSIONS){
+    // Remove the oldest (lowest ver number)
+    sessions.sort(function(a,b){return (a.ver||0)-(b.ver||0);});
+    deleted = sessions.shift();
+  }
+  sessions.push(sess);
+  ss(VH_KEY, sessions);
+
+  // Update autosave indicator
+  updateAutoSaveLabel();
+  return {ver: sess.ver, deleted: deleted};
+}
+
+function updateAutoSaveLabel(){
+  var el=document.getElementById('autosave-ts');
+  if(el){
+    var now=new Date();
+    el.textContent='Last saved: '+fmtTs(now.toISOString());
+  }
+}
+
+function fmtTs(iso){
+  if(!iso) return '—';
+  var d=new Date(iso);
+  var mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return d.getDate()+' '+mo[d.getMonth()]+' '+d.getFullYear()+
+    ' '+pad(d.getHours())+':'+pad(d.getMinutes());
+}
+
+function showVersionHistory(){
+  var sessions = sg(VH_KEY, []);
+  sessions.sort(function(a,b){return (b.ver||0)-(a.ver||0);}); // newest first
+
+  var rows='';
+  if(!sessions.length){
+    rows='<div class="vh-empty">No saved versions yet. Click "Save Now" to create your first version.</div>';
+  } else {
+    for(var i=0;i<sessions.length;i++){
+      var s=sessions[i];
+      var label=s.formData&&s.formData.brname ? s.formData.brname.substring(0,30) : '(no branch)';
+      rows+='<div class="vh-row">'+
+        '<div class="vh-ver">Ver. '+s.ver+'</div>'+
+        '<div class="vh-ts">'+fmtTs(s.ts)+'<br><span style="color:#aaa;font-size:10px">'+label+'</span></div>'+
+        '<div class="vh-obs">'+(s.selCount||0)+' obs.</div>'+
+        '<div class="vh-btns">'+
+          '<button class="vh-btn load" onclick="loadVersion('+s.ver+')">Load</button>'+
+          '<button class="vh-btn exp" onclick="exportVersion('+s.ver+')">Export</button>'+
+          '<button class="vh-btn del" onclick="deleteVersion('+s.ver+')">Delete</button>'+
+        '</div>'+
+      '</div>';
+    }
+  }
+
+  var lastSave=sessions.length?fmtTs(sessions[0].ts):'Never';
+  var el=document.createElement('div');
+  el.className='vh-bg';
+  el.id='vhModal';
+  el.innerHTML=
+    '<div class="vh-box">'+
+    '<div class="vh-head"><h3>&#128190; Save &amp; Version History</h3><button onclick="closeVH()">&#10005;</button></div>'+
+    '<div class="vh-body">'+
+    '<p>Up to <strong>'+MAX_VERSIONS+' versions</strong> are kept. When the limit is reached, the oldest version is deleted automatically.</p>'+
+    '<div class="vh-list">'+rows+'</div>'+
+    '</div>'+
+    '<div class="vh-autosave"><span class="vh-dot"></span><span id="autosave-ts">Last saved: '+lastSave+'</span></div>'+
+    '<div class="vh-foot">'+
+    '<button class="vh-save-now" onclick="doSaveNow()">&#128190; Save Now</button>'+
+    '<button class="vh-imp" onclick="document.getElementById(\'sessioninp\').click()">&#128194; Import from File</button>'+
+    '<button class="vh-close-btn" onclick="closeVH()">Close</button>'+
+    '</div></div>';
+  document.body.appendChild(el);
+}
+
+function closeVH(){var m=document.getElementById('vhModal');if(m)m.parentNode.removeChild(m);}
+
+function doSaveNow(){
+  var result=saveVersion();
+  closeVH();
+  var msg='Version '+result.ver+' saved.';
+  if(result.deleted) msg+='\n\nOldest version (Ver. '+result.deleted.ver+', saved '+fmtTs(result.deleted.ts)+') has been removed to stay within the 6-version limit.';
+  toast(msg.split('\n\n')[0]);
+  if(result.deleted) setTimeout(function(){alert(msg);},400);
+}
+
+function loadVersion(ver){
+  var sessions=sg(VH_KEY,[]);
+  for(var i=0;i<sessions.length;i++){
+    if((sessions[i].ver||0)===ver){
+      if(!confirm('Load Version '+ver+' (saved '+fmtTs(sessions[i].ts)+')?\n\nThis will replace your current unsaved work.')) return;
+      closeVH();
+      restoreSession(sessions[i]);
+      toast('Version '+ver+' loaded.');
+      return;
+    }
+  }
+}
+
+function exportVersion(ver){
+  var sessions=sg(VH_KEY,[]);
+  for(var i=0;i<sessions.length;i++){
+    if((sessions[i].ver||0)===ver){
+      var blob=new Blob([JSON.stringify(sessions[i],null,2)],{type:'application/json'});
+      var a=document.createElement('a');
+      var brSlug=((sessions[i].formData&&sessions[i].formData.brname)||'BHS').replace(/[^a-zA-Z0-9]+/g,'_').substring(0,25);
+      a.download='BHS_Session_v'+ver+'_'+brSlug+'.json';
+      a.href=URL.createObjectURL(blob);
+      a.click();
+      setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+      return;
+    }
+  }
+}
+
+function deleteVersion(ver){
+  if(!confirm('Delete Version '+ver+' permanently?')) return;
+  var sessions=sg(VH_KEY,[]);
+  sessions=sessions.filter(function(s){return (s.ver||0)!==ver;});
+  ss(VH_KEY,sessions);
+  closeVH();
+  setTimeout(showVersionHistory,50);
+}
+
+function importSessionFile(e){
+  var file=e.target.files[0];
+  if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      var sess=JSON.parse(ev.target.result);
+      if(!sess.ts) throw new Error('Invalid session file');
+      if(!confirm('Import session from file "'+file.name+'"?\n\nThis will replace your current unsaved work.')) return;
+      // Save as new version first then restore
+      sess.ver=(function(){
+        var all=sg(VH_KEY,[]);
+        var max=0;for(var i=0;i<all.length;i++){if((all[i].ver||0)>max)max=all[i].ver||0;}
+        return max+1;
+      })();
+      sess.ts=new Date().toISOString();
+      var sessions=sg(VH_KEY,[]);
+      if(sessions.length>=MAX_VERSIONS){sessions.sort(function(a,b){return (a.ver||0)-(b.ver||0);});sessions.shift();}
+      sessions.push(sess);
+      ss(VH_KEY,sessions);
+      restoreSession(sess);
+      toast('Session imported as Version '+sess.ver+'.');
+    } catch(err){alert('Could not load session file: '+err.message);}
+    e.target.value='';
+  };
+  reader.readAsText(file);
+}
+
+// Auto-save every 60 seconds if there are selected observations
+(function startAutoSave(){
+  setInterval(function(){
+    if(Object.keys(selIds).length>0){
+      saveVersion();
+    }
+  },60000);
+})();
 
 // ============================================================
 // PENDING SELECTION & GENERATE CONFIRM
