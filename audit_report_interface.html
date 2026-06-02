@@ -41,8 +41,17 @@ html,body{height:100%;font-family:'Inter',sans-serif;font-size:13.5px;color:#1e2
 .cmp-stat{font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px}
 .cmp-stat.found{background:#e6f7e6;color:#256025}
 .cmp-stat.missing{background:#fde8e8;color:#8b1a1a}
-.cmp-obs-list{max-height:340px;overflow-y:auto}
-.cmp-obs-row{padding:9px 14px;border-bottom:1px solid #f0f4f8;display:flex;gap:10px;align-items:flex-start}
+.cmp-obs-list{max-height:420px;overflow-y:auto}
+.cmp-cat-hdr{display:flex;align-items:center;gap:8px;padding:8px 14px;background:#edf2f8;border-bottom:1px solid #d0dcea;cursor:pointer;user-select:none}
+.cmp-cat-hdr:hover{background:#e0e8f4}
+.cmp-cat-name{font-size:12px;font-weight:700;color:var(--navy);flex:1}
+.cmp-cat-counts{display:flex;gap:6px}
+.cmp-cat-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+.cmp-cat-badge.miss{background:#fde8e8;color:#8b1a1a}
+.cmp-cat-badge.found{background:#e6f7e6;color:#256025}
+.cmp-chevron{font-size:10px;color:#666;transition:transform .2s;display:inline-block;width:14px;text-align:center}
+.cmp-cat-body{border-bottom:2px solid #d0dcea}
+.cmp-obs-row{padding:8px 14px 8px 28px;border-bottom:1px solid #f0f4f8;display:flex;gap:10px;align-items:flex-start}
 .cmp-obs-row:last-child{border-bottom:none}
 .cmp-obs-row.miss{background:#fffafa}
 .cmp-obs-row.hit{background:#f6fff6}
@@ -9192,33 +9201,78 @@ function runComparison(){
   // Render stats
   var statsEl=document.getElementById('cmpStats');
   if(statsEl) statsEl.innerHTML=
-    '<span>Total databank observations checked: <strong>'+total+'</strong></span>'+
+    '<span>Checked: <strong>'+total+'</strong></span>'+
     '<span class="cmp-stat found">&#10003; Found: '+foundCount+'</span>'+
-    '<span class="cmp-stat missing">&#10005; Missing: '+missCount+'</span>';
+    '<span class="cmp-stat missing">&#10005; Missing: '+missCount+'</span>'+
+    '<span style="margin-left:auto;display:flex;gap:10px;font-size:11px">'+
+    '<a href="#" style="color:var(--navy);font-weight:600;text-decoration:none" onclick="cmpToggleAll(true);return false">Expand All</a>'+
+    '<a href="#" style="color:var(--navy);font-weight:600;text-decoration:none" onclick="cmpToggleAll(false);return false">Collapse All</a>'+
+    '</span>';
 
-  // Render list
-  var listEl=document.getElementById('cmpList');
-  var h='';
-  var shown=0;
+  // Build category groups
+  var catMap={}, catOrder=[];
   for(var k=0;k<cmpState.results.length;k++){
     var r=cmpState.results[k];
     if(cmpState.type==='missing'&&r.found) continue;
     if(cmpState.type==='found'&&!r.found) continue;
-    shown++;
-    h+='<div class="cmp-obs-row '+(r.found?'hit':'miss')+'">'+
-      '<div class="cmp-icon">'+(r.found?'&#9989;':'&#10060;')+'</div>'+
-      '<div class="cmp-obs-info">'+
-      '<div class="cmp-obs-title">'+esc(r.o.title)+'</div>'+
-      '<div class="cmp-obs-meta">'+esc(r.o.category||'Others')+' &nbsp;|&nbsp; '+esc(r.o.type||'New')+'</div>'+
-      '</div></div>';
+    var cat=r.o.category||'Others';
+    if(!catMap[cat]){catMap[cat]=[];catOrder.push(cat);}
+    catMap[cat].push(r);
   }
-  if(!shown) h='<div style="padding:20px;text-align:center;color:#aaa;font-size:13px">No observations match the current filter.</div>';
+
+  // Render grouped list
+  var listEl=document.getElementById('cmpList');
+  var h='';
+  if(!catOrder.length){
+    h='<div style="padding:20px;text-align:center;color:#aaa;font-size:13px">No observations match the current filter.</div>';
+  } else {
+    for(var ci=0;ci<catOrder.length;ci++){
+      var cat=catOrder[ci];
+      var rows=catMap[cat];
+      var catMiss=0, catFound=0;
+      for(var ri=0;ri<rows.length;ri++){rows[ri].found?catFound++:catMiss++;}
+      var cid='cmp-cat-'+ci;
+      h+='<div class="cmp-cat-hdr" onclick="cmpToggleCat(\''+cid+'\',this)">'+
+        '<span class="cmp-chevron" id="chv-'+cid+'">&#9660;</span>'+
+        '<span class="cmp-cat-name">'+esc(cat)+'</span>'+
+        '<span class="cmp-cat-counts">'+
+        (catMiss?'<span class="cmp-cat-badge miss">&#10005; '+catMiss+' missing</span>':'')+
+        (catFound?'<span class="cmp-cat-badge found">&#10003; '+catFound+' found</span>':'')+
+        '</span></div>';
+      h+='<div class="cmp-cat-body" id="'+cid+'">';
+      for(var ri2=0;ri2<rows.length;ri2++){
+        var r2=rows[ri2];
+        h+='<div class="cmp-obs-row '+(r2.found?'hit':'miss')+'">'+
+          '<div class="cmp-icon">'+(r2.found?'&#9989;':'&#10060;')+'</div>'+
+          '<div class="cmp-obs-info">'+
+          '<div class="cmp-obs-title">'+esc(r2.o.title)+'</div>'+
+          '</div></div>';
+      }
+      h+='</div>';
+    }
+  }
   if(listEl) listEl.innerHTML=h;
 
   var ra=document.getElementById('cmpResultsArea'); if(ra) ra.style.display='block';
   var nf=document.getElementById('cmpNoFile'); if(nf) nf.style.display='none';
   var em=document.getElementById('cmpExpMiss'); if(em) em.style.display=missCount?'inline-block':'none';
   var ef=document.getElementById('cmpExpFull'); if(ef) ef.style.display='inline-block';
+}
+
+function cmpToggleCat(id, hdr){
+  var body=document.getElementById(id);
+  var chv=document.getElementById('chv-'+id);
+  if(!body) return;
+  var collapsed=body.style.display==='none';
+  body.style.display=collapsed?'':'none';
+  if(chv) chv.innerHTML=collapsed?'&#9660;':'&#9654;';
+}
+
+function cmpToggleAll(expand){
+  var bodies=document.querySelectorAll('#cmpList .cmp-cat-body');
+  var chvs=document.querySelectorAll('#cmpList .cmp-chevron');
+  for(var i=0;i<bodies.length;i++) bodies[i].style.display=expand?'':'none';
+  for(var i=0;i<chvs.length;i++) chvs[i].innerHTML=expand?'&#9660;':'&#9654;';
 }
 
 function exportCmpReport(mode){
