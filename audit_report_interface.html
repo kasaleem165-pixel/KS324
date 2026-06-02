@@ -9787,6 +9787,12 @@ function renderAnnexList(){
     h+='<div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">Title / Description</div>';
     h+='<input type="text" style="width:100%;border:1px solid var(--gbor);border-radius:3px;padding:4px 7px;font-family:Inter,sans-serif;font-size:12px;outline:none" value="'+esc(a.title)+'" placeholder="e.g. Detail of overdue books" oninput="updateAnx(\''+a.id+'\',\'title\',this.value)"></div>';
     h+='</div>';
+    // Text content area
+    h+='<div style="margin-bottom:8px">';
+    h+='<div style="font-size:10px;font-weight:700;color:var(--gtxt);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">&#9997; Text Content (type or paste)</div>';
+    h+='<textarea id="anxtxt-'+a.id+'" style="width:100%;box-sizing:border-box;min-height:80px;resize:vertical;font-family:Inter,sans-serif;font-size:12px;border:1px dashed #b0c4de;border-radius:4px;padding:6px 8px;background:#fafcff;outline:none" placeholder="Type or paste text here..." oninput="updateAnx(\''+a.id+'\',\'text\',this.value)">'+esc(a.text||'')+'</textarea>';
+    h+='<button class="mib" style="margin-top:4px" onclick="insertAnnexTable(\''+a.id+'\')">&#8862; Insert Table</button>';
+    h+='</div>';
     if(a.files&&a.files.length){
       for(var f=0;f<a.files.length;f++){
         var fi=a.files[f];
@@ -9826,10 +9832,22 @@ function renderAnnexList(){
   el.innerHTML=h;
 }
 
+function resequenceAnnexLabels(){
+  // Only auto-rename entries whose label matches the default pattern "Annexure-X"
+  var seq=0;
+  for(var i=0;i<annexures.length;i++){
+    var lbl=annexures[i].label||'';
+    if(/^Annexure-[A-Z0-9]+$/i.test(lbl)||lbl===''){
+      annexures[i].label='Annexure-'+(ANX_LABELS[seq]||String(seq+1));
+    }
+    seq++;
+  }
+}
+
 function addAnnex(){
   var id='ANX'+Date.now();
-  var lbl='Annexure-'+(ANX_LABELS[annexures.length]||String(annexures.length+1));
-  annexures.push({id:id,label:lbl,title:'',open:true,files:[],linkedObs:[]});
+  annexures.push({id:id,label:'',title:'',open:true,files:[],linkedObs:[],text:''});
+  resequenceAnnexLabels();
   renderAnnexList(); renderRpt();
 }
 
@@ -9855,6 +9873,7 @@ function toggleAnnexLink(annexId,obsId){
 
 function delAnnex(id){
   annexures=annexures.filter(function(a){return a.id!==id;});
+  resequenceAnnexLabels();
   renderAnnexList(); renderRpt();
 }
 
@@ -9873,6 +9892,33 @@ function updateAnx(id,key,val){
     var ttEl=hdr.querySelector('.anxtit'); if(ttEl&&key==='title') ttEl.textContent=val||'(no title)';
   }
   renderRpt();
+}
+
+function insertAnnexTable(id){
+  var rows=parseInt(prompt('Number of rows (data rows, excluding header):', '3'),10);
+  if(isNaN(rows)||rows<1) return;
+  var cols=parseInt(prompt('Number of columns:', '3'),10);
+  if(isNaN(cols)||cols<1) return;
+  // Build plain-text table representation
+  var sep='|'; var line='';
+  var headers=[]; for(var c=0;c<cols;c++) headers.push('Column '+(c+1));
+  var hRow=sep+headers.join(sep)+sep;
+  var divRow=sep; for(var c2=0;c2<cols;c2++) divRow+='-----'+sep;
+  var tbl=hRow+'\n'+divRow+'\n';
+  for(var r=0;r<rows;r++){
+    var row=sep; for(var c3=0;c3<cols;c3++) row+='      '+sep;
+    tbl+=row+'\n';
+  }
+  // Append to existing text
+  for(var i=0;i<annexures.length;i++){
+    if(annexures[i].id===id){
+      var cur=annexures[i].text||'';
+      annexures[i].text=(cur?cur+'\n\n':'')+tbl;
+      break;
+    }
+  }
+  var ta=document.getElementById('anxtxt-'+id);
+  if(ta){ ta.value=annexures[i].text; ta.style.minHeight='120px'; }
 }
 
 function triggerFU(id){var el=document.getElementById('fu-'+id);if(el)el.click();}
@@ -9907,6 +9953,45 @@ function removeFile(id,idx){
 
 // Build annexures HTML block (used in report preview, soft copy, final report)
 // Build annexures HTML block (used in report preview, soft copy, final report)
+function annexTextToHtml(text, navy, gbor){
+  // Detect pipe-table lines and convert to HTML table; other lines become paragraphs
+  navy=navy||'#1a3a5c'; gbor=gbor||'#dde2ea';
+  var lines=text.split('\n');
+  var html=''; var i=0;
+  while(i<lines.length){
+    var line=lines[i];
+    // Pipe table: starts and ends with |
+    if(/^\|.*\|$/.test(line.trim())){
+      var tableLines=[];
+      while(i<lines.length&&/^\|.*\|$/.test(lines[i].trim())){
+        tableLines.push(lines[i]); i++;
+      }
+      html+='<table style="border-collapse:collapse;width:100%;font-size:12px;margin-bottom:8px">';
+      var firstRow=true;
+      for(var t=0;t<tableLines.length;t++){
+        var tl=tableLines[t].trim();
+        // Skip divider rows (---|---...)
+        if(/^\|[-| :]+\|$/.test(tl)) continue;
+        var cells=tl.split('|');
+        cells=cells.slice(1,cells.length-1); // remove outer empty elements
+        html+='<tr>';
+        for(var c=0;c<cells.length;c++){
+          var td=firstRow?'th':'td';
+          html+='<'+td+' style="border:1px solid '+gbor+';padding:5px 8px;'+(firstRow?'background:'+navy+';color:#fff;font-weight:700;':'')+'">'+esc(cells[c].trim())+'</'+td+'>';
+        }
+        html+='</tr>';
+        firstRow=false;
+      }
+      html+='</table>';
+    } else {
+      if(line.trim()) html+='<p style="font-size:12px;line-height:1.7;margin:0 0 6px 0">'+esc(line)+'</p>';
+      else html+='<div style="height:6px"></div>';
+      i++;
+    }
+  }
+  return html;
+}
+
 function buildAnnexHtml(inline, obsNumMap){
   if(!annexures.length) return '';
   var navy='#1a3a5c', gbor='#dde2ea', gtxt='#6a7888';
@@ -9931,8 +10016,12 @@ function buildAnnexHtml(inline, obsNumMap){
     } else {
       h+='<div style="margin-bottom:10px"></div>';
     }
+    // Text content block
+    if(a.text&&a.text.trim()){
+      h+='<div style="margin-bottom:12px">'+annexTextToHtml(a.text,navy,gbor)+'</div>';
+    }
     if(!a.files||!a.files.length){
-      h+='<p style="font-size:12px;color:'+gtxt+';font-style:italic">No files attached.</p>';
+      if(!a.text||!a.text.trim()) h+='<p style="font-size:12px;color:'+gtxt+';font-style:italic">No content attached.</p>';
     } else {
       for(var f=0;f<a.files.length;f++){
         var fi=a.files[f];
