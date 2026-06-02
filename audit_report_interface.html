@@ -22,6 +22,40 @@ html,body{height:100%;font-family:'Inter',sans-serif;font-size:13.5px;color:#1e2
 .tbtn.load{background:#5b3fa0;color:#fff}
 .tbtn.fin{background:#b84000;color:#fff}
 .tbtn.draft{background:#156d5a;color:#fff}
+.tbtn.cmp{background:#6a3a8a;color:#fff}
+/* Compare Modal */
+.cmp-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto}
+.cmp-box{background:#fff;border-radius:10px;width:740px;max-width:97vw;font-family:'Inter',sans-serif;box-shadow:0 8px 32px rgba(0,0,0,.25);margin-bottom:40px}
+.cmp-head{background:var(--navy);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;border-radius:10px 10px 0 0}
+.cmp-head h3{margin:0;font-size:14px;font-weight:700}
+.cmp-head button{background:none;border:none;color:#fff;font-size:18px;cursor:pointer}
+.cmp-body{padding:18px 20px}
+.cmp-drop{border:2px dashed #b0c4de;border-radius:8px;padding:28px;text-align:center;cursor:pointer;margin-bottom:14px;transition:.15s;background:#f8faff}
+.cmp-drop:hover{border-color:var(--navy);background:#edf2fb}
+.cmp-drop p{margin:6px 0 0;font-size:12px;color:#888}
+.cmp-filters{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end}
+.cmp-filters label{font-size:11px;font-weight:700;color:var(--navy);display:block;margin-bottom:3px}
+.cmp-filters select{padding:6px 10px;border:1px solid #c0d0e0;border-radius:5px;font-family:'Inter',sans-serif;font-size:12px}
+.cmp-results{border:1px solid #d8e4f0;border-radius:6px;overflow:hidden;margin-bottom:14px}
+.cmp-results-hdr{background:#edf2f8;padding:9px 14px;font-size:12px;font-weight:700;color:var(--navy);display:flex;gap:16px}
+.cmp-stat{font-size:12px;font-weight:700;padding:3px 10px;border-radius:12px}
+.cmp-stat.found{background:#e6f7e6;color:#256025}
+.cmp-stat.missing{background:#fde8e8;color:#8b1a1a}
+.cmp-obs-list{max-height:340px;overflow-y:auto}
+.cmp-obs-row{padding:9px 14px;border-bottom:1px solid #f0f4f8;display:flex;gap:10px;align-items:flex-start}
+.cmp-obs-row:last-child{border-bottom:none}
+.cmp-obs-row.miss{background:#fffafa}
+.cmp-obs-row.hit{background:#f6fff6}
+.cmp-icon{font-size:13px;margin-top:1px;flex-shrink:0}
+.cmp-obs-info{flex:1}
+.cmp-obs-title{font-size:12.5px;font-weight:600;color:#1e2d40}
+.cmp-obs-meta{font-size:11px;color:#888;margin-top:2px}
+.cmp-foot{display:flex;gap:10px;padding:0 20px 18px;flex-wrap:wrap}
+.cmp-foot button{padding:8px 16px;border:none;border-radius:5px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.cmp-run{background:var(--navy);color:#fff}
+.cmp-exp-miss{background:#8b1a1a;color:#fff}
+.cmp-exp-full{background:#156d5a;color:#fff}
+.cmp-close-btn{background:#e8edf5;color:#444;margin-left:auto}
 .tbtn.save{background:#1a3a5c;color:#fff}
 /* Version History Modal */
 .vh-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center}
@@ -7530,6 +7564,7 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 
 <div id="toolbar">
   <div class="brand">BHS <small>Internal Audit — Report Builder</small></div>
+  <button class="tbtn cmp" onclick="showCompareModal()">&#128269; Compare Report</button>
   <button class="tbtn save" onclick="showVersionHistory()">&#128190; Save / Versions</button>
   <button class="tbtn pdf" onclick="downloadPDF()">&#128462; PDF</button>
   <button class="tbtn soft" onclick="downloadSoftCopy()">&#128233; Auditee Copy</button>
@@ -7541,6 +7576,7 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 </div>
 <input type="file" id="fileinp" accept=".html" style="display:none" onchange="loadAuditeeFile(event)">
 <input type="file" id="sessioninp" accept=".json" style="display:none" onchange="importSessionFile(event)">
+<input type="file" id="cmpinp" accept=".html,.htm" style="display:none" onchange="cmpFileLoaded(event)">
 
 <div id="main">
 <!-- LEFT PANEL -->
@@ -8944,6 +8980,212 @@ function doClear(){
   document.getElementById('qinp').value='';
   showPrompt();
   toast('Cleared.');
+}
+
+// ============================================================
+// COMPARE REPORT vs DATABANK
+// ============================================================
+var cmpState = { text:'', results:[], cat:'All Categories', type:'missing' };
+
+function showCompareModal(){
+  cmpState.text=''; cmpState.results=[];
+  var catOptions='<option>All Categories</option>';
+  var cats=DEF_CA.slice(1);
+  for(var ci=0;ci<cats.length;ci++) catOptions+='<option>'+esc(cats[ci])+'</option>';
+
+  var el=document.createElement('div');
+  el.className='cmp-bg'; el.id='cmpModal';
+  el.innerHTML=
+    '<div class="cmp-box">'+
+    '<div class="cmp-head"><h3>&#128269; Compare Report Against Databank</h3><button onclick="closeCmp()">&#10005;</button></div>'+
+    '<div class="cmp-body">'+
+    '<div class="cmp-drop" id="cmpDrop" onclick="document.getElementById(\'cmpinp\').click()" '+
+         'ondragover="event.preventDefault();this.style.borderColor=\'var(--navy)\'" '+
+         'ondragleave="this.style.borderColor=\'#b0c4de\'" '+
+         'ondrop="event.preventDefault();cmpHandleDrop(event)">'+
+    '<div style="font-size:28px">&#128196;</div>'+
+    '<div style="font-size:13px;font-weight:700;color:var(--navy);margin-top:6px">Click or drag &amp; drop a report HTML file</div>'+
+    '<p>Load any audit report (HTML) generated by this system or saved from another source.</p>'+
+    '</div>'+
+    '<div id="cmpFileInfo" style="display:none;background:#e8f0e8;border:1px solid #a0c8a0;border-radius:5px;padding:8px 14px;font-size:12px;color:#255025;margin-bottom:14px"></div>'+
+    '<div class="cmp-filters">'+
+    '<div><label>Filter by Category</label><select id="cmpCat" onchange="cmpState.cat=this.value">'+catOptions+'</select></div>'+
+    '<div><label>Show</label><select id="cmpType" onchange="cmpState.type=this.value">'+
+      '<option value="missing">Missing observations only</option>'+
+      '<option value="found">Found observations only</option>'+
+      '<option value="all">All (found + missing)</option>'+
+    '</select></div>'+
+    '</div>'+
+    '<div id="cmpResultsArea" style="display:none">'+
+    '<div class="cmp-results-hdr" id="cmpStats"></div>'+
+    '<div class="cmp-obs-list cmp-results" id="cmpList"></div>'+
+    '</div>'+
+    '<div id="cmpNoFile" style="text-align:center;padding:18px;color:#aaa;font-size:13px">Load a report file above, then click Run Comparison.</div>'+
+    '</div>'+
+    '<div class="cmp-foot">'+
+    '<button class="cmp-run" onclick="runComparison()">&#9654; Run Comparison</button>'+
+    '<button class="cmp-exp-miss" id="cmpExpMiss" style="display:none" onclick="exportCmpReport(\'missing\')">&#128462; Export Missing (Word)</button>'+
+    '<button class="cmp-exp-full" id="cmpExpFull" style="display:none" onclick="exportCmpReport(\'all\')">&#128462; Export Full Report (Word)</button>'+
+    '<button class="cmp-close-btn" onclick="closeCmp()">Close</button>'+
+    '</div></div>';
+  document.body.appendChild(el);
+}
+
+function closeCmp(){var m=document.getElementById('cmpModal');if(m)m.parentNode.removeChild(m);}
+
+function cmpHandleDrop(e){
+  var f=e.dataTransfer.files[0];
+  if(f) readCmpFile(f);
+}
+
+function cmpFileLoaded(e){
+  var f=e.target.files[0];
+  if(f) readCmpFile(f);
+  e.target.value='';
+}
+
+function readCmpFile(f){
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    cmpState.text=ev.target.result;
+    var info=document.getElementById('cmpFileInfo');
+    var drop=document.getElementById('cmpDrop');
+    if(info){info.style.display='block';info.innerHTML='&#10003; Loaded: <strong>'+esc(f.name)+'</strong> ('+Math.round(f.size/1024)+' KB)';}
+    if(drop) drop.style.borderColor='#2a8a2a';
+    var noFile=document.getElementById('cmpNoFile');
+    if(noFile) noFile.textContent='File loaded. Click "Run Comparison" to analyse.';
+  };
+  reader.readAsText(f);
+}
+
+function runComparison(){
+  if(!cmpState.text){alert('Please load a report file first.');return;}
+  var reportText=cmpState.text.toLowerCase();
+  // Strip HTML tags to get plain text for matching
+  var tmp=document.createElement('div');
+  tmp.innerHTML=cmpState.text;
+  var plainText=(tmp.textContent||tmp.innerText||'').toLowerCase();
+
+  var catF=document.getElementById('cmpCat'); if(catF) cmpState.cat=catF.value;
+  var typF=document.getElementById('cmpType'); if(typF) cmpState.type=typF.value;
+
+  cmpState.results=[];
+  var obs=DB.observations;
+  for(var i=0;i<obs.length;i++){
+    var o=obs[i];
+    if(cmpState.cat!=='All Categories' && o.category!==cmpState.cat) continue;
+    // Match by: title presence, or first 60 chars of observation text
+    var titleMatch=plainText.indexOf(o.title.toLowerCase())>=0;
+    var obsSnip=(o.observation||'').toLowerCase().substring(0,80).trim();
+    var obsMatch=obsSnip.length>30&&plainText.indexOf(obsSnip)>=0;
+    var found=titleMatch||obsMatch;
+    cmpState.results.push({o:o, found:found});
+  }
+
+  var total=cmpState.results.length;
+  var foundCount=0;
+  for(var j=0;j<cmpState.results.length;j++){if(cmpState.results[j].found)foundCount++;}
+  var missCount=total-foundCount;
+
+  // Render stats
+  var statsEl=document.getElementById('cmpStats');
+  if(statsEl) statsEl.innerHTML=
+    '<span>Total databank observations checked: <strong>'+total+'</strong></span>'+
+    '<span class="cmp-stat found">&#10003; Found: '+foundCount+'</span>'+
+    '<span class="cmp-stat missing">&#10005; Missing: '+missCount+'</span>';
+
+  // Render list
+  var listEl=document.getElementById('cmpList');
+  var h='';
+  var shown=0;
+  for(var k=0;k<cmpState.results.length;k++){
+    var r=cmpState.results[k];
+    if(cmpState.type==='missing'&&r.found) continue;
+    if(cmpState.type==='found'&&!r.found) continue;
+    shown++;
+    h+='<div class="cmp-obs-row '+(r.found?'hit':'miss')+'">'+
+      '<div class="cmp-icon">'+(r.found?'&#9989;':'&#10060;')+'</div>'+
+      '<div class="cmp-obs-info">'+
+      '<div class="cmp-obs-title">'+esc(r.o.title)+'</div>'+
+      '<div class="cmp-obs-meta">'+esc(r.o.category||'Others')+' &nbsp;|&nbsp; '+esc(r.o.type||'New')+'</div>'+
+      '</div></div>';
+  }
+  if(!shown) h='<div style="padding:20px;text-align:center;color:#aaa;font-size:13px">No observations match the current filter.</div>';
+  if(listEl) listEl.innerHTML=h;
+
+  var ra=document.getElementById('cmpResultsArea'); if(ra) ra.style.display='block';
+  var nf=document.getElementById('cmpNoFile'); if(nf) nf.style.display='none';
+  var em=document.getElementById('cmpExpMiss'); if(em) em.style.display=missCount?'inline-block':'none';
+  var ef=document.getElementById('cmpExpFull'); if(ef) ef.style.display='inline-block';
+}
+
+function exportCmpReport(mode){
+  var results=cmpState.results;
+  if(!results.length){alert('Run comparison first.');return;}
+  var today=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+
+  // Group missing by category
+  var catMap={};var catOrder=[];
+  for(var i=0;i<results.length;i++){
+    var r=results[i];
+    if(mode==='missing'&&r.found) continue;
+    var cat=r.o.category||'Others';
+    if(!catMap[cat]){catMap[cat]=[];catOrder.push(cat);}
+    catMap[cat].push(r);
+  }
+
+  var h='<!DOCTYPE html><html><head><meta charset="UTF-8">'+
+    '<title>Databank Comparison Report</title>'+
+    '<style>body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:30px;color:#222}'+
+    'h1{font-size:20px;color:#1a3a5c;border-bottom:3px solid #1a3a5c;padding-bottom:8px}'+
+    'h2{font-size:13px;font-weight:700;color:#fff;background:#1a3a5c;padding:7px 12px;border-radius:4px;margin-top:22px}'+
+    'h3{font-size:12px;font-weight:700;color:#1a3a5c;border-bottom:2px solid #c8a84b;padding-bottom:4px;margin-top:16px;text-transform:uppercase;letter-spacing:.4px}'+
+    '.obs{border:1px solid #d0dcea;border-radius:5px;padding:12px 14px;margin-bottom:12px;background:#fafcff}'+
+    '.obs-title{font-weight:700;font-size:13px;color:#1a3a5c;margin-bottom:6px}'+
+    '.lbl{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin:8px 0 3px}'+
+    '.txt{font-size:12.5px;line-height:1.6;color:#333}'+
+    '.badge-miss{display:inline-block;background:#fde8e8;color:#8b1a1a;border:1px solid #f0b0b0;border-radius:10px;font-size:10px;font-weight:700;padding:1px 8px;margin-left:8px}'+
+    '.badge-found{display:inline-block;background:#e6f7e6;color:#256025;border:1px solid #a0d8a0;border-radius:10px;font-size:10px;font-weight:700;padding:1px 8px;margin-left:8px}'+
+    '.meta{display:flex;gap:16px;margin-bottom:10px;font-size:11.5px;color:#555}'+
+    '@media print{body{margin:0;padding:15px}.obs{page-break-inside:avoid}}</style></head><body>';
+
+  var totalMiss=0; for(var x=0;x<results.length;x++){if(!results[x].found)totalMiss++;}
+  h+='<h1>Databank Comparison Report</h1>';
+  h+='<div class="meta"><span><strong>Date:</strong> '+today+'</span>'+
+     '<span><strong>Category:</strong> '+(cmpState.cat||'All Categories')+'</span>'+
+     '<span><strong>Total checked:</strong> '+results.length+'</span>'+
+     '<span style="color:#8b1a1a;font-weight:700">Missing: '+totalMiss+'</span></div>';
+
+  var num=0;
+  if(catOrder.length===0){
+    h+='<p style="color:#aaa;text-align:center;padding:20px">No observations to export.</p>';
+  }
+  for(var ci=0;ci<catOrder.length;ci++){
+    var cat=catOrder[ci];
+    h+='<h2>'+esc(cat)+'</h2>';
+    var rows=catMap[cat];
+    for(var ri=0;ri<rows.length;ri++){
+      num++;
+      var r=rows[ri];
+      var o=r.o;
+      var badge=r.found?'<span class="badge-found">&#10003; In Report</span>':'<span class="badge-miss">&#10005; Missing</span>';
+      h+='<div class="obs">'+
+        '<div class="obs-title">'+num+'. '+esc(o.title)+badge+'</div>'+
+        '<div class="lbl">Observation</div><div class="txt">'+esc(o.observation||'')+'</div>'+
+        '<div class="lbl">Recommendation</div><div class="txt">'+esc(o.recommendation||'')+'</div>'+
+        '</div>';
+    }
+  }
+  h+='</body></html>';
+
+  var label=mode==='missing'?'Missing_Observations':'Full_Comparison';
+  var catSlug=(cmpState.cat||'All').replace(/[^a-zA-Z0-9]+/g,'_').substring(0,25);
+  var blob=new Blob([h],{type:'text/html'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='BHS_Databank_'+label+'_'+catSlug+'_'+new Date().toISOString().slice(0,10)+'.html';
+  a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
 }
 
 // ============================================================
