@@ -8707,7 +8707,7 @@ function renderRpt(){
       var effType=obsTypeMap[o.id]||o.type||'New';
       var tc=effType.toLowerCase();
       var ax=annexMap[o.id]||o._annex||'';
-      var resp=respMap[o.id]!=null?respMap[o.id]:(o.typical_response||'');
+      var resp=respMap[o.id]!=null?respMap[o.id]:'';
       h+='<div class="oc '+tc+'">';
       h+='<div class="och"><span class="onum">Obs. '+num+'</span>';
       h+='<span class="otl">'+esc(o.title)+' <span class="badge '+tc+'">'+esc(effType)+'</span></span>';
@@ -8759,9 +8759,8 @@ function renderRpt(){
         h+='</div>';
         h+='</div>';
       } else {
-        if((avVal==='auto'||avVal==='manual')&&(avStored||o.audit_view)){
-          var avInit=avStored||(avVal==='auto'?o.audit_view:'');
-          h+='<div class="osl">Audit View</div><textarea class="oresp" id="av-'+o.id+'" placeholder="Type audit view here..." oninput="avMap[\''+o.id+'\']=this.value">'+esc(avInit)+'</textarea>';
+        if(avVal==='auto'||avVal==='manual'){
+          h+='<div class="osl">Audit View</div><textarea class="oresp" id="av-'+o.id+'" placeholder="Type audit view here..." oninput="avMap[\''+o.id+'\']=this.value">'+esc(avStored)+'</textarea>';
         }
         h+='<div class="osl">Action Taken</div>';
         h+='<textarea class="oresp" id="act-'+o.id+'" placeholder="Enter action taken..." oninput="actMap[\''+o.id+'\']=this.value">'+esc(actStored)+'</textarea>';
@@ -9168,9 +9167,8 @@ function downloadSoftCopy(){
     // Auditee Response — always blank in soft copy
     h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Auditee Response</div>';
     h+='<textarea name="resp_'+esc(o.id)+'" style="width:100%;border:1px dashed #b0c0d8;border-radius:4px;padding:7px 9px;font-family:Inter,sans-serif;font-size:12.5px;color:#2a3a50;background:#fffef0;resize:vertical;min-height:60px;outline:none" placeholder="Please enter auditee response here..."></textarea>';
-    // Audit View
-    if(avVal==='auto'&&o.audit_view) h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Audit View</div><div style="font-size:12.5px;line-height:1.65;color:#2a3a50;margin-bottom:8px">'+esc(o.audit_view)+'</div>';
-    else if(avVal==='manual'){
+    // Audit View — only show if auditor explicitly typed one (avStored), never from DB
+    if((avVal==='auto'||avVal==='manual')&&avStored){
       h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Audit View</div>';
       h+='<div style="font-size:12.5px;line-height:1.65;color:#2a3a50;margin-bottom:8px">'+esc(avStored)+'</div>';
     }
@@ -9601,13 +9599,13 @@ function finalizeReport(){
     var effType=obsTypeMap[o.id]||o.type||'New';
     var tc=effType.toLowerCase();
     var ax=annexMap[o.id]||o._annex||'';
-    var avStored=avMap[o.id]||o.audit_view||'';
-    var respStored=respMap[o.id]!=null?respMap[o.id]:(o.typical_response||'');
+    var avStored=avMap[o.id]||'';
+    var respStored=respMap[o.id]!=null?respMap[o.id]:'';
     var actStored=actMap[o.id]||'';
     // Read live values from DOM if report is visible
-    var rEl=document.getElementById('r-'+o.id); if(rEl) respStored=rEl.value||respStored;
-    var avEl=document.getElementById('av-'+o.id)||document.getElementById('av-ta-'+o.id); if(avEl) avStored=avEl.value||avStored;
-    var actEl=document.getElementById('act-'+o.id)||document.getElementById('act-ta-'+o.id); if(actEl) actStored=actEl.value||actStored;
+    var rEl=document.getElementById('r-'+o.id); if(rEl) respStored=rEl.value;
+    var avEl=document.getElementById('av-'+o.id)||document.getElementById('av-ta-'+o.id); if(avEl) avStored=avEl.value;
+    var actEl=document.getElementById('act-'+o.id)||document.getElementById('act-ta-'+o.id); if(actEl) actStored=actEl.value;
     var aStatus=assessMap[o.id]||'';
     // Use auditor-edited observation/recommendation text if available
     var obsText=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:o.observation||'';
@@ -9631,10 +9629,7 @@ function finalizeReport(){
       if(aStatus==='resolved'&&actStored) h+=sl('Action Taken')+st(actStored);
       if((aStatus==='partial'||aStatus==='notresolved')&&avStored) h+=sl('Audit View')+st(avStored);
     } else {
-      if(avVal!=='none'){
-        var av=avVal==='auto'?o.audit_view:avStored;
-        if(av)           h+=sl('Audit View')+st(av);
-      }
+      if(avVal!=='none'&&avStored) h+=sl('Audit View')+st(avStored);
       if(actStored)      h+=sl('Action Taken')+st(actStored);
     }
     h+='</div></div>';
