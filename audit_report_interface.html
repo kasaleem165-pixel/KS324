@@ -9070,16 +9070,18 @@ function downloadDraft(individual){
 
   var saveScript='<script>'+
     'function saveDraftResponses(){'+
-      'var textareas=document.querySelectorAll("textarea[name]");'+
+      'var tas=document.querySelectorAll("textarea[name]");'+
       'var data={};'+
-      'for(var i=0;i<textareas.length;i++){if(textareas[i].name)data[textareas[i].name]=textareas[i].value;}'+
-      'var json=JSON.stringify(data);'+
-      'var clone=document.documentElement.outerHTML;'+
-      'var block=\'<script id="bhs-resp-data" type="application/json">\'+json+\'<\\/script>\';'+
-      'if(clone.indexOf(\'id="bhs-resp-data"\')>=0){'+
-      '  clone=clone.replace(/<script id="bhs-resp-data"[^>]*>[\\s\\S]*?<\\/script>/,block);'+
-      '}else{clone=clone.replace("</head>",block+"</head>");}'+
-      'var blob=new Blob([clone],{type:"text/html"});'+
+      'for(var i=0;i<tas.length;i++){if(tas[i].name)data[tas[i].name]=tas[i].value;}'+
+      'var json=JSON.stringify(data).replace(/<\\/script>/gi,"<\\\\/script>");'+
+      'var out="<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>Auditee Responses<\\/title>"'+
+      '+\'<script id="bhs-resp-data" type="application/json">\'+json+\'<\\/script>\''+
+      '+"<\\/head><body style=\\"font-family:Arial,sans-serif;padding:30px;color:#333\\">'+
+      '<h2>&#128203; Auditee Response File<\\/h2>'+
+      '<p>Please email this file back to the auditor to load via the Load Response button.<\\/p>'+
+      '<p style=\\"color:#888;font-size:12px\\">Observations responded: "+Object.keys(data).length+"<\\/p>'+
+      '<\\/body><\\/html>";'+
+      'var blob=new Blob([out],{type:"text/html"});'+
       'var a=document.createElement("a");'+
       'a.href=URL.createObjectURL(blob);'+
       'a.download=document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_Responded.html";'+
@@ -9278,22 +9280,19 @@ function downloadSoftCopy(){
   softHtml+='  for(var i=0;i<tas.length;i++){\n';
   softHtml+='    if(tas[i].name) data[tas[i].name]=tas[i].value;\n';
   softHtml+='  }\n';
-  softHtml+='  // Embed responses as JSON inside the HTML so the auditor can load them reliably\n';
-  softHtml+='  var json=JSON.stringify(data);\n';
-  softHtml+='  var clone=document.documentElement.outerHTML;\n';
-  softHtml+='  var tag=\'<script id="bhs-resp-data" type="application/json">\';\n';
-  softHtml+='  var endTag=\'<\\/script>\';\n';
-  softHtml+='  var block=tag+json+endTag;\n';
-  softHtml+='  if(clone.indexOf(\'id="bhs-resp-data"\')>=0){\n';
-  softHtml+='    clone=clone.replace(/<script id="bhs-resp-data"[^>]*>[\\s\\S]*?<\\/script>/,block);\n';
-  softHtml+='  } else {\n';
-  softHtml+='    clone=clone.replace("</head>",block+"</head>");\n';
-  softHtml+='  }\n';
-  softHtml+='  var blob=new Blob([clone],{type:"text/html"});\n';
-  softHtml+='  var url=URL.createObjectURL(blob);\n';
+  softHtml+='  var json=JSON.stringify(data).replace(/<\\/script>/gi,"<\\\\/script>");\n';
+  softHtml+='  var out="<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>Auditee Responses<\\/title>"\n';
+  softHtml+='    +\'<script id="bhs-resp-data" type="application/json">\'+json+\'<\\/script>\'\n';
+  softHtml+='    +"<\\/head><body style=\\"font-family:Arial,sans-serif;padding:30px;color:#333\\">"\n';
+  softHtml+='    +"<h2>&#128203; Auditee Response File<\\/h2>"\n';
+  softHtml+='    +"<p>This file contains your responses. Please email it back to the auditor who will load it via the <strong>Load Response<\\/strong> button.<\\/p>"\n';
+  softHtml+='    +"<p style=\\"color:#888;font-size:12px\\">Observations responded: "+Object.keys(data).length+"<\\/p>"\n';
+  softHtml+='    +"<\\/body><\\/html>";\n';
+  softHtml+='  var blob=new Blob([out],{type:"text/html"});\n';
   softHtml+='  var a=document.createElement("a");\n';
-  softHtml+='  a.href=url; a.download=document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_Responded.html";\n';
-  softHtml+='  a.click(); URL.revokeObjectURL(url);\n';
+  softHtml+='  a.href=URL.createObjectURL(blob);\n';
+  softHtml+='  a.download=document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_Responded.html";\n';
+  softHtml+='  a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);},2000);\n';
   softHtml+='}\n';
   softHtml+='</scr'+'ipt>\n';
   softHtml+='</body>\n</html>';
@@ -9519,41 +9518,52 @@ function loadAuditeeFile(evt){
     var doc=parser.parseFromString(html,'text/html');
     var loadedObs=[];
 
-    // Primary: read from embedded JSON data block (reliable, browser-independent)
+    // Primary: embedded JSON block (new format — reliable)
     var respDataEl=doc.getElementById('bhs-resp-data');
     if(respDataEl){
       try{
-        var respData=JSON.parse(respDataEl.textContent||respDataEl.innerHTML);
+        var rawJson=(respDataEl.textContent||respDataEl.innerHTML||'').trim();
+        var respData=JSON.parse(rawJson);
         var rkeys=Object.keys(respData);
         for(var ri=0;ri<rkeys.length;ri++){
           var rnm=rkeys[ri];
           var rval=respData[rnm];
           if(rnm.indexOf('resp_')===0){
             var rid=rnm.slice(5);
+            // Add ALL obs IDs to selIds, responses only if non-blank
+            if(loadedObs.indexOf(rid)<0) loadedObs.push(rid);
             if(rval) respMap[rid]=rval;
-            if(rval&&loadedObs.indexOf(rid)<0) loadedObs.push(rid);
           } else if(rnm.indexOf('act_')===0){
             if(rval) actMap[rnm.slice(4)]=rval;
           }
         }
-      }catch(ex){}
+      }catch(ex){ loadedObs=[]; }
     }
 
-    // Fallback: read from textarea textContent (legacy files saved before this fix)
+    // Fallback: scan textareas (legacy format)
     if(!loadedObs.length){
       var tas=doc.querySelectorAll('textarea[name]');
       for(var i=0;i<tas.length;i++){
         var nm=tas[i].getAttribute('name');
-        var val=(tas[i].textContent||'').trim();
+        if(!nm) continue;
         if(nm.indexOf('resp_')===0){
           var id=nm.slice(5);
+          var val=(tas[i].textContent||'').trim();
+          if(loadedObs.indexOf(id)<0) loadedObs.push(id);
           if(val) respMap[id]=val;
-          if(val&&loadedObs.indexOf(id)<0) loadedObs.push(id);
         } else if(nm.indexOf('act_')===0){
-          if(val) actMap[nm.slice(4)]=val;
+          var av=(tas[i].textContent||'').trim();
+          if(av) actMap[nm.slice(4)]=av;
         }
       }
     }
+
+    if(!loadedObs.length){
+      alert('Could not read any observations from this file.\n\nPlease make sure you are loading a responded Auditee Copy file generated by this application.\n\nNote: Files saved before the latest update must be re-generated.');
+      evt.target.value='';
+      return;
+    }
+
     // Restore Branch & Report Information fields from embedded meta
     var metaEl=doc.getElementById('report-meta');
     if(metaEl){
