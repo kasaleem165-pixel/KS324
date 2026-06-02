@@ -9059,10 +9059,8 @@ function downloadDraft(individual){
           h+='<div style="font-size:13px;line-height:1.6;color:#2a3a50;margin-bottom:10px;white-space:pre-wrap">'+esc(obsText)+'</div>';
           h+='<div style="font-size:11.5px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Recommendation</div>';
           h+='<div style="font-size:13px;line-height:1.6;color:#2a3a50;margin-bottom:10px;white-space:pre-wrap">'+esc(recText)+'</div>';
-          if(resp){
-            h+='<div style="font-size:11.5px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Auditee Response</div>';
-            h+='<div style="font-size:13px;line-height:1.6;color:#2a3a50;white-space:pre-wrap">'+esc(resp)+'</div>';
-          }
+          h+='<div style="font-size:11.5px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Auditee Response</div>';
+          h+='<textarea name="resp_'+o.id+'" style="width:100%;box-sizing:border-box;border:1px dashed #b0c0d8;border-radius:4px;padding:7px 9px;font-family:Inter,sans-serif;font-size:12.5px;color:#2a3a50;background:#fffef0;resize:vertical;min-height:70px;outline:none" placeholder="Please enter auditee response here...">'+esc(resp)+'</textarea>';
           h+='</div>';
         }
       }
@@ -9072,8 +9070,28 @@ function downloadDraft(individual){
     return h;
   }
 
+  var saveScript='<script>'+
+    'function saveDraftResponses(){'+
+      'var textareas=document.querySelectorAll("textarea[name]");'+
+      'var data={};'+
+      'for(var i=0;i<textareas.length;i++){data[textareas[i].name]=textareas[i].value;}'+
+      'var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});'+
+      'var a=document.createElement("a");'+
+      'a.href=URL.createObjectURL(blob);'+
+      'a.download="draft_responses.json";'+
+      'a.click();'+
+      'setTimeout(function(){URL.revokeObjectURL(a.href);},2000);'+
+    '}'+
+    '<\/script>';
+
   function triggerDownload(html, filename){
-    var full='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+filename+'</title></head><body>'+html+'</body></html>';
+    var notice='<div style="background:#fff8e1;border:1px solid #f0c040;border-radius:6px;padding:12px 16px;margin-bottom:24px;font-family:Arial,sans-serif;font-size:13px;color:#5a4000">'+
+      '<strong>&#9432; Instructions for Auditee:</strong> Please read each observation carefully and type your response in the yellow-highlighted <em>Auditee Response</em> fields. '+
+      'When complete, click the <strong>"Save My Responses"</strong> button below.</div>';
+    var saveBtn='<div style="text-align:center;margin-top:30px;padding:20px 0;border-top:2px solid #1a3a5c">'+
+      '<button onclick="saveDraftResponses()" style="padding:12px 32px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial,sans-serif">&#128190; Save My Responses</button>'+
+      '</div>';
+    var full='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+filename+'</title>'+saveScript+'</head><body>'+notice+html+saveBtn+'</body></html>';
     var blob=new Blob([full],{type:'text/html'});
     var a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
