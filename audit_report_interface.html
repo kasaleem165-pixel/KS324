@@ -8853,8 +8853,12 @@ function remObs(id){
   var title='this observation';
   for(var i=0;i<DB.observations.length;i++){if(DB.observations[i].id===id){title='"'+DB.observations[i].title+'"';break;}}
   for(var j=0;j<customs.length;j++){if(customs[j].id===id){title='"'+customs[j].title+'"';break;}}
-  if(!confirm('Remove '+title+' from the report?\n\nThis will mark it for removal. Click Generate / Refresh Report to confirm the change.')){return;}
-  queuePending(id, false);
+  if(!confirm('Remove '+title+' from the report?\n\nClick OK to remove immediately.')){return;}
+  handleSel(id, false, document.getElementById('ri-'+id));
+  customs=customs.filter(function(o){return o.id!==id;});
+  delete window.pendingSel[id];
+  flushObsEditsToDb();
+  renderRpt();
 }
 
 var _rptSel={};
@@ -8890,12 +8894,16 @@ function clearRptSel(){
 function bulkRemObs(){
   var ids=Object.keys(_rptSel);
   if(!ids.length) return;
-  if(!confirm('Remove '+ids.length+' selected observation(s) from the report?\n\nThey will be marked for removal. Click Generate / Refresh Report to confirm the change.')){return;}
+  if(!confirm('Remove '+ids.length+' selected observation(s) from the report?\n\nClick OK to remove immediately.')){return;}
   for(var i=0;i<ids.length;i++){
-    queuePending(ids[i], false);
+    handleSel(ids[i], false, document.getElementById('ri-'+ids[i]));
+    customs=customs.filter(function(o){return o.id!==ids[i];});
+    delete window.pendingSel[ids[i]];
   }
   _rptSel={};
   updateRptRemBar();
+  flushObsEditsToDb();
+  renderRpt();
 }
 
 // ============================================================
