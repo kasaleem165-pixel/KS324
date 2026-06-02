@@ -7617,6 +7617,18 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
       </div>
     </div>
 
+    <div class="fr"><label>Report Stage</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="rpt_stage" onchange="renderRpt()" style="flex:1;padding:5px 8px;border:1px solid var(--gbor);border-radius:4px;font-family:Inter,sans-serif;font-size:12px;background:#fff">
+          <option value="draft_bh">Draft – Branch Head Review</option>
+          <option value="draft_ar">Draft – Auditee Response</option>
+          <option value="draft_av">Draft – Audit View / Action Taken</option>
+          <option value="final">&#10003; FINAL (Issued)</option>
+        </select>
+        <span id="rpt_stage_badge" style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;white-space:nowrap"></span>
+      </div>
+    </div>
+
     <div class="fr"><label>Branch Name</label>
       <input type="text" id="brname" placeholder="e.g. LMA 11-FCC Branch Gulberg, Lahore" list="dl-brname" oninput="brAutoFill('name',this.value);renderRpt()" autocomplete="off">
       <datalist id="dl-brname"></datalist>
@@ -7968,6 +7980,7 @@ window.onload = function() {
       toast('Session restored: Version '+latest.ver+' ('+fmtTs(latest.ts)+')');
     }
   }
+  updateStageBadge();
   showPrompt(); // show prompt until user searches
 };
 
@@ -8399,22 +8412,63 @@ function fmtRange(from,to){
   if(f&&t) return f+' to '+t;
   return f||t;
 }
+var RPT_STAGE_LABELS = {
+  draft_bh: 'Draft – Branch Head Review',
+  draft_ar: 'Draft – Auditee Response',
+  draft_av: 'Draft – Audit View / Action Taken',
+  final:    'FINAL'
+};
+var RPT_STAGE_COLORS = {
+  draft_bh: {bg:'#fff4e0',color:'#8a5000'},
+  draft_ar: {bg:'#e8f0fb',color:'#1a3a7c'},
+  draft_av: {bg:'#f0f0f0',color:'#444'},
+  final:    {bg:'#e6f9ec',color:'#1a6e35'}
+};
+
+function getRptStage(){
+  var el=document.getElementById('rpt_stage');
+  return el ? el.value : 'draft_bh';
+}
+
+function updateStageBadge(){
+  var stage=getRptStage();
+  var badge=document.getElementById('rpt_stage_badge');
+  if(!badge) return;
+  var lbl=RPT_STAGE_LABELS[stage]||stage;
+  var col=RPT_STAGE_COLORS[stage]||{bg:'#eee',color:'#333'};
+  badge.textContent=lbl;
+  badge.style.background=col.bg;
+  badge.style.color=col.color;
+  badge.style.border='1px solid '+col.color;
+}
+
+function getEffectiveRno(base, stage){
+  if(!base) return '';
+  var lbl=RPT_STAGE_LABELS[stage]||'';
+  return base + (lbl ? ' / ' + lbl : '');
+}
+
 function getHdrVals(){
+  var rnoBase=document.getElementById('rno').value.trim();
+  var stage=getRptStage();
+  updateStageBadge();
   return {
-    brcode  : document.getElementById('brcode').value.trim(),
-    brname  : document.getElementById('brname').value.trim(),
-    brregion: document.getElementById('brregion').value.trim(),
-    brcity  : document.getElementById('brcity').value.trim(),
-    brhead  : document.getElementById('brhead').value.trim(),
-    braddress: document.getElementById('braddress').value.trim(),
-    brautype: document.getElementById('brautype').value.trim(),
-    brvisit : fmtRange(document.getElementById('brvisit_from').value, document.getElementById('brvisit_to').value),
-    brprev  : fmtDt(document.getElementById('brprev').value),
-    brfwk   : document.getElementById('brfwk').value.trim(),
-    rno     : document.getElementById('rno').value.trim(),
-    pb      : document.getElementById('spb').value,
-    dt      : document.getElementById('rdt').value,
-    per     : fmtRange(document.getElementById('rper_from').value, document.getElementById('rper_to').value)
+    brcode    : document.getElementById('brcode').value.trim(),
+    brname    : document.getElementById('brname').value.trim(),
+    brregion  : document.getElementById('brregion').value.trim(),
+    brcity    : document.getElementById('brcity').value.trim(),
+    brhead    : document.getElementById('brhead').value.trim(),
+    braddress : document.getElementById('braddress').value.trim(),
+    brautype  : document.getElementById('brautype').value.trim(),
+    brvisit   : fmtRange(document.getElementById('brvisit_from').value, document.getElementById('brvisit_to').value),
+    brprev    : fmtDt(document.getElementById('brprev').value),
+    brfwk     : document.getElementById('brfwk').value.trim(),
+    rno       : getEffectiveRno(rnoBase, stage),
+    rnoBase   : rnoBase,
+    rptStage  : stage,
+    pb        : document.getElementById('spb').value,
+    dt        : document.getElementById('rdt').value,
+    per       : fmtRange(document.getElementById('rper_from').value, document.getElementById('rper_to').value)
   };
 }
 
@@ -8426,7 +8480,7 @@ var VH_KEY = 'bhs_sessions';
 
 function captureSession() {
   // Collect all form field values
-  var fields = ['brcode','rno','brname','brregion','brcity','brhead','braddress','brautype','rdt',
+  var fields = ['brcode','rno','rpt_stage','brname','brregion','brcity','brhead','braddress','brautype','rdt',
                 'rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk','spb'];
   var formData = {};
   for(var i=0;i<fields.length;i++){
@@ -8455,7 +8509,7 @@ function restoreSession(sess) {
   if(!sess) return;
   // Restore form fields
   var fd = sess.formData || {};
-  var fields = ['brcode','rno','brname','brregion','brcity','brhead','braddress','brautype','rdt',
+  var fields = ['brcode','rno','rpt_stage','brname','brregion','brcity','brhead','braddress','brautype','rdt',
                 'rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk','spb'];
   for(var i=0;i<fields.length;i++){
     var el=document.getElementById(fields[i]);
@@ -8535,9 +8589,13 @@ function showVersionHistory(){
     for(var i=0;i<sessions.length;i++){
       var s=sessions[i];
       var label=s.formData&&s.formData.brname ? s.formData.brname.substring(0,30) : '(no branch)';
+      var stageKey=s.formData&&s.formData.rpt_stage?s.formData.rpt_stage:'draft_bh';
+      var stageLbl=RPT_STAGE_LABELS[stageKey]||stageKey;
+      var stageCol=RPT_STAGE_COLORS[stageKey]||{bg:'#eee',color:'#333'};
+      var stagePill='<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;background:'+stageCol.bg+';color:'+stageCol.color+';border:1px solid '+stageCol.color+';white-space:nowrap">'+esc(stageLbl)+'</span>';
       rows+='<div class="vh-row">'+
         '<div class="vh-ver">Ver. '+s.ver+'</div>'+
-        '<div class="vh-ts">'+fmtTs(s.ts)+'<br><span style="color:#aaa;font-size:10px">'+label+'</span></div>'+
+        '<div class="vh-ts">'+fmtTs(s.ts)+'<br><span style="color:#aaa;font-size:10px">'+esc(label)+'</span><br>'+stagePill+'</div>'+
         '<div class="vh-obs">'+(s.selCount||0)+' obs.</div>'+
         '<div class="vh-btns">'+
           '<button class="vh-btn load" onclick="loadVersion('+s.ver+')">Load</button>'+
@@ -8812,6 +8870,10 @@ function renderRpt(){
   }
 
   var h='';
+  var curStage=H.rptStage||'draft_bh';
+  var curStageLbl=RPT_STAGE_LABELS[curStage]||curStage;
+  var curStageCol=RPT_STAGE_COLORS[curStage]||{bg:'#eee',color:'#333'};
+  h+='<div style="background:'+curStageCol.bg+';border-bottom:3px solid '+curStageCol.color+';padding:6px 16px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.8px;color:'+curStageCol.color+';text-transform:uppercase">'+esc(curStageLbl)+'</div>';
   h+='<div class="rhdr">';
   h+='<div class="rlogo">Beaconhouse School System &nbsp;|&nbsp; Internal Audit</div>';
   h+='<h1>AUDIT REPORT</h1>';
