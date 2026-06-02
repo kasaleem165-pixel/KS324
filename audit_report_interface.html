@@ -8956,16 +8956,17 @@ function showDraftModal() {
   var all=dbObs.concat(cuObs);
   if(!all.length){alert('No observations selected. Please select observations first.');return;}
 
-  // Collect unique categories preserving order
-  var catSeen={}, catOrder=[];
+  // Collect unique categories preserving order — stored globally for button access
+  window._draftCats=[];
+  var catSeen={};
   for(var i=0;i<all.length;i++){
     var c=all[i].category||'Others';
-    if(!catSeen[c]){catSeen[c]=true;catOrder.push(c);}
+    if(!catSeen[c]){catSeen[c]=true;window._draftCats.push(c);}
   }
 
   var checks='';
-  for(var ci=0;ci<catOrder.length;ci++){
-    checks+='<label><input type="checkbox" id="dcat-'+ci+'" checked><span>'+esc(catOrder[ci])+'</span></label>';
+  for(var ci=0;ci<window._draftCats.length;ci++){
+    checks+='<label><input type="checkbox" id="dcat-'+ci+'" checked><span>'+esc(window._draftCats[ci])+'</span></label>';
   }
 
   var el=document.createElement('div');
@@ -8979,8 +8980,8 @@ function showDraftModal() {
     '<div class="dmodal-row">'+
     '<button class="dm-sel-all" onclick="draftToggleAll()">Toggle All</button>'+
     '<button class="dm-cancel" onclick="closeDraftModal()">Cancel</button>'+
-    '<button class="dm-combined" onclick="downloadDraft(false,'+JSON.stringify(catOrder)+')">&#128230; Combined</button>'+
-    '<button class="dm-individual" onclick="downloadDraft(true,'+JSON.stringify(catOrder)+')">&#128195; Individual Files</button>'+
+    '<button class="dm-combined" onclick="downloadDraft(false)">&#128230; Combined</button>'+
+    '<button class="dm-individual" onclick="downloadDraft(true)">&#128195; Individual Files</button>'+
     '</div></div>';
   document.body.appendChild(el);
 }
@@ -8994,7 +8995,8 @@ function draftToggleAll(){
   for(var i=0;i<checks.length;i++){checks[i].checked=anyUnchecked;}
 }
 
-function downloadDraft(individual, allCats){
+function downloadDraft(individual){
+  var allCats=window._draftCats||[];
   var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
   var allObs=dbObs.concat(cuObs);
