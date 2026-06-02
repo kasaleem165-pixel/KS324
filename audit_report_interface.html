@@ -9072,11 +9072,17 @@ function downloadDraft(individual){
     'function saveDraftResponses(){'+
       'var textareas=document.querySelectorAll("textarea[name]");'+
       'var data={};'+
-      'for(var i=0;i<textareas.length;i++){data[textareas[i].name]=textareas[i].value;}'+
-      'var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});'+
+      'for(var i=0;i<textareas.length;i++){if(textareas[i].name)data[textareas[i].name]=textareas[i].value;}'+
+      'var json=JSON.stringify(data);'+
+      'var clone=document.documentElement.outerHTML;'+
+      'var block=\'<script id="bhs-resp-data" type="application/json">\'+json+\'<\\/script>\';'+
+      'if(clone.indexOf(\'id="bhs-resp-data"\')>=0){'+
+      '  clone=clone.replace(/<script id="bhs-resp-data"[^>]*>[\\s\\S]*?<\\/script>/,block);'+
+      '}else{clone=clone.replace("</head>",block+"</head>");}'+
+      'var blob=new Blob([clone],{type:"text/html"});'+
       'var a=document.createElement("a");'+
       'a.href=URL.createObjectURL(blob);'+
-      'a.download="draft_responses.json";'+
+      'a.download=document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_Responded.html";'+
       'a.click();'+
       'setTimeout(function(){URL.revokeObjectURL(a.href);},2000);'+
     '}'+
@@ -9267,26 +9273,23 @@ function downloadSoftCopy(){
   // Inline JS for the save-responses feature
   softHtml+='<script>\n';
   softHtml+='function saveResponses(){\n';
-  softHtml+='  var tas=document.querySelectorAll("textarea");\n';
-  softHtml+='  var clone=document.documentElement.outerHTML;\n';
+  softHtml+='  var tas=document.querySelectorAll("textarea[name]");\n';
+  softHtml+='  var data={};\n';
   softHtml+='  for(var i=0;i<tas.length;i++){\n';
-  softHtml+='    var ta=tas[i];\n';
-  softHtml+='    var nm=ta.name||"";\n';
-  softHtml+='    var val=ta.value.replace(/\\\\/g,"\\\\\\\\").replace(/`/g,"\\\\`");\n';
-  softHtml+='    clone=clone.replace(\'name="\'+nm+\'" style=\',\'data-val="\'+encodeURIComponent(ta.value)+\'" name="\'+nm+\'" style=\');\n';
+  softHtml+='    if(tas[i].name) data[tas[i].name]=tas[i].value;\n';
   softHtml+='  }\n';
-  softHtml+='  // Re-inject values as defaultValue\n';
-  softHtml+='  clone=clone.replace(/<script>/g,"<scr"+"ipt>").replace(/<\\/script>/g,"</scr"+"ipt>");\n';
-  softHtml+='  // Build new doc\n';
-  softHtml+='  var parser=new DOMParser();\n';
-  softHtml+='  var doc=parser.parseFromString(clone,"text/html");\n';
-  softHtml+='  var newTas=doc.querySelectorAll("textarea[data-val]");\n';
-  softHtml+='  for(var j=0;j<newTas.length;j++){\n';
-  softHtml+='    newTas[j].textContent=decodeURIComponent(newTas[j].getAttribute("data-val"));\n';
-  softHtml+='    newTas[j].removeAttribute("data-val");\n';
+  softHtml+='  // Embed responses as JSON inside the HTML so the auditor can load them reliably\n';
+  softHtml+='  var json=JSON.stringify(data);\n';
+  softHtml+='  var clone=document.documentElement.outerHTML;\n';
+  softHtml+='  var tag=\'<script id="bhs-resp-data" type="application/json">\';\n';
+  softHtml+='  var endTag=\'<\\/script>\';\n';
+  softHtml+='  var block=tag+json+endTag;\n';
+  softHtml+='  if(clone.indexOf(\'id="bhs-resp-data"\')>=0){\n';
+  softHtml+='    clone=clone.replace(/<script id="bhs-resp-data"[^>]*>[\\s\\S]*?<\\/script>/,block);\n';
+  softHtml+='  } else {\n';
+  softHtml+='    clone=clone.replace("</head>",block+"</head>");\n';
   softHtml+='  }\n';
-  softHtml+='  var out="<!DOCTYPE html>\\n"+doc.documentElement.outerHTML;\n';
-  softHtml+='  var blob=new Blob([out],{type:"text/html"});\n';
+  softHtml+='  var blob=new Blob([clone],{type:"text/html"});\n';
   softHtml+='  var url=URL.createObjectURL(blob);\n';
   softHtml+='  var a=document.createElement("a");\n';
   softHtml+='  a.href=url; a.download=document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_Responded.html";\n';
@@ -9514,18 +9517,41 @@ function loadAuditeeFile(evt){
     var html=e.target.result;
     var parser=new DOMParser();
     var doc=parser.parseFromString(html,'text/html');
-    var tas=doc.querySelectorAll('textarea[name]');
     var loadedObs=[];
-    for(var i=0;i<tas.length;i++){
-      var nm=tas[i].getAttribute('name');
-      var val=tas[i].textContent;
-      if(nm.indexOf('resp_')===0){
-        var id=nm.slice(5);
-        respMap[id]=val;
-        if(loadedObs.indexOf(id)<0) loadedObs.push(id);
-      } else if(nm.indexOf('act_')===0){
-        var id2=nm.slice(4);
-        actMap[id2]=val;
+
+    // Primary: read from embedded JSON data block (reliable, browser-independent)
+    var respDataEl=doc.getElementById('bhs-resp-data');
+    if(respDataEl){
+      try{
+        var respData=JSON.parse(respDataEl.textContent||respDataEl.innerHTML);
+        var rkeys=Object.keys(respData);
+        for(var ri=0;ri<rkeys.length;ri++){
+          var rnm=rkeys[ri];
+          var rval=respData[rnm];
+          if(rnm.indexOf('resp_')===0){
+            var rid=rnm.slice(5);
+            if(rval) respMap[rid]=rval;
+            if(rval&&loadedObs.indexOf(rid)<0) loadedObs.push(rid);
+          } else if(rnm.indexOf('act_')===0){
+            if(rval) actMap[rnm.slice(4)]=rval;
+          }
+        }
+      }catch(ex){}
+    }
+
+    // Fallback: read from textarea textContent (legacy files saved before this fix)
+    if(!loadedObs.length){
+      var tas=doc.querySelectorAll('textarea[name]');
+      for(var i=0;i<tas.length;i++){
+        var nm=tas[i].getAttribute('name');
+        var val=(tas[i].textContent||'').trim();
+        if(nm.indexOf('resp_')===0){
+          var id=nm.slice(5);
+          if(val) respMap[id]=val;
+          if(val&&loadedObs.indexOf(id)<0) loadedObs.push(id);
+        } else if(nm.indexOf('act_')===0){
+          if(val) actMap[nm.slice(4)]=val;
+        }
       }
     }
     // Restore Branch & Report Information fields from embedded meta
