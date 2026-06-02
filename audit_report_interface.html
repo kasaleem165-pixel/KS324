@@ -7638,7 +7638,7 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
     </div>
 
     <div class="fr"><label>Branch Address</label>
-      <input type="text" id="braddress" placeholder="e.g. 12-FCC, Gulberg III, Lahore" oninput="renderRpt()">
+      <input type="text" id="braddress" placeholder="e.g. 12-FCC, Gulberg III, Lahore" oninput="saveBrAddress();renderRpt()">
     </div>
 
     <div class="g2">
@@ -7860,7 +7860,6 @@ function brAutoFill(field, val){
     var br=BHS_BRANCHES[i];
     if(field==='code' && br.code===val){ b=br; break; }
     if(field==='name' && br.name===val){ b=br; break; }
-    if(field==='head' && br.head===val){ b=br; break; }
   }
   // For region or city: only fill if exactly one branch matches
   if(!b && (field==='region'||field==='city')){
@@ -7876,8 +7875,19 @@ function brAutoFill(field, val){
   setFld('brname', b.name);
   setFld('brregion', b.region);
   setFld('brcity', b.city);
-  setFld('brhead', b.head);
-  if(b.address) setFld('braddress', b.address);
+  // Auto-fill address from saved directory (user-entered addresses are remembered per branch code)
+  var savedAddrs=sg('bhs_br_addr',{});
+  var addr=savedAddrs[b.code]||'';
+  setFld('braddress', addr);
+}
+
+function saveBrAddress(){
+  var code=document.getElementById('brcode').value.trim();
+  var addr=document.getElementById('braddress').value.trim();
+  if(!code) return;
+  var savedAddrs=sg('bhs_br_addr',{});
+  if(addr) savedAddrs[code]=addr; else delete savedAddrs[code];
+  ss('bhs_br_addr', savedAddrs);
 }
 
 // ============================================================
