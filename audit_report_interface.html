@@ -202,6 +202,11 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 .otl{flex:1;font-size:13px;font-weight:700;color:#1e2d40}
 .odl{background:none;border:none;cursor:pointer;color:#c03020;font-size:14px;padding:2px 4px;border-radius:3px}
 .odl:hover{background:#fde8e8}
+.ocb-chk{width:15px;height:15px;cursor:pointer;accent-color:#c03020;flex-shrink:0}
+#rpt-rem-bar{position:sticky;top:0;z-index:200;background:#8b1a1a;color:#fff;display:none;align-items:center;justify-content:space-between;padding:8px 16px;gap:10px;border-bottom:2px solid #c03020}
+#rpt-rem-bar span{font-size:13px;font-weight:700}
+#rpt-rem-bar button{background:#fff;color:#8b1a1a;border:none;border-radius:4px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer}
+#rpt-rem-bar button:hover{background:#ffe0e0}
 .ocb{padding:11px 13px}
 .osl{font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--navy);margin-bottom:3px}
 .ost{font-size:12.5px;line-height:1.6;color:#2a3a50;margin-bottom:9px}
@@ -7765,6 +7770,13 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
       <div style="font-size:15px;font-weight:600;color:var(--navy);margin-bottom:6px">Report Preview</div>
       <div>Select a Branch, tick observations on the left,<br>then click <strong>Generate / Refresh Report</strong>.</div>
     </div>
+    <div id="rpt-rem-bar">
+      <span id="rpt-rem-lbl">0 observation(s) selected for removal</span>
+      <div style="display:flex;gap:8px">
+        <button onclick="clearRptSel()">Clear</button>
+        <button onclick="bulkRemObs()">Remove Selected</button>
+      </div>
+    </div>
     <div id="rpcont" style="display:none"></div>
   </div>
 </div>
@@ -8676,6 +8688,10 @@ function renderRpt(){
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
   var all=dbObs.concat(cuObs);
 
+  // Reset report-panel multi-select state on each render
+  _rptSel={};
+  updateRptRemBar();
+
   var empty=document.getElementById('rpempty');
   var cont =document.getElementById('rpcont');
 
@@ -8753,10 +8769,11 @@ function renderRpt(){
       var tc=effType.toLowerCase();
       var ax=annexMap[o.id]||o._annex||'';
       var resp=respMap[o.id]!=null?respMap[o.id]:'';
-      h+='<div class="oc '+tc+'">';
+      h+='<div class="oc '+tc+'" id="oc-'+o.id+'">';
       h+='<div class="och"><span class="onum">Obs. '+num+'</span>';
       h+='<span class="otl">'+esc(o.title)+' <span class="badge '+tc+'">'+esc(effType)+'</span></span>';
-      h+='<button class="odl" onclick="remObs(\''+o.id+'\')">&#10005;</button></div>';
+      h+='<input type="checkbox" class="ocb-chk" id="ocbx-'+o.id+'" title="Select for removal" onchange="toggleRptSel(\''+o.id+'\',this.checked)">';
+      h+='<button class="odl" title="Remove this observation" onclick="remObs(\''+o.id+'\')">&#10005;</button></div>';
       h+='<div class="ocb">';
       var avMode=document.querySelector('input[name="avmode"]:checked');
       var avVal=avMode?avMode.value:'auto';
@@ -8833,17 +8850,48 @@ function renderRpt(){
 }
 
 function remObs(id){
-  delete selIds[id];
-  customs=customs.filter(function(o){return o.id!==id;});
-  var ri=document.getElementById('ri-'+id);
-  if(ri){
-    var cb=document.getElementById('cb-'+id);
-    if(cb)cb.checked=false;
-    ri.className='ri';
-    var ax=document.getElementById('ax-'+id);
-    if(ax)ax.parentNode.removeChild(ax);
+  // Route through pending system so confirmAndGenerate() shows the confirmation
+  queuePending(id, false);
+}
+
+var _rptSel={};
+
+function toggleRptSel(id, checked){
+  if(checked){ _rptSel[id]=true; }
+  else { delete _rptSel[id]; }
+  updateRptRemBar();
+}
+
+function updateRptRemBar(){
+  var ids=Object.keys(_rptSel);
+  var bar=document.getElementById('rpt-rem-bar');
+  if(!bar) return;
+  if(ids.length>0){
+    bar.style.display='flex';
+    document.getElementById('rpt-rem-lbl').textContent=ids.length+' observation(s) selected for removal';
+  } else {
+    bar.style.display='none';
   }
-  renderRpt();
+}
+
+function clearRptSel(){
+  var ids=Object.keys(_rptSel);
+  for(var i=0;i<ids.length;i++){
+    var cbx=document.getElementById('ocbx-'+ids[i]);
+    if(cbx) cbx.checked=false;
+  }
+  _rptSel={};
+  updateRptRemBar();
+}
+
+function bulkRemObs(){
+  var ids=Object.keys(_rptSel);
+  if(!ids.length) return;
+  for(var i=0;i<ids.length;i++){
+    queuePending(ids[i], false);
+  }
+  _rptSel={};
+  updateRptRemBar();
 }
 
 // ============================================================
