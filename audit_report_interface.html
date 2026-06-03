@@ -209,6 +209,7 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 .odl{background:none;border:none;cursor:pointer;color:#c03020;font-size:14px;padding:2px 4px;border-radius:3px}
 .odl:hover{background:#fde8e8}
 .ocb-chk{width:15px;height:15px;cursor:pointer;accent-color:#c03020;flex-shrink:0}
+.ref-row{margin-top:10px;padding:8px 10px;background:#fff8f0;border:1px dashed #c07030;border-radius:5px}
 #rpt-rem-bar{position:sticky;top:0;z-index:200;background:#8b1a1a;color:#fff;display:none;align-items:center;justify-content:space-between;padding:8px 16px;gap:10px;border-bottom:2px solid #c03020}
 #rpt-rem-bar span{font-size:13px;font-weight:700}
 #rpt-rem-bar button{background:#fff;color:#8b1a1a;border:none;border-radius:4px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer}
@@ -7944,6 +7945,7 @@ var avMap    = {};   // {obsId: manual audit view text}
 var actMap   = {};   // {obsId: action taken text}
 var respMap  = {};   // {obsId: auditee response text}
 var assessMap= {};   // {obsId: 'agreed'|'resolved'|'partial'|'notresolved'}
+var refMap   = {};   // {obsId: referral note text, '' means no referral}
 var obsEdits = {};   // {obsId: {observation, recommendation}} — auditor edits to obs text
 var responseLoaded = false;
 var customs  = [];
@@ -8509,6 +8511,7 @@ function captureSession() {
     respMap  : respMap,
     assessMap: assessMap,
     obsEdits : obsEdits,
+    refMap   : refMap,
     customs  : customs
   };
 }
@@ -8536,6 +8539,7 @@ function restoreSession(sess) {
   respMap   = sess.respMap   || {};
   assessMap = sess.assessMap || {};
   obsEdits  = sess.obsEdits  || {};
+  refMap    = sess.refMap    || {};
   customs   = sess.customs   || [];
   window.pendingSel = {};
   updateGenBtn();
@@ -8997,6 +9001,17 @@ function renderRpt(){
         var lnkLabels=lnkAnx.map(function(a){return a.label||'?';}).join(', ');
         h+='<div class="oax"><strong>Annexure Ref:</strong> <span style="color:var(--navy);font-weight:600">'+esc(lnkLabels)+'</span></div>';
       }
+      // 8. Referral Note
+      var refVal=refMap[o.id]!=null?refMap[o.id]:null;
+      var refOn=(refVal!==null);
+      var refText=refOn?refVal:'Referred to Regional Office / Branch Head';
+      h+='<div class="ref-row" id="ref-row-'+o.id+'">';
+      h+='<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:11.5px;font-weight:600;color:#6a3a00;user-select:none">';
+      h+='<input type="checkbox" id="ref-chk-'+o.id+'"'+(refOn?' checked':'')+' onchange="toggleRef(\''+o.id+'\',this.checked)" style="accent-color:#b84000;width:14px;height:14px">';
+      h+='&#128203; Add Referral Note</label>';
+      h+='<div id="ref-body-'+o.id+'" style="display:'+(refOn?'block':'none')+';margin-top:6px">';
+      h+='<input type="text" id="ref-txt-'+o.id+'" value="'+esc(refText)+'" style="width:100%;border:1px solid #c07030;border-radius:4px;padding:5px 9px;font-family:Inter,sans-serif;font-size:12px;color:#6a2000;background:#fff8f0;outline:none;font-style:italic" oninput="refMap[\''+o.id+'\']=this.value">';
+      h+='</div></div>';
       h+='</div></div>';
       }
       h+='</div>';
@@ -9203,7 +9218,7 @@ function doCopy(){
 
 function doClear(){
   if(!confirm('Clear all selections?'))return;
-  selIds={}; annexMap={}; obsTypeMap={}; avMap={}; actMap={}; respMap={}; assessMap={}; obsEdits={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; avMap={}; actMap={}; respMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
   responseLoaded=false;
   renderAnnexList();
   document.getElementById('qinp').value='';
@@ -10383,6 +10398,12 @@ function finalizeReport(){
       if(avVal!=='none'&&avStored) h+=sl('Audit View')+st(avStored);
       if(actStored)      h+=sl('Action Taken')+st(actStored);
     }
+    // Referral note
+    var refTxt=refMap[o.id]!=null?refMap[o.id]:null;
+    var refTxtEl=document.getElementById('ref-txt-'+o.id); if(refTxtEl&&refMap[o.id]!=null) refTxt=refTxtEl.value;
+    if(refTxt){
+      h+='<div style="margin-top:10px;padding:7px 12px;background:#fff8f0;border:1px solid #c07030;border-left:4px solid #b84000;border-radius:0 4px 4px 0;font-size:12px;font-style:italic;color:#6a2000;font-weight:600">'+esc(refTxt)+'</div>';
+    }
     h+='</div></div>';
     return h;
   }
@@ -10541,6 +10562,18 @@ function saveAsFinal(fmt){
 // ============================================================
 // LOAD REPORT (re-import from exported HTML or JSON session)
 // ============================================================
+function toggleRef(id, on){
+  var body=document.getElementById('ref-body-'+id);
+  if(on){
+    var existing=document.getElementById('ref-txt-'+id);
+    refMap[id]=existing?existing.value:'Referred to Regional Office / Branch Head';
+    if(body) body.style.display='block';
+  } else {
+    delete refMap[id];
+    if(body) body.style.display='none';
+  }
+}
+
 function triggerLoadReport(){
   document.getElementById('rptinp').click();
 }
