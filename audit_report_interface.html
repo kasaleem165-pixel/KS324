@@ -7591,7 +7591,6 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
   <div class="brand">BHS <small>Internal Audit — Report Builder</small></div>
   <button class="tbtn cmp" onclick="showCompareModal()">&#128269; Compare Report</button>
   <button class="tbtn save" onclick="showVersionHistory()">&#128190; Save / Versions</button>
-  <button class="tbtn pdf" onclick="downloadPDF()">&#128462; PDF</button>
   <button class="tbtn soft" onclick="downloadSoftCopy()">&#128233; Auditee Copy</button>
   <button class="tbtn draft" onclick="showDraftModal()">&#128196; Draft by Category</button>
   <button class="tbtn load" onclick="triggerLoad()">&#128193; Load Response</button>
@@ -7613,8 +7612,17 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
     <button id="genbtn" onclick="confirmAndGenerate()">&#9889; Generate / Refresh Report</button>
   </div>
 
-  <div class="sec">
-    <div class="sh">Branch &amp; Report Information</div>
+  <div class="sec" style="position:relative">
+    <div class="sh" style="display:flex;align-items:center;justify-content:space-between">
+      <span>Branch &amp; Report Information</span>
+      <span id="brinfo-lockbadge" style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;background:#fff3cd;color:#856404;border:1px solid #ffc107;cursor:pointer" onclick="unlockBrInfo()" title="Click to unlock for editing">&#128274; Locked</span>
+    </div>
+    <div id="brinfo-lock-overlay" onclick="unlockBrInfo()" style="position:absolute;top:36px;left:0;right:0;bottom:0;z-index:50;cursor:pointer;background:rgba(255,255,255,0.55);display:flex;align-items:center;justify-content:center;border-radius:0 0 6px 6px">
+      <div style="background:#fff;border:2px solid #ffc107;border-radius:8px;padding:12px 20px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.12)">
+        <div style="font-size:15px;margin-bottom:4px">&#128274;</div>
+        <div style="font-size:12px;font-weight:700;color:#856404">Click to edit Branch &amp; Report Information</div>
+      </div>
+    </div>
 
     <div class="g2">
       <div class="fr"><label>Branch Code</label>
@@ -7991,6 +7999,7 @@ window.onload = function() {
     }
   }
   updateStageBadge();
+  lockBrInfo();
   showPrompt(); // show prompt until user searches
 };
 
@@ -8544,6 +8553,8 @@ function restoreSession(sess) {
   window.pendingSel = {};
   updateGenBtn();
   validateDates();
+  updateStageBadge();
+  lockBrInfo();
   renderRpt();
 }
 
@@ -9226,6 +9237,7 @@ function doClear(){
   document.getElementById('rpcont').style.display='none';
   document.getElementById('rpempty').style.display='block';
   document.getElementById('qinp').value='';
+  lockBrInfo();
   showPrompt();
   toast('Cleared.');
 }
@@ -10498,6 +10510,11 @@ function showSaveDialog(){
       '<div class="sd-info"><strong>Word Document (.doc)</strong>'+
       '<span>Opens in Microsoft Word or LibreOffice. Ideal for sharing and printing.</span></div>'+
     '</div>'+
+    '<div class="sd-opt" onclick="saveAsFinal(\'pdf\')">'+
+      '<span class="sd-icon">&#128443;</span>'+
+      '<div class="sd-info"><strong>PDF (Print / Save as PDF)</strong>'+
+      '<span>Opens the report in a new tab with a print dialog. Choose "Save as PDF" in your printer options.</span></div>'+
+    '</div>'+
     '<div class="sd-opt" onclick="saveAsFinal(\'json\')">'+
       '<span class="sd-icon">&#128190;</span>'+
       '<div class="sd-info"><strong>Session File (.json)</strong>'+
@@ -10546,6 +10563,15 @@ function saveAsFinal(fmt){
     a.click();
     setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
     toast('Saved as Word: '+wname);
+
+  } else if(fmt==='pdf'){
+    // Open report HTML in new tab — user uses browser Print → Save as PDF
+    var pblob=new Blob([pf.html],{type:'text/html'});
+    var purl=URL.createObjectURL(pblob);
+    var pw=window.open(purl,'_blank');
+    if(pw){ pw.onload=function(){ pw.focus(); pw.print(); }; }
+    setTimeout(function(){URL.revokeObjectURL(purl);},30000);
+    toast('Report opened — use Print → Save as PDF');
 
   } else if(fmt==='json'){
     var sess=pf.sess||captureSession();
@@ -10619,6 +10645,29 @@ function loadReportFile(e){
     toast('Report loaded from: '+file.name);
   };
   reader.readAsText(file);
+}
+
+// ============================================================
+// BRANCH INFO LOCK
+// ============================================================
+var _brInfoUnlocked = false;
+
+function lockBrInfo(){
+  _brInfoUnlocked = false;
+  var ov=document.getElementById('brinfo-lock-overlay');
+  var badge=document.getElementById('brinfo-lockbadge');
+  if(ov) ov.style.display='flex';
+  if(badge){ badge.textContent='🔒 Locked'; badge.style.background='#fff3cd'; badge.style.color='#856404'; badge.style.borderColor='#ffc107'; }
+}
+
+function unlockBrInfo(){
+  if(_brInfoUnlocked) return;
+  if(!confirm('You are about to edit Branch & Report Information.\n\nAny changes here will update the report header and all exports.\n\nClick OK to unlock and proceed.')) return;
+  _brInfoUnlocked = true;
+  var ov=document.getElementById('brinfo-lock-overlay');
+  var badge=document.getElementById('brinfo-lockbadge');
+  if(ov) ov.style.display='none';
+  if(badge){ badge.textContent='🔓 Unlocked'; badge.style.background='#e6f9ec'; badge.style.color='#1a6e35'; badge.style.borderColor='#5a9a6a'; }
 }
 
 // ============================================================
