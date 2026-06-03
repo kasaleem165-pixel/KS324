@@ -8527,6 +8527,8 @@ function captureSession() {
 
 function restoreSession(sess) {
   if(!sess) return;
+  // Temporarily enable fields so values can be set, then re-lock
+  setBrInfoDisabled(false);
   // Restore form fields
   var fd = sess.formData || {};
   var fields = ['brcode','rno','rpt_stage','brname','brregion','brcity','brhead','braddress','brautype','rdt',
@@ -10651,19 +10653,33 @@ function loadReportFile(e){
 // BRANCH INFO LOCK
 // ============================================================
 var _brInfoUnlocked = false;
+var BR_INFO_FIELDS = ['brcode','rno','rpt_stage','brname','brregion','brcity','brhead','braddress',
+                      'brautype','rdt','rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk','spb'];
+
+function setBrInfoDisabled(disabled){
+  for(var i=0;i<BR_INFO_FIELDS.length;i++){
+    var el=document.getElementById(BR_INFO_FIELDS[i]);
+    if(el) el.disabled=disabled;
+  }
+  // Also disable the Manage Auditor gear button
+  var gear=document.querySelector('.gbtn[onclick*="prepby"]');
+  if(gear) gear.disabled=disabled;
+}
 
 function lockBrInfo(){
   _brInfoUnlocked = false;
+  setBrInfoDisabled(true);
   var ov=document.getElementById('brinfo-lock-overlay');
   var badge=document.getElementById('brinfo-lockbadge');
   if(ov) ov.style.display='flex';
-  if(badge){ badge.textContent='🔒 Locked'; badge.style.background='#fff3cd'; badge.style.color='#856404'; badge.style.borderColor='#ffc107'; }
+  if(badge){ badge.textContent='🔒 Locked — click to edit'; badge.style.background='#fff3cd'; badge.style.color='#856404'; badge.style.borderColor='#ffc107'; }
 }
 
 function unlockBrInfo(){
   if(_brInfoUnlocked) return;
-  if(!confirm('You are about to edit Branch & Report Information.\n\nAny changes here will update the report header and all exports.\n\nClick OK to unlock and proceed.')) return;
+  if(!confirm('You are about to edit Branch & Report Information.\n\nAny changes here will update the report header and all exports.\n\nClick OK to unlock and proceed with editing.')) return;
   _brInfoUnlocked = true;
+  setBrInfoDisabled(false);
   var ov=document.getElementById('brinfo-lock-overlay');
   var badge=document.getElementById('brinfo-lockbadge');
   if(ov) ov.style.display='none';
