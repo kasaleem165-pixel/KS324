@@ -128,9 +128,9 @@ textarea{resize:vertical;line-height:1.5}
       <label>Load file(s) — Word (.docx), JSON session, or plain text</label>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
         <button class="btn btn-sm" onclick="document.getElementById('file_picker').click()">&#128194; Browse &amp; Add Files…</button>
-        <input type="file" id="file_picker" accept=".docx,.doc,.json,.txt" multiple style="display:none" onchange="handleFilePick(this)">
+        <input type="file" id="file_picker" accept=".docx,.doc,.xlsx,.xls,.json,.txt" multiple style="display:none" onchange="handleFilePick(this)">
       </div>
-      <div class="hint">Supports multiple Word (.docx), JSON session, or plain-text files. Add as many as needed — all will be analysed together.</div>
+      <div class="hint">Supports Word (.docx), Excel (.xlsx), JSON session, or plain-text files. Add as many as needed — all will be analysed together.</div>
     </div>
     <div id="loaded-files-list" style="display:none;margin-bottom:10px">
       <div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:4px">Loaded Files:</div>
@@ -346,6 +346,15 @@ function handleFilePick(input){
           });
         };
         r2.readAsArrayBuffer(file);
+      } else if(ext==='xlsx'||ext==='xls'){
+        var r4 = new FileReader();
+        r4.onload = function(e){
+          parseXlsxFile(e.target.result, function(text){
+            addLoadedReport(file.name, '', null, text||'');
+            if(!text) toast('Warning: could not extract text from '+file.name);
+          });
+        };
+        r4.readAsArrayBuffer(file);
       } else {
         var r3 = new FileReader();
         r3.onload = function(e){ addLoadedReport(file.name, '', null, e.target.result||''); };
@@ -378,7 +387,7 @@ function renderLoadedFilesList(){
   var h='';
   for(var i=0;i<_loadedReports.length;i++){
     var rp=_loadedReports[i];
-    var icon = (rp.name.indexOf('.docx')!==-1||rp.name.indexOf('.doc')!==-1)?'&#128196;':(rp.name.indexOf('.json')!==-1?'&#128202;':'&#128200;');
+    var icon = (rp.name.indexOf('.docx')!==-1||rp.name.indexOf('.doc')!==-1)?'&#128196;':(rp.name.indexOf('.xlsx')!==-1||rp.name.indexOf('.xls')!==-1)?'&#128200;':(rp.name.indexOf('.json')!==-1?'&#128202;':'&#128196;');
     var wc = rp.text ? rp.text.split(/\s+/).filter(function(w){return w;}).length : 0;
     h+='<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #eaeff6">';
     h+='<span style="font-size:14px;flex-shrink:0">'+icon+'</span>';
@@ -488,6 +497,94 @@ function xmlToText(xml){
     .replace(/<[^>]+>/g, '')
     .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#[0-9]+;/g,'')
     .replace(/\n{3,}/g,'\n\n').trim();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// XLSX PARSER — extracts text from xl/sharedStrings.xml + sheets
+// ═══════════════════════════════════════════════════════════════
+function parseXlsxFile(arrayBuffer, callback){
+  // Helper: extract a named entry from the ZIP using same logic as parseDocxFile
+  function extractEntry(arrayBuffer, targetFile, onDone){
+    try{
+      var bytes = new Uint8Array(arrayBuffer);
+      var dv = new DataView(arrayBuffer);
+      var eocdPos=-1;
+      for(var i=bytes.length-22;i>=0;i--){
+        if(bytes[i]===0x50&&bytes[i+1]===0x4B&&bytes[i+2]===0x05&&bytes[i+3]===0x06){ eocdPos=i; break; }
+      }
+      if(eocdPos<0){ onDone(null); return; }
+      var cdOffset=dv.getUint32(eocdPos+16,true);
+      var cdSize  =dv.getUint32(eocdPos+12,true);
+      var pos=cdOffset;
+      while(pos<cdOffset+cdSize){
+        if(dv.getUint32(pos,true)!==0x02014B50) break;
+        var comprMethod=dv.getUint16(pos+10,true);
+        var compSize   =dv.getUint32(pos+20,true);
+        var fnLen      =dv.getUint16(pos+28,true);
+        var extraLen   =dv.getUint16(pos+30,true);
+        var commentLen =dv.getUint16(pos+32,true);
+        var localOffset=dv.getUint32(pos+42,true);
+        var fnBytes    =bytes.subarray(pos+46,pos+46+fnLen);
+        var fn=''; for(var ci=0;ci<fnBytes.length;ci++) fn+=String.fromCharCode(fnBytes[ci]);
+        if(fn===targetFile){
+          var lhFnLen   =dv.getUint16(localOffset+26,true);
+          var lhExtraLen=dv.getUint16(localOffset+28,true);
+          var dataStart =localOffset+30+lhFnLen+lhExtraLen;
+          var compData  =arrayBuffer.slice(dataStart,dataStart+compSize);
+          if(comprMethod===0){
+            onDone(new TextDecoder().decode(compData));
+          } else if(comprMethod===8){
+            var ds=new DecompressionStream('deflate-raw');
+            var w=ds.writable.getWriter(); var r=ds.readable.getReader();
+            w.write(new Uint8Array(compData)); w.close();
+            var chunks=[]; var totalLen=0;
+            function pump(){
+              r.read().then(function(res){
+                if(res.done){
+                  var combined=new Uint8Array(totalLen); var off=0;
+                  for(var ci=0;ci<chunks.length;ci++){ combined.set(chunks[ci],off); off+=chunks[ci].length; }
+                  onDone(new TextDecoder().decode(combined));
+                } else { chunks.push(res.value); totalLen+=res.value.length; pump(); }
+              }).catch(function(){ onDone(null); });
+            }
+            pump();
+          } else { onDone(null); }
+          return;
+        }
+        pos+=46+fnLen+extraLen+commentLen;
+      }
+      onDone(null);
+    }catch(e){ onDone(null); }
+  }
+
+  // Extract sharedStrings.xml then sheet1.xml
+  extractEntry(arrayBuffer, 'xl/sharedStrings.xml', function(ssXml){
+    // Build shared strings array
+    var strings=[];
+    if(ssXml){
+      var siRe=/<si>([\s\S]*?)<\/si>/g; var siM;
+      while((siM=siRe.exec(ssXml))!==null){
+        var raw=siM[1].replace(/<[^>]+>/g,'')
+          .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"');
+        strings.push(raw.trim());
+      }
+    }
+
+    // Also grab inline text from sheet1
+    extractEntry(arrayBuffer, 'xl/worksheets/sheet1.xml', function(sheetXml){
+      var lines=[];
+      if(strings.length) lines=lines.concat(strings.filter(function(s){return s;}));
+      if(sheetXml){
+        // Inline strings <is><t>...</t></is>
+        var isRe=/<is>([\s\S]*?)<\/is>/g; var isM;
+        while((isM=isRe.exec(sheetXml))!==null){
+          var t=isM[1].replace(/<[^>]+>/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').trim();
+          if(t) lines.push(t);
+        }
+      }
+      callback(lines.join('\n'));
+    });
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════
