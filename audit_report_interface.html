@@ -7648,8 +7648,7 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
         </div>
       </div>
       <div class="fr" style="margin-bottom:0"><label>Branch Head</label>
-        <input type="text" id="brhead" placeholder="e.g. Sana Omer" list="dl-brhead" oninput="brAutoFill('head',this.value);renderRpt()" autocomplete="off">
-        <datalist id="dl-brhead"></datalist>
+        <input type="text" id="brhead" placeholder="e.g. Sana Omer" oninput="renderRpt()">
       </div>
     </div>
 
@@ -7858,21 +7857,17 @@ var BHS_BRANCHES = JSON.parse(document.getElementById('branch-data').textContent
   var dlName=document.getElementById('dl-brname');
   var dlRegion=document.getElementById('dl-brregion');
   var dlCity=document.getElementById('dl-brcity');
-  var dlHead=document.getElementById('dl-brhead');
-  var codeH='', nameH='', headH='';
+  var codeH='', nameH='';
   var regions={}, cities={};
   for(var i=0;i<BHS_BRANCHES.length;i++){
     var b=BHS_BRANCHES[i];
-    // Code datalist shows name as the visible hint
     codeH+='<option value="'+esc(b.code)+'">'+esc(b.name)+'</option>';
     nameH+='<option value="'+esc(b.name)+'"></option>';
-    if(b.head) headH+='<option value="'+esc(b.head)+'"></option>';
     if(b.region) regions[b.region]=1;
     if(b.city) cities[b.city]=1;
   }
   if(dlCode)   dlCode.innerHTML=codeH;
   if(dlName)   dlName.innerHTML=nameH;
-  if(dlHead)   dlHead.innerHTML=headH;
   var regH='',citH='';
   for(var r in regions) regH+='<option value="'+esc(r)+'"></option>';
   for(var c in cities)  citH+='<option value="'+esc(c)+'"></option>';
@@ -7889,7 +7884,6 @@ function brAutoFill(field, val){
     var br=BHS_BRANCHES[i];
     if(field==='code' && br.code===val){ b=br; break; }
     if(field==='name' && br.name===val){ b=br; break; }
-    if(field==='head' && br.head===val){ b=br; break; }
   }
   // For region or city: fill only if exactly one branch matches
   if(!b && (field==='region'||field==='city')){
@@ -7905,7 +7899,6 @@ function brAutoFill(field, val){
   setFld('brname',   b.name);
   setFld('brregion', b.region);
   setFld('brcity',   b.city);
-  setFld('brhead',   b.head);
   // Auto-fill address from saved directory
   var savedAddrs=sg('bhs_br_addr',{});
   var addr=savedAddrs[b.code]||'';
