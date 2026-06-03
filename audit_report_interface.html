@@ -8586,8 +8586,9 @@ function saveVersion() {
   sessions.push(sess);
   ss(VH_KEY, sessions);
 
-  // Update autosave indicator
+  // Update autosave indicator and re-lock branch info
   updateAutoSaveLabel();
+  lockBrInfo();
   return {ver: sess.ver, deleted: deleted};
 }
 
@@ -10546,6 +10547,7 @@ function saveAsFinal(fmt){
     a.click();
     setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
     toast('Saved as HTML: '+pf.fname);
+    lockBrInfo();
 
   } else if(fmt==='word'){
     // Word-compatible HTML wrapped in Word namespace
@@ -10569,6 +10571,7 @@ function saveAsFinal(fmt){
     a.click();
     setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
     toast('Saved as Word: '+wname);
+    lockBrInfo();
 
   } else if(fmt==='pdf'){
     // Open report HTML in new tab — user uses browser Print → Save as PDF
@@ -10578,6 +10581,7 @@ function saveAsFinal(fmt){
     if(pw){ pw.onload=function(){ pw.focus(); pw.print(); }; }
     setTimeout(function(){URL.revokeObjectURL(purl);},30000);
     toast('Report opened — use Print → Save as PDF');
+    lockBrInfo();
 
   } else if(fmt==='json'){
     var sess=pf.sess||captureSession();
@@ -10588,6 +10592,7 @@ function saveAsFinal(fmt){
     a.click();
     setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
     toast('Session saved: '+jname);
+    lockBrInfo();
   }
 }
 
@@ -10676,18 +10681,19 @@ function lockBrInfo(){
   var ov=document.getElementById('brinfo-lock-overlay');
   var badge=document.getElementById('brinfo-lockbadge');
   if(ov) ov.style.display='flex';
-  if(badge){ badge.textContent='🔒 Locked — click to edit'; badge.style.background='#fff3cd'; badge.style.color='#856404'; badge.style.borderColor='#ffc107'; }
+  if(badge){ badge.style.display=''; badge.textContent='&#128274; Locked — click to edit'; badge.style.background='#fff3cd'; badge.style.color='#856404'; badge.style.borderColor='#ffc107'; }
 }
 
 function unlockBrInfo(){
   if(_brInfoUnlocked) return;
-  if(!confirm('You are about to edit Branch & Report Information.\n\nAny changes here will update the report header and all exports.\n\nClick OK to unlock and proceed with editing.')) return;
+  if(!confirm('You are about to edit Branch & Report Information.\n\nAny changes here will update the report header and all exports.\n\nClick OK to proceed with editing.')) return;
   _brInfoUnlocked = true;
   setBrInfoDisabled(false);
   var ov=document.getElementById('brinfo-lock-overlay');
   var badge=document.getElementById('brinfo-lockbadge');
   if(ov) ov.style.display='none';
-  if(badge){ badge.textContent='🔓 Unlocked'; badge.style.background='#e6f9ec'; badge.style.color='#1a6e35'; badge.style.borderColor='#5a9a6a'; }
+  // Badge hidden while unlocked — overlay being gone is sufficient indication
+  if(badge) badge.style.display='none';
 }
 
 // ============================================================
