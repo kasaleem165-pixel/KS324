@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Risk Assessment — BHS Internal Audit</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Inter,sans-serif;font-size:13px;background:#f0f3f8;color:#1e2d40;height:100vh;display:flex;flex-direction:column}
+#toolbar{display:flex;align-items:center;gap:10px;background:#1a3a5c;padding:9px 18px;color:#fff;flex-shrink:0}
+#toolbar .logo{font-size:11px;font-weight:700;letter-spacing:1.5px;color:#c9962a;text-transform:uppercase}
+#toolbar .title{font-size:14px;font-weight:700;color:#fff;margin-left:4px}
+#toolbar .back{margin-left:auto;font-size:11px;color:#aac4e0;cursor:pointer;text-decoration:underline}
+#wrap{display:flex;flex:1;overflow:hidden}
+#LP{width:38%;min-width:320px;max-width:460px;background:#fff;border-right:2px solid #dde4ee;overflow-y:auto;display:flex;flex-direction:column}
+#RP{flex:1;overflow-y:auto;padding:20px;background:#f0f3f8}
+.sec{padding:14px 16px;border-bottom:1px solid #eaeff6}
+.sh{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#1a3a5c;margin-bottom:10px}
+.fr{margin-bottom:10px}
+label{display:block;font-size:11px;font-weight:600;color:#4a5a70;margin-bottom:3px}
+input[type=text],input[type=date],select,textarea{width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:12px;background:#fff;color:#1e2d40}
+textarea{resize:vertical;line-height:1.5}
+.btn{padding:10px 16px;border:none;border-radius:5px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.btn-primary{background:#1a3a5c;color:#fff;width:100%}
+.btn-primary:hover{background:#2a5080}
+.btn-gold{background:#c9962a;color:#111;width:100%}
+.btn-gold:hover{background:#e0a830}
+.btn-sm{padding:4px 10px;font-size:11px;border-radius:4px;border:1px solid #c8d8ec;background:#f5f8fd;color:#1a3a5c;cursor:pointer;font-weight:600}
+.btn-sm:hover{background:#e8f0fb}
+.hint{font-size:10px;color:#7a8a9a;margin-top:3px;line-height:1.5}
+/* Results */
+#results-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#7a8a9a;text-align:center;gap:12px}
+#results-empty .icon{font-size:48px}
+#results-content{display:none}
+.card{background:#fff;border-radius:8px;box-shadow:0 1px 6px rgba(26,58,92,.08);padding:18px 20px;margin-bottom:18px}
+.card-title{font-size:13px;font-weight:800;color:#1a3a5c;text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;border-bottom:2px solid #1a3a5c;padding-bottom:6px}
+/* Risk badges */
+.risk-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
+.risk-critical{background:#fde8e8;color:#9b1a1a;border:1px solid #f0a0a0}
+.risk-high{background:#fff0e0;color:#b04400;border:1px solid #f0b070}
+.risk-medium{background:#fffbe0;color:#806000;border:1px solid #e0c030}
+.risk-low{background:#e8f8e8;color:#1a6020;border:1px solid #80c880}
+/* Summary row */
+.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.summary-tile{background:#fff;border-radius:7px;padding:12px 10px;text-align:center;box-shadow:0 1px 6px rgba(26,58,92,.08);border-top:4px solid #ccc}
+.summary-tile.critical{border-top-color:#c03030}
+.summary-tile.high{border-top-color:#d07020}
+.summary-tile.medium{border-top-color:#c0a000}
+.summary-tile.low{border-top-color:#40a040}
+.summary-tile .count{font-size:26px;font-weight:800;color:#1a3a5c}
+.summary-tile .lbl{font-size:10px;font-weight:700;color:#6a7888;text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+/* Category table */
+.risk-table{width:100%;border-collapse:collapse;font-size:12px}
+.risk-table th{background:#1a3a5c;color:#fff;padding:7px 10px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.4px}
+.risk-table td{padding:8px 10px;border-bottom:1px solid #eaeff6;vertical-align:top}
+.risk-table tr:hover td{background:#f5f8fd}
+.risk-table .cat-name{font-weight:700;color:#1a3a5c}
+/* Bar chart */
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.bar-label{width:190px;font-size:11px;color:#2a3a50;flex-shrink:0;font-weight:600}
+.bar-track{flex:1;background:#eaeff6;border-radius:4px;height:16px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width .4s ease}
+.bar-val{font-size:11px;font-weight:700;color:#1a3a5c;width:34px;text-align:right;flex-shrink:0}
+/* Focus area cards */
+.focus-card{border:1px solid #dde4ee;border-left:5px solid #ccc;border-radius:0 6px 6px 0;padding:12px 14px;margin-bottom:10px}
+.focus-card.critical{border-left-color:#c03030;background:#fffafa}
+.focus-card.high{border-left-color:#d07020;background:#fffdf8}
+.focus-card.medium{border-left-color:#c0a000;background:#fffeee}
+.focus-card.low{border-left-color:#40a040;background:#f5fff5}
+.focus-rank{font-size:11px;font-weight:800;color:#6a7888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.focus-name{font-size:13px;font-weight:800;color:#1a3a5c;margin-bottom:6px}
+.focus-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.focus-meta span{font-size:10px;background:#edf2f8;border:1px solid #c8d8ec;border-radius:10px;padding:2px 8px;color:#2a4060;font-weight:600}
+.focus-obs{font-size:11px;color:#3a5070;margin-top:6px}
+.focus-obs li{margin-bottom:3px}
+/* Trend */
+.trend-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #eaeff6}
+.trend-arrow{font-size:18px;font-weight:900}
+.trend-up{color:#c03030}
+.trend-down{color:#1a7040}
+.trend-flat{color:#806000}
+/* Score gauge */
+.gauge-wrap{text-align:center;margin:8px 0 16px}
+.gauge-score{font-size:48px;font-weight:900;line-height:1}
+.gauge-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-top:4px}
+.gauge-bar{width:100%;height:12px;border-radius:6px;background:linear-gradient(90deg,#40a040 0%,#c0a000 40%,#d07020 70%,#c03030 100%);margin:12px 0 4px;position:relative}
+.gauge-needle{position:absolute;top:-3px;width:6px;height:18px;background:#1a3a5c;border-radius:3px;transform:translateX(-50%)}
+.gauge-ticks{display:flex;justify-content:space-between;font-size:9px;color:#6a7888;font-weight:700}
+/* Rec table */
+.rec-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #eaeff6}
+.rec-num{width:24px;height:24px;border-radius:50%;background:#1a3a5c;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.rec-body .rec-title{font-size:12px;font-weight:700;color:#1a3a5c}
+.rec-body .rec-desc{font-size:11px;color:#4a5a70;margin-top:2px;line-height:1.5}
+/* Toast */
+#toast{position:fixed;bottom:20px;right:20px;background:#1a2a3a;color:#fff;padding:9px 15px;border-radius:5px;font-size:13px;font-weight:500;opacity:0;transform:translateY(8px);transition:.3s;z-index:999;pointer-events:none}
+#toast.show{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <div class="logo">BHS Internal Audit</div>
+  <div class="title">&#128202; Risk Assessment Tool</div>
+  <span class="back" onclick="window.location='audit_report_interface.html'">&#8592; Back to Report Builder</span>
+</div>
+
+<div id="wrap">
+
+<!-- ═══════════════════════════════ LEFT PANEL ═══════════════════════════════ -->
+<div id="LP">
+
+  <div class="sec" style="background:#f5f8fd">
+    <div class="sh">&#128205; Branch Selection</div>
+    <div class="fr">
+      <label>Branch</label>
+      <input type="text" id="sel_branch" list="dl-branch" placeholder="Type branch name or code…" autocomplete="off" oninput="onBranchInput(this.value)">
+      <datalist id="dl-branch"></datalist>
+    </div>
+    <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="fr" style="margin-bottom:0"><label>Region</label><input type="text" id="sel_region" readonly style="background:#f5f8fd"></div>
+      <div class="fr" style="margin-bottom:0"><label>City</label><input type="text" id="sel_city" readonly style="background:#f5f8fd"></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sh">&#128196; Most Recent Audit Report</div>
+    <div class="fr">
+      <label>Report Date <span style="font-weight:400;color:#9a9a9a">(approximate)</span></label>
+      <input type="date" id="rpt1_date">
+    </div>
+    <div class="fr">
+      <label>Paste report content — or load a saved JSON session</label>
+      <textarea id="rpt1_text" rows="7" placeholder="Paste the text of the most recent audit report here. Include observation titles, categories, and any 'Repeated' labels for best analysis…"></textarea>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-sm" onclick="document.getElementById('rpt1_json').click()">&#128194; Load Session JSON</button>
+      <input type="file" id="rpt1_json" accept=".json" style="display:none" onchange="loadSessionJson(this,'rpt1')">
+      <button class="btn btn-sm" onclick="document.getElementById('rpt1_text').value=''">&#10005; Clear</button>
+    </div>
+    <div id="rpt1_info" class="hint" style="margin-top:6px"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sh">&#128196; Previous Audit Report <span style="font-weight:400;font-size:10px;color:#9a9a9a">(optional — enables trend analysis)</span></div>
+    <div class="fr">
+      <label>Report Date</label>
+      <input type="date" id="rpt2_date">
+    </div>
+    <div class="fr">
+      <label>Paste report content or load JSON session</label>
+      <textarea id="rpt2_text" rows="5" placeholder="Paste an older audit report to compare trends…"></textarea>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-sm" onclick="document.getElementById('rpt2_json').click()">&#128194; Load Session JSON</button>
+      <input type="file" id="rpt2_json" accept=".json" style="display:none" onchange="loadSessionJson(this,'rpt2')">
+      <button class="btn btn-sm" onclick="document.getElementById('rpt2_text').value=''">&#10005; Clear</button>
+    </div>
+    <div id="rpt2_info" class="hint" style="margin-top:6px"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sh">&#9881; Analysis Options</div>
+    <div class="fr">
+      <label>Audit Type for upcoming audit</label>
+      <input type="text" id="next_autype" value="Routine Audit Visit" placeholder="e.g. Routine Audit Visit">
+    </div>
+    <div class="fr">
+      <label>Auditor / Prepared By</label>
+      <input type="text" id="next_pb" placeholder="Auditor name">
+    </div>
+  </div>
+
+  <div style="padding:14px 16px">
+    <button class="btn btn-gold" onclick="runAnalysis()" style="padding:13px;font-size:13px;letter-spacing:.3px">&#128202; Run Risk Assessment</button>
+    <div class="hint" style="text-align:center;margin-top:8px">Risk is calculated from databank frequency, observation history, and repeated findings</div>
+  </div>
+
+</div><!-- end LP -->
+
+<!-- ═══════════════════════════════ RIGHT PANEL ═══════════════════════════════ -->
+<div id="RP">
+
+  <div id="results-empty">
+    <div class="icon">&#128202;</div>
+    <div style="font-size:15px;font-weight:700;color:#2a3a50">BHS Internal Audit — Risk Assessment</div>
+    <div style="max-width:380px;line-height:1.7">Select a branch, load or paste the most recent audit report, then click <strong>Run Risk Assessment</strong> to generate a prioritized risk profile and audit focus recommendations.</div>
+  </div>
+
+  <div id="results-content">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
+      <div>
+        <div id="res-branch" style="font-size:20px;font-weight:800;color:#1a3a5c"></div>
+        <div id="res-meta" style="font-size:12px;color:#6a7888;margin-top:3px"></div>
+      </div>
+      <div style="text-align:right">
+        <div id="res-overall-badge"></div>
+        <div id="res-generated" style="font-size:10px;color:#9a9a9a;margin-top:4px"></div>
+      </div>
+    </div>
+
+    <!-- Summary tiles -->
+    <div class="summary-grid" id="res-summary"></div>
+
+    <!-- Risk Score Gauge -->
+    <div class="card">
+      <div class="card-title">Overall Risk Score</div>
+      <div class="gauge-wrap">
+        <div id="gauge-score" class="gauge-score" style="color:#1a3a5c">—</div>
+        <div id="gauge-label" class="gauge-label" style="color:#6a7888">Run analysis to calculate</div>
+      </div>
+      <div class="gauge-bar"><div id="gauge-needle" class="gauge-needle" style="left:0%"></div></div>
+      <div class="gauge-ticks"><span>Low</span><span>Medium</span><span>High</span><span>Critical</span></div>
+      <div id="gauge-summary" style="font-size:12px;color:#4a5a70;margin-top:12px;line-height:1.6"></div>
+    </div>
+
+    <!-- Category Risk Matrix -->
+    <div class="card">
+      <div class="card-title">Category Risk Matrix</div>
+      <div id="res-matrix"></div>
+    </div>
+
+    <!-- Observation Frequency Bar Chart -->
+    <div class="card">
+      <div class="card-title">Observation Frequency by Category</div>
+      <div id="res-barchart"></div>
+    </div>
+
+    <!-- Top Focus Areas -->
+    <div class="card">
+      <div class="card-title">&#128680; Priority Focus Areas for Upcoming Audit</div>
+      <div id="res-focus"></div>
+    </div>
+
+    <!-- Trend Analysis -->
+    <div class="card" id="trend-card" style="display:none">
+      <div class="card-title">&#128200; Trend Analysis (Report 1 vs Report 2)</div>
+      <div id="res-trend"></div>
+    </div>
+
+    <!-- Repeated Observations -->
+    <div class="card" id="repeated-card" style="display:none">
+      <div class="card-title">&#9888; Persistent / Repeated Issues</div>
+      <div id="res-repeated"></div>
+    </div>
+
+    <!-- Specific Recommendations -->
+    <div class="card">
+      <div class="card-title">&#9989; Audit Recommendations — Specific Checkpoints</div>
+      <div id="res-recs"></div>
+    </div>
+
+    <!-- Print button -->
+    <div style="text-align:center;margin-top:8px;margin-bottom:30px">
+      <button class="btn btn-primary" style="width:auto;padding:10px 28px" onclick="window.print()">&#128462; Print / Save as PDF</button>
+    </div>
+
+  </div><!-- end results-content -->
+
+</div><!-- end RP -->
+</div><!-- end wrap -->
+
+<div id="toast"></div>
+
+<!-- ═══════════ BRANCH DATA ═══════════ -->
+<script type="application/json" id="branch-data">
+[{"code":"239","name":"Newlands, Lahore","region":"Center","city":"Lahore","head":"Philip Mark Armstrong","address":""},{"code":"249","name":"TNS Beaconhouse Defence","region":"Center","city":"Lahore","head":"Iain Keith Riley","address":""},{"code":"252","name":"Beaconhouse-Newlands Sports Complex","region":"Center","city":"Lahore","head":"Khawaja Junaid Ahmed","address":""},{"code":"277","name":"TNS Beaconhouse Gulberg","region":"Center","city":"Lahore","head":"Shazia Iqbal Khan","address":""},{"code":"280","name":"Newlands, Multan","region":"Center","city":"Multan","head":"Rabia Rehan","address":""},{"code":"282","name":"TEY Newlands, Lahore","region":"Center","city":"Lahore","head":"Aysha Imran","address":""},{"code":"212","name":"Defence Campus, Lahore","region":"Center","city":"Lahore","head":"Naila Khalid","address":""},{"code":"214","name":"Walton Campus, Lahore","region":"Center","city":"Lahore","head":"Tahmina Lodhi","address":""},{"code":"278","name":"Ring Road Campus, Lahore","region":"Center","city":"Lahore","head":"Saima Sadiq Lone","address":""},{"code":"299","name":"BCP Defence Campus, Lahore","region":"Center","city":"Lahore","head":"Saadia Yaqub","address":""},{"code":"206","name":"LMA 51-FCC Gulberg, Lahore","region":"Center","city":"Lahore","head":"Sadaf Shakeel","address":""},{"code":"207","name":"LMA 72-L Model Town, Lahore","region":"Center","city":"Lahore","head":"Attiqa Farman","address":""},{"code":"213","name":"Liberty Campus, Lahore","region":"Center","city":"Lahore","head":"Tehmina Naeem","address":""},{"code":"228","name":"LMA 6-E Gulberg, Lahore","region":"Center","city":"Lahore","head":"Sumreen Zafar","address":""},{"code":"240","name":"LMA 11-FCC Gulberg, Lahore","region":"Center","city":"Lahore","head":"Sana Omer","address":""},{"code":"298","name":"BCP Liberty Campus, Lahore","region":"Center","city":"Lahore","head":"Sadia Faisal","address":""},{"code":"225","name":"BCP Gulberg Campus, Lahore","region":"Center","city":"Lahore","head":"Aisha Khalid","address":""},{"code":"291","name":"Primary Campus Upper Mall, Lahore","region":"Center","city":"Lahore","head":"Juwayriah Hayder","address":""},{"code":"292","name":"Cantt Campus, Lahore","region":"Center","city":"Lahore","head":"Fariha Najam","address":""},{"code":"638","name":"Askari X Campus, Lahore","region":"Center","city":"Lahore","head":"Ayesha Humayun Janjua","address":""},{"code":"211","name":"Garden Town Campus, Lahore","region":"Center","city":"Lahore","head":"Samreen Tariq","address":""},{"code":"215","name":"Allama Iqbal Town Campus, Lahore","region":"Center","city":"Lahore","head":"Muhammad Irshad Barkat","address":""},{"code":"284","name":"Senior Campus Allama Iqbal Town, Lahore","region":"Center","city":"Lahore","head":"Asma Zoeed","address":""},{"code":"611","name":"17-G Model Town, Lahore","region":"Center","city":"Lahore","head":"Aima Qamar","address":""},{"code":"618","name":"Boys Campus 45-I B/1 Peco Road, Lahore","region":"Center","city":"Lahore","head":"Bushra Irfan","address":""},{"code":"619","name":"Girls Campus 78-A/I Township, Lahore","region":"Center","city":"Lahore","head":"Arsalah Farooq","address":""},{"code":"285","name":"BCP Johar Town Campus, Lahore","region":"Center","city":"Lahore","head":"Tameema Tasnim Umer","address":""},{"code":"665","name":"Junior Campus Johar Town, Lahore","region":"Center","city":"Lahore","head":"Shakeeba Latif","address":""},{"code":"666","name":"Boys Campus Johar Town, Lahore","region":"Center","city":"Lahore","head":"Shamaila Saleem","address":""},{"code":"667","name":"Girls Campus Johar Town, Lahore","region":"Center","city":"Lahore","head":"Memoona Rauf Khan","address":""},{"code":"217","name":"Valencia Town Campus, Lahore","region":"Center","city":"Lahore","head":"Muhammad Sajid Mansoor","address":""},{"code":"606","name":"Wapda Town Campus, Lahore","region":"Center","city":"Lahore","head":"Nayyer Naveed Qureshi","address":""},{"code":"608","name":"S.A Gardens Campus","region":"Center","city":"Lahore","head":"Syed Ammar Bin Aijaz","address":""},{"code":"660","name":"Girls Campus Canal Side, Lahore","region":"Center","city":"Lahore","head":"Mahnaz Jahanzeb","address":""},{"code":"661","name":"Boys Campus Canal Side, Lahore","region":"Center","city":"Lahore","head":"Abdul Haseeb","address":""},{"code":"257","name":"Girls Campus, Sahiwal","region":"Center","city":"Sahiwal","head":"Saima Nazli","address":""},{"code":"264","name":"Boys Campus, Sahiwal","region":"Center","city":"Sahiwal","head":"Muhammad Azhar Asghar","address":""},{"code":"270","name":"Bahria Town Campus, Lahore","region":"Center","city":"Lahore","head":"Syeda Aniqa Shafique","address":""},{"code":"287","name":"Senior Campus Bahria Town, Lahore","region":"Center","city":"Lahore","head":"Humaira Tariq","address":""},{"code":"288","name":"BCP Bahria Town Campus, Lahore","region":"Center","city":"Lahore","head":"Shamaila Rizwan","address":""},{"code":"296","name":"Girls Campus, Okara","region":"Center","city":"Okara","head":"Muhammad Aamir Akhlaq","address":""},{"code":"297","name":"Boys Campus, Okara","region":"Center","city":"Okara","head":"Muhammad Aamir Akhlaq","address":""},{"code":"677","name":"HB Plus Okara","region":"Center","city":"Okara","head":"Muhammad Aamir Akhlaq","address":""},{"code":"243","name":"Satellite Town Campus, Gujranwala","region":"Center","city":"Gujranwala","head":"Saba Khan","address":""},{"code":"244","name":"Palm Tree Campus, Gujranwala","region":"Center","city":"Gujranwala","head":"Razzaq Ahmad","address":""},{"code":"246","name":"Wapda Town Campus, Gujranwala","region":"Center","city":"Gujranwala","head":"Anjum Afshan","address":""},{"code":"269","name":"Citi Housing Campus, Gujranwala","region":"Center","city":"Gujranwala","head":"Sadaf Atif","address":""},{"code":"271","name":"Sialkot Campus","region":"Center","city":"Sialkot","head":"Kashif Rahman","address":""},{"code":"293","name":"BCP Campus, Sialkot","region":"Center","city":"Sialkot","head":"Kashif Rahman","address":""},{"code":"294","name":"BCP Campus, Gujranwala","region":"Center","city":"Gujranwala","head":"Kashif Habib","address":""},{"code":"232","name":"Main Campus Canal, Faisalabad","region":"Center","city":"Faisalabad","head":"Sabahet Shurjeel Malik","address":""},{"code":"238","name":"Girls Campus Canal, Faisalabad","region":"Center","city":"Faisalabad","head":"Shaeela Shafqat","address":""},{"code":"254","name":"BCP Campus, Faisalabad","region":"Center","city":"Faisalabad","head":"Roha Ghauri","address":""},{"code":"258","name":"Jhang Campus","region":"Center","city":"Jhang","head":"Nazish Arfa","address":""},{"code":"688","name":"HB Plus Jhang","region":"Center","city":"Jhang","head":"Nazish Arfa","address":""},{"code":"231","name":"KG Campus Peoples Colony, Faisalabad","region":"Center","city":"Faisalabad","head":"Naheed Alamgir","address":""},{"code":"234","name":"Primary Campus Peoples Colony, Faisalabad","region":"Center","city":"Faisalabad","head":"Abida Maqbool","address":""},{"code":"260","name":"Primary Campus Civil Lines, Faisalabad","region":"Center","city":"Faisalabad","head":"Nousheen Haider","address":""},{"code":"642","name":"Toba Tek Singh Campus","region":"Center","city":"Toba Tek Singh","head":"Aadil Raza Chaudhry","address":""},{"code":"679","name":"Gojra Campus","region":"Center","city":"Gojra","head":"Nisaim Pasha","address":""},{"code":"251","name":"Junior Campus, Hafizabad","region":"Center","city":"Hafizabad","head":"Saima Farooq","address":""},{"code":"253","name":"Senior Campus, Hafizabad","region":"Center","city":"Hafizabad","head":"Sana Shafi","address":""},{"code":"261","name":"Junior Campus, Sheikhupura","region":"Center","city":"Sheikhupura","head":"Shazina Bilal","address":""},{"code":"262","name":"Senior Campus, Sheikhupura","region":"Center","city":"Sheikhupura","head":"Basit Sajjad","address":""},{"code":"289","name":"BCP Campus, Sargodha","region":"Center","city":"Sargodha","head":"Saadia Hassan","address":""},{"code":"622","name":"Primary Campus, Sargodha","region":"Center","city":"Sargodha","head":"Sara Khan Maiken","address":""},{"code":"624","name":"Cantt Campus, Sargodha","region":"Center","city":"Sargodha","head":"Nemat Ullah","address":""},{"code":"221","name":"Bosan Road Campus, Multan","region":"Center","city":"Multan","head":"Asifa Tareen","address":""},{"code":"223","name":"Girls Campus Officers Colony, Multan","region":"Center","city":"Multan","head":"Asma Parveen","address":""},{"code":"224","name":"BCP Campus, Multan","region":"Center","city":"Multan","head":"Sumera Nasheed","address":""},{"code":"226","name":"Cantt Campus, Multan","region":"Center","city":"Multan","head":"Shireen Shafqat","address":""},{"code":"279","name":"Senior Campus Officers Colony, Multan","region":"Center","city":"Multan","head":"Muhammad Shahzad Afzal","address":""},{"code":"476","name":"Sadiqabad Campus","region":"Center","city":"Sadiqabad","head":"Ayesha Mazhar","address":""},{"code":"680","name":"Rahim Yar Khan Campus","region":"Center","city":"Rahim Yar Khan","head":"Anjum Kaiwan","address":""},{"code":"682","name":"Early Years Campus Model Town, Bahawalpur","region":"Center","city":"Bahawalpur","head":"Saima Naveed","address":""},{"code":"684","name":"Main Campus Bahawalpur","region":"Center","city":"Bahawalpur","head":"Naveed Razzaq","address":""},{"code":"686","name":"Model Town Campus, Bahawalpur","region":"Center","city":"Bahawalpur","head":"Saima Naveed","address":""},{"code":"687","name":"HB Plus Rahim Yar Khan","region":"Center","city":"Rahim Yar Khan","head":"Anjum Kaiwan","address":""},{"code":"689","name":"HB Plus Sadiqabad","region":"Center","city":"Sadiqabad","head":"Ayesha Mazhar","address":""},{"code":"369","name":"Newlands, Islamabad","region":"North","city":"Islamabad","head":"Larry Savery F","address":""},{"code":"302","name":"BCP Margalla Campus, Islamabad","region":"North","city":"Islamabad","head":"Aisha Hafeez","address":""},{"code":"305","name":"F-8/2 Campus, Islamabad","region":"North","city":"Islamabad","head":"Salma Haroon","address":""},{"code":"311","name":"Margalla Campus, Islamabad","region":"North","city":"Islamabad","head":"Ayesha Ansar","address":""},{"code":"314","name":"F-7/4 Campus, Islamabad","region":"North","city":"Islamabad","head":"Saba Amar Mall","address":""},{"code":"319","name":"F-7/1 Campus, Islamabad","region":"North","city":"Islamabad","head":"Shumaiza Rizwan","address":""},{"code":"337","name":"F-7/3 Campus, Islamabad","region":"North","city":"Islamabad","head":"Hina Sadaf","address":""},{"code":"310","name":"E-11 Campus, Islamabad","region":"North","city":"Islamabad","head":"Samar Azhar","address":""},{"code":"320","name":"F-10/4 1 Campus, Islamabad","region":"North","city":"Islamabad","head":"Saba Imran","address":""},{"code":"330","name":"BCP Karakoram Campus H-11, Islamabad","region":"North","city":"Islamabad","head":"Riffat Choudhry","address":""},{"code":"349","name":"I-9 Campus, Islamabad","region":"North","city":"Islamabad","head":"Nighat Javed","address":""},{"code":"378","name":"Metropolitan Campus G-11, Islamabad","region":"North","city":"Islamabad","head":"Mariam Arif","address":""},{"code":"379","name":"Karakoram Campus H-11, Islamabad","region":"North","city":"Islamabad","head":"Rukhsana Shehzad","address":""},{"code":"321","name":"Tipu Sultan Campus, Rawalpindi","region":"North","city":"Rawalpindi","head":"Nabila Khalid","address":""},{"code":"328","name":"Beaconhouse Educational Complex G-15, Islamabad","region":"North","city":"Islamabad","head":"Ayesha Shams","address":""},{"code":"340","name":"Attock Campus","region":"North","city":"Attock","head":"Muhammad Kashif Jamal","address":""},{"code":"360","name":"BCP Tipu Sultan Campus, Rawalpindi","region":"North","city":"Rawalpindi","head":"Maria Faisal","address":""},{"code":"361","name":"Wah Cantt Campus","region":"North","city":"Wah Cantt.","head":"Robina Sohaib","address":""},{"code":"366","name":"BCP Campus, Wah Cantt","region":"North","city":"Wah Cantt.","head":"Robina Sohaib","address":""},{"code":"332","name":"KG Campus Satellite Town, Rawalpindi","region":"North","city":"Rawalpindi","head":"Bushra Saeed Khan","address":""},{"code":"333","name":"Primary and Girls Campus Satellite Town, Rawalpindi","region":"North","city":"Rawalpindi","head":"Mussarat Jehanzeb","address":""},{"code":"334","name":"Boys Campus Satellite Town, Rawalpindi","region":"North","city":"Rawalpindi","head":"Maryam Shafiq Khan","address":""},{"code":"636","name":"Civil Lines Campus, Rawalpindi","region":"North","city":"Rawalpindi","head":"Aisha Ali","address":""},{"code":"338","name":"KG Campus PWD, Islamabad","region":"North","city":"Islamabad","head":"Fauzia Jafar Bukhari","address":""},{"code":"358","name":"Bahria Enclave Campus, Islamabad","region":"North","city":"Islamabad","head":"Amna Usman Khan","address":""},{"code":"376","name":"Gulberg Green Campus, Islamabad","region":"North","city":"Islamabad","head":"Ghousia Naveed","address":""},{"code":"384","name":"Primary and Middle Campus PWD, Islamabad","region":"North","city":"Islamabad","head":"Saima Faheem","address":""},{"code":"387","name":"Muzaffarabad Campus","region":"North","city":"Muzaffarabad","head":"Aanaba Hameed Qureshi","address":""},{"code":"388","name":"BCP Bahria Enclave Campus, Islamabad","region":"North","city":"Islamabad","head":"Amna Usman Khan","address":""},{"code":"326","name":"Harley Street Campus, Rawalpindi","region":"North","city":"Rawalpindi","head":"Sumairah Naveed","address":""},{"code":"335","name":"Gulraiz Campus, Rawalpindi","region":"North","city":"Rawalpindi","head":"Ayesha Omar","address":""},{"code":"352","name":"Potohar Campus, Islamabad","region":"North","city":"Islamabad","head":"Ayesha Sohail Farooq","address":""},{"code":"354","name":"Gulshan Campus, Rawalpindi","region":"North","city":"Rawalpindi","head":"Zil-E-Zahra","address":""},{"code":"363","name":"BCP Potohar Campus, Islamabad","region":"North","city":"Islamabad","head":"Farhana Tariq","address":""},{"code":"377","name":"Chakwal Campus","region":"North","city":"Chakwal","head":"Muhammad Waseem Sabri","address":""},{"code":"398","name":"Balkasar Campus, Chakwal","region":"North","city":"Chakwal","head":"ANILA KALEEM","address":""},{"code":"364","name":"Gujrat Campus","region":"North","city":"Gujrat","head":"Kashif Hussain","address":""},{"code":"367","name":"BCP Campus, Gujrat","region":"North","city":"Gujrat","head":"Kashif Hussain","address":""},{"code":"368","name":"Kharian Campus","region":"North","city":"Kharian","head":"Faiza Sharif","address":""},{"code":"370","name":"BCP Campus, Jhelum","region":"North","city":"Jhelum","head":"Nezafat Malik","address":""},{"code":"380","name":"BCP Campus, Kharian","region":"North","city":"Kharian","head":"Faiza Sharif","address":""},{"code":"385","name":"Mirpur Campus","region":"North","city":"Mirpur","head":"Sumaira Tanveer","address":""},{"code":"631","name":"Jhelum Campus","region":"North","city":"Jhelum","head":"Nezafat Malik","address":""},{"code":"691","name":"HB Plus Mirpur","region":"North","city":"Mirpur","head":"Sumaira Tanveer","address":""},{"code":"341","name":"Jamrud Campus, Peshawar","region":"North","city":"Peshawar","head":"Shaista Amjad Ali","address":""},{"code":"345","name":"Frontier Campus, Peshawar","region":"North","city":"Peshawar","head":"Nargis Iqbal","address":""},{"code":"346","name":"Khyber Campus, Peshawar","region":"North","city":"Peshawar","head":"Rani Akhtar","address":""},{"code":"347","name":"KG Campus Arbab Road, Peshawar","region":"North","city":"Peshawar","head":"Farida Arfan","address":""},{"code":"359","name":"BCP Frontier Campus, Peshawar","region":"North","city":"Peshawar","head":"Shomaila Saadat","address":""},{"code":"374","name":"Warsak Road Campus, Peshawar","region":"North","city":"Peshawar","head":"Mehnaz Arbab","address":""},{"code":"355","name":"Swat Campus","region":"North","city":"Saidu Sharif","head":"Muhammad Riaz","address":""},{"code":"372","name":"Jalala Campus, Mardan","region":"North","city":"Mardan","head":"Saima Hameed","address":""},{"code":"381","name":"Nowshera Campus","region":"North","city":"Nowshera","head":"Saima Haider Naqvi","address":""},{"code":"383","name":"Risalpur Campus","region":"North","city":"Risalpur","head":"Saima Noureen","address":""},{"code":"690","name":"HB Plus Nowshera","region":"North","city":"Nowshera","head":"Saima Haider Naqvi","address":""},{"code":"692","name":"HB Plus Mardan","region":"North","city":"Mardan","head":"Saima Hameed","address":""},{"code":"351","name":"Main Campus, Abbottabad","region":"North","city":"Abbottabad","head":"Zainab Jamil","address":""},{"code":"362","name":"BCP Campus, Abbottabad","region":"North","city":"Abbottabad","head":"Zainab Jamil","address":""},{"code":"373","name":"Mansehra Campus","region":"North","city":"Mansehra","head":"Shehryar Aslam","address":""},{"code":"397","name":"Kunhar Campus, Abbottabad","region":"North","city":"Abbottabad","head":"Hina Fahad","address":""},{"code":"390","name":"Junior Campus Rasul Road, Mandi Bahauddin","region":"North","city":"Mandi Baha-ud-din","head":"Alia Irshad","address":""},{"code":"391","name":"Main Campus, Mandi Bahauddin","region":"North","city":"Mandi Baha-ud-din","head":"Saima Khursheed","address":""},{"code":"392","name":"KG Campus Phalia Road, Mandi Bahauddin","region":"North","city":"Mandi Baha-ud-din","head":"Sarah Shafqat","address":""},{"code":"395","name":"BCP Campus, Mandi Bahauddin","region":"North","city":"Mandi Baha-ud-din","head":"Saima Khursheed","address":""},{"code":"431","name":"Clifton Campus, Karachi","region":"South","city":"Karachi","head":"Ayesha Uzma Aslam","address":""},{"code":"433","name":"Defence Campus, Karachi","region":"South","city":"Karachi","head":"Shireen Karamally","address":""},{"code":"434","name":"Early Years Campus, Clifton, Karachi","region":"South","city":"Karachi","head":"Amna Khan","address":""},{"code":"445","name":"Jubilee Campus, Karachi","region":"South","city":"Karachi","head":"Tabinda Raza","address":""},{"code":"491","name":"Discovery Centre, Karachi","region":"South","city":"Karachi","head":"Sana Zafar","address":""},{"code":"492","name":"Discovery Centre, Early Years, Karachi","region":"South","city":"Karachi","head":"Asma Amir","address":""},{"code":"461","name":"Early Years Campus, Block 7, Gulshan, Karachi","region":"South","city":"Karachi","head":"Maria Shahzad","address":""},{"code":"464","name":"Gulshan Campus, Karachi","region":"South","city":"Karachi","head":"Rabiya Ejaz","address":""},{"code":"472","name":"Primary Campus, Block 4, Gulshan, Karachi","region":"South","city":"Karachi","head":"Batul Raza","address":""},{"code":"475","name":"Early Years Campus, Block 13D, Gulshan, Karachi","region":"South","city":"Karachi","head":"Amal Kazmi","address":""},{"code":"478","name":"Primary Campus, Stadium, Gulshan, Karachi","region":"South","city":"Karachi","head":"Saira Shahrukh","address":""},{"code":"483","name":"Early Years Campus, Stadium, Gulshan, Karachi","region":"South","city":"Karachi","head":"Saira Shahrukh","address":""},{"code":"465","name":"O-Level Campus, Gulshan, Karachi","region":"South","city":"Karachi","head":"Maliha Noman","address":""},{"code":"466","name":"BCP Gulshan, Karachi","region":"South","city":"Karachi","head":"Bushra Nasir","address":""},{"code":"467","name":"Early Years Campus, Block 4, Gulshan, Karachi","region":"South","city":"Karachi","head":"Hina Farooq","address":""},{"code":"468","name":"Elementary Campus, Block 4, Gulshan, Karachi","region":"South","city":"Karachi","head":"Madiha Abdul Baseer","address":""},{"code":"469","name":"Middle Campus, Gulshan, Karachi","region":"South","city":"Karachi","head":"Shehla Nawaz","address":""},{"code":"413","name":"Elementary Campus, Block 3, PECHS, Karachi","region":"South","city":"Karachi","head":"Nausheen Bashir","address":""},{"code":"424","name":"Elementary Campus, Darul Aman, Karachi","region":"South","city":"Karachi","head":"Sonia Rizwan","address":""},{"code":"482","name":"Elementary Campus, Jamshed Road, Karachi","region":"South","city":"Karachi","head":"Syeda Dur-e-Najaf Zaidi","address":""},{"code":"406","name":"IBDP PECHS, Karachi","region":"South","city":"Karachi","head":"Sadia Aamir","address":""},{"code":"414","name":"Early Years Campus, PECHS, Karachi","region":"South","city":"Karachi","head":"Quratul-Ain Kamal","address":""},{"code":"418","name":"Elementary Campus, KAECHS, Karachi","region":"South","city":"Karachi","head":"Sumera Savez","address":""},{"code":"420","name":"Primary Campus, SMCHS, Karachi","region":"South","city":"Karachi","head":"Quratul-Ain Kamal","address":""},{"code":"436","name":"PECHS Campus, Karachi","region":"South","city":"Karachi","head":"Sadia Aamir","address":""},{"code":"442","name":"BCP PECHS, Karachi","region":"South","city":"Karachi","head":"Sadia Aamir","address":""},{"code":"425","name":"Early Years Campus, Block 14, Jauhar, Karachi","region":"South","city":"Karachi","head":"Syeda Narjis Navaid Rizvi","address":""},{"code":"426","name":"College Campus Jauhar Block 15, Karachi","region":"South","city":"Karachi","head":"Nadia Rashid Inam","address":""},{"code":"427","name":"Early Years Campus, Block 15, Jauhar, Karachi","region":"South","city":"Karachi","head":"Sana Fatima","address":""},{"code":"440","name":"Jauhar Campus, Karachi","region":"South","city":"Karachi","head":"Nadia Rashid Inam","address":""},{"code":"449","name":"Early Years Campus Hilltop, Jauhar, Karachi","region":"South","city":"Karachi","head":"Sadaf Naveed","address":""},{"code":"479","name":"Primary Campus, Jauhar, Karachi","region":"South","city":"Karachi","head":"Nausheen Ubaid","address":""},{"code":"425","name":"Early Years Campus, Block 14, Jauhar, Karachi","region":"South","city":"Karachi","head":"Syeda Narjis Navaid Rizvi","address":""},{"code":"426","name":"College Campus Jauhar Block 15, Karachi","region":"South","city":"Karachi","head":"Nadia Rashid Inam","address":""},{"code":"427","name":"Early Years Campus, Block 15, Jauhar, Karachi","region":"South","city":"Karachi","head":"Sana Fatima","address":""},{"code":"440","name":"Jauhar Campus, Karachi","region":"South","city":"Karachi","head":"Nadia Rashid Inam","address":""},{"code":"449","name":"Early Years Campus Hilltop, Jauhar, Karachi","region":"South","city":"Karachi","head":"Sadaf Naveed","address":""},{"code":"479","name":"Primary Campus, Jauhar, Karachi","region":"South","city":"Karachi","head":"Nausheen Ubaid","address":""},{"code":"651","name":"Early Years Campus, Block B, North Nazimabad, Karachi","region":"South","city":"Karachi","head":"Sophia Ahmer","address":""},{"code":"652","name":"Primary Campus, Block F, North Nazimabad, Karachi","region":"South","city":"Karachi","head":"Aisha Haseeb","address":""},{"code":"653","name":"Girls Campus, North Nazimabad, Karachi","region":"South","city":"Karachi","head":"Amtul Matin Ghazala","address":""},{"code":"673","name":"Primary Campus, Block B, North Nazimabad, Karachi","region":"South","city":"Karachi","head":"Samina Jamal","address":""},{"code":"674","name":"Early Years Campus, Block D, North Nazimabad, Karachi","region":"South","city":"Karachi","head":"Madiha Akbar","address":""},{"code":"430","name":"BCP North Nazimabad, Karachi","region":"South","city":"Karachi","head":"Fauzia Fatima","address":""},{"code":"480","name":"O-Level Campus, Block B, North Nazimabad, Karachi","region":"South","city":"Karachi","head":"Fauzia Fatima","address":""},{"code":"654","name":"O-Level Campus, Block F, North Nazimabad, Karachi","region":"South","city":"Karachi","head":"Saira Iqbal","address":""},{"code":"657","name":"Elementary Campus, Federal B Area, Karachi","region":"South","city":"Karachi","head":"Rabia Hussainy","address":""},{"code":"659","name":"North Nazimabad Campus, Karachi","region":"South","city":"Karachi","head":"Nausheen Murshad","address":""},{"code":"443","name":"BCP Qasimabad, Hyderabad","region":"South","city":"Hyderabad","head":"Shifa Farhan Shaikh","address":""},{"code":"450","name":"Nawabshah Campus","region":"South","city":"Nawabshah","head":"Agha Saifullah Khan","address":""},{"code":"451","name":"Qasimabad Campus, Hyderabad","region":"South","city":"Hyderabad","head":"Shifa Farhan Shaikh","address":""},{"code":"495","name":"Sukkur Campus","region":"South","city":"Sukkar","head":"Muhammad Sufyan Memon","address":""},{"code":"496","name":"Early Years Campus, Sukkur","region":"South","city":"Sukkar","head":"Maria Abro","address":""},{"code":"444","name":"BCP Juniper Campus, Quetta","region":"South","city":"Quetta","head":"Mehr Marrium","address":""},{"code":"471","name":"Juniper Campus, Quetta","region":"South","city":"Quetta","head":"Qurat-ul-Ain Khalid","address":""},{"code":"477","name":"Early Years Campus, Quetta","region":"South","city":"Quetta","head":"Asma Rasheed","address":""},{"code":"484","name":"Cantt Campus, Quetta","region":"South","city":"Quetta","head":"Rehana Kasi","address":""},{"code":"439","name":"Early Years Campus, Malir, Karachi","region":"South","city":"Karachi","head":"Rawaha Azfar","address":""},{"code":"441","name":"Steel Town Campus, Karachi","region":"South","city":"Karachi","head":"Nusrat Jokhio","address":""},{"code":"448","name":"Racecourse Campus, Karachi","region":"South","city":"Karachi","head":"Muneeza Zubair","address":""},{"code":"457","name":"Jinnah Avenue Campus, Malir, Karachi","region":"South","city":"Karachi","head":"Sameen Zubair","address":""},{"code":"481","name":"Thatta Campus","region":"South","city":"Thatta","head":"Muhammad Younus Iqbal","address":""},{"code":"485","name":"SUPARCO Campus, Karachi","region":"South","city":"Karachi","head":"Ayesha Siddiqui","address":""},{"code":"486","name":"Bahria Town Campus, Karachi","region":"South","city":"Karachi","head":"Nayyera Junaid","address":""},{"code":"439","name":"Early Years Campus, Malir, Karachi","region":"South","city":"Karachi","head":"Rawaha Azfar","address":""},{"code":"441","name":"Steel Town Campus, Karachi","region":"South","city":"Karachi","head":"Nusrat Jokhio","address":""},{"code":"448","name":"Racecourse Campus, Karachi","region":"South","city":"Karachi","head":"Muneeza Zubair","address":""},{"code":"457","name":"Jinnah Avenue Campus, Malir, Karachi","region":"South","city":"Karachi","head":"Sameen Zubair","address":""},{"code":"481","name":"Thatta Campus","region":"South","city":"Thatta","head":"Muhammad Younus Iqbal","address":""},{"code":"485","name":"SUPARCO Campus, Karachi","region":"South","city":"Karachi","head":"Ayesha Siddiqui","address":""},{"code":"486","name":"Bahria Town Campus, Karachi","region":"South","city":"Karachi","head":"Nayyera Junaid","address":""},{"code":"452","name":"Early Years Campus, Latifabad, Hyderabad","region":"South","city":"Hyderabad","head":"Anjuman Rashdi","address":""},{"code":"453","name":"Latifabad Campus, Hyderabad","region":"South","city":"Hyderabad","head":"Farzana Lodhi","address":""},{"code":"454","name":"Elementary Campus, Latifabad, Hyderabad","region":"South","city":"Hyderabad","head":"Farina Nadeem Qureshi","address":""},{"code":"455","name":"Primary Campus, Latifabad, Hyderabad","region":"South","city":"Hyderabad","head":"Aneeta Kumari","address":""},{"code":"456","name":"Kohsar Campus, Hyderabad","region":"South","city":"Hyderabad","head":"Shahbano Khalid","address":""},{"code":"452","name":"Early Years Campus, Latifabad, Hyderabad","region":"South","city":"Hyderabad","head":"Anjuman Rashdi","address":""},{"code":"453","name":"Latifabad Campus, Hyderabad","region":"South","city":"Hyderabad","head":"Farzana Lodhi","address":""},{"code":"454","name":"Elementary Campus, Latifabad, Hyderabad","region":"South","city":"Hyderabad","head":"Farina Nadeem Qureshi","address":""},{"code":"455","name":"Primary Campus, Latifabad, Hyderabad","region":"South","city":"Hyderabad","head":"Aneeta Kumari","address":""},{"code":"456","name":"Kohsar Campus, Hyderabad","region":"South","city":"Hyderabad","head":"Shahbano Khalid","address":""},{"code":"458","name":"Newlands, Karachi","region":"South","city":"Karachi","head":"Hufsa Awan","address":""}]
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DATABANK CATEGORY STATISTICS (pre-computed from main databank)
+// ═══════════════════════════════════════════════════════════════
+var DB_CATS = {
+  'Financial Management':     {count:108, weight:4, titles:['Expenditure Exceeded Budgeted Amount','Accounting Procedure not Followed / Bank Payment Vouchers','Withholding Tax Deposited with Delay','Procurement at Higher Rates than Market','Purchase Committee not Properly Functioning','Splitting of Transactions to Bypass Company Policies','Bank Payments Recorded through Journal Vouchers','Procurement Procedures not Complied']},
+  'HR & Payroll':             {count:67,  weight:4, titles:['Incomplete Employee Files','Delay in Employee Confirmations','EOBI Numbers not Updated in BEAMS','Reference / Security Reference Check not in Practice','Short Office Hours','Delay in Final Settlement of Employees','Outgoing/Departure Attendance not Marked','Delay in Confirmation of Employees']},
+  'Safety & Security':        {count:40,  weight:5, titles:['Guards Strength Approved Copy not Available','CCTV Recording Gaps','Annual Firing Practice not Conducted Regularly','Discrepancies in Security Guard Documentation','Weapon/Ammunition Register Discrepancies','UPS not Available / Control Room Deficiencies','Security Guards Frequently Changed','Scanning Room not Available']},
+  'Fixed Assets & Inventory': {count:36,  weight:3, titles:['Untraced Fixed Assets','Out of Order Assets','Un-Numbered Assets','Physical Verification Report not Available','Duplicate / Same Codes on Assets','Asset Disposal Pending AIDN','Stock Register not Maintained','Fixed Asset Register Missing Columns']},
+  'Library & Records':        {count:47,  weight:2, titles:['Low Item Per Child Ratio in Library','Books not Entered in Library Module KOHA','Incomplete Barcode Labelling on Books','Library Books in Poor Condition','Discrepancies in Cost of Books / Wrong Data in KOHA','Transfer and Disposal of Books not Processed','High Item Per Child Book Ratio','Delay in Return of Library Books']},
+  'Student Records & Fee':    {count:22,  weight:3, titles:['Registration Fee Deposited with Delay','Incomplete / Wrong Student Information in BEAMS','Incomplete Student Files','Unclaimed Student Security','Fee Concession Approvals not Filed','Anomalies in Registration Fee Collection','Files of Transferred-In Students not Available','Security Refund not Processed Timely']},
+  'General Administration':   {count:39,  weight:2, titles:['Discrepancies in Memorandum Registers','Document Tracking Sheet not in Practice','Generator Log Book not Maintained','Inward Gate Pass not in Practice','Renewed School Business Registration Not Available','Demolition Register not Maintained','Printed Stationery Register not Maintained','Renewal of Utilities Contracts Pending']}
+};
+
+// Keywords per category (for text-based parsing)
+var CAT_KEYWORDS = {
+  'Financial Management':     ['financial','payment','voucher','bank','budget','tax','withholding','procurement','purchase','committee','reimbursement','expenditure','imprest','splitting','invoice','petty cash','reconcil','accounts','bpv','journal','jv'],
+  'HR & Payroll':             ['employee','payroll','staff','hr','eobi','pessi','sessi','attendance','leave','salary','confirmation','settlement','hire','recruitment','reference check','departure','short office'],
+  'Safety & Security':        ['security','guard','cctv','camera','fire','safety','metal detector','wtmd','ammunition','weapon','firing','ups','control room','scanning','access','cso'],
+  'Fixed Assets & Inventory': ['asset','fixed asset','far','aidn','disposal','equipment','inventory','stock','register','physical verification','tagged','barcode','asset code','grn'],
+  'Library & Records':        ['library','book','koha','ratio','reading','item per child','barcode','librarian','transfer of books','library module'],
+  'Student Records & Fee':    ['student','fee','security refund','registration','ism','enrollment','challan','beams student','student file','concession','unclaimed'],
+  'General Administration':   ['register','record','documentation','gate pass','stationery','generator','demolition','daycare','inward','outward','maintenance','renewal','contract','log book']
+};
+
+// ═══════════════════════════════════════════════════════════════
+// BRANCH DATA
+// ═══════════════════════════════════════════════════════════════
+var BHS_BRANCHES = JSON.parse(document.getElementById('branch-data').textContent);
+var _currentBranch = null;
+var _sessions = {rpt1: null, rpt2: null};
+
+(function buildBranchDatalist(){
+  var dl = document.getElementById('dl-branch');
+  var h = '';
+  for(var i=0;i<BHS_BRANCHES.length;i++){
+    h += '<option value="'+esc(BHS_BRANCHES[i].name)+'">'+esc(BHS_BRANCHES[i].code)+' — '+esc(BHS_BRANCHES[i].city)+'</option>';
+  }
+  dl.innerHTML = h;
+})();
+
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function toast(msg){ var el=document.getElementById('toast'); el.textContent=msg; el.className='show'; setTimeout(function(){el.className='';},2800); }
+
+function onBranchInput(val){
+  _currentBranch = null;
+  for(var i=0;i<BHS_BRANCHES.length;i++){
+    if(BHS_BRANCHES[i].name===val||BHS_BRANCHES[i].code===val){
+      _currentBranch=BHS_BRANCHES[i]; break;
+    }
+  }
+  document.getElementById('sel_region').value = _currentBranch ? _currentBranch.region : '';
+  document.getElementById('sel_city').value   = _currentBranch ? _currentBranch.city   : '';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOAD JSON SESSION
+// ═══════════════════════════════════════════════════════════════
+function loadSessionJson(input, slot){
+  var file = input.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var data = JSON.parse(e.target.result);
+      // May be array (version history) or single session
+      var sess = Array.isArray(data) ? data[0] : data;
+      if(Array.isArray(data)){
+        // Sort by version desc, pick latest
+        data.sort(function(a,b){return (b.ver||0)-(a.ver||0);});
+        sess = data[0];
+      }
+      _sessions[slot] = sess;
+      // Auto-fill branch if not set
+      if(!document.getElementById('sel_branch').value && sess.formData && sess.formData.brname){
+        document.getElementById('sel_branch').value = sess.formData.brname;
+        onBranchInput(sess.formData.brname);
+      }
+      // Auto-fill date
+      var dtField = document.getElementById(slot+'_date');
+      if(sess.formData && sess.formData.rdt && !dtField.value){
+        dtField.value = sess.formData.rdt;
+      }
+      // Build a text summary for the textarea
+      var selCount = Object.keys(sess.selIds||{}).length;
+      var repCount = 0;
+      var om = sess.obsTypeMap||{};
+      for(var k in om){ if(om[k]==='Repeated') repCount++; }
+      var info = '&#9989; Session loaded: '+esc(file.name)+'\n'+selCount+' observations ('+repCount+' repeated, '+(selCount-repCount)+' new)';
+      if(sess.formData && sess.formData.brname) info += '\nBranch: '+esc(sess.formData.brname);
+      document.getElementById(slot+'_info').innerHTML = info;
+      document.getElementById(slot+'_text').value = buildTextFromSession(sess);
+      toast('Session loaded from '+file.name);
+    }catch(err){
+      toast('Could not parse JSON file.');
+    }
+    input.value='';
+  };
+  reader.readAsText(file);
+}
+
+function buildTextFromSession(sess){
+  // Build readable text from session data for keyword analysis
+  // We don't have full DB here, so just capture obs type counts
+  var lines = [];
+  var om = sess.obsTypeMap||{};
+  var si = sess.selIds||{};
+  for(var id in si){
+    var t = om[id]||'New';
+    lines.push(t+' Observation: '+id);
+  }
+  if(sess.formData){
+    var fd=sess.formData;
+    if(fd.brautype) lines.unshift('Audit Type: '+fd.brautype);
+    if(fd.brname) lines.unshift('Branch: '+fd.brname);
+  }
+  return lines.join('\n');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CORE ANALYSIS ENGINE
+// ═══════════════════════════════════════════════════════════════
+function parseReport(text, sess){
+  var result = {};
+  var catNames = Object.keys(DB_CATS);
+
+  // Initialize
+  for(var i=0;i<catNames.length;i++){
+    result[catNames[i]] = {obs:0, repeated:0, new:0, matches:[]};
+  }
+
+  if(sess){
+    // JSON session: more accurate - use obsTypeMap
+    var om = sess.obsTypeMap||{};
+    var si = sess.selIds||{};
+    var ids = Object.keys(si);
+    // Without full DB we can't look up categories, but we can count repeated/new totals
+    var rep=0, nw=0;
+    for(var j=0;j<ids.length;j++){
+      var typ = (om[ids[j]]||'New').toLowerCase();
+      if(typ==='repeated') rep++; else nw++;
+    }
+    // Distribute proportionally across categories based on text keywords in any pasted content
+    var total = rep+nw;
+    if(total>0){
+      var textCats = parseTextCategories(text||'');
+      var textTotal = 0;
+      for(var c in textCats) textTotal+=textCats[c];
+      if(textTotal>0){
+        for(var c in textCats){
+          if(result[c]){
+            var ratio = textCats[c]/textTotal;
+            result[c].obs   = Math.round(total*ratio);
+            result[c].repeated = Math.round(rep*ratio);
+            result[c].new  = result[c].obs - result[c].repeated;
+          }
+        }
+      } else {
+        // No text, distribute evenly across top 3 categories by DB weight
+        var top3 = catNames.slice().sort(function(a,b){return DB_CATS[b].weight-DB_CATS[a].weight;}).slice(0,3);
+        for(var ti=0;ti<top3.length;ti++){
+          result[top3[ti]].obs = Math.round(total/3);
+          result[top3[ti]].repeated = Math.round(rep/3);
+          result[top3[ti]].new = result[top3[ti]].obs - result[top3[ti]].repeated;
+        }
+      }
+    }
+  } else if(text && text.trim()){
+    // Text-based parsing
+    var textCats = parseTextCategories(text);
+    var repeatedLines = countRepeatedInText(text);
+
+    for(var c in textCats){
+      if(result[c]){
+        result[c].obs = textCats[c];
+        result[c].repeated = repeatedLines[c]||0;
+        result[c].new = Math.max(0, result[c].obs - result[c].repeated);
+      }
+    }
+  }
+  return result;
+}
+
+function parseTextCategories(text){
+  var lower = text.toLowerCase();
+  var lines = lower.split('\n');
+  var catCounts = {};
+  var catNames = Object.keys(CAT_KEYWORDS);
+
+  for(var li=0;li<lines.length;li++){
+    var line = lines[li];
+    if(!line.trim()) continue;
+    for(var ci=0;ci<catNames.length;ci++){
+      var kws = CAT_KEYWORDS[catNames[ci]];
+      for(var ki=0;ki<kws.length;ki++){
+        if(line.indexOf(kws[ki])!==-1){
+          catCounts[catNames[ci]] = (catCounts[catNames[ci]]||0)+1;
+          break;
+        }
+      }
+    }
+  }
+  return catCounts;
+}
+
+function countRepeatedInText(text){
+  var lower = text.toLowerCase();
+  var lines = lower.split('\n');
+  var repCounts = {};
+  var catNames = Object.keys(CAT_KEYWORDS);
+
+  for(var li=0;li<lines.length;li++){
+    var line = lines[li];
+    if(line.indexOf('repeated')===-1) continue;
+    for(var ci=0;ci<catNames.length;ci++){
+      var kws = CAT_KEYWORDS[catNames[ci]];
+      // Check surrounding 3 lines for category keywords
+      var context = lines.slice(Math.max(0,li-2),li+3).join(' ');
+      for(var ki=0;ki<kws.length;ki++){
+        if(context.indexOf(kws[ki])!==-1){
+          repCounts[catNames[ci]] = (repCounts[catNames[ci]]||0)+1;
+          break;
+        }
+      }
+    }
+  }
+  return repCounts;
+}
+
+function scoreCategory(catName, rpt1data, rpt2data){
+  var d1 = rpt1data[catName] || {obs:0,repeated:0};
+  var d2 = rpt2data ? (rpt2data[catName]||{obs:0,repeated:0}) : null;
+  var dbInfo = DB_CATS[catName];
+
+  // Total obs across all categories in rpt1
+  var totalRpt1 = 0;
+  for(var c in rpt1data) totalRpt1 += rpt1data[c].obs||0;
+  if(totalRpt1<1) totalRpt1=1;
+
+  // Frequency score (0-40): how many obs in this cat relative to total
+  var freqScore = (d1.obs / totalRpt1) * 40;
+
+  // Recurrence score (0-30): repeated obs in this cat
+  var recScore = 0;
+  if(d1.obs>0) recScore = (d1.repeated/d1.obs)*30;
+  if(d2 && d2.obs>0 && d1.obs>0) recScore = Math.min(30, recScore+10); // both reports have this cat
+
+  // DB weight score (0-20): how much this cat features in the databank
+  var maxDbCount = 108; // Financial Management is highest
+  var dbScore = (dbInfo.count/maxDbCount) * dbInfo.weight * 4;
+  dbScore = Math.min(20, dbScore);
+
+  // Severity bonus (0-10): safety gets extra weight
+  var sevBonus = (catName==='Safety & Security') ? 10 : 0;
+
+  var total = freqScore + recScore + dbScore + sevBonus;
+  return Math.min(100, Math.round(total));
+}
+
+function scoreToLevel(score){
+  if(score>=75) return 'critical';
+  if(score>=50) return 'high';
+  if(score>=25) return 'medium';
+  return 'low';
+}
+function levelLabel(level){
+  return {critical:'Critical',high:'High',medium:'Medium',low:'Low'}[level]||level;
+}
+function levelColor(level){
+  return {critical:'#c03030',high:'#d07020',medium:'#c0a000',low:'#40a040'}[level]||'#999';
+}
+function levelBarColor(level){
+  return {critical:'#e05050',high:'#e08030',medium:'#d0b020',low:'#50b050'}[level]||'#999';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RUN ANALYSIS
+// ═══════════════════════════════════════════════════════════════
+function runAnalysis(){
+  var branchName = document.getElementById('sel_branch').value.trim() || 'Unknown Branch';
+  var rpt1text   = document.getElementById('rpt1_text').value.trim();
+  var rpt2text   = document.getElementById('rpt2_text').value.trim();
+  var rpt1date   = document.getElementById('rpt1_date').value;
+  var rpt2date   = document.getElementById('rpt2_date').value;
+  var autype     = document.getElementById('next_autype').value.trim() || 'Routine Audit Visit';
+  var pb         = document.getElementById('next_pb').value.trim();
+
+  if(!rpt1text && !_sessions.rpt1){
+    toast('Please paste or load the most recent audit report first.');
+    return;
+  }
+
+  var rpt1data = parseReport(rpt1text, _sessions.rpt1);
+  var rpt2data = (rpt2text||_sessions.rpt2) ? parseReport(rpt2text, _sessions.rpt2) : null;
+
+  // Score each category
+  var catNames = Object.keys(DB_CATS);
+  var scores = [];
+  for(var i=0;i<catNames.length;i++){
+    var s = scoreCategory(catNames[i], rpt1data, rpt2data);
+    scores.push({cat:catNames[i], score:s, level:scoreToLevel(s), d1:rpt1data[catNames[i]], d2:rpt2data?rpt2data[catNames[i]]:null});
+  }
+  scores.sort(function(a,b){return b.score-a.score;});
+
+  // Overall score = weighted average of top 3
+  var overallScore = Math.round((scores[0].score*0.5)+(scores[1].score*0.3)+(scores[2].score*0.2));
+
+  // Render everything
+  renderResults(branchName, scores, overallScore, rpt1date, rpt2date, autype, pb, rpt2data!=null);
+  document.getElementById('results-empty').style.display='none';
+  document.getElementById('results-content').style.display='block';
+  document.getElementById('RP').scrollTop=0;
+  toast('Risk assessment complete.');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
+function renderResults(branch, scores, overall, d1, d2, autype, pb, hasTrend){
+  var overallLevel = scoreToLevel(overall);
+
+  // Header
+  var region = _currentBranch ? _currentBranch.region+' Region, ' : '';
+  var city   = _currentBranch ? _currentBranch.city : '';
+  document.getElementById('res-branch').textContent = branch;
+  document.getElementById('res-meta').textContent = (region+city+' | '+autype+(pb?' | '+pb:'')).replace(/^\s*\|\s*/,'');
+  document.getElementById('res-overall-badge').innerHTML = '<span class="risk-badge risk-'+overallLevel+'">&#9679; Overall Risk: '+levelLabel(overallLevel)+'</span>';
+  document.getElementById('res-generated').textContent = 'Generated: '+new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+
+  // Summary tiles
+  var counts = {critical:0,high:0,medium:0,low:0};
+  for(var i=0;i<scores.length;i++) counts[scores[i].level]++;
+  document.getElementById('res-summary').innerHTML =
+    tile('critical', counts.critical, 'Critical') +
+    tile('high',     counts.high,     'High') +
+    tile('medium',   counts.medium,   'Medium') +
+    tile('low',      counts.low,      'Low');
+
+  // Gauge
+  document.getElementById('gauge-score').textContent = overall+'/100';
+  document.getElementById('gauge-score').style.color = levelColor(overallLevel);
+  document.getElementById('gauge-label').textContent = levelLabel(overallLevel)+' Risk — '+gaugeDesc(overallLevel);
+  document.getElementById('gauge-label').style.color = levelColor(overallLevel);
+  document.getElementById('gauge-needle').style.left = overall+'%';
+  document.getElementById('gauge-summary').innerHTML = gaugeSummary(branch, scores, overallLevel, d1);
+
+  // Category matrix
+  renderMatrix(scores);
+
+  // Bar chart
+  renderBarChart(scores);
+
+  // Focus areas
+  renderFocus(scores, branch, autype);
+
+  // Trend
+  if(hasTrend){
+    document.getElementById('trend-card').style.display='block';
+    renderTrend(scores);
+  } else {
+    document.getElementById('trend-card').style.display='none';
+  }
+
+  // Repeated
+  var hasRepeated = false;
+  for(var j=0;j<scores.length;j++){ if(scores[j].d1&&scores[j].d1.repeated>0){hasRepeated=true;break;} }
+  if(hasRepeated){
+    document.getElementById('repeated-card').style.display='block';
+    renderRepeated(scores);
+  } else {
+    document.getElementById('repeated-card').style.display='none';
+  }
+
+  // Recommendations
+  renderRecs(scores);
+}
+
+function tile(cls, count, label){
+  return '<div class="summary-tile '+cls+'"><div class="count">'+count+'</div><div class="lbl">'+label+'</div></div>';
+}
+
+function gaugeDesc(level){
+  return {critical:'Immediate comprehensive audit required',high:'Focused audit with priority on flagged areas',medium:'Standard audit with additional scrutiny in key areas',low:'Routine audit — maintain current oversight'}[level]||'';
+}
+
+function gaugeSummary(branch, scores, level, d1){
+  var top = scores[0];
+  var repTotal=0, obsTotal=0;
+  for(var i=0;i<scores.length;i++){
+    if(scores[i].d1){ obsTotal+=scores[i].d1.obs||0; repTotal+=scores[i].d1.repeated||0; }
+  }
+  var repPct = obsTotal>0 ? Math.round(repTotal/obsTotal*100) : 0;
+  var d1str = d1 ? ' (report dated '+fmtDate(d1)+')' : '';
+  return 'Analysis of <strong>'+esc(branch)+'</strong>'+d1str+' identified <strong>'+obsTotal+' observations</strong> across all categories, of which <strong>'+repTotal+' ('+repPct+'%)</strong> are repeated from previous audits. Highest-risk category: <strong>'+esc(top.cat)+'</strong> with a risk score of <strong>'+top.score+'/100</strong>.';
+}
+
+function fmtDate(iso){
+  if(!iso) return '';
+  var d=new Date(iso);
+  return d.getDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]+' '+d.getFullYear();
+}
+
+function renderMatrix(scores){
+  var h='<table class="risk-table"><thead><tr><th>Category</th><th>Risk Level</th><th>Risk Score</th><th>Obs (Report 1)</th><th>of which Repeated</th><th>DB Observations</th></tr></thead><tbody>';
+  for(var i=0;i<scores.length;i++){
+    var s=scores[i];
+    var obs1 = s.d1?s.d1.obs:0;
+    var rep1 = s.d1?s.d1.repeated:0;
+    h+='<tr>';
+    h+='<td><span class="cat-name">'+esc(s.cat)+'</span></td>';
+    h+='<td><span class="risk-badge risk-'+s.level+'">'+levelLabel(s.level)+'</span></td>';
+    h+='<td><div style="display:flex;align-items:center;gap:6px"><div style="width:'+s.score+'px;max-width:80px;height:8px;background:'+levelBarColor(s.level)+';border-radius:4px"></div><strong style="color:'+levelColor(s.level)+'">'+s.score+'</strong></div></td>';
+    h+='<td>'+obs1+'</td>';
+    h+='<td>'+(rep1>0?'<span style="color:#c03030;font-weight:700">'+rep1+'</span>':'0')+'</td>';
+    h+='<td style="color:#6a7888">'+DB_CATS[s.cat].count+'</td>';
+    h+='</tr>';
+  }
+  h+='</tbody></table>';
+  document.getElementById('res-matrix').innerHTML=h;
+}
+
+function renderBarChart(scores){
+  var maxObs=0;
+  for(var i=0;i<scores.length;i++){
+    var obs=scores[i].d1?scores[i].d1.obs:0;
+    if(obs>maxObs) maxObs=obs;
+  }
+  if(maxObs<1) maxObs=1;
+  var h='';
+  for(var i=0;i<scores.length;i++){
+    var s=scores[i];
+    var obs=s.d1?s.d1.obs:0;
+    var rep=s.d1?s.d1.repeated:0;
+    var pct=Math.round(obs/maxObs*100);
+    h+='<div class="bar-row">';
+    h+='<div class="bar-label">'+esc(s.cat)+'</div>';
+    h+='<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+levelBarColor(s.level)+'"></div></div>';
+    h+='<div class="bar-val">'+obs+(rep>0?'<span style="color:#c03030;font-size:9px"> ('+rep+'R)</span>':'')+'</div>';
+    h+='</div>';
+  }
+  h+='<div style="font-size:10px;color:#9a9a9a;margin-top:8px">Numbers show total observations; <span style="color:#c03030;font-weight:700">R</span> = Repeated</div>';
+  document.getElementById('res-barchart').innerHTML=h;
+}
+
+function renderFocus(scores, branch, autype){
+  var h='';
+  var top = scores.slice(0,5);
+  for(var i=0;i<top.length;i++){
+    var s=top[i];
+    var db=DB_CATS[s.cat];
+    var obs1=s.d1?s.d1.obs:0;
+    var rep1=s.d1?s.d1.repeated:0;
+    h+='<div class="focus-card '+s.level+'">';
+    h+='<div class="focus-rank">Priority #'+(i+1)+'</div>';
+    h+='<div class="focus-name">'+esc(s.cat)+' <span class="risk-badge risk-'+s.level+'" style="font-size:10px;margin-left:6px">'+levelLabel(s.level)+'</span></div>';
+    h+='<div class="focus-meta">';
+    h+='<span>Risk Score: '+s.score+'/100</span>';
+    h+='<span>'+obs1+' obs in latest report</span>';
+    if(rep1>0) h+='<span style="background:#fde8e8;border-color:#f0a0a0;color:#9b1a1a">'+rep1+' Repeated</span>';
+    h+='<span>'+db.count+' issues in BHS databank</span>';
+    h+='</div>';
+    h+='<div style="font-size:11px;color:#5a6a7a;margin-bottom:6px">'+focusReason(s)+'</div>';
+    h+='<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:4px">Key checkpoints from BHS databank:</div>';
+    h+='<ul class="focus-obs">';
+    var titles=db.titles.slice(0,5);
+    for(var ti=0;ti<titles.length;ti++) h+='<li>'+esc(titles[ti])+'</li>';
+    h+='</ul>';
+    h+='</div>';
+  }
+  document.getElementById('res-focus').innerHTML=h;
+}
+
+function focusReason(s){
+  var parts=[];
+  if(s.d1&&s.d1.obs>0) parts.push(s.d1.obs+' observation'+(s.d1.obs>1?'s':'')+' identified in latest report');
+  if(s.d1&&s.d1.repeated>0) parts.push(s.d1.repeated+' unresolved from previous audit (escalated risk)');
+  parts.push(DB_CATS[s.cat].count+' historical findings in BHS databank indicate systemic risk');
+  if(s.cat==='Safety & Security') parts.push('Safety observations carry highest inherent risk weight');
+  return parts.join('; ')+'.';
+}
+
+function renderTrend(scores){
+  var h='<div style="font-size:12px;color:#4a5a70;margin-bottom:12px">Comparison between the two loaded reports. &#8593; = worsening trend (more observations); &#8595; = improving.</div>';
+  for(var i=0;i<scores.length;i++){
+    var s=scores[i];
+    var obs1=s.d1?s.d1.obs:0;
+    var obs2=s.d2?s.d2.obs:0;
+    if(obs1===0&&obs2===0) continue;
+    var diff=obs1-obs2;
+    var arrow, cls, note;
+    if(diff>0){arrow='&#8593;';cls='trend-up';note='Increased by '+diff+' (+'+Math.round(diff/(obs2||1)*100)+'%)';}
+    else if(diff<0){arrow='&#8595;';cls='trend-down';note='Decreased by '+Math.abs(diff)+' ('+Math.round(diff/(obs2||1)*100)+'%)';}
+    else{arrow='&#8212;';cls='trend-flat';note='No change';}
+    h+='<div class="trend-row"><div class="trend-arrow '+cls+'">'+arrow+'</div>';
+    h+='<div style="flex:1"><strong>'+esc(s.cat)+'</strong></div>';
+    h+='<div style="font-size:11px;color:#4a5a70">Report 2: '+obs2+' &rarr; Report 1: '+obs1+'</div>';
+    h+='<div style="font-size:11px;color:'+levelColor(s.level)+';width:160px;text-align:right">'+note+'</div></div>';
+  }
+  document.getElementById('res-trend').innerHTML=h;
+}
+
+function renderRepeated(scores){
+  var h='<div style="font-size:12px;color:#4a5a70;margin-bottom:12px">The following categories contain repeated (un-resolved) observations from prior audits. These require highest priority attention as repeated non-compliance escalates risk severity.</div>';
+  var found=false;
+  for(var i=0;i<scores.length;i++){
+    var s=scores[i];
+    if(!s.d1||!s.d1.repeated) continue;
+    found=true;
+    h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #eaeff6">';
+    h+='<span style="color:#c03030;font-size:18px;font-weight:900">&#9888;</span>';
+    h+='<div style="flex:1"><strong style="color:#1a3a5c">'+esc(s.cat)+'</strong> — ';
+    h+='<span style="color:#c03030;font-weight:700">'+s.d1.repeated+' repeated observation'+(s.d1.repeated>1?'s':'')+' unresolved</span></div>';
+    h+='<span class="risk-badge risk-critical">Escalated</span>';
+    h+='</div>';
+  }
+  if(!found) h='<div style="color:#6a7888;font-size:12px;padding:10px 0">No repeated observations detected in the loaded report data.</div>';
+  document.getElementById('res-repeated').innerHTML=h;
+}
+
+function renderRecs(scores){
+  var recs=[];
+  // Top scoring categories get recommendations
+  for(var i=0;i<scores.length&&recs.length<8;i++){
+    var s=scores[i];
+    if(s.score<20) continue;
+    var db=DB_CATS[s.cat];
+    var urgency = s.level==='critical'||s.level==='high' ? '(High Priority)' : s.level==='medium'?'(Medium Priority)':'(Advisory)';
+    var desc = 'Examine all '+esc(s.cat)+' records. ';
+    if(s.d1&&s.d1.repeated>0) desc+='Pay special attention to '+s.d1.repeated+' observation'+(s.d1.repeated>1?'s':'')+' that recurred from the last audit. ';
+    desc+='Key checkpoints: '+esc(db.titles.slice(0,3).join('; '))+'.';
+    recs.push({title:'Review '+esc(s.cat)+' '+urgency, desc:desc, level:s.level});
+  }
+  var h='';
+  for(var ri=0;ri<recs.length;ri++){
+    h+='<div class="rec-row">';
+    h+='<div class="rec-num" style="background:'+levelColor(recs[ri].level)+'">'+( ri+1)+'</div>';
+    h+='<div class="rec-body"><div class="rec-title">'+recs[ri].title+'</div><div class="rec-desc">'+recs[ri].desc+'</div></div>';
+    h+='</div>';
+  }
+  if(!h) h='<div style="color:#6a7888;font-size:12px;padding:10px 0">Load audit report data to generate specific recommendations.</div>';
+  document.getElementById('res-recs').innerHTML=h;
+}
+</script>
+
+</body>
+</html>
