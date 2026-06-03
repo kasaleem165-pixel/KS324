@@ -87,6 +87,12 @@ html,body{height:100%;font-family:'Inter',sans-serif;font-size:13.5px;color:#1e2
 .vh-btn.exp{background:#1a7a4a;color:#fff}
 .vh-btn.del{background:#8b1a1a;color:#fff}
 .vh-empty{padding:20px;text-align:center;color:#aaa;font-size:13px}
+.sd-opt{display:flex;align-items:flex-start;gap:14px;padding:13px 16px;border:2px solid #d0dcea;border-radius:8px;cursor:pointer;margin-bottom:10px;transition:border-color .15s,background .15s}
+.sd-opt:hover{border-color:#1a3a5c;background:#f5f8fd}
+.sd-opt .sd-icon{font-size:26px;flex-shrink:0;margin-top:2px}
+.sd-opt .sd-info strong{font-size:13px;color:#1a3a5c;display:block;margin-bottom:2px}
+.sd-opt .sd-info span{font-size:11px;color:#6a7888;line-height:1.4}
+.sd-note{font-size:11px;color:#888;background:#f8f8f8;border-radius:5px;padding:9px 12px;border-left:3px solid #c8d8ec;margin-top:4px}
 .vh-foot{display:flex;gap:10px;padding:0 20px 18px;flex-wrap:wrap}
 .vh-foot button{padding:8px 16px;border:none;border-radius:5px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
 .vh-save-now{background:var(--navy);color:#fff}
@@ -7588,12 +7594,14 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
   <button class="tbtn soft" onclick="downloadSoftCopy()">&#128233; Auditee Copy</button>
   <button class="tbtn draft" onclick="showDraftModal()">&#128196; Draft by Category</button>
   <button class="tbtn load" onclick="triggerLoad()">&#128193; Load Response</button>
-  <button class="tbtn fin" onclick="finalizeReport()">&#9989; Finalize &amp; Save</button>
+  <button class="tbtn load" onclick="triggerLoadReport()">&#128228; Load Report</button>
+  <button class="tbtn fin" onclick="showSaveDialog()">&#9989; Finalize &amp; Save</button>
   <button class="tbtn cp" onclick="doCopy()">&#128203; Copy</button>
   <button class="tbtn r" onclick="doClear()">&#10005; Clear</button>
 </div>
 <input type="file" id="fileinp" accept=".html" style="display:none" onchange="loadAuditeeFile(event)">
 <input type="file" id="sessioninp" accept=".json" style="display:none" onchange="importSessionFile(event)">
+<input type="file" id="rptinp" accept=".html,.htm,.json" style="display:none" onchange="loadReportFile(event)">
 <input type="file" id="cmpinp" accept=".html,.htm,.docx" style="display:none" onchange="cmpFileLoaded(event)">
 
 <div id="main">
@@ -10436,14 +10444,148 @@ function finalizeReport(){
   finalHtml+='<p style="font-size:12px;color:#6a7888;margin-bottom:16px">Total Observations: <strong>'+num+'</strong></p>';
   finalHtml+=obsSection;
   finalHtml+=buildAnnexHtml(true);
+  // Embed full session so this HTML can be re-loaded into the app
+  var embeddedSess=captureSession();
+  embeddedSess.ts=new Date().toISOString();
+  embeddedSess.ver=0; // marker: came from exported HTML
+  finalHtml+='<script id="bhs-session-data" type="application/json">'+JSON.stringify(embeddedSess)+'<\/script>';
   finalHtml+='</div>\n</div>\n</body>\n</html>';
 
-  var blob=new Blob([finalHtml],{type:'text/html'});
-  var url=URL.createObjectURL(blob);
+  // Store built report for save dialog to use
+  window._pendingFinal = {html: finalHtml, fname: fname, sess: embeddedSess};
+}
+
+function showSaveDialog(){
+  // Build the final content first
+  finalizeReport();
+  if(!window._pendingFinal){ alert('Please generate the report first.'); return; }
+
+  var el=document.createElement('div');
+  el.className='vh-bg'; el.id='sdModal';
+  el.innerHTML=
+    '<div class="vh-box" style="width:500px">'+
+    '<div class="vh-head"><h3>&#128190; Save Report</h3><button onclick="document.getElementById(\'sdModal\').remove()">&#10005;</button></div>'+
+    '<div class="vh-body">'+
+    '<p>Choose format and the file will download to your browser\'s <strong>Downloads folder</strong>.<br>To save to a specific folder, move the file after downloading.</p>'+
+    '<div class="sd-opt" onclick="saveAsFinal(\'html\')">'+
+      '<span class="sd-icon">&#128196;</span>'+
+      '<div class="sd-info"><strong>HTML Report (Re-loadable)</strong>'+
+      '<span>Saves the complete final report as an HTML file.<br>Can be re-opened in a browser and re-loaded into this app to resume editing.</span></div>'+
+    '</div>'+
+    '<div class="sd-opt" onclick="saveAsFinal(\'word\')">'+
+      '<span class="sd-icon">&#128462;</span>'+
+      '<div class="sd-info"><strong>Word Document (.doc)</strong>'+
+      '<span>Opens in Microsoft Word or LibreOffice. Ideal for sharing and printing.</span></div>'+
+    '</div>'+
+    '<div class="sd-opt" onclick="saveAsFinal(\'json\')">'+
+      '<span class="sd-icon">&#128190;</span>'+
+      '<div class="sd-info"><strong>Session File (.json)</strong>'+
+      '<span>Saves all working data (observations, responses, annexures). Use this to back up your work and reload it in the app at any time via Save / Versions → Import.</span></div>'+
+    '</div>'+
+    '<div class="sd-note">&#9432; &nbsp;Browsers do not allow apps to choose the save folder directly. Files download to your configured Downloads folder. You can change your browser\'s download folder in its Settings.</div>'+
+    '</div></div>';
+  document.body.appendChild(el);
+  el.addEventListener('click', function(e){ if(e.target===el) el.remove(); });
+}
+
+function saveAsFinal(fmt){
+  var modal=document.getElementById('sdModal');
+  if(modal) modal.remove();
+  var pf=window._pendingFinal;
+  if(!pf) return;
   var a=document.createElement('a');
-  a.href=url; a.download=fname; a.click();
-  URL.revokeObjectURL(url);
-  toast('Final report saved: '+fname);
+
+  if(fmt==='html'){
+    var blob=new Blob([pf.html],{type:'text/html'});
+    a.href=URL.createObjectURL(blob);
+    a.download=pf.fname;
+    a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+    toast('Saved as HTML: '+pf.fname);
+
+  } else if(fmt==='word'){
+    // Word-compatible HTML wrapped in Word namespace
+    var wordHtml='<html xmlns:o="urn:schemas-microsoft-com:office:office" '+
+      'xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'+
+      '<head><meta charset="UTF-8">'+
+      '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom>'+
+      '<w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->'+
+      '<style>body{font-family:Calibri,sans-serif;font-size:11pt;margin:2cm}'+
+      'h1{font-size:16pt;color:#1a3a5c}h2{font-size:13pt;color:#2a5080}'+
+      'table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;font-size:10pt}'+
+      'th{background:#1a3a5c;color:#fff}</style></head><body>'+
+      pf.html.replace(/<!DOCTYPE[^>]*>/i,'').replace(/<html[^>]*>/i,'').replace(/<\/html>/i,'')
+      .replace(/<head>[\s\S]*?<\/head>/i,'')
+      .replace(/<body[^>]*>/i,'').replace(/<\/body>/i,'')
+      +'</body></html>';
+    var wblob=new Blob([wordHtml],{type:'application/msword'});
+    var wname=pf.fname.replace(/\.html?$/i,'.doc');
+    a.href=URL.createObjectURL(wblob);
+    a.download=wname;
+    a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+    toast('Saved as Word: '+wname);
+
+  } else if(fmt==='json'){
+    var sess=pf.sess||captureSession();
+    var jblob=new Blob([JSON.stringify(sess,null,2)],{type:'application/json'});
+    var jname=pf.fname.replace(/\.html?$/i,'_session.json');
+    a.href=URL.createObjectURL(jblob);
+    a.download=jname;
+    a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+    toast('Session saved: '+jname);
+  }
+}
+
+// ============================================================
+// LOAD REPORT (re-import from exported HTML or JSON session)
+// ============================================================
+function triggerLoadReport(){
+  document.getElementById('rptinp').click();
+}
+
+function loadReportFile(e){
+  var file=e.target.files[0];
+  e.target.value='';
+  if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    var text=ev.target.result;
+    var sess=null;
+
+    // Try JSON session file first
+    if(file.name.toLowerCase().endsWith('.json')){
+      try{ sess=JSON.parse(text); } catch(ex){ alert('Invalid JSON file.'); return; }
+    } else {
+      // Try to extract embedded session from HTML
+      var match=text.match(/<script[^>]+id="bhs-session-data"[^>]*>([\s\S]*?)<\/script>/i);
+      if(match){
+        try{ sess=JSON.parse(match[1]); } catch(ex){}
+      }
+      // Fallback: try legacy auditee response JSON embed
+      if(!sess){
+        var match2=text.match(/<script[^>]+id="bhs-resp-data"[^>]*>([\s\S]*?)<\/script>/i);
+        if(match2){
+          try{
+            var respData=JSON.parse(match2[1]);
+            // Build a minimal session from response data only
+            sess={formData:{},respMap:respData,selIds:{},obsTypeMap:{},avMap:{},actMap:{},assessMap:{},obsEdits:{},customs:[],annexures:[]};
+            var rkeys=Object.keys(respData);
+            for(var ri=0;ri<rkeys.length;ri++) sess.selIds[rkeys[ri]]=true;
+            sess.ts=new Date().toISOString();
+          } catch(ex2){}
+        }
+      }
+    }
+
+    if(!sess||!sess.ts){ alert('No session data found in this file.\n\nMake sure you are loading:\n• A .json session file exported from this app\n• An HTML report exported by this app (which embeds session data automatically)'); return; }
+
+    if(!confirm('Load report from "'+file.name+'"?\n\nThis will replace your current unsaved work.\nClick OK to continue.')) return;
+    restoreSession(sess);
+    toast('Report loaded from: '+file.name);
+  };
+  reader.readAsText(file);
 }
 
 // ============================================================
