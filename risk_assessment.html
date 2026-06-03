@@ -123,39 +123,24 @@ textarea{resize:vertical;line-height:1.5}
   </div>
 
   <div class="sec">
-    <div class="sh">&#128196; Most Recent Audit Report</div>
+    <div class="sh">&#128196; Previous Audit Report(s)</div>
     <div class="fr">
-      <label>Report Date <span style="font-weight:400;color:#9a9a9a">(approximate)</span></label>
-      <input type="date" id="rpt1_date">
+      <label>Load file(s) — Word (.docx), JSON session, or plain text</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
+        <button class="btn btn-sm" onclick="document.getElementById('file_picker').click()">&#128194; Browse &amp; Add Files…</button>
+        <input type="file" id="file_picker" accept=".docx,.doc,.json,.txt" multiple style="display:none" onchange="handleFilePick(this)">
+      </div>
+      <div class="hint">Supports multiple Word (.docx), JSON session, or plain-text files. Add as many as needed — all will be analysed together.</div>
     </div>
-    <div class="fr">
-      <label>Paste report content — or load a saved JSON session</label>
-      <textarea id="rpt1_text" rows="7" placeholder="Paste the text of the most recent audit report here. Include observation titles, categories, and any 'Repeated' labels for best analysis…"></textarea>
+    <div id="loaded-files-list" style="display:none;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:4px">Loaded Files:</div>
+      <div id="loaded-files-items"></div>
     </div>
-    <div style="display:flex;gap:6px">
-      <button class="btn btn-sm" onclick="document.getElementById('rpt1_json').click()">&#128194; Load Session JSON</button>
-      <input type="file" id="rpt1_json" accept=".json" style="display:none" onchange="loadSessionJson(this,'rpt1')">
-      <button class="btn btn-sm" onclick="document.getElementById('rpt1_text').value=''">&#10005; Clear</button>
+    <div class="fr" style="margin-top:6px">
+      <label>Or paste report text directly</label>
+      <textarea id="paste_text" rows="7" placeholder="Paste the text of a previous audit report here. Include observation titles, categories, and any 'Repeated' labels for best analysis…"></textarea>
     </div>
-    <div id="rpt1_info" class="hint" style="margin-top:6px"></div>
-  </div>
-
-  <div class="sec">
-    <div class="sh">&#128196; Previous Audit Report <span style="font-weight:400;font-size:10px;color:#9a9a9a">(optional — enables trend analysis)</span></div>
-    <div class="fr">
-      <label>Report Date</label>
-      <input type="date" id="rpt2_date">
-    </div>
-    <div class="fr">
-      <label>Paste report content or load JSON session</label>
-      <textarea id="rpt2_text" rows="5" placeholder="Paste an older audit report to compare trends…"></textarea>
-    </div>
-    <div style="display:flex;gap:6px">
-      <button class="btn btn-sm" onclick="document.getElementById('rpt2_json').click()">&#128194; Load Session JSON</button>
-      <input type="file" id="rpt2_json" accept=".json" style="display:none" onchange="loadSessionJson(this,'rpt2')">
-      <button class="btn btn-sm" onclick="document.getElementById('rpt2_text').value=''">&#10005; Clear</button>
-    </div>
-    <div id="rpt2_info" class="hint" style="margin-top:6px"></div>
+    <button class="btn btn-sm" onclick="document.getElementById('paste_text').value=''">&#10005; Clear Pasted Text</button>
   </div>
 
   <div class="sec">
@@ -183,7 +168,7 @@ textarea{resize:vertical;line-height:1.5}
   <div id="results-empty">
     <div class="icon">&#128202;</div>
     <div style="font-size:15px;font-weight:700;color:#2a3a50">BHS Internal Audit — Risk Assessment</div>
-    <div style="max-width:380px;line-height:1.7">Select a branch, load or paste the most recent audit report, then click <strong>Run Risk Assessment</strong> to generate a prioritized risk profile and audit focus recommendations.</div>
+    <div style="max-width:380px;line-height:1.7">Select a branch, load or paste one or more previous audit reports, then click <strong>Run Risk Assessment</strong> to generate a prioritized risk profile and audit focus recommendations.</div>
   </div>
 
   <div id="results-content">
@@ -235,7 +220,7 @@ textarea{resize:vertical;line-height:1.5}
 
     <!-- Trend Analysis -->
     <div class="card" id="trend-card" style="display:none">
-      <div class="card-title">&#128200; Trend Analysis (Report 1 vs Report 2)</div>
+      <div class="card-title">&#128200; Trend Analysis (Older vs Newer Report)</div>
       <div id="res-trend"></div>
     </div>
 
@@ -298,7 +283,7 @@ var CAT_KEYWORDS = {
 // ═══════════════════════════════════════════════════════════════
 var BHS_BRANCHES = JSON.parse(document.getElementById('branch-data').textContent);
 var _currentBranch = null;
-var _sessions = {rpt1: null, rpt2: null};
+var _loadedReports = []; // [{name, date, sess, text}]
 
 (function buildBranchDatalist(){
   var dl = document.getElementById('dl-branch');
@@ -324,60 +309,97 @@ function onBranchInput(val){
 }
 
 // ═══════════════════════════════════════════════════════════════
-// LOAD JSON SESSION
+// FILE LOADING — MULTI-FILE (DOCX / JSON / TXT)
 // ═══════════════════════════════════════════════════════════════
-function loadSessionJson(input, slot){
-  var file = input.files[0];
-  if(!file) return;
-  var reader = new FileReader();
-  reader.onload = function(e){
-    try{
-      var data = JSON.parse(e.target.result);
-      // May be array (version history) or single session
-      var sess = Array.isArray(data) ? data[0] : data;
-      if(Array.isArray(data)){
-        // Sort by version desc, pick latest
-        data.sort(function(a,b){return (b.ver||0)-(a.ver||0);});
-        sess = data[0];
+function handleFilePick(input){
+  var files = input.files;
+  if(!files||!files.length) return;
+  for(var fi=0;fi<files.length;fi++){
+    (function(file){
+      var ext = file.name.split('.').pop().toLowerCase();
+      if(ext==='json'){
+        var r = new FileReader();
+        r.onload = function(e){
+          try{
+            var data = JSON.parse(e.target.result);
+            var sess = Array.isArray(data) ? data[0] : data;
+            if(Array.isArray(data)){
+              data.sort(function(a,b){return (b.ver||0)-(a.ver||0);});
+              sess = data[0];
+            }
+            var text = buildTextFromSession(sess);
+            var date = (sess.formData&&sess.formData.rdt)||'';
+            if(!document.getElementById('sel_branch').value && sess.formData&&sess.formData.brname){
+              document.getElementById('sel_branch').value = sess.formData.brname;
+              onBranchInput(sess.formData.brname);
+            }
+            addLoadedReport(file.name, date, sess, text);
+          }catch(err){ toast('Could not read JSON: '+file.name); }
+        };
+        r.readAsText(file);
+      } else if(ext==='docx'||ext==='doc'){
+        var r2 = new FileReader();
+        r2.onload = function(e){
+          parseDocxFile(e.target.result, function(text){
+            addLoadedReport(file.name, '', null, text||'');
+            if(!text) toast('Warning: could not extract text from '+file.name);
+          });
+        };
+        r2.readAsArrayBuffer(file);
+      } else {
+        var r3 = new FileReader();
+        r3.onload = function(e){ addLoadedReport(file.name, '', null, e.target.result||''); };
+        r3.readAsText(file);
       }
-      _sessions[slot] = sess;
-      // Auto-fill branch if not set
-      if(!document.getElementById('sel_branch').value && sess.formData && sess.formData.brname){
-        document.getElementById('sel_branch').value = sess.formData.brname;
-        onBranchInput(sess.formData.brname);
-      }
-      // Auto-fill date
-      var dtField = document.getElementById(slot+'_date');
-      if(sess.formData && sess.formData.rdt && !dtField.value){
-        dtField.value = sess.formData.rdt;
-      }
-      // Build a text summary for the textarea
-      var selCount = Object.keys(sess.selIds||{}).length;
-      var repCount = 0;
-      var om = sess.obsTypeMap||{};
-      for(var k in om){ if(om[k]==='Repeated') repCount++; }
-      var info = '&#9989; Session loaded: '+esc(file.name)+'\n'+selCount+' observations ('+repCount+' repeated, '+(selCount-repCount)+' new)';
-      if(sess.formData && sess.formData.brname) info += '\nBranch: '+esc(sess.formData.brname);
-      document.getElementById(slot+'_info').innerHTML = info;
-      document.getElementById(slot+'_text').value = buildTextFromSession(sess);
-      toast('Session loaded from '+file.name);
-    }catch(err){
-      toast('Could not parse JSON file.');
-    }
-    input.value='';
-  };
-  reader.readAsText(file);
+    })(files[fi]);
+  }
+  input.value='';
+}
+
+function addLoadedReport(name, date, sess, text){
+  for(var i=0;i<_loadedReports.length;i++){
+    if(_loadedReports[i].name===name){ toast(name+' is already loaded.'); return; }
+  }
+  _loadedReports.push({name:name, date:date, sess:sess, text:text});
+  renderLoadedFilesList();
+  toast('Loaded: '+name);
+}
+
+function removeLoadedReport(idx){
+  _loadedReports.splice(idx,1);
+  renderLoadedFilesList();
+}
+
+function renderLoadedFilesList(){
+  var container = document.getElementById('loaded-files-list');
+  var items = document.getElementById('loaded-files-items');
+  if(!_loadedReports.length){ container.style.display='none'; return; }
+  container.style.display='block';
+  var h='';
+  for(var i=0;i<_loadedReports.length;i++){
+    var rp=_loadedReports[i];
+    var icon = (rp.name.indexOf('.docx')!==-1||rp.name.indexOf('.doc')!==-1)?'&#128196;':(rp.name.indexOf('.json')!==-1?'&#128202;':'&#128200;');
+    var wc = rp.text ? rp.text.split(/\s+/).filter(function(w){return w;}).length : 0;
+    h+='<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #eaeff6">';
+    h+='<span style="font-size:14px;flex-shrink:0">'+icon+'</span>';
+    h+='<div style="flex:1;min-width:0">';
+    h+='<div style="font-size:11px;font-weight:700;color:#1a3a5c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(rp.name)+'">'+esc(rp.name)+'</div>';
+    h+='<div style="display:flex;align-items:center;gap:6px;margin-top:3px">';
+    h+='<input type="date" value="'+esc(rp.date||'')+'" style="padding:2px 5px;font-size:10px;width:130px;border:1px solid #c8d8ec;border-radius:3px" onchange="_loadedReports['+i+'].date=this.value">';
+    h+='<span style="font-size:10px;color:#9a9a9a">'+wc+' words extracted</span>';
+    h+='</div></div>';
+    h+='<button class="btn-sm" onclick="removeLoadedReport('+i+')" title="Remove" style="padding:3px 7px;color:#c03030;border-color:#f0a0a0;flex-shrink:0">&#10005;</button>';
+    h+='</div>';
+  }
+  items.innerHTML=h;
 }
 
 function buildTextFromSession(sess){
-  // Build readable text from session data for keyword analysis
-  // We don't have full DB here, so just capture obs type counts
-  var lines = [];
-  var om = sess.obsTypeMap||{};
-  var si = sess.selIds||{};
+  var lines=[];
+  var om=sess.obsTypeMap||{};
+  var si=sess.selIds||{};
   for(var id in si){
-    var t = om[id]||'New';
-    lines.push(t+' Observation: '+id);
+    lines.push((om[id]||'New')+' Observation: '+id);
   }
   if(sess.formData){
     var fd=sess.formData;
@@ -385,6 +407,87 @@ function buildTextFromSession(sess){
     if(fd.brname) lines.unshift('Branch: '+fd.brname);
   }
   return lines.join('\n');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DOCX PARSER — extracts text from word/document.xml via ZIP
+// ═══════════════════════════════════════════════════════════════
+function parseDocxFile(arrayBuffer, callback){
+  try{
+    var bytes = new Uint8Array(arrayBuffer);
+    var dv = new DataView(arrayBuffer);
+
+    // Find End of Central Directory (EOCD) signature PK\x05\x06
+    var eocdPos = -1;
+    for(var i=bytes.length-22;i>=0;i--){
+      if(bytes[i]===0x50&&bytes[i+1]===0x4B&&bytes[i+2]===0x05&&bytes[i+3]===0x06){ eocdPos=i; break; }
+    }
+    if(eocdPos<0){ callback(''); return; }
+
+    var cdOffset = dv.getUint32(eocdPos+16, true);
+    var cdSize   = dv.getUint32(eocdPos+12, true);
+    var target   = 'word/document.xml';
+    var pos = cdOffset;
+
+    while(pos < cdOffset+cdSize){
+      if(dv.getUint32(pos,true)!==0x02014B50) break; // PK\x01\x02
+      var comprMethod   = dv.getUint16(pos+10, true);
+      var compSize      = dv.getUint32(pos+20, true);
+      var fnLen         = dv.getUint16(pos+28, true);
+      var extraLen      = dv.getUint16(pos+30, true);
+      var commentLen    = dv.getUint16(pos+32, true);
+      var localOffset   = dv.getUint32(pos+42, true);
+      var fnBytes       = bytes.subarray(pos+46, pos+46+fnLen);
+      var fn='';
+      for(var ci=0;ci<fnBytes.length;ci++) fn+=String.fromCharCode(fnBytes[ci]);
+
+      if(fn===target){
+        var lhFnLen    = dv.getUint16(localOffset+26, true);
+        var lhExtraLen = dv.getUint16(localOffset+28, true);
+        var dataStart  = localOffset+30+lhFnLen+lhExtraLen;
+        var compData   = arrayBuffer.slice(dataStart, dataStart+compSize);
+
+        if(comprMethod===0){
+          // Stored — no compression
+          callback(xmlToText(new TextDecoder().decode(compData)));
+        } else if(comprMethod===8){
+          // DEFLATE
+          var ds = new DecompressionStream('deflate-raw');
+          var writer = ds.writable.getWriter();
+          var reader = ds.readable.getReader();
+          writer.write(new Uint8Array(compData));
+          writer.close();
+          var chunks=[]; var totalLen=0;
+          function pump(){
+            reader.read().then(function(res){
+              if(res.done){
+                var combined=new Uint8Array(totalLen); var off=0;
+                for(var ci=0;ci<chunks.length;ci++){ combined.set(chunks[ci],off); off+=chunks[ci].length; }
+                callback(xmlToText(new TextDecoder().decode(combined)));
+              } else {
+                chunks.push(res.value); totalLen+=res.value.length; pump();
+              }
+            }).catch(function(){ callback(''); });
+          }
+          pump();
+        } else {
+          callback('');
+        }
+        return;
+      }
+      pos += 46+fnLen+extraLen+commentLen;
+    }
+    callback(''); // word/document.xml not found
+  }catch(e){ callback(''); }
+}
+
+function xmlToText(xml){
+  return xml
+    .replace(/<w:p[ >]/g, '\n')
+    .replace(/<w:tab[^>]*\/>/g, '\t')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#[0-9]+;/g,'')
+    .replace(/\n{3,}/g,'\n\n').trim();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -546,41 +649,78 @@ function levelBarColor(level){
 // ═══════════════════════════════════════════════════════════════
 // RUN ANALYSIS
 // ═══════════════════════════════════════════════════════════════
+function mergeParsedReports(parsedList){
+  var merged={};
+  var catNames=Object.keys(DB_CATS);
+  for(var i=0;i<catNames.length;i++) merged[catNames[i]]={obs:0,repeated:0,new:0,matches:[]};
+  for(var j=0;j<parsedList.length;j++){
+    var r=parsedList[j];
+    for(var c in r){
+      if(merged[c]){
+        merged[c].obs      += r[c].obs||0;
+        merged[c].repeated += r[c].repeated||0;
+        merged[c].new      += r[c].new||0;
+      }
+    }
+  }
+  return merged;
+}
+
 function runAnalysis(){
   var branchName = document.getElementById('sel_branch').value.trim() || 'Unknown Branch';
-  var rpt1text   = document.getElementById('rpt1_text').value.trim();
-  var rpt2text   = document.getElementById('rpt2_text').value.trim();
-  var rpt1date   = document.getElementById('rpt1_date').value;
-  var rpt2date   = document.getElementById('rpt2_date').value;
+  var pasteText  = document.getElementById('paste_text').value.trim();
   var autype     = document.getElementById('next_autype').value.trim() || 'Routine Audit Visit';
   var pb         = document.getElementById('next_pb').value.trim();
 
-  if(!rpt1text && !_sessions.rpt1){
-    toast('Please paste or load the most recent audit report first.');
+  if(!pasteText && !_loadedReports.length){
+    toast('Please load or paste at least one previous audit report first.');
     return;
   }
 
-  var rpt1data = parseReport(rpt1text, _sessions.rpt1);
-  var rpt2data = (rpt2text||_sessions.rpt2) ? parseReport(rpt2text, _sessions.rpt2) : null;
+  // Build list of all data sources
+  var allSources=[]; // [{text, sess, date}]
+  for(var li=0;li<_loadedReports.length;li++){
+    allSources.push({text:_loadedReports[li].text, sess:_loadedReports[li].sess, date:_loadedReports[li].date});
+  }
+  if(pasteText) allSources.push({text:pasteText, sess:null, date:''});
 
-  // Score each category
+  // Parse each source
+  var parsedList=[];
+  for(var pi=0;pi<allSources.length;pi++){
+    parsedList.push(parseReport(allSources[pi].text, allSources[pi].sess));
+  }
+
+  var rpt1data, rpt2data=null;
+  var d1='', d2='';
+  if(parsedList.length===1){
+    rpt1data = parsedList[0];
+    d1 = allSources[0].date||'';
+  } else {
+    // Merge all for primary risk scoring; use first vs last for trend
+    rpt1data = mergeParsedReports(parsedList);
+    rpt2data = parsedList[0];              // oldest
+    var newest = parsedList[parsedList.length-1]; // newest
+    // For trend, replace rpt1data with newest single report
+    rpt1data = newest;
+    d1 = allSources[allSources.length-1].date||'';
+    d2 = allSources[0].date||'';
+  }
+
   var catNames = Object.keys(DB_CATS);
   var scores = [];
-  for(var i=0;i<catNames.length;i++){
-    var s = scoreCategory(catNames[i], rpt1data, rpt2data);
-    scores.push({cat:catNames[i], score:s, level:scoreToLevel(s), d1:rpt1data[catNames[i]], d2:rpt2data?rpt2data[catNames[i]]:null});
+  for(var si=0;si<catNames.length;si++){
+    var sc = scoreCategory(catNames[si], rpt1data, rpt2data);
+    scores.push({cat:catNames[si], score:sc, level:scoreToLevel(sc), d1:rpt1data[catNames[si]], d2:rpt2data?rpt2data[catNames[si]]:null});
   }
   scores.sort(function(a,b){return b.score-a.score;});
 
-  // Overall score = weighted average of top 3
   var overallScore = Math.round((scores[0].score*0.5)+(scores[1].score*0.3)+(scores[2].score*0.2));
 
-  // Render everything
-  renderResults(branchName, scores, overallScore, rpt1date, rpt2date, autype, pb, rpt2data!=null);
+  renderResults(branchName, scores, overallScore, d1, d2, autype, pb, rpt2data!=null);
   document.getElementById('results-empty').style.display='none';
   document.getElementById('results-content').style.display='block';
   document.getElementById('RP').scrollTop=0;
-  toast('Risk assessment complete.');
+  toast('Risk assessment complete — '+allSources.length+' report'+(allSources.length>1?'s':'')+' analysed.');
 }
 
 // ═══════════════════════════════════════════════════════════════
