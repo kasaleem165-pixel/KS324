@@ -9165,9 +9165,11 @@ function renderRpt(){
       h+='<textarea class="oedit" id="re-'+o.id+'" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].recommendation=this.value">'+esc(recText)+'</textarea>';
       // 3. Annexure Data (if set)
       if(ax) h+='<div class="oax"><strong>Annexure Data:</strong> '+esc(ax)+'</div>';
-      // 4. Auditee Response — blank when Hide mode, pre-filled from respMap otherwise
-      h+='<div class="osl">Auditee Response</div>';
-      h+='<textarea class="oresp" id="r-'+o.id+'" placeholder="Enter auditee response..." oninput="respMap[\''+o.id+'\']=this.value">'+esc(avVal==='none'?'':resp)+'</textarea>';
+      // 4. Auditee Response — only show after response is loaded/uploaded
+      if(responseLoaded){
+        h+='<div class="osl">Auditee Response</div>';
+        h+='<textarea class="oresp" id="r-'+o.id+'" placeholder="Enter auditee response..." oninput="respMap[\''+o.id+'\']=this.value">'+esc(avVal==='none'?'':resp)+'</textarea>';
+      }
       // 5 & 6: Assessment-driven (after response load) or original mode
       if(responseLoaded){
         var aStatus=assessMap[o.id]||'';
@@ -9195,12 +9197,6 @@ function renderRpt(){
         h+='<textarea class="oresp" id="av-ta-'+o.id+'" placeholder="Describe what remains outstanding or why the response is insufficient..." oninput="avMap[\''+o.id+'\']=this.value">'+esc(avStored)+'</textarea>';
         h+='</div>';
         h+='</div>';
-      } else {
-        if(avVal==='auto'||avVal==='manual'){
-          h+='<div class="osl">Audit View</div><textarea class="oresp" id="av-'+o.id+'" placeholder="Type audit view here..." oninput="avMap[\''+o.id+'\']=this.value">'+esc(avStored)+'</textarea>';
-        }
-        h+='<div class="osl">Action Taken</div>';
-        h+='<textarea class="oresp" id="act-'+o.id+'" placeholder="Enter action taken..." oninput="actMap[\''+o.id+'\']=this.value">'+esc(actStored)+'</textarea>';
       }
       // 7. Linked Annexures (auto-derived)
       var lnkAnx=getLinkedAnnexures(o.id);
