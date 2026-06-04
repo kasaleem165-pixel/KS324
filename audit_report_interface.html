@@ -9824,11 +9824,19 @@ function showDraftModal() {
   var all=dbObs.concat(cuObs);
   if(!all.length){alert('No observations selected. Please select observations first.');return;}
 
+  // Filter to only observations with a referral note (RO or HO)
+  var referred=[];
+  for(var ri=0;ri<all.length;ri++){
+    if(refMap[all[ri].id]) referred.push(all[ri]);
+  }
+  if(!referred.length){alert('No observations have a Referral Note set.\n\nPlease tick "Add Referral Note" on the observations you wish to refer before using Draft by Category.');return;}
+
   // Collect unique categories preserving order — stored globally for button access
   window._draftCats=[];
+  window._draftReferred=referred;
   var catSeen={};
-  for(var i=0;i<all.length;i++){
-    var c=all[i].category||'Others';
+  for(var i=0;i<referred.length;i++){
+    var c=referred[i].category||'Others';
     if(!catSeen[c]){catSeen[c]=true;window._draftCats.push(c);}
   }
 
@@ -9843,7 +9851,7 @@ function showDraftModal() {
   el.innerHTML=
     '<div class="dmodal">'+
     '<h3>&#128196; Draft Report by Category</h3>'+
-    '<p>Select categories to include. You can download them as one combined part or as separate files per category.</p>'+
+    '<p>Showing only observations with a Referral Note (RO/HO). Select categories to include.</p>'+
     '<div class="cat-check-list">'+checks+'</div>'+
     '<div class="dmodal-row">'+
     '<button class="dm-sel-all" onclick="draftToggleAll()">Toggle All</button>'+
@@ -9865,9 +9873,7 @@ function draftToggleAll(){
 
 function downloadDraft(individual){
   var allCats=window._draftCats||[];
-  var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
-  var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
-  var allObs=dbObs.concat(cuObs);
+  var allObs=window._draftReferred||[];
 
   // Determine selected categories
   var selCats=[];
@@ -9921,7 +9927,11 @@ function downloadDraft(individual){
           var obsText=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:o.observation||'';
           var recText=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
           h+='<div style="background:#f8fafd;border:1px solid #c5d5e8;border-radius:6px;padding:14px 16px;margin-bottom:14px">';
-          h+='<div style="font-weight:700;color:#1a3a5c;margin-bottom:8px">Obs. '+num+': '+esc(o.title)+'</div>';
+          var refLabel=refMap[o.id]||'';
+          h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+          h+='<span style="font-weight:700;color:#1a3a5c">Obs. '+num+': '+esc(o.title)+'</span>';
+          if(refLabel) h+='<span style="padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#fff0e0;color:#7a3000;border:1px solid #e0a060">'+esc(refLabel)+'</span>';
+          h+='</div>';
           h+='<div style="font-size:11.5px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Observation</div>';
           h+='<div style="font-size:13px;line-height:1.6;color:#2a3a50;margin-bottom:10px;white-space:pre-wrap">'+esc(obsText)+'</div>';
           h+='<div style="font-size:11.5px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Recommendation</div>';
