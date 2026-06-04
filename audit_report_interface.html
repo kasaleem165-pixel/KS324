@@ -9218,12 +9218,11 @@ function renderRpt(){
       // Preset dropdown
       var selRO=(refText==='Referred to Regional Office'?' selected':'');
       var selHO=(refText==='Referred to Head Office'?' selected':'');
-      h+='<select id="ref-sel-'+o.id+'" style="width:100%;border:1px solid #c07030;border-radius:4px;padding:5px 9px;font-family:Inter,sans-serif;font-size:12px;color:#6a2000;background:#fff8f0;outline:none;margin-bottom:4px;cursor:pointer" onchange="setRefPreset(\''+o.id+'\',this.value)">';
+      h+='<select id="ref-sel-'+o.id+'" style="width:100%;border:1px solid #c07030;border-radius:4px;padding:5px 9px;font-family:Inter,sans-serif;font-size:12px;color:#6a2000;background:#fff8f0;outline:none;cursor:pointer" onchange="setRefPreset(\''+o.id+'\',this.value)">';
       h+='<option value="">— Select referral wording —</option>';
       h+='<option value="Referred to Regional Office"'+selRO+'>Referred to Regional Office</option>';
       h+='<option value="Referred to Head Office"'+selHO+'>Referred to Head Office</option>';
       h+='</select>';
-      h+='<input type="text" id="ref-txt-'+o.id+'" value="'+esc(refText)+'" style="width:100%;border:1px solid #c07030;border-radius:4px;padding:5px 9px;font-family:Inter,sans-serif;font-size:12px;color:#6a2000;background:#fff8f0;outline:none;font-style:italic" placeholder="Or type custom referral note..." oninput="refMap[\''+o.id+'\']=this.value">';
       h+='</div></div>';
       h+='</div></div>';
       }
@@ -10703,7 +10702,7 @@ function finalizeReport(){
     }
     // Referral note
     var refTxt=refMap[o.id]!=null?refMap[o.id]:null;
-    var refTxtEl=document.getElementById('ref-txt-'+o.id); if(refTxtEl&&refMap[o.id]!=null) refTxt=refTxtEl.value;
+    var refSelEl=document.getElementById('ref-sel-'+o.id); if(refSelEl&&refMap[o.id]!=null) refTxt=refSelEl.value||refTxt;
     if(refTxt){
       h+='<div style="margin-top:10px;padding:7px 12px;background:#fff8f0;border:1px solid #c07030;border-left:4px solid #b84000;border-radius:0 4px 4px 0;font-size:12px;font-style:italic;color:#6a2000;font-weight:600">'+esc(refTxt)+'</div>';
     }
@@ -10888,8 +10887,7 @@ function saveAsFinal(fmt){
 function toggleRef(id, on){
   var body=document.getElementById('ref-body-'+id);
   if(on){
-    var existing=document.getElementById('ref-txt-'+id);
-    refMap[id]=existing?existing.value:'';
+    refMap[id]=refMap[id]||'';
     if(body) body.style.display='block';
   } else {
     delete refMap[id];
@@ -10899,8 +10897,6 @@ function toggleRef(id, on){
 
 function setRefPreset(id, val){
   refMap[id]=val;
-  var txt=document.getElementById('ref-txt-'+id);
-  if(txt) txt.value=val;
 }
 
 function triggerLoadReport(){
