@@ -10019,8 +10019,8 @@ function downloadSoftCopy(){
     if(scRecText) h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Recommendation</div><div style="font-size:12.5px;line-height:1.65;color:#2a3a50;margin-bottom:10px">'+esc(scRecText)+'</div>';
     if(ax) h+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> '+esc(ax)+'</div>';
     // Auditee Response — always blank in soft copy
-    h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Auditee Response</div>';
-    h+='<textarea name="resp_'+esc(o.id)+'" style="width:100%;border:1px dashed #b0c0d8;border-radius:4px;padding:7px 9px;font-family:Inter,sans-serif;font-size:12.5px;color:#2a3a50;background:#fffef0;resize:vertical;min-height:60px;outline:none" placeholder="Please enter auditee response here..."></textarea>';
+    h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Auditee Response <span style="color:#c0392b;font-size:9px">(Required)</span></div>';
+    h+='<textarea name="resp_'+esc(o.id)+'" data-obs-num="'+num+'" style="width:100%;border:1px dashed #b0c0d8;border-radius:4px;padding:7px 9px;font-family:Inter,sans-serif;font-size:12.5px;color:#2a3a50;background:#fffef0;resize:vertical;min-height:60px;outline:none" placeholder="Please enter auditee response here..."></textarea>';
     // Audit View — only show if auditor explicitly typed one (avStored), never from DB
     if((avVal==='auto'||avVal==='manual')&&avStored){
       h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Audit View</div>';
@@ -10029,6 +10029,9 @@ function downloadSoftCopy(){
     // Action Taken — blank in soft copy
     h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Action Taken</div>';
     h+='<textarea name="act_'+esc(o.id)+'" style="width:100%;border:1px dashed #b0c0d8;border-radius:4px;padding:7px 9px;font-family:Inter,sans-serif;font-size:12.5px;color:#2a3a50;background:#fffef0;resize:vertical;min-height:60px;outline:none" placeholder="Please describe action taken..."></textarea>';
+    // Follow-up Action Required
+    h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#5b3fa0;margin:10px 0 4px">Follow-up Action Required</div>';
+    h+='<textarea name="followup_'+esc(o.id)+'" style="width:100%;border:1px dashed #b0a0d8;border-radius:4px;padding:7px 9px;font-family:Inter,sans-serif;font-size:12.5px;color:#3a2a70;background:#f8f5ff;resize:vertical;min-height:50px;outline:none" placeholder="Describe any follow-up action required or pending..."></textarea>';
     h+='</div></div>';
     return h;
   }
@@ -10097,11 +10100,16 @@ function downloadSoftCopy(){
   softHtml+='#notice strong{color:#7a5000}\n';
   softHtml+='#rp{background:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(26,58,92,.1);padding:30px 34px}\n';
   softHtml+='textarea{font-family:Inter,sans-serif}\n';
-  softHtml+='#savebtn{display:block;width:100%;margin-top:24px;padding:13px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-family:Inter,sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px}\n';
+  softHtml+='#draftbtn{display:block;width:100%;margin-top:24px;padding:13px;background:#b04400;color:#fff;border:none;border-radius:6px;font-family:Inter,sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px}\n';
+  softHtml+='#draftbtn:hover{background:#d05000}\n';
+  softHtml+='#savebtn{display:block;width:100%;margin-top:10px;padding:13px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-family:Inter,sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px}\n';
   softHtml+='#savebtn:hover{background:#2a5080}\n';
+  softHtml+='#progressbar{height:8px;background:#e0e8f0;border-radius:4px;margin-top:16px;overflow:hidden}\n';
+  softHtml+='#progressfill{height:100%;background:#2a8a40;border-radius:4px;transition:width .3s}\n';
+  softHtml+='#progresslbl{font-size:11px;color:#4a6080;margin-top:4px;text-align:right}\n';
   softHtml+='@media print{#notice,#savebtn{display:none!important}body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}}\n';
   softHtml+='</style>\n</head>\n<body>\n<div id="wrap">\n';
-  softHtml+='<div id="notice"><strong>&#9432; Instructions for Auditee:</strong> Please read each observation carefully and type your response in the yellow-highlighted fields labelled <em>Auditee Response</em> and <em>Action Taken</em>. When finished, click the <strong>"Save with My Responses"</strong> button at the bottom to download the completed file and email it back to the auditor.</div>\n';
+  softHtml+='<div id="notice"><strong>&#9432; Instructions for Auditee:</strong> Please read each observation carefully and type your response in the yellow-highlighted fields labelled <em>Auditee Response</em> (required) and <em>Action Taken</em>. You may also fill in the <em>Follow-up Action Required</em> field for each observation. Use <strong>"Save Draft"</strong> to save your progress at any time. When all responses are complete, click <strong>"&#10003; Submit Final Responses"</strong> to download the completed file for email. <em>The final submit button will be blocked if any Auditee Response field is blank.</em></div>\n';
   softHtml+='<div id="rp">\n';
   // Report header
   softHtml+='<div style="text-align:center;border-bottom:3px solid #1a3a5c;padding-bottom:16px;margin-bottom:20px">\n';
@@ -10118,26 +10126,89 @@ function downloadSoftCopy(){
   softHtml+=obsSection;
   softHtml+=buildAnnexHtml(true);
   softHtml+='</div>\n'; // end #rp
-  // Save-with-responses button — inline JS in the soft copy
-  softHtml+='<button id="savebtn" onclick="saveResponses()">&#128190; Save with My Responses</button>\n';
+  // Progress bar and action buttons
+  softHtml+='<div id="progressbar"><div id="progressfill" style="width:0%"></div></div>\n';
+  softHtml+='<div id="progresslbl">0 of 0 responses completed</div>\n';
+  softHtml+='<button id="draftbtn" onclick="saveDraft()">&#128190; Save Draft (Incomplete — NOT FOR FORWARDING)</button>\n';
+  softHtml+='<button id="savebtn" onclick="saveResponses()">&#10003; Submit Final Responses</button>\n';
   softHtml+='</div>\n'; // end #wrap
 
   // Inline JS for the save-responses feature
   softHtml+='<script>\n';
-  softHtml+='function saveResponses(){\n';
+  // Collect all textarea values
+  softHtml+='function collectData(){\n';
   softHtml+='  var tas=document.querySelectorAll("textarea[name]");\n';
   softHtml+='  var data={};\n';
-  softHtml+='  for(var i=0;i<tas.length;i++){\n';
-  softHtml+='    if(tas[i].name) data[tas[i].name]=tas[i].value;\n';
+  softHtml+='  for(var i=0;i<tas.length;i++){if(tas[i].name) data[tas[i].name]=tas[i].value;}\n';
+  softHtml+='  return data;\n';
+  softHtml+='}\n';
+  // Check completion — returns array of blank obs labels
+  softHtml+='function checkComplete(){\n';
+  softHtml+='  var respTas=document.querySelectorAll("textarea[name^=\\"resp_\\"]");\n';
+  softHtml+='  var blank=[];\n';
+  softHtml+='  for(var i=0;i<respTas.length;i++){\n';
+  softHtml+='    if(!respTas[i].value.trim()){\n';
+  softHtml+='      var num=respTas[i].getAttribute("data-obs-num")||String(i+1);\n';
+  softHtml+='      blank.push("Obs. "+num);\n';
+  softHtml+='    }\n';
   softHtml+='  }\n';
+  softHtml+='  return blank;\n';
+  softHtml+='}\n';
+  // Update progress bar on input
+  softHtml+='function updateProgress(){\n';
+  softHtml+='  var respTas=document.querySelectorAll("textarea[name^=\\"resp_\\"]");\n';
+  softHtml+='  var total=respTas.length, done=0;\n';
+  softHtml+='  for(var i=0;i<respTas.length;i++){if(respTas[i].value.trim()) done++;}\n';
+  softHtml+='  var pct=total?Math.round(done/total*100):0;\n';
+  softHtml+='  var fill=document.getElementById("progressfill");\n';
+  softHtml+='  var lbl=document.getElementById("progresslbl");\n';
+  softHtml+='  if(fill) fill.style.width=pct+"%";\n';
+  softHtml+='  if(lbl) lbl.textContent=done+" of "+total+" responses completed";\n';
+  softHtml+='}\n';
+  softHtml+='(function(){\n';
+  softHtml+='  var tas=document.querySelectorAll("textarea[name^=\\"resp_\\"]");\n';
+  softHtml+='  for(var i=0;i<tas.length;i++) tas[i].addEventListener("input",updateProgress);\n';
+  softHtml+='  updateProgress();\n';
+  softHtml+='})();\n';
+  // Build downloaded HTML string
+  softHtml+='function buildHtml(data, isDraft){\n';
   softHtml+='  var json=JSON.stringify(data).replace(/<\\/script>/gi,"<\\\\/script>");\n';
-  softHtml+='  var out="<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>Auditee Responses<\\/title>"\n';
+  softHtml+='  var respTas=document.querySelectorAll("textarea[name^=\\"resp_\\"]");\n';
+  softHtml+='  var total=respTas.length, done=0;\n';
+  softHtml+='  for(var i=0;i<respTas.length;i++){if(respTas[i].value.trim()) done++;}\n';
+  softHtml+='  var banner="";\n';
+  softHtml+='  if(isDraft) banner="<div style=\\"background:#c0392b;color:#fff;text-align:center;font-family:Arial,sans-serif;font-size:16px;font-weight:700;padding:14px 20px;letter-spacing:1px\\">&#9888; DRAFT &mdash; NOT FOR FORWARDING &mdash; '+done+' of "+total+" responses completed</div>";\n';
+  softHtml+='  var out="<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>"+(isDraft?"[DRAFT] ":"")+"Auditee Responses<\\/title>"\n';
   softHtml+='    +\'<script id="bhs-resp-data" type="application/json">\'+json+\'<\\/script>\'\n';
-  softHtml+='    +"<\\/head><body style=\\"font-family:Arial,sans-serif;padding:30px;color:#333\\">"\n';
+  softHtml+='    +"<\\/head><body style=\\"font-family:Arial,sans-serif;padding:0;color:#333\\">"\n';
+  softHtml+='    +banner\n';
+  softHtml+='    +"<div style=\\"padding:30px\\">"\n';
   softHtml+='    +"<h2>&#128203; Auditee Response File<\\/h2>"\n';
   softHtml+='    +"<p>This file contains your responses. Please email it back to the auditor who will load it via the <strong>Load Response<\\/strong> button.<\\/p>"\n';
-  softHtml+='    +"<p style=\\"color:#888;font-size:12px\\">Observations responded: "+Object.keys(data).length+"<\\/p>"\n';
-  softHtml+='    +"<\\/body><\\/html>";\n';
+  softHtml+='    +"<p style=\\"color:#888;font-size:12px\\">Responses completed: "+done+" of "+total+"<\\/p>"\n';
+  softHtml+='    +(isDraft?"<p style=\\"color:#c0392b;font-weight:700;font-size:13px\\">&#9888; This is a DRAFT. Complete all required responses before submitting the final version.<\\/p>":"")\n';
+  softHtml+='    +"<\\/div><\\/body><\\/html>";\n';
+  softHtml+='  return out;\n';
+  softHtml+='}\n';
+  // Save Draft — no validation, marks as DRAFT
+  softHtml+='function saveDraft(){\n';
+  softHtml+='  var data=collectData();\n';
+  softHtml+='  var out=buildHtml(data,true);\n';
+  softHtml+='  var blob=new Blob([out],{type:"text/html"});\n';
+  softHtml+='  var a=document.createElement("a");\n';
+  softHtml+='  a.href=URL.createObjectURL(blob);\n';
+  softHtml+='  a.download="DRAFT_"+document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+".html";\n';
+  softHtml+='  a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);},2000);\n';
+  softHtml+='}\n';
+  // Save Final — validates all resp_ fields first
+  softHtml+='function saveResponses(){\n';
+  softHtml+='  var blank=checkComplete();\n';
+  softHtml+='  if(blank.length){\n';
+  softHtml+='    alert("Please complete all Auditee Response fields before submitting.\\n\\nThe following observations have no response:\\n"+blank.join(", "));\n';
+  softHtml+='    return;\n';
+  softHtml+='  }\n';
+  softHtml+='  var data=collectData();\n';
+  softHtml+='  var out=buildHtml(data,false);\n';
   softHtml+='  var blob=new Blob([out],{type:"text/html"});\n';
   softHtml+='  var a=document.createElement("a");\n';
   softHtml+='  a.href=URL.createObjectURL(blob);\n';
