@@ -9209,13 +9209,21 @@ function renderRpt(){
       // 8. Referral Note
       var refVal=refMap[o.id]!=null?refMap[o.id]:null;
       var refOn=(refVal!==null);
-      var refText=refOn?refVal:'Referred to Regional Office / Branch Head';
+      var refText=refOn?refVal:'';
       h+='<div class="ref-row" id="ref-row-'+o.id+'">';
       h+='<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:11.5px;font-weight:600;color:#6a3a00;user-select:none">';
       h+='<input type="checkbox" id="ref-chk-'+o.id+'"'+(refOn?' checked':'')+' onchange="toggleRef(\''+o.id+'\',this.checked)" style="accent-color:#b84000;width:14px;height:14px">';
       h+='&#128203; Add Referral Note</label>';
       h+='<div id="ref-body-'+o.id+'" style="display:'+(refOn?'block':'none')+';margin-top:6px">';
-      h+='<input type="text" id="ref-txt-'+o.id+'" value="'+esc(refText)+'" style="width:100%;border:1px solid #c07030;border-radius:4px;padding:5px 9px;font-family:Inter,sans-serif;font-size:12px;color:#6a2000;background:#fff8f0;outline:none;font-style:italic" oninput="refMap[\''+o.id+'\']=this.value">';
+      // Preset dropdown
+      var selRO=(refText==='Referred to Regional Office'?' selected':'');
+      var selHO=(refText==='Referred to Head Office'?' selected':'');
+      h+='<select id="ref-sel-'+o.id+'" style="width:100%;border:1px solid #c07030;border-radius:4px;padding:5px 9px;font-family:Inter,sans-serif;font-size:12px;color:#6a2000;background:#fff8f0;outline:none;margin-bottom:4px;cursor:pointer" onchange="setRefPreset(\''+o.id+'\',this.value)">';
+      h+='<option value="">— Select referral wording —</option>';
+      h+='<option value="Referred to Regional Office"'+selRO+'>Referred to Regional Office</option>';
+      h+='<option value="Referred to Head Office"'+selHO+'>Referred to Head Office</option>';
+      h+='</select>';
+      h+='<input type="text" id="ref-txt-'+o.id+'" value="'+esc(refText)+'" style="width:100%;border:1px solid #c07030;border-radius:4px;padding:5px 9px;font-family:Inter,sans-serif;font-size:12px;color:#6a2000;background:#fff8f0;outline:none;font-style:italic" placeholder="Or type custom referral note..." oninput="refMap[\''+o.id+'\']=this.value">';
       h+='</div></div>';
       h+='</div></div>';
       }
@@ -10881,12 +10889,18 @@ function toggleRef(id, on){
   var body=document.getElementById('ref-body-'+id);
   if(on){
     var existing=document.getElementById('ref-txt-'+id);
-    refMap[id]=existing?existing.value:'Referred to Regional Office / Branch Head';
+    refMap[id]=existing?existing.value:'';
     if(body) body.style.display='block';
   } else {
     delete refMap[id];
     if(body) body.style.display='none';
   }
+}
+
+function setRefPreset(id, val){
+  refMap[id]=val;
+  var txt=document.getElementById('ref-txt-'+id);
+  if(txt) txt.value=val;
 }
 
 function triggerLoadReport(){
