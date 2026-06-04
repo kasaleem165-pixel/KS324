@@ -221,6 +221,11 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 .oedit:focus{border-color:#4a7fc1;background:#fff;outline:none}
 .oresp{width:100%;border:1px dashed #b0c0d8;border-radius:4px;padding:6px 9px;font-family:'Inter',sans-serif;font-size:12.5px;color:#2a3a50;background:#fafcff;resize:vertical;min-height:46px;outline:none}
 .oax{display:flex;align-items:center;gap:7px;margin:8px 0;padding:7px 0;border-top:1px solid #eee;font-size:12px}
+.sens-sel{padding:2px 7px;font-size:11px;font-weight:700;border-radius:4px;border:1px solid #c8d8ec;cursor:pointer;font-family:inherit;background:#fff;color:#1e2d40;outline:none;margin-left:6px}
+.sens-sel.s-high{background:#fde8e8;color:#9b1a1a;border-color:#f0a0a0}
+.sens-sel.s-mh{background:#fff0e0;color:#b04400;border-color:#f0b070}
+.sens-sel.s-lm{background:#fffbe0;color:#806000;border-color:#e0c030}
+.sens-sel.s-low{background:#e8f8e8;color:#1a6020;border-color:#80c880}
 .oax strong{font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px}
 
 /* ANNEXURES */
@@ -7987,6 +7992,7 @@ var CATS     = sg('bhs_ca', DEF_CA);
 var selIds   = {};   // {obsId: true}
 var annexMap = {};   // {obsId: "text"}
 var obsTypeMap = {}; // {obsId: 'New'|'Repeated'} — per-report type override
+var sensitivityMap = {}; // {obsId: 'High'|'M to H'|'L to M'|'Low'}
 var avMap    = {};   // {obsId: manual audit view text}
 var actMap   = {};   // {obsId: action taken text}
 var respMap  = {};   // {obsId: auditee response text}
@@ -8378,6 +8384,13 @@ function validateDates() {
 // ============================================================
 // AUDITOR ASSESSMENT
 // ============================================================
+function setSensitivity(id, sel){
+  var val = sel.value;
+  if(val) sensitivityMap[id]=val; else delete sensitivityMap[id];
+  // Update dropdown colour class
+  sel.className = 'sens-sel'+(val==='High'?' s-high':val==='M to H'?' s-mh':val==='L to M'?' s-lm':val==='Low'?' s-low':'');
+}
+
 function findDbAssessText(id, type){
   // Look up observation in DB by ID
   var obs = null;
@@ -8590,6 +8603,7 @@ function captureSession() {
     actMap   : actMap,
     respMap  : respMap,
     assessMap: assessMap,
+    sensitivityMap: sensitivityMap,
     obsEdits : obsEdits,
     refMap   : refMap,
     customs  : customs,
@@ -8621,9 +8635,10 @@ function restoreSession(sess) {
   avMap     = sess.avMap     || {};
   actMap    = sess.actMap    || {};
   respMap   = sess.respMap   || {};
-  assessMap = sess.assessMap || {};
-  obsEdits  = sess.obsEdits  || {};
-  refMap    = sess.refMap    || {};
+  assessMap      = sess.assessMap      || {};
+  sensitivityMap = sess.sensitivityMap || {};
+  obsEdits       = sess.obsEdits       || {};
+  refMap         = sess.refMap         || {};
   // Restore responseLoaded — also infer it if assessMap or respMap has entries
   responseLoaded = sess.responseLoaded || Object.keys(assessMap).length>0 || Object.keys(sess.respMap||{}).length>0;
   customs   = sess.customs   || [];
@@ -9120,9 +9135,18 @@ function renderRpt(){
       var tc=effType.toLowerCase();
       var ax=annexMap[o.id]||o._annex||'';
       var resp=respMap[o.id]!=null?respMap[o.id]:'';
+      var curSens=sensitivityMap[o.id]||'';
+      var sensClass=curSens==='High'?'s-high':curSens==='M to H'?'s-mh':curSens==='L to M'?'s-lm':curSens==='Low'?'s-low':'';
       h+='<div class="oc '+tc+'" id="oc-'+o.id+'">';
       h+='<div class="och"><span class="onum">Obs. '+num+'</span>';
       h+='<span class="otl">'+esc(o.title)+' <span class="badge '+tc+'">'+esc(effType)+'</span></span>';
+      h+='<select class="sens-sel '+sensClass+'" title="Sensitivity Level" onchange="setSensitivity(\''+o.id+'\',this)">';
+      h+='<option value="">Sensitivity</option>';
+      h+='<option value="High"'+(curSens==='High'?' selected':'')+'>High</option>';
+      h+='<option value="M to H"'+(curSens==='M to H'?' selected':'')+'>M to H</option>';
+      h+='<option value="L to M"'+(curSens==='L to M'?' selected':'')+'>L to M</option>';
+      h+='<option value="Low"'+(curSens==='Low'?' selected':'')+'>Low</option>';
+      h+='</select>';
       h+='<input type="checkbox" class="ocb-chk" id="ocbx-'+o.id+'" title="Select for removal" onchange="toggleRptSel(\''+o.id+'\',this.checked)">';
       h+='<button class="odl" title="Remove this observation" onclick="remObs(\''+o.id+'\')">&#10005;</button></div>';
       h+='<div class="ocb">';
@@ -9401,7 +9425,7 @@ function doCopy(){
 
 function doClear(){
   if(!confirm('Clear all selections?'))return;
-  selIds={}; annexMap={}; obsTypeMap={}; avMap={}; actMap={}; respMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; avMap={}; actMap={}; respMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
   for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
   responseLoaded=false;
   renderAnnexList();
@@ -10569,6 +10593,8 @@ function finalizeReport(){
     h+='<span style="font-size:11px;font-weight:700;color:#6a7888">Obs. '+num+'</span>';
     h+='<span style="flex:1;font-size:13px;font-weight:700;color:#1e2d40">'+esc(o.title)+'</span>';
     h+='<span style="padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;'+(tc==='repeated'?'background:#fff0e6;color:#b04800;border:1px solid #f0b080':'background:#e6f0ff;color:#1050a0;border:1px solid #90b8e8')+'">'+esc(effType)+'</span>';
+    var finSens=sensitivityMap[o.id]||'';
+    if(finSens){var sc=finSens==='High'?'background:#fde8e8;color:#9b1a1a;border-color:#f0a0a0':finSens==='M to H'?'background:#fff0e0;color:#b04400;border-color:#f0b070':finSens==='L to M'?'background:#fffbe0;color:#806000;border-color:#e0c030':'background:#e8f8e8;color:#1a6020;border-color:#80c880';h+='<span style="padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;border:1px solid;'+sc+'">'+esc(finSens)+'</span>';}
     h+='</div><div style="padding:11px 13px">';
     if(obsText) h+=sl('Observation')+st(obsText);
     if(recText) h+=sl('Recommendation')+st(recText);
