@@ -102,6 +102,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;font-size:13.5px;color:#1e2
 .vh-dot{width:8px;height:8px;border-radius:50%;background:#2ecc71;display:inline-block}
 .tbtn.cp{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.35)}
 .tbtn.r{background:#8b1a1a;color:#fff}
+.tbtn.new{background:#2a6040;color:#fff}
 
 /* LAYOUT */
 #main{display:flex;height:calc(100vh - 44px);overflow:hidden}
@@ -7600,6 +7601,7 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 
 <div id="toolbar">
   <div class="brand">BHS <small>Internal Audit — Report Builder</small></div>
+  <button class="tbtn new" onclick="doNewReport()">&#43; New Report</button>
   <button class="tbtn cmp" onclick="showCompareModal()">&#128269; Compare Report</button>
   <button class="tbtn save" onclick="showVersionHistory()">&#128190; Save / Versions</button>
   <button class="tbtn soft" onclick="downloadSoftCopy()">&#128233; Auditee Copy</button>
@@ -9435,6 +9437,24 @@ function doClear(){
   toast('Cleared.');
 }
 
+function doNewReport(){
+  if(!confirm('Start a new blank report? All current data will be cleared.'))return;
+  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; avMap={}; actMap={}; respMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
+  responseLoaded=false;
+  // Clear all header/form fields
+  var fields=['brcode','brname','brregion','brcity','brhead','braddress','brautype','rno','pb','rdt','rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk'];
+  for(var fi=0;fi<fields.length;fi++){var el=document.getElementById(fields[fi]);if(el)el.value='';}
+  for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
+  renderAnnexList();
+  document.getElementById('qinp').value='';
+  document.getElementById('scat').value='All Categories';
+  document.getElementById('rpcont').style.display='none';
+  document.getElementById('rpempty').style.display='block';
+  unlockBrInfo();
+  showPrompt();
+  toast('New report started.');
+}
+
 // ============================================================
 // COMPARE REPORT vs DATABANK
 // ============================================================
@@ -10170,7 +10190,7 @@ function downloadSoftCopy(){
   softHtml+='  var total=respTas.length, done=0;\n';
   softHtml+='  for(var i=0;i<respTas.length;i++){if(respTas[i].value.trim()) done++;}\n';
   softHtml+='  var banner="";\n';
-  softHtml+='  if(isDraft) banner="<div style=\\"background:#c0392b;color:#fff;text-align:center;font-family:Arial,sans-serif;font-size:16px;font-weight:700;padding:14px 20px;letter-spacing:1px\\">&#9888; DRAFT &mdash; NOT FOR FORWARDING &mdash; '+done+' of "+total+" responses completed</div>";\n';
+  softHtml+='  if(isDraft) banner="<div style=\\"background:#c0392b;color:#fff;text-align:center;font-family:Arial,sans-serif;font-size:16px;font-weight:700;padding:14px 20px;letter-spacing:1px\\">&#9888; DRAFT &mdash; NOT FOR FORWARDING &mdash; "+done+" of "+total+" responses completed</div>";\n';
   softHtml+='  var out="<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>"+(isDraft?"[DRAFT] ":"")+"Auditee Responses<\\/title>"\n';
   softHtml+='    +\'<script id="bhs-resp-data" type="application/json">\'+json+\'<\\/script>\'\n';
   softHtml+='    +"<\\/head><body style=\\"font-family:Arial,sans-serif;padding:0;color:#333\\">"\n';
