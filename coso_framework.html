@@ -786,10 +786,38 @@ function generateCOSO(){
 
   // Split into lines and filter
   var rawLines = allText.split(/[\n\r]+/);
+
+  // Known column headings from COSO databank files — never treat as observations
+  var SKIP_HEADERS = [
+    'coso component','coso framework','company','branch','m to h','l to m',
+    'observations','observation','sensitivity','risk level','category','sr no',
+    'sr #','s no','s#','serial','heading','title','description','particulars',
+    'region','section','component','sub component','finding','recommendation',
+    'audit area','control type','frequency','impact','likelihood','rating',
+    'high','medium','low','critical','new','repeated','type','status','remarks',
+    'prepared by','reviewed by','approved by','date','report no','ref','reference'
+  ];
+
+  function isHeaderLine(ln){
+    var lower = ln.toLowerCase().trim();
+    // Exact match against known headers
+    for(var hi=0;hi<SKIP_HEADERS.length;hi++){
+      if(lower===SKIP_HEADERS[hi]) return true;
+    }
+    // Line looks like a row of column headings: multiple short tab/pipe-separated words
+    var cells = lower.split(/\t|\|/);
+    if(cells.length>=3){
+      var shortCells=0;
+      for(var ci=0;ci<cells.length;ci++){ if(cells[ci].trim().length<=20) shortCells++; }
+      if(shortCells===cells.length) return true;
+    }
+    return false;
+  }
+
   var lines = [];
   for(var li=0;li<rawLines.length;li++){
     var ln = rawLines[li].trim();
-    if(ln.length>5 && !/^\s*[\d\.\-\*]+\s*$/.test(ln)) lines.push(ln);
+    if(ln.length>5 && !/^\s*[\d\.\-\*]+\s*$/.test(ln) && !isHeaderLine(ln)) lines.push(ln);
   }
 
   if(!lines.length){
