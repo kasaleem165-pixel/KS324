@@ -8378,6 +8378,22 @@ function validateDates() {
 // ============================================================
 // AUDITOR ASSESSMENT
 // ============================================================
+function findDbAssessText(id, type){
+  // Look up observation in DB by ID
+  var obs = null;
+  for(var i=0;i<DB.observations.length;i++){
+    if(DB.observations[i].id===id){ obs=DB.observations[i]; break; }
+  }
+  if(!obs){
+    for(var ci=0;ci<customs.length;ci++){
+      if(customs[ci].id===id){ obs=customs[ci]; break; }
+    }
+  }
+  if(!obs) return 'No matched wording found in databank.';
+  var text = (obs.audit_view||'').trim();
+  return text || 'No matched wording found in databank.';
+}
+
 function setAssess(id, val) {
   assessMap[id] = val;
   var agrBlk=document.getElementById('agr-blk-'+id);
@@ -8386,6 +8402,23 @@ function setAssess(id, val) {
   if(agrBlk) agrBlk.style.display=(val==='agreed')?'block':'none';
   if(actBlk) actBlk.style.display=(val==='resolved')?'block':'none';
   if(avBlk)  avBlk.style.display =(val==='partial'||val==='notresolved')?'block':'none';
+
+  // Auto-populate Action Taken or Audit View from databank (only if textarea is empty)
+  if(val==='resolved'){
+    var actTa=document.getElementById('act-ta-'+id);
+    if(actTa && !actTa.value.trim()){
+      var txt=findDbAssessText(id,'act');
+      actTa.value=txt;
+      actMap[id]=txt;
+    }
+  } else if(val==='partial'||val==='notresolved'){
+    var avTa=document.getElementById('av-ta-'+id);
+    if(avTa && !avTa.value.trim()){
+      var txt=findDbAssessText(id,'av');
+      avTa.value=txt;
+      avMap[id]=txt;
+    }
+  }
 }
 
 function toggleSuggest(id, type) {
