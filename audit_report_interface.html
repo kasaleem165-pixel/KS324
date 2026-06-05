@@ -10406,9 +10406,12 @@ function downloadSoftCopy(){
       h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Audit View</div>';
       h+='<div style="font-size:12.5px;line-height:1.65;color:#2a3a50;margin-bottom:8px">'+esc(avStored)+'</div>';
     }
-    // Follow-up Action Required
-    h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#5b3fa0;margin:10px 0 4px">Follow-up Action Required</div>';
-    h+='<textarea name="followup_'+esc(o.id)+'" style="width:100%;border:1px dashed #b0a0d8;border-radius:4px;padding:7px 9px;font-family:Inter,sans-serif;font-size:12.5px;color:#3a2a70;background:#f8f5ff;resize:vertical;min-height:50px;outline:none" placeholder="Describe any follow-up action required or pending..."></textarea>';
+    // Estimated Time to Resolve
+    h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a6030;margin:10px 0 4px">Estimated Time to Resolve <span style="font-size:9px;color:#888;font-weight:400;text-transform:none">(e.g. 2 weeks, 30 days, by 31-Dec-2025)</span></div>';
+    h+='<div style="display:flex;align-items:center;gap:10px;background:#f0faf4;border:1px solid #90d0a8;border-radius:4px;padding:8px 12px">';
+    h+='<span style="font-size:12px;color:#1a6030;white-space:nowrap">The above observation will be resolved within:</span>';
+    h+='<input type="text" name="eta_'+esc(o.id)+'" style="flex:1;border:none;border-bottom:2px solid #1a6030;background:transparent;padding:3px 6px;font-family:Inter,sans-serif;font-size:13px;font-weight:600;color:#1a6030;outline:none" placeholder="State estimated time frame...">';
+    h+='</div>';
     h+='</div></div>';
     return h;
   }
@@ -10486,7 +10489,7 @@ function downloadSoftCopy(){
   softHtml+='#progresslbl{font-size:11px;color:#4a6080;margin-top:4px;text-align:right}\n';
   softHtml+='@media print{#notice,#savebtn{display:none!important}body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}}\n';
   softHtml+='</style>\n</head>\n<body>\n<div id="wrap">\n';
-  softHtml+='<div id="notice"><strong>&#9432; Instructions for Auditee:</strong> Please read each observation carefully and type your response in the yellow-highlighted fields labelled <em>Auditee Response</em> (required) and <em>Action Taken</em>. You may also fill in the <em>Follow-up Action Required</em> field for each observation. Use <strong>"Save Draft"</strong> to save your progress at any time. When all responses are complete, click <strong>"&#10003; Submit Final Responses"</strong> to download the completed file for email. <em>The final submit button will be blocked if any Auditee Response field is blank.</em></div>\n';
+  softHtml+='<div id="notice"><strong>&#9432; Instructions for Auditee:</strong> Please read each observation carefully and enter your response in the yellow-highlighted <em>Auditee Response</em> field (required). Also fill in the <em>Estimated Time to Resolve</em> field to indicate the expected timeframe for resolving each observation (e.g. 2 weeks, 30 days, by 31-Dec-2025). Use <strong>"Save Draft"</strong> to save progress at any time. When all responses are complete, click <strong>"&#10003; Submit Final Responses"</strong> to download the completed file for submission. <em>The final submit button will be blocked if any Auditee Response field is blank.</em></div>\n';
   softHtml+='<div id="rp">\n';
   // Report header
   softHtml+='<div style="text-align:center;border-bottom:3px solid #1a3a5c;padding-bottom:16px;margin-bottom:20px">\n';
@@ -10514,9 +10517,11 @@ function downloadSoftCopy(){
   softHtml+='<script>\n';
   // Collect all textarea values
   softHtml+='function collectData(){\n';
-  softHtml+='  var tas=document.querySelectorAll("textarea[name]");\n';
   softHtml+='  var data={};\n';
+  softHtml+='  var tas=document.querySelectorAll("textarea[name]");\n';
   softHtml+='  for(var i=0;i<tas.length;i++){if(tas[i].name) data[tas[i].name]=tas[i].value;}\n';
+  softHtml+='  var inps=document.querySelectorAll("input[name^=\\"eta_\\"]");\n';
+  softHtml+='  for(var j=0;j<inps.length;j++){if(inps[j].name) data[inps[j].name]=inps[j].value;}\n';
   softHtml+='  return data;\n';
   softHtml+='}\n';
   // Check completion — returns array of blank obs labels
