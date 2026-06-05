@@ -7723,6 +7723,7 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
   <button class="tbtn cp" onclick="doCopy()">&#128203; Copy</button>
   <button class="tbtn r" onclick="doClear()">&#10005; Clear</button>
   <button class="tbtn" id="aws-tab-btn" style="background:#1e5c3a;color:#fff;margin-left:10px" onclick="toggleAWSPanel()">&#128203; Work Status</button>
+  <button class="tbtn" id="ra-tab-btn" style="background:#1a3a5c;color:#fff;margin-left:6px" onclick="toggleRAPanel()">&#128202; Risk Assessment</button>
 </div>
 
 <!-- ===== AUDIT WORK STATUS PANEL ===== -->
@@ -11452,6 +11453,10 @@ function toggleAWSPanel(){
   } else {
     panel.style.display='block';
     main.style.display='none';
+    var raPanel=document.getElementById('ra-panel');
+    var raBtn=document.getElementById('ra-tab-btn');
+    if(raPanel) raPanel.style.display='none';
+    if(raBtn){raBtn.style.background='#1a3a5c';raBtn.style.color='#fff';raBtn.textContent='📊 Risk Assessment';}
     btn.style.background='#c9962a';
     btn.style.color='#111';
     btn.textContent='← Back to Report';
@@ -11813,6 +11818,756 @@ function awsSyncFromReport(){
   }
   if(changed) awsSaveState();
 }
+
+// ===================================================================
+// RISK ASSESSMENT — embedded panel
+// ===================================================================
+var RA_DB_CATS = {
+  'Financial Management':     {count:108, weight:4, titles:['Expenditure Exceeded Budgeted Amount','Accounting Procedure not Followed / Bank Payment Vouchers','Withholding Tax Deposited with Delay','Procurement at Higher Rates than Market','Purchase Committee not Properly Functioning','Splitting of Transactions to Bypass Company Policies','Bank Payments Recorded through Journal Vouchers','Procurement Procedures not Complied']},
+  'HR & Payroll':             {count:67,  weight:4, titles:['Incomplete Employee Files','Delay in Employee Confirmations','EOBI Numbers not Updated in BEAMS','Reference / Security Reference Check not in Practice','Short Office Hours','Delay in Final Settlement of Employees','Outgoing/Departure Attendance not Marked','Delay in Confirmation of Employees']},
+  'Safety & Security':        {count:40,  weight:5, titles:['Guards Strength Approved Copy not Available','CCTV Recording Gaps','Annual Firing Practice not Conducted Regularly','Discrepancies in Security Guard Documentation','Weapon/Ammunition Register Discrepancies','UPS not Available / Control Room Deficiencies','Security Guards Frequently Changed','Scanning Room not Available']},
+  'Fixed Assets & Inventory': {count:36,  weight:3, titles:['Untraced Fixed Assets','Out of Order Assets','Un-Numbered Assets','Physical Verification Report not Available','Duplicate / Same Codes on Assets','Asset Disposal Pending AIDN','Stock Register not Maintained','Fixed Asset Register Missing Columns']},
+  'Library & Records':        {count:47,  weight:2, titles:['Low Item Per Child Ratio in Library','Books not Entered in Library Module KOHA','Incomplete Barcode Labelling on Books','Library Books in Poor Condition','Discrepancies in Cost of Books / Wrong Data in KOHA','Transfer and Disposal of Books not Processed','High Item Per Child Book Ratio','Delay in Return of Library Books']},
+  'Student Records & Fee':    {count:22,  weight:3, titles:['Registration Fee Deposited with Delay','Incomplete / Wrong Student Information in BEAMS','Incomplete Student Files','Unclaimed Student Security','Fee Concession Approvals not Filed','Anomalies in Registration Fee Collection','Files of Transferred-In Students not Available','Security Refund not Processed Timely']},
+  'General Administration':   {count:39,  weight:2, titles:['Discrepancies in Memorandum Registers','Document Tracking Sheet not in Practice','Generator Log Book not Maintained','Inward Gate Pass not in Practice','Renewed School Business Registration Not Available','Demolition Register not Maintained','Printed Stationery Register not Maintained','Renewal of Utilities Contracts Pending']}
+};
+var RA_CAT_KEYWORDS = {
+  'Financial Management':     ['financial','payment','voucher','bank','budget','tax','withholding','procurement','purchase','committee','reimbursement','expenditure','imprest','splitting','invoice','petty cash','reconcil','accounts','bpv','journal','jv'],
+  'HR & Payroll':             ['employee','payroll','staff','hr','eobi','pessi','sessi','attendance','leave','salary','confirmation','settlement','hire','recruitment','reference check','departure','short office'],
+  'Safety & Security':        ['security','guard','cctv','camera','fire','safety','metal detector','wtmd','ammunition','weapon','firing','ups','control room','scanning','access','cso'],
+  'Fixed Assets & Inventory': ['asset','fixed asset','far','aidn','disposal','equipment','inventory','stock','register','physical verification','tagged','barcode','asset code','grn'],
+  'Library & Records':        ['library','book','koha','ratio','reading','item per child','barcode','librarian','transfer of books','library module'],
+  'Student Records & Fee':    ['student','fee','security refund','registration','ism','enrollment','challan','beams student','student file','concession','unclaimed'],
+  'General Administration':   ['register','record','documentation','gate pass','stationery','generator','demolition','daycare','inward','outward','maintenance','renewal','contract','log book']
+};
+var RA_BRANCHES = [];
+var ra_currentBranch = null;
+var ra_loadedReports = [];
+
+function toggleRAPanel(){
+  var panel=document.getElementById('ra-panel');
+  var main=document.getElementById('main');
+  var awsPanel=document.getElementById('aws-panel');
+  var btn=document.getElementById('ra-tab-btn');
+  var awsBtn=document.getElementById('aws-tab-btn');
+  if(!panel||!main) return;
+  var showing=panel.style.display==='block';
+  if(showing){
+    panel.style.display='none';
+    main.style.display='';
+    btn.style.background='#1a3a5c';
+    btn.style.color='#fff';
+    btn.textContent='\u{1F4CA} Risk Assessment';
+  } else {
+    panel.style.display='block';
+    main.style.display='none';
+    if(awsPanel) awsPanel.style.display='none';
+    if(awsBtn){awsBtn.style.background='#1e5c3a';awsBtn.style.color='#fff';awsBtn.textContent='\u{1F4CB} Work Status';}
+    btn.style.background='#c9962a';
+    btn.style.color='#111';
+    btn.textContent='← Back to Report';
+    ra_initBranches();
+  }
+}
+
+function ra_initBranches(){
+  if(RA_BRANCHES.length) return;
+  var el=document.getElementById('ra-branch-data');
+  if(!el) return;
+  try{ RA_BRANCHES=JSON.parse(el.textContent); }catch(e){ RA_BRANCHES=[]; }
+  ra_buildBranchDatalist();
+}
+
+function ra_buildBranchDatalist(){
+  var dl=document.getElementById('ra-dl-branch');
+  if(!dl) return;
+  var h='';
+  for(var i=0;i<RA_BRANCHES.length;i++){
+    h+='<option value="'+ra_esc(RA_BRANCHES[i].name)+'">'+ra_esc(RA_BRANCHES[i].code)+' -- '+ra_esc(RA_BRANCHES[i].city)+'</option>';
+  }
+  dl.innerHTML=h;
+}
+
+function ra_esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function ra_toast(msg){ var el=document.getElementById('ra-toast'); if(!el) return; el.textContent=msg; el.className='ra-show'; setTimeout(function(){el.className='';},2800); }
+
+function ra_onBranchInput(val){
+  ra_currentBranch=null;
+  for(var i=0;i<RA_BRANCHES.length;i++){
+    if(RA_BRANCHES[i].name===val||RA_BRANCHES[i].code===val){
+      ra_currentBranch=RA_BRANCHES[i]; break;
+    }
+  }
+  var re=document.getElementById('ra-sel_region');
+  var ci=document.getElementById('ra-sel_city');
+  if(re) re.value=ra_currentBranch?ra_currentBranch.region:'';
+  if(ci) ci.value=ra_currentBranch?ra_currentBranch.city:'';
+}
+
+function ra_handleFilePick(input){
+  var files=input.files;
+  if(!files||!files.length) return;
+  for(var fi=0;fi<files.length;fi++){
+    (function(file){
+      var ext=file.name.split('.').pop().toLowerCase();
+      if(ext==='json'){
+        var r=new FileReader();
+        r.onload=function(e){
+          try{
+            var data=JSON.parse(e.target.result);
+            var sess=Array.isArray(data)?data[0]:data;
+            if(Array.isArray(data)){
+              data.sort(function(a,b){return (b.ver||0)-(a.ver||0);});
+              sess=data[0];
+            }
+            var text=ra_buildTextFromSession(sess);
+            var date=(sess.formData&&sess.formData.rdt)||'';
+            var sb=document.getElementById('ra-sel_branch');
+            if(sb&&!sb.value&&sess.formData&&sess.formData.brname){
+              sb.value=sess.formData.brname;
+              ra_onBranchInput(sess.formData.brname);
+            }
+            ra_addLoadedReport(file.name,date,sess,text);
+          }catch(err){ ra_toast('Could not read JSON: '+file.name); }
+        };
+        r.readAsText(file);
+      } else if(ext==='docx'||ext==='doc'){
+        var r2=new FileReader();
+        r2.onload=function(e){
+          ra_parseDocxFile(e.target.result,function(text){
+            ra_addLoadedReport(file.name,'',null,text||'');
+            if(!text) ra_toast('Warning: could not extract text from '+file.name);
+          });
+        };
+        r2.readAsArrayBuffer(file);
+      } else if(ext==='xlsx'||ext==='xls'){
+        var r4=new FileReader();
+        r4.onload=function(e){
+          ra_parseXlsxFile(e.target.result,function(text){
+            ra_addLoadedReport(file.name,'',null,text||'');
+            if(!text) ra_toast('Warning: could not extract text from '+file.name);
+          });
+        };
+        r4.readAsArrayBuffer(file);
+      } else {
+        var r3=new FileReader();
+        r3.onload=function(e){ ra_addLoadedReport(file.name,'',null,e.target.result||''); };
+        r3.readAsText(file);
+      }
+    })(files[fi]);
+  }
+  input.value='';
+}
+
+function ra_addLoadedReport(name,date,sess,text){
+  for(var i=0;i<ra_loadedReports.length;i++){
+    if(ra_loadedReports[i].name===name){ ra_toast(name+' is already loaded.'); return; }
+  }
+  ra_loadedReports.push({name:name,date:date,sess:sess,text:text});
+  ra_renderLoadedFilesList();
+  ra_toast('Loaded: '+name);
+}
+
+function ra_removeLoadedReport(idx){
+  ra_loadedReports.splice(idx,1);
+  ra_renderLoadedFilesList();
+}
+
+function ra_renderLoadedFilesList(){
+  var container=document.getElementById('ra-loaded-files-list');
+  var items=document.getElementById('ra-loaded-files-items');
+  if(!container) return;
+  if(!ra_loadedReports.length){ container.style.display='none'; return; }
+  container.style.display='block';
+  var h='';
+  for(var i=0;i<ra_loadedReports.length;i++){
+    var rp=ra_loadedReports[i];
+    var icon=(rp.name.indexOf('.docx')!==-1||rp.name.indexOf('.doc')!==-1)?'&#128196;':(rp.name.indexOf('.xlsx')!==-1||rp.name.indexOf('.xls')!==-1)?'&#128200;':(rp.name.indexOf('.json')!==-1?'&#128202;':'&#128196;');
+    var wc=rp.text?rp.text.split(/\s+/).filter(function(w){return w;}).length:0;
+    h+='<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #eaeff6">';
+    h+='<span style="font-size:14px;flex-shrink:0">'+icon+'</span>';
+    h+='<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:700;color:#1a3a5c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+ra_esc(rp.name)+'</div>';
+    h+='<div style="display:flex;align-items:center;gap:6px;margin-top:3px"><input type="date" value="'+ra_esc(rp.date||'')+'" style="padding:2px 5px;font-size:10px;width:130px;border:1px solid #c8d8ec;border-radius:3px" onchange="ra_loadedReports['+i+'].date=this.value">';
+    h+='<span style="font-size:10px;color:#9a9a9a">'+wc+' words</span></div></div>';
+    h+='<button onclick="ra_removeLoadedReport('+i+')" title="Remove" style="padding:3px 7px;font-size:11px;border:1px solid #f0a0a0;border-radius:4px;background:#f5f8fd;color:#c03030;cursor:pointer;font-weight:600;flex-shrink:0">&#10005;</button>';
+    h+='</div>';
+  }
+  if(items) items.innerHTML=h;
+}
+
+function ra_buildTextFromSession(sess){
+  var lines=[];
+  var om=sess.obsTypeMap||{};
+  var si=sess.selIds||{};
+  for(var id in si){ lines.push((om[id]||'New')+' Observation: '+id); }
+  if(sess.formData){
+    if(sess.formData.brautype) lines.unshift('Audit Type: '+sess.formData.brautype);
+    if(sess.formData.brname) lines.unshift('Branch: '+sess.formData.brname);
+  }
+  return lines.join('\n');
+}
+
+function ra_parseDocxFile(arrayBuffer,callback){
+  try{
+    var bytes=new Uint8Array(arrayBuffer);
+    var dv=new DataView(arrayBuffer);
+    var eocdPos=-1;
+    for(var i=bytes.length-22;i>=0;i--){
+      if(bytes[i]===0x50&&bytes[i+1]===0x4B&&bytes[i+2]===0x05&&bytes[i+3]===0x06){ eocdPos=i; break; }
+    }
+    if(eocdPos<0){ callback(''); return; }
+    var cdOffset=dv.getUint32(eocdPos+16,true);
+    var cdSize=dv.getUint32(eocdPos+12,true);
+    var target='word/document.xml';
+    var pos=cdOffset;
+    while(pos<cdOffset+cdSize){
+      if(dv.getUint32(pos,true)!==0x02014B50) break;
+      var comprMethod=dv.getUint16(pos+10,true);
+      var compSize=dv.getUint32(pos+20,true);
+      var fnLen=dv.getUint16(pos+28,true);
+      var extraLen=dv.getUint16(pos+30,true);
+      var commentLen=dv.getUint16(pos+32,true);
+      var localOffset=dv.getUint32(pos+42,true);
+      var fnBytes=bytes.subarray(pos+46,pos+46+fnLen);
+      var fn='';
+      for(var ci=0;ci<fnBytes.length;ci++) fn+=String.fromCharCode(fnBytes[ci]);
+      if(fn===target){
+        var lhFnLen=dv.getUint16(localOffset+26,true);
+        var lhExtraLen=dv.getUint16(localOffset+28,true);
+        var dataStart=localOffset+30+lhFnLen+lhExtraLen;
+        var compData=arrayBuffer.slice(dataStart,dataStart+compSize);
+        if(comprMethod===0){
+          callback(ra_xmlToText(new TextDecoder().decode(compData)));
+        } else if(comprMethod===8){
+          var ds=new DecompressionStream('deflate-raw');
+          var writer=ds.writable.getWriter();
+          var reader=ds.readable.getReader();
+          writer.write(new Uint8Array(compData));
+          writer.close();
+          var ra_chunks=[]; var ra_totalLen=0;
+          (function ra_pump(){
+            reader.read().then(function(res){
+              if(res.done){
+                var combined=new Uint8Array(ra_totalLen); var off=0;
+                for(var k=0;k<ra_chunks.length;k++){ combined.set(ra_chunks[k],off); off+=ra_chunks[k].length; }
+                callback(ra_xmlToText(new TextDecoder().decode(combined)));
+              } else { ra_chunks.push(res.value); ra_totalLen+=res.value.length; ra_pump(); }
+            }).catch(function(){ callback(''); });
+          })();
+        } else { callback(''); }
+        return;
+      }
+      pos+=46+fnLen+extraLen+commentLen;
+    }
+    callback('');
+  }catch(e){ callback(''); }
+}
+
+function ra_xmlToText(xml){
+  return xml
+    .replace(/<w:p[ >]/g,'\n').replace(/<w:tab[^>]*\/>/g,'\t').replace(/<[^>]+>/g,'')
+    .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#[0-9]+;/g,'')
+    .replace(/\n{3,}/g,'\n\n').trim();
+}
+
+function ra_parseXlsxFile(arrayBuffer,callback){
+  function ra_extractEntry(ab,targetFile,onDone){
+    try{
+      var bytes=new Uint8Array(ab); var dv=new DataView(ab);
+      var eocdPos=-1;
+      for(var i=bytes.length-22;i>=0;i--){
+        if(bytes[i]===0x50&&bytes[i+1]===0x4B&&bytes[i+2]===0x05&&bytes[i+3]===0x06){ eocdPos=i; break; }
+      }
+      if(eocdPos<0){ onDone(null); return; }
+      var cdOffset=dv.getUint32(eocdPos+16,true); var cdSize=dv.getUint32(eocdPos+12,true);
+      var pos=cdOffset;
+      while(pos<cdOffset+cdSize){
+        if(dv.getUint32(pos,true)!==0x02014B50) break;
+        var comprMethod=dv.getUint16(pos+10,true); var compSize=dv.getUint32(pos+20,true);
+        var fnLen=dv.getUint16(pos+28,true); var extraLen=dv.getUint16(pos+30,true);
+        var commentLen=dv.getUint16(pos+32,true); var localOffset=dv.getUint32(pos+42,true);
+        var fnBytes=bytes.subarray(pos+46,pos+46+fnLen); var fn='';
+        for(var ci=0;ci<fnBytes.length;ci++) fn+=String.fromCharCode(fnBytes[ci]);
+        if(fn===targetFile){
+          var lhFnLen=dv.getUint16(localOffset+26,true); var lhExtraLen=dv.getUint16(localOffset+28,true);
+          var dataStart=localOffset+30+lhFnLen+lhExtraLen;
+          var compData=ab.slice(dataStart,dataStart+compSize);
+          if(comprMethod===0){ onDone(new TextDecoder().decode(compData)); }
+          else if(comprMethod===8){
+            var ds=new DecompressionStream('deflate-raw');
+            var w=ds.writable.getWriter(); var r=ds.readable.getReader();
+            w.write(new Uint8Array(compData)); w.close();
+            var xchunks=[]; var xtotalLen=0;
+            (function xpump(){
+              r.read().then(function(res){
+                if(res.done){
+                  var combined=new Uint8Array(xtotalLen); var off=0;
+                  for(var k=0;k<xchunks.length;k++){ combined.set(xchunks[k],off); off+=xchunks[k].length; }
+                  onDone(new TextDecoder().decode(combined));
+                } else { xchunks.push(res.value); xtotalLen+=res.value.length; xpump(); }
+              }).catch(function(){ onDone(null); });
+            })();
+          } else { onDone(null); }
+          return;
+        }
+        pos+=46+fnLen+extraLen+commentLen;
+      }
+      onDone(null);
+    }catch(e){ onDone(null); }
+  }
+  ra_extractEntry(arrayBuffer,'xl/sharedStrings.xml',function(ssXml){
+    var strings=[];
+    if(ssXml){
+      var siRe=/<si>([\s\S]*?)<\/si>/g; var siM;
+      while((siM=siRe.exec(ssXml))!==null){
+        var raw=siM[1].replace(/<[^>]+>/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"');
+        strings.push(raw.trim());
+      }
+    }
+    ra_extractEntry(arrayBuffer,'xl/worksheets/sheet1.xml',function(sheetXml){
+      var lines=strings.filter(function(s){return s;});
+      if(sheetXml){
+        var isRe=/<is>([\s\S]*?)<\/is>/g; var isM;
+        while((isM=isRe.exec(sheetXml))!==null){
+          var t=isM[1].replace(/<[^>]+>/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').trim();
+          if(t) lines.push(t);
+        }
+      }
+      callback(lines.join('\n'));
+    });
+  });
+}
+
+function ra_parseReport(text,sess){
+  var result={}; var catNames=Object.keys(RA_DB_CATS);
+  for(var i=0;i<catNames.length;i++) result[catNames[i]]={obs:0,repeated:0,new:0};
+  if(sess){
+    var om=sess.obsTypeMap||{}; var si=sess.selIds||{}; var ids=Object.keys(si);
+    var rep=0,nw=0;
+    for(var j=0;j<ids.length;j++){ if((om[ids[j]]||'New').toLowerCase()==='repeated') rep++; else nw++; }
+    var total=rep+nw;
+    if(total>0){
+      var tCats=ra_parseTextCategories(text||''); var tTotal=0;
+      for(var c in tCats) tTotal+=tCats[c];
+      if(tTotal>0){
+        for(var c2 in tCats){ if(result[c2]){ var ratio=tCats[c2]/tTotal; result[c2].obs=Math.round(total*ratio); result[c2].repeated=Math.round(rep*ratio); result[c2].new=result[c2].obs-result[c2].repeated; } }
+      } else {
+        var top3=catNames.slice().sort(function(a,b){return RA_DB_CATS[b].weight-RA_DB_CATS[a].weight;}).slice(0,3);
+        for(var ti=0;ti<top3.length;ti++){ result[top3[ti]].obs=Math.round(total/3); result[top3[ti]].repeated=Math.round(rep/3); result[top3[ti]].new=result[top3[ti]].obs-result[top3[ti]].repeated; }
+      }
+    }
+  } else if(text&&text.trim()){
+    var tCats2=ra_parseTextCategories(text); var repLines=ra_countRepeatedInText(text);
+    for(var c3 in tCats2){ if(result[c3]){ result[c3].obs=tCats2[c3]; result[c3].repeated=repLines[c3]||0; result[c3].new=Math.max(0,result[c3].obs-result[c3].repeated); } }
+  }
+  return result;
+}
+
+function ra_parseTextCategories(text){
+  var lower=text.toLowerCase(); var lines=lower.split('\n'); var catCounts={}; var catNames=Object.keys(RA_CAT_KEYWORDS);
+  for(var li=0;li<lines.length;li++){
+    if(!lines[li].trim()) continue;
+    for(var ci=0;ci<catNames.length;ci++){
+      var kws=RA_CAT_KEYWORDS[catNames[ci]];
+      for(var ki=0;ki<kws.length;ki++){ if(lines[li].indexOf(kws[ki])!==-1){ catCounts[catNames[ci]]=(catCounts[catNames[ci]]||0)+1; break; } }
+    }
+  }
+  return catCounts;
+}
+
+function ra_countRepeatedInText(text){
+  var lower=text.toLowerCase(); var lines=lower.split('\n'); var repCounts={}; var catNames=Object.keys(RA_CAT_KEYWORDS);
+  for(var li=0;li<lines.length;li++){
+    if(lines[li].indexOf('repeated')===-1) continue;
+    for(var ci=0;ci<catNames.length;ci++){
+      var kws=RA_CAT_KEYWORDS[catNames[ci]]; var context=lines.slice(Math.max(0,li-2),li+3).join(' ');
+      for(var ki=0;ki<kws.length;ki++){ if(context.indexOf(kws[ki])!==-1){ repCounts[catNames[ci]]=(repCounts[catNames[ci]]||0)+1; break; } }
+    }
+  }
+  return repCounts;
+}
+
+function ra_scoreCategory(catName,rpt1,rpt2){
+  var d1=rpt1[catName]||{obs:0,repeated:0}; var d2=rpt2?(rpt2[catName]||{obs:0,repeated:0}):null;
+  var db=RA_DB_CATS[catName]; var tot=0;
+  for(var c in rpt1) tot+=rpt1[c].obs||0; if(tot<1) tot=1;
+  var freq=(d1.obs/tot)*40;
+  var rec=0; if(d1.obs>0) rec=(d1.repeated/d1.obs)*30; if(d2&&d2.obs>0&&d1.obs>0) rec=Math.min(30,rec+10);
+  var dbs=Math.min(20,(db.count/108)*db.weight*4);
+  var sev=(catName==='Safety & Security')?10:0;
+  return Math.min(100,Math.round(freq+rec+dbs+sev));
+}
+
+function ra_scoreToLevel(score){ return score>=75?'critical':score>=50?'high':score>=25?'medium':'low'; }
+function ra_levelLabel(level){ return {critical:'Critical',high:'High',medium:'Medium',low:'Low'}[level]||level; }
+function ra_levelColor(level){ return {critical:'#c03030',high:'#d07020',medium:'#c0a000',low:'#40a040'}[level]||'#999'; }
+function ra_levelBarColor(level){ return {critical:'#e05050',high:'#e08030',medium:'#d0b020',low:'#50b050'}[level]||'#999'; }
+
+function ra_runAnalysis(){
+  var brEl=document.getElementById('ra-sel_branch'); var branchName=brEl?brEl.value.trim():'Unknown Branch'; if(!branchName) branchName='Unknown Branch';
+  var ptEl=document.getElementById('ra-paste_text'); var pasteText=ptEl?ptEl.value.trim():'';
+  var atEl=document.getElementById('ra-next_autype'); var autype=atEl?atEl.value.trim():'Routine Audit Visit';
+  var pbEl=document.getElementById('ra-next_pb'); var pb=pbEl?pbEl.value.trim():'';
+  if(!pasteText&&!ra_loadedReports.length){ ra_toast('Please load or paste at least one previous audit report first.'); return; }
+  var allSources=[];
+  for(var li=0;li<ra_loadedReports.length;li++) allSources.push({text:ra_loadedReports[li].text,sess:ra_loadedReports[li].sess,date:ra_loadedReports[li].date});
+  if(pasteText) allSources.push({text:pasteText,sess:null,date:''});
+  var parsedList=[];
+  for(var pi=0;pi<allSources.length;pi++) parsedList.push(ra_parseReport(allSources[pi].text,allSources[pi].sess));
+  var rpt1,rpt2=null,d1='',d2='';
+  if(parsedList.length===1){ rpt1=parsedList[0]; d1=allSources[0].date||''; }
+  else { rpt1=parsedList[parsedList.length-1]; rpt2=parsedList[0]; d1=allSources[allSources.length-1].date||''; d2=allSources[0].date||''; }
+  var catNames=Object.keys(RA_DB_CATS); var scores=[];
+  for(var si=0;si<catNames.length;si++){
+    var sc=ra_scoreCategory(catNames[si],rpt1,rpt2);
+    scores.push({cat:catNames[si],score:sc,level:ra_scoreToLevel(sc),d1:rpt1[catNames[si]],d2:rpt2?rpt2[catNames[si]]:null});
+  }
+  scores.sort(function(a,b){return b.score-a.score;});
+  var overall=Math.round((scores[0].score*0.5)+(scores[1].score*0.3)+(scores[2].score*0.2));
+  ra_renderResults(branchName,scores,overall,d1,d2,autype,pb,rpt2!=null);
+  document.getElementById('ra-results-empty').style.display='none';
+  document.getElementById('ra-results-content').style.display='block';
+  document.getElementById('ra-RP').scrollTop=0;
+  ra_toast('Risk assessment complete -- '+allSources.length+' report'+(allSources.length>1?'s':'')+' analysed.');
+}
+
+function ra_renderResults(branch,scores,overall,d1,d2,autype,pb,hasTrend){
+  var ol=ra_scoreToLevel(overall);
+  var region=ra_currentBranch?ra_currentBranch.region+' Region, ':'';
+  var city=ra_currentBranch?ra_currentBranch.city:'';
+  document.getElementById('ra-res-branch').textContent=branch;
+  document.getElementById('ra-res-meta').textContent=(region+city+' | '+autype+(pb?' | '+pb:'')).replace(/^\s*\|\s*/,'');
+  var bBg={critical:'#fde8e8',high:'#fff0e0',medium:'#fffbe0',low:'#e8f8e8'}[ol]||'#eee';
+  var bFg={critical:'#9b1a1a',high:'#b04400',medium:'#806000',low:'#1a6020'}[ol]||'#333';
+  var bBd={critical:'#f0a0a0',high:'#f0b070',medium:'#e0c030',low:'#80c880'}[ol]||'#ccc';
+  document.getElementById('ra-res-overall-badge').innerHTML='<span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;background:'+bBg+';color:'+bFg+';border:1px solid '+bBd+'">&#9679; Overall Risk: '+ra_levelLabel(ol)+'</span>';
+  document.getElementById('ra-res-generated').textContent='Generated: '+new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  var counts={critical:0,high:0,medium:0,low:0};
+  for(var i=0;i<scores.length;i++) counts[scores[i].level]++;
+  document.getElementById('ra-res-summary').innerHTML=ra_tile('critical',counts.critical,'Critical')+ra_tile('high',counts.high,'High')+ra_tile('medium',counts.medium,'Medium')+ra_tile('low',counts.low,'Low');
+  document.getElementById('ra-gauge-score').textContent=overall+'/100';
+  document.getElementById('ra-gauge-score').style.color=ra_levelColor(ol);
+  document.getElementById('ra-gauge-label').textContent=ra_levelLabel(ol)+' Risk -- '+ra_gaugeDesc(ol);
+  document.getElementById('ra-gauge-label').style.color=ra_levelColor(ol);
+  document.getElementById('ra-gauge-needle').style.left=overall+'%';
+  document.getElementById('ra-gauge-summary').innerHTML=ra_gaugeSummary(branch,scores,ol,d1);
+  ra_renderMatrix(scores); ra_renderBarChart(scores); ra_renderFocus(scores,branch,autype);
+  document.getElementById('ra-trend-card').style.display=hasTrend?'block':'none';
+  if(hasTrend) ra_renderTrend(scores);
+  var hasRep=false;
+  for(var j=0;j<scores.length;j++){ if(scores[j].d1&&scores[j].d1.repeated>0){hasRep=true;break;} }
+  document.getElementById('ra-repeated-card').style.display=hasRep?'block':'none';
+  if(hasRep) ra_renderRepeated(scores);
+  ra_renderRecs(scores);
+}
+
+function ra_tile(cls,count,label){
+  var bc={critical:'#c03030',high:'#d07020',medium:'#c0a000',low:'#40a040'}[cls]||'#ccc';
+  return '<div style="background:#fff;border-radius:7px;padding:12px 10px;text-align:center;box-shadow:0 1px 6px rgba(26,58,92,.08);border-top:4px solid '+bc+'"><div style="font-size:26px;font-weight:800;color:#1a3a5c">'+count+'</div><div style="font-size:10px;font-weight:700;color:#6a7888;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">'+label+'</div></div>';
+}
+
+function ra_gaugeDesc(level){
+  return {critical:'Immediate comprehensive audit required',high:'Focused audit with priority on flagged areas',medium:'Standard audit with additional scrutiny in key areas',low:'Routine audit -- maintain current oversight'}[level]||'';
+}
+
+function ra_gaugeSummary(branch,scores,level,d1){
+  var top=scores[0]; var repTotal=0,obsTotal=0;
+  for(var i=0;i<scores.length;i++){ if(scores[i].d1){ obsTotal+=scores[i].d1.obs||0; repTotal+=scores[i].d1.repeated||0; } }
+  var repPct=obsTotal>0?Math.round(repTotal/obsTotal*100):0;
+  var d1str=d1?' (report dated '+ra_fmtDate(d1)+')':'';
+  return 'Analysis of <strong>'+ra_esc(branch)+'</strong>'+d1str+' identified <strong>'+obsTotal+' observations</strong>, of which <strong>'+repTotal+' ('+repPct+'%)</strong> are repeated. Highest-risk: <strong>'+ra_esc(top.cat)+'</strong> (score '+top.score+'/100).';
+}
+
+function ra_fmtDate(iso){
+  if(!iso) return ''; var d=new Date(iso);
+  return d.getDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]+' '+d.getFullYear();
+}
+
+function ra_renderMatrix(scores){
+  var h='<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
+  var ths=['Category','Risk Level','Risk Score','Obs (Latest)','Repeated','DB Count'];
+  for(var t=0;t<ths.length;t++) h+='<th style="background:#1a3a5c;color:#fff;padding:7px 10px;text-align:left;font-size:11px;font-weight:700">'+ths[t]+'</th>';
+  h+='</tr></thead><tbody>';
+  for(var i=0;i<scores.length;i++){
+    var s=scores[i]; var obs1=s.d1?s.d1.obs:0; var rep1=s.d1?s.d1.repeated:0;
+    var bBg={critical:'#fde8e8',high:'#fff0e0',medium:'#fffbe0',low:'#e8f8e8'}[s.level]||'#eee';
+    var bFg={critical:'#9b1a1a',high:'#b04400',medium:'#806000',low:'#1a6020'}[s.level]||'#333';
+    var bBd={critical:'#f0a0a0',high:'#f0b070',medium:'#e0c030',low:'#80c880'}[s.level]||'#ccc';
+    h+='<tr>';
+    h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6;font-weight:700;color:#1a3a5c">'+ra_esc(s.cat)+'</td>';
+    h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6"><span style="display:inline-block;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:800;text-transform:uppercase;background:'+bBg+';color:'+bFg+';border:1px solid '+bBd+'">'+ra_levelLabel(s.level)+'</span></td>';
+    h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6"><div style="display:flex;align-items:center;gap:6px"><div style="width:'+s.score+'px;max-width:80px;height:8px;background:'+ra_levelBarColor(s.level)+';border-radius:4px"></div><strong style="color:'+ra_levelColor(s.level)+'">'+s.score+'</strong></div></td>';
+    h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6">'+obs1+'</td>';
+    h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6">'+(rep1>0?'<span style="color:#c03030;font-weight:700">'+rep1+'</span>':'0')+'</td>';
+    h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6;color:#6a7888">'+RA_DB_CATS[s.cat].count+'</td>';
+    h+='</tr>';
+  }
+  h+='</tbody></table>';
+  document.getElementById('ra-res-matrix').innerHTML=h;
+}
+
+function ra_renderBarChart(scores){
+  var maxObs=1;
+  for(var i=0;i<scores.length;i++){ var o=scores[i].d1?scores[i].d1.obs:0; if(o>maxObs) maxObs=o; }
+  var h='';
+  for(var j=0;j<scores.length;j++){
+    var s=scores[j]; var obs=s.d1?s.d1.obs:0; var rep=s.d1?s.d1.repeated:0;
+    var pct=Math.round(obs/maxObs*100);
+    h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+    h+='<div style="width:190px;font-size:11px;color:#2a3a50;flex-shrink:0;font-weight:600">'+ra_esc(s.cat)+'</div>';
+    h+='<div style="flex:1;background:#eaeff6;border-radius:4px;height:16px;overflow:hidden"><div style="width:'+pct+'%;height:100%;border-radius:4px;background:'+ra_levelBarColor(s.level)+'"></div></div>';
+    h+='<div style="font-size:11px;font-weight:700;color:#1a3a5c;width:42px;text-align:right;flex-shrink:0">'+obs+(rep>0?'<span style="color:#c03030;font-size:9px">('+rep+'R)</span>':'')+'</div>';
+    h+='</div>';
+  }
+  h+='<div style="font-size:10px;color:#9a9a9a;margin-top:8px"><span style="color:#c03030;font-weight:700">R</span> = Repeated observations</div>';
+  document.getElementById('ra-res-barchart').innerHTML=h;
+}
+
+function ra_renderFocus(scores,branch,autype){
+  var h=''; var top=scores.slice(0,5);
+  for(var i=0;i<top.length;i++){
+    var s=top[i]; var db=RA_DB_CATS[s.cat]; var obs1=s.d1?s.d1.obs:0; var rep1=s.d1?s.d1.repeated:0;
+    var bc={critical:'#c03030',high:'#d07020',medium:'#c0a000',low:'#40a040'}[s.level]||'#ccc';
+    var bg={critical:'#fffafa',high:'#fffdf8',medium:'#fffeee',low:'#f5fff5'}[s.level]||'#fff';
+    var bBg={critical:'#fde8e8',high:'#fff0e0',medium:'#fffbe0',low:'#e8f8e8'}[s.level]||'#eee';
+    var bFg={critical:'#9b1a1a',high:'#b04400',medium:'#806000',low:'#1a6020'}[s.level]||'#333';
+    var bBd={critical:'#f0a0a0',high:'#f0b070',medium:'#e0c030',low:'#80c880'}[s.level]||'#ccc';
+    h+='<div style="border:1px solid #dde4ee;border-left:5px solid '+bc+';border-radius:0 6px 6px 0;padding:12px 14px;margin-bottom:10px;background:'+bg+'">';
+    h+='<div style="font-size:11px;font-weight:800;color:#6a7888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Priority #'+(i+1)+'</div>';
+    h+='<div style="font-size:13px;font-weight:800;color:#1a3a5c;margin-bottom:6px">'+ra_esc(s.cat)+'<span style="display:inline-block;padding:3px 8px;border-radius:10px;font-size:10px;font-weight:800;text-transform:uppercase;background:'+bBg+';color:'+bFg+';border:1px solid '+bBd+';margin-left:8px">'+ra_levelLabel(s.level)+'</span></div>';
+    h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">';
+    h+='<span style="font-size:10px;background:#edf2f8;border:1px solid #c8d8ec;border-radius:10px;padding:2px 8px;color:#2a4060;font-weight:600">Score: '+s.score+'/100</span>';
+    h+='<span style="font-size:10px;background:#edf2f8;border:1px solid #c8d8ec;border-radius:10px;padding:2px 8px;color:#2a4060;font-weight:600">'+obs1+' obs</span>';
+    if(rep1>0) h+='<span style="font-size:10px;background:#fde8e8;border:1px solid #f0a0a0;border-radius:10px;padding:2px 8px;color:#9b1a1a;font-weight:600">'+rep1+' Repeated</span>';
+    h+='<span style="font-size:10px;background:#edf2f8;border:1px solid #c8d8ec;border-radius:10px;padding:2px 8px;color:#2a4060;font-weight:600">'+db.count+' in databank</span>';
+    h+='</div>';
+    h+='<div style="font-size:11px;color:#5a6a7a;margin-bottom:6px">'+ra_focusReason(s)+'</div>';
+    h+='<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:4px">Key checkpoints from BHS databank:</div>';
+    h+='<ul style="font-size:11px;color:#3a5070;margin-top:4px;padding-left:18px">';
+    var titles=db.titles.slice(0,5);
+    for(var ti=0;ti<titles.length;ti++) h+='<li style="margin-bottom:3px">'+ra_esc(titles[ti])+'</li>';
+    h+='</ul></div>';
+  }
+  document.getElementById('ra-res-focus').innerHTML=h;
+}
+
+function ra_focusReason(s){
+  var parts=[];
+  if(s.d1&&s.d1.obs>0) parts.push(s.d1.obs+' observation'+(s.d1.obs>1?'s':'')+' identified in latest report');
+  if(s.d1&&s.d1.repeated>0) parts.push(s.d1.repeated+' unresolved from previous audit (escalated risk)');
+  parts.push(RA_DB_CATS[s.cat].count+' historical findings in BHS databank indicate systemic risk');
+  if(s.cat==='Safety & Security') parts.push('Safety observations carry highest inherent risk weight');
+  return parts.join('; ')+'.';
+}
+
+function ra_renderTrend(scores){
+  var h='<div style="font-size:12px;color:#4a5a70;margin-bottom:12px">Comparison between the two loaded reports. &#8593; = worsening (more obs); &#8595; = improving.</div>';
+  for(var i=0;i<scores.length;i++){
+    var s=scores[i]; var o1=s.d1?s.d1.obs:0; var o2=s.d2?s.d2.obs:0;
+    if(o1===0&&o2===0) continue;
+    var diff=o1-o2; var arrow,ac,note;
+    if(diff>0){arrow='&#8593;';ac='#c03030';note='+'+(diff)+' (+'+Math.round(diff/(o2||1)*100)+'%)';}
+    else if(diff<0){arrow='&#8595;';ac='#1a7040';note=diff+' ('+Math.round(diff/(o2||1)*100)+'%)';}
+    else{arrow='&#8212;';ac='#806000';note='No change';}
+    h+='<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #eaeff6">';
+    h+='<div style="font-size:18px;font-weight:900;color:'+ac+'">'+arrow+'</div>';
+    h+='<div style="flex:1"><strong>'+ra_esc(s.cat)+'</strong></div>';
+    h+='<div style="font-size:11px;color:#4a5a70">Older: '+o2+' &rarr; Newer: '+o1+'</div>';
+    h+='<div style="font-size:11px;color:'+ra_levelColor(s.level)+';width:140px;text-align:right">'+note+'</div></div>';
+  }
+  document.getElementById('ra-res-trend').innerHTML=h;
+}
+
+function ra_renderRepeated(scores){
+  var h='<div style="font-size:12px;color:#4a5a70;margin-bottom:12px">Categories with repeated (unresolved) observations from prior audits. Highest priority for attention.</div>';
+  var found=false;
+  for(var i=0;i<scores.length;i++){
+    var s=scores[i]; if(!s.d1||!s.d1.repeated) continue; found=true;
+    h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #eaeff6">';
+    h+='<span style="color:#c03030;font-size:18px;font-weight:900">&#9888;</span>';
+    h+='<div style="flex:1"><strong style="color:#1a3a5c">'+ra_esc(s.cat)+'</strong> -- <span style="color:#c03030;font-weight:700">'+s.d1.repeated+' repeated observation'+(s.d1.repeated>1?'s':'')+' unresolved</span></div>';
+    h+='<span style="display:inline-block;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:800;background:#fde8e8;color:#9b1a1a;border:1px solid #f0a0a0">Escalated</span>';
+    h+='</div>';
+  }
+  if(!found) h='<div style="color:#6a7888;font-size:12px;padding:10px 0">No repeated observations detected.</div>';
+  document.getElementById('ra-res-repeated').innerHTML=h;
+}
+
+function ra_renderRecs(scores){
+  var recs=[]; var ri;
+  for(var i=0;i<scores.length&&recs.length<8;i++){
+    var s=scores[i]; if(s.score<20) continue; var db=RA_DB_CATS[s.cat];
+    var urgency=s.level==='critical'||s.level==='high'?'(High Priority)':s.level==='medium'?'(Medium Priority)':'(Advisory)';
+    var desc='Examine all '+ra_esc(s.cat)+' records. ';
+    if(s.d1&&s.d1.repeated>0) desc+='Pay special attention to '+s.d1.repeated+' observation'+(s.d1.repeated>1?'s':'')+' that recurred from the last audit. ';
+    desc+='Key checkpoints: '+ra_esc(db.titles.slice(0,3).join('; '))+'.';
+    recs.push({title:'Review '+ra_esc(s.cat)+' '+urgency,desc:desc,level:s.level});
+  }
+  var h='';
+  for(ri=0;ri<recs.length;ri++){
+    h+='<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #eaeff6">';
+    h+='<div style="width:24px;height:24px;border-radius:50%;background:'+ra_levelColor(recs[ri].level)+';color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">'+(ri+1)+'</div>';
+    h+='<div><div style="font-size:12px;font-weight:700;color:#1a3a5c">'+recs[ri].title+'</div><div style="font-size:11px;color:#4a5a70;margin-top:2px;line-height:1.5">'+recs[ri].desc+'</div></div>';
+    h+='</div>';
+  }
+  if(!h) h='<div style="color:#6a7888;font-size:12px;padding:10px 0">Load audit report data to generate recommendations.</div>';
+  document.getElementById('ra-res-recs').innerHTML=h;
+}
 </script>
+
+<!-- ===== RISK ASSESSMENT PANEL ===== -->
+<script type="application/json" id="ra-branch-data">
+[{"code":"239","name":"Newlands, Lahore","region":"Center","city":"Lahore"},{"code":"249","name":"TNS Beaconhouse Defence","region":"Center","city":"Lahore"},{"code":"212","name":"Defence Campus, Lahore","region":"Center","city":"Lahore"},{"code":"214","name":"Walton Campus, Lahore","region":"Center","city":"Lahore"},{"code":"278","name":"Ring Road Campus, Lahore","region":"Center","city":"Lahore"},{"code":"232","name":"Main Campus Canal, Faisalabad","region":"Center","city":"Faisalabad"},{"code":"221","name":"Bosan Road Campus, Multan","region":"Center","city":"Multan"},{"code":"243","name":"Satellite Town Campus, Gujranwala","region":"Center","city":"Gujranwala"},{"code":"271","name":"Sialkot Campus","region":"Center","city":"Sialkot"},{"code":"302","name":"BCP Margalla Campus, Islamabad","region":"North","city":"Islamabad"},{"code":"305","name":"F-8/2 Campus, Islamabad","region":"North","city":"Islamabad"},{"code":"311","name":"Margalla Campus, Islamabad","region":"North","city":"Islamabad"},{"code":"321","name":"Tipu Sultan Campus, Rawalpindi","region":"North","city":"Rawalpindi"},{"code":"332","name":"KG Campus Satellite Town, Rawalpindi","region":"North","city":"Rawalpindi"},{"code":"345","name":"Frontier Campus, Peshawar","region":"North","city":"Peshawar"},{"code":"351","name":"Main Campus, Abbottabad","region":"North","city":"Abbottabad"},{"code":"364","name":"Gujrat Campus","region":"North","city":"Gujrat"},{"code":"431","name":"Clifton Campus, Karachi","region":"South","city":"Karachi"},{"code":"433","name":"Defence Campus, Karachi","region":"South","city":"Karachi"},{"code":"464","name":"Gulshan Campus, Karachi","region":"South","city":"Karachi"},{"code":"451","name":"Qasimabad Campus, Hyderabad","region":"South","city":"Hyderabad"},{"code":"471","name":"Juniper Campus, Quetta","region":"South","city":"Quetta"},{"code":"495","name":"Sukkur Campus","region":"South","city":"Sukkar"}]
+</script>
+<div id="ra-panel" style="display:none;max-width:100%;background:#f0f3f8;min-height:calc(100vh - 50px)">
+  <style>
+    #ra-panel .ra-wrap{display:flex;height:calc(100vh - 50px);overflow:hidden}
+    #ra-panel #ra-LP{width:38%;min-width:300px;max-width:420px;background:#fff;border-right:2px solid #dde4ee;overflow-y:auto;display:flex;flex-direction:column}
+    #ra-panel #ra-RP{flex:1;overflow-y:auto;padding:20px;background:#f0f3f8}
+    #ra-panel .ra-sec{padding:14px 16px;border-bottom:1px solid #eaeff6}
+    #ra-panel .ra-sh{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#1a3a5c;margin-bottom:10px}
+    #ra-panel .ra-fr{margin-bottom:10px}
+    #ra-panel .ra-fr label{display:block;font-size:11px;font-weight:600;color:#4a5a70;margin-bottom:3px}
+    #ra-panel .ra-fr input,#ra-panel .ra-fr select,#ra-panel .ra-fr textarea{width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:12px;background:#fff;color:#1e2d40}
+    #ra-panel .ra-fr textarea{resize:vertical;line-height:1.5}
+    #ra-panel .ra-hint{font-size:10px;color:#7a8a9a;margin-top:3px;line-height:1.5}
+    #ra-panel .ra-btn-gold{padding:13px;font-size:13px;letter-spacing:.3px;background:#c9962a;color:#111;border:none;border-radius:5px;font-family:inherit;font-weight:700;cursor:pointer;width:100%}
+    #ra-panel .ra-btn-gold:hover{background:#e0a830}
+    #ra-panel .ra-card{background:#fff;border-radius:8px;box-shadow:0 1px 6px rgba(26,58,92,.08);padding:18px 20px;margin-bottom:18px}
+    #ra-panel .ra-card-title{font-size:13px;font-weight:800;color:#1a3a5c;text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;border-bottom:2px solid #1a3a5c;padding-bottom:6px}
+    #ra-panel .ra-summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+    #ra-panel .ra-gauge-wrap{text-align:center;margin:8px 0 16px}
+    #ra-panel .ra-gauge-score{font-size:48px;font-weight:900;line-height:1}
+    #ra-panel .ra-gauge-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-top:4px}
+    #ra-panel .ra-gauge-bar{width:100%;height:12px;border-radius:6px;background:linear-gradient(90deg,#40a040 0%,#c0a000 40%,#d07020 70%,#c03030 100%);margin:12px 0 4px;position:relative}
+    #ra-panel .ra-gauge-needle{position:absolute;top:-3px;width:6px;height:18px;background:#1a3a5c;border-radius:3px;transform:translateX(-50%)}
+    #ra-panel .ra-gauge-ticks{display:flex;justify-content:space-between;font-size:9px;color:#6a7888;font-weight:700}
+    #ra-panel #ra-toast{position:fixed;bottom:20px;right:20px;background:#1a2a3a;color:#fff;padding:9px 15px;border-radius:5px;font-size:13px;font-weight:500;opacity:0;transform:translateY(8px);transition:.3s;z-index:9999;pointer-events:none}
+    #ra-panel #ra-toast.ra-show{opacity:1;transform:translateY(0)}
+  </style>
+  <div class="ra-wrap">
+    <!-- LEFT PANEL -->
+    <div id="ra-LP">
+      <div class="ra-sec" style="background:#f5f8fd">
+        <div class="ra-sh">&#128205; Branch Selection</div>
+        <div class="ra-fr">
+          <label>Branch</label>
+          <input type="text" id="ra-sel_branch" list="ra-dl-branch" placeholder="Type branch name or code..." autocomplete="off" oninput="ra_onBranchInput(this.value)">
+          <datalist id="ra-dl-branch"></datalist>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="ra-fr" style="margin-bottom:0"><label>Region</label><input type="text" id="ra-sel_region" readonly style="background:#f5f8fd"></div>
+          <div class="ra-fr" style="margin-bottom:0"><label>City</label><input type="text" id="ra-sel_city" readonly style="background:#f5f8fd"></div>
+        </div>
+      </div>
+      <div class="ra-sec">
+        <div class="ra-sh">&#128196; Previous Audit Report(s)</div>
+        <div class="ra-fr">
+          <label>Load file(s) — Word (.docx), JSON session, Excel or plain text</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
+            <button style="padding:4px 10px;font-size:11px;border-radius:4px;border:1px solid #c8d8ec;background:#f5f8fd;color:#1a3a5c;cursor:pointer;font-weight:600" onclick="document.getElementById('ra-file_picker').click()">&#128194; Browse &amp; Add Files...</button>
+            <input type="file" id="ra-file_picker" accept=".docx,.doc,.xlsx,.xls,.json,.txt" multiple style="display:none" onchange="ra_handleFilePick(this)">
+          </div>
+          <div class="ra-hint">Supports Word (.docx), Excel (.xlsx), JSON session, or plain-text files. Add as many as needed.</div>
+        </div>
+        <div id="ra-loaded-files-list" style="display:none;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:4px">Loaded Files:</div>
+          <div id="ra-loaded-files-items"></div>
+        </div>
+        <div class="ra-fr" style="margin-top:6px">
+          <label>Or paste report text directly</label>
+          <textarea id="ra-paste_text" rows="7" placeholder="Paste the text of a previous audit report here. Include observation titles, categories, and any 'Repeated' labels for best analysis..."></textarea>
+        </div>
+        <button style="padding:4px 10px;font-size:11px;border-radius:4px;border:1px solid #c8d8ec;background:#f5f8fd;color:#1a3a5c;cursor:pointer;font-weight:600" onclick="document.getElementById('ra-paste_text').value=''">&#10005; Clear Pasted Text</button>
+      </div>
+      <div class="ra-sec">
+        <div class="ra-sh">&#9881; Analysis Options</div>
+        <div class="ra-fr">
+          <label>Audit Type for upcoming audit</label>
+          <input type="text" id="ra-next_autype" value="Routine Audit Visit" placeholder="e.g. Routine Audit Visit">
+        </div>
+        <div class="ra-fr">
+          <label>Auditor / Prepared By</label>
+          <input type="text" id="ra-next_pb" placeholder="Auditor name">
+        </div>
+      </div>
+      <div style="padding:14px 16px">
+        <button class="ra-btn-gold" onclick="ra_runAnalysis()">&#128202; Run Risk Assessment</button>
+        <div class="ra-hint" style="text-align:center;margin-top:8px">Risk is calculated from databank frequency, observation history, and repeated findings</div>
+      </div>
+    </div><!-- end ra-LP -->
+
+    <!-- RIGHT PANEL -->
+    <div id="ra-RP">
+      <div id="ra-results-empty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#7a8a9a;text-align:center;gap:12px">
+        <div style="font-size:48px">&#128202;</div>
+        <div style="font-size:15px;font-weight:700;color:#2a3a50">BHS Internal Audit — Risk Assessment</div>
+        <div style="max-width:380px;line-height:1.7">Select a branch, load or paste one or more previous audit reports, then click <strong>Run Risk Assessment</strong> to generate a prioritized risk profile and audit focus recommendations.</div>
+      </div>
+      <div id="ra-results-content" style="display:none">
+        <!-- Header -->
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
+          <div>
+            <div id="ra-res-branch" style="font-size:20px;font-weight:800;color:#1a3a5c"></div>
+            <div id="ra-res-meta" style="font-size:12px;color:#6a7888;margin-top:3px"></div>
+          </div>
+          <div style="text-align:right">
+            <div id="ra-res-overall-badge"></div>
+            <div id="ra-res-generated" style="font-size:10px;color:#9a9a9a;margin-top:4px"></div>
+          </div>
+        </div>
+        <!-- Summary tiles -->
+        <div class="ra-summary-grid" id="ra-res-summary"></div>
+        <!-- Gauge -->
+        <div class="ra-card">
+          <div class="ra-card-title">Overall Risk Score</div>
+          <div class="ra-gauge-wrap">
+            <div id="ra-gauge-score" class="ra-gauge-score" style="color:#1a3a5c">--</div>
+            <div id="ra-gauge-label" class="ra-gauge-label" style="color:#6a7888">Run analysis to calculate</div>
+          </div>
+          <div class="ra-gauge-bar"><div id="ra-gauge-needle" class="ra-gauge-needle" style="left:0%"></div></div>
+          <div class="ra-gauge-ticks"><span>Low</span><span>Medium</span><span>High</span><span>Critical</span></div>
+          <div id="ra-gauge-summary" style="font-size:12px;color:#4a5a70;margin-top:12px;line-height:1.6"></div>
+        </div>
+        <!-- Category Risk Matrix -->
+        <div class="ra-card">
+          <div class="ra-card-title">Category Risk Matrix</div>
+          <div id="ra-res-matrix"></div>
+        </div>
+        <!-- Bar Chart -->
+        <div class="ra-card">
+          <div class="ra-card-title">Observation Frequency by Category</div>
+          <div id="ra-res-barchart"></div>
+        </div>
+        <!-- Focus Areas -->
+        <div class="ra-card">
+          <div class="ra-card-title">&#128680; Priority Focus Areas for Upcoming Audit</div>
+          <div id="ra-res-focus"></div>
+        </div>
+        <!-- Trend -->
+        <div class="ra-card" id="ra-trend-card" style="display:none">
+          <div class="ra-card-title">&#128200; Trend Analysis (Older vs Newer Report)</div>
+          <div id="ra-res-trend"></div>
+        </div>
+        <!-- Repeated -->
+        <div class="ra-card" id="ra-repeated-card" style="display:none">
+          <div class="ra-card-title">&#9888; Persistent / Repeated Issues</div>
+          <div id="ra-res-repeated"></div>
+        </div>
+        <!-- Recommendations -->
+        <div class="ra-card">
+          <div class="ra-card-title">&#9989; Audit Recommendations</div>
+          <div id="ra-res-recs"></div>
+        </div>
+        <!-- Print -->
+        <div style="text-align:center;margin-top:8px;margin-bottom:30px">
+          <button style="padding:10px 28px;border:none;border-radius:5px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;background:#1a3a5c;color:#fff" onclick="window.print()">&#128462; Print / Save as PDF</button>
+        </div>
+      </div><!-- end ra-results-content -->
+    </div><!-- end ra-RP -->
+  </div><!-- end ra-wrap -->
+  <div id="ra-toast"></div>
+</div><!-- end ra-panel -->
+
 </body>
 </html>
