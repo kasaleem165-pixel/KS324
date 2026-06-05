@@ -8400,30 +8400,71 @@ function setObsType(id, val) {
 
 // ============================================================
 // DATE VALIDATION
+// Returns true if all filled-in dates are consistent, false if any rule violated
 // ============================================================
 function validateDates() {
-  var visitFrom = document.getElementById('brvisit_from').value;
+  var perFrom   = document.getElementById('rper_from').value;
   var perTo     = document.getElementById('rper_to').value;
+  var visitFrom = document.getElementById('brvisit_from').value;
+  var visitTo   = document.getElementById('brvisit_to').value;
   var rdt       = document.getElementById('rdt').value;
 
-  // Audit Period To must not be after Visit From
-  var errPer = document.getElementById('err_per');
-  var perAfterVisit = (perTo && visitFrom && perTo > visitFrom);
-  if(errPer) errPer.style.display = perAfterVisit ? 'block' : 'none';
+  var errors = [];
 
-  // Audit Period To must not be later than Report Date
-  var errPerRdt = document.getElementById('err_per_rdt');
-  var perAfterRdt = (perTo && rdt && perTo > rdt);
-  if(errPerRdt) errPerRdt.style.display = perAfterRdt ? 'block' : 'none';
+  // Helper: mark field red or clear
+  function mark(id, bad){
+    var el=document.getElementById(id);
+    if(el) el.style.borderColor = bad ? '#c0392b' : '';
+  }
+  // Clear all first
+  ['rper_from','rper_to','brvisit_from','brvisit_to','rdt'].forEach(function(id){ mark(id,false); });
 
-  // Highlight rper_to if either condition triggered
-  document.getElementById('rper_to').style.borderColor = (perAfterVisit || perAfterRdt) ? '#c0392b' : '';
+  // Rule 1: Audit Period From must not be after Audit Period To
+  var r1 = perFrom && perTo && perFrom > perTo;
+  if(r1){ errors.push('Audit Period From must not be later than Audit Period To.'); mark('rper_from',true); mark('rper_to',true); }
 
-  // Report Date must not be before Visit From
-  var errRdt = document.getElementById('err_rdt');
-  if(errRdt){
-    errRdt.style.display = (rdt && visitFrom && rdt < visitFrom) ? 'block' : 'none';
-    document.getElementById('rdt').style.borderColor = (rdt && visitFrom && rdt < visitFrom) ? '#c0392b' : '';
+  // Rule 2: Audit Period To must not be after Visit From
+  var r2 = perTo && visitFrom && perTo > visitFrom;
+  if(r2){ errors.push('Audit Period To must not be later than Visit From date.'); mark('rper_to',true); mark('brvisit_from',true); }
+
+  // Rule 3: Audit Period To must not be later than Report Date
+  var r3 = perTo && rdt && perTo > rdt;
+  if(r3){ errors.push('Audit Period To must not be later than Report Date.'); mark('rper_to',true); mark('rdt',true); }
+
+  // Rule 4: Visit From must not be after Visit To
+  var r4 = visitFrom && visitTo && visitFrom > visitTo;
+  if(r4){ errors.push('Visit From must not be later than Visit To.'); mark('brvisit_from',true); mark('brvisit_to',true); }
+
+  // Rule 5: Report Date must not be before Visit From
+  var r5 = rdt && visitFrom && rdt < visitFrom;
+  if(r5){ errors.push('Report Date must not be earlier than Visit From date.'); mark('rdt',true); mark('brvisit_from',true); }
+
+  // Rule 6: Report Date must not be before Visit To
+  var r6 = rdt && visitTo && rdt < visitTo;
+  if(r6){ errors.push('Report Date must not be earlier than Visit To date.'); mark('rdt',true); mark('brvisit_to',true); }
+
+  // Show consolidated error block
+  var errBox = document.getElementById('date-err-box');
+  if(!errBox){
+    errBox = document.createElement('div');
+    errBox.id = 'date-err-box';
+    errBox.style.cssText = 'margin-top:6px;padding:7px 10px;background:#fdecea;border:1px solid #f0a0a0;border-radius:4px;font-size:11px;color:#8b1a1a;line-height:1.7';
+    var visitDiv = document.getElementById('err_rdt');
+    if(visitDiv && visitDiv.parentNode) visitDiv.parentNode.insertBefore(errBox, visitDiv);
+  }
+  // Hide legacy individual error elements
+  ['err_per','err_per_rdt','err_rdt'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.style.display='none';
+  });
+
+  if(errors.length){
+    errBox.innerHTML = '&#9888; <strong>Date inconsistencies detected:</strong><ul style="margin:3px 0 0 14px;padding:0">'
+      + errors.map(function(e){ return '<li>'+e+'</li>'; }).join('') + '</ul>';
+    errBox.style.display = 'block';
+    return false;
+  } else {
+    errBox.style.display = 'none';
+    return true;
   }
 }
 
@@ -8918,6 +8959,12 @@ function updateGenBtn(){
 }
 
 function confirmAndGenerate(){
+  // Block generation if dates are inconsistent
+  if(!validateDates()){
+    alert('Please fix the date inconsistencies in Branch & Report Information before generating the report.\n\nSee the red fields and error messages for details.');
+    return;
+  }
+
   var ids = Object.keys(window.pendingSel);
   if(!ids.length){
     flushObsEditsToDb();
