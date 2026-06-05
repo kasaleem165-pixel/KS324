@@ -7998,6 +7998,8 @@ var sensitivityMap = {}; // {obsId: 'High'|'M to H'|'L to M'|'Low'}
 var avMap    = {};   // {obsId: manual audit view text}
 var actMap   = {};   // {obsId: action taken text}
 var respMap  = {};   // {obsId: auditee response text}
+var respBHMap= {};   // {obsId: Branch Head response}
+var respROMap= {};   // {obsId: RO/HO response}
 var assessMap= {};   // {obsId: 'agreed'|'resolved'|'partial'|'notresolved'}
 var refMap   = {};   // {obsId: referral note text, '' means no referral}
 var obsEdits = {};   // {obsId: {observation, recommendation}} — auditor edits to obs text
@@ -8604,6 +8606,8 @@ function captureSession() {
     avMap    : avMap,
     actMap   : actMap,
     respMap  : respMap,
+    respBHMap: respBHMap,
+    respROMap: respROMap,
     assessMap: assessMap,
     sensitivityMap: sensitivityMap,
     obsEdits : obsEdits,
@@ -8637,6 +8641,8 @@ function restoreSession(sess) {
   avMap     = sess.avMap     || {};
   actMap    = sess.actMap    || {};
   respMap   = sess.respMap   || {};
+  respBHMap = sess.respBHMap || {};
+  respROMap = sess.respROMap || {};
   assessMap      = sess.assessMap      || {};
   sensitivityMap = sess.sensitivityMap || {};
   obsEdits       = sess.obsEdits       || {};
@@ -9167,10 +9173,22 @@ function renderRpt(){
       h+='<textarea class="oedit" id="re-'+o.id+'" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].recommendation=this.value">'+esc(recText)+'</textarea>';
       // 3. Annexure Data (if set)
       if(ax) h+='<div class="oax"><strong>Annexure Data:</strong> '+esc(ax)+'</div>';
-      // 4. Auditee Response — only show after response is loaded/uploaded
+      // 4. Auditee Response — only show after response is loaded/uploaded; split by BH / RO/HO
       if(responseLoaded){
-        h+='<div class="osl">Auditee Response</div>';
-        h+='<textarea class="oresp" id="r-'+o.id+'" readonly style="background:#f0f4f8;color:#3a4a5c;cursor:default;border-color:#b0c0d8" title="Auditee response is locked after loading">'+esc(avVal==='none'?'':resp)+'</textarea>';
+        var bhResp=respBHMap[o.id]!=null?respBHMap[o.id]:null;
+        var roResp=respROMap[o.id]!=null?respROMap[o.id]:null;
+        if(bhResp!==null){
+          h+='<div class="osl">Auditee Response &ndash; BH</div>';
+          h+='<textarea class="oresp" readonly style="background:#f0f4f8;color:#3a4a5c;cursor:default;border-color:#b0c0d8" title="Branch Head response — locked">'+esc(bhResp)+'</textarea>';
+        }
+        if(roResp!==null){
+          h+='<div class="osl" style="color:#5b3fa0">Auditee Response &ndash; RO/HO</div>';
+          h+='<textarea class="oresp" readonly style="background:#f8f5ff;color:#3a2a70;cursor:default;border-color:#c0a8e8" title="RO/HO response — locked">'+esc(roResp)+'</textarea>';
+        }
+        if(bhResp===null&&roResp===null&&resp){
+          h+='<div class="osl">Auditee Response</div>';
+          h+='<textarea class="oresp" id="r-'+o.id+'" readonly style="background:#f0f4f8;color:#3a4a5c;cursor:default;border-color:#b0c0d8" title="Auditee response is locked after loading">'+esc(resp)+'</textarea>';
+        }
       }
       // 5 & 6: Assessment-driven (after response load) or original mode
       if(responseLoaded){
@@ -9430,7 +9448,7 @@ function doCopy(){
 
 function doClear(){
   if(!confirm('Clear all selections?'))return;
-  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; avMap={}; actMap={}; respMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
   for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
   responseLoaded=false;
   renderAnnexList();
@@ -9446,7 +9464,7 @@ function doClear(){
 
 function doNewReport(){
   if(!confirm('Start a new blank report? All current data will be cleared.'))return;
-  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; avMap={}; actMap={}; respMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
   responseLoaded=false;
   // Clear all header/form fields
   var fields=['brcode','brname','brregion','brcity','brhead','braddress','brautype','rno','pb','rdt','rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk'];
@@ -10604,7 +10622,68 @@ function loadAuditeeFile(evt){
       return;
     }
 
-    // Restore Branch & Report Information fields from embedded meta
+    // Ask user whether this response is BH, RO/HO, or both
+    window._pendingRespLoad = { loadedObs: loadedObs, parsedResp: {} };
+    for(var px=0;px<loadedObs.length;px++) window._pendingRespLoad.parsedResp[loadedObs[px]]=respMap[loadedObs[px]]||'';
+    showRespTypeModal(doc, loadedObs);
+    return; // rest of logic handled in applyRespLoad()
+
+    // Meta restore and finalisation handled in applyRespLoad after type selection
+    window._pendingRespDoc = doc;
+  };
+  reader.readAsText(file);
+}
+
+function showRespTypeModal(doc, loadedObs){
+  var existing=document.getElementById('respTypeModal');
+  if(existing) existing.parentNode.removeChild(existing);
+  var el=document.createElement('div');
+  el.id='respTypeModal';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center';
+  el.innerHTML=
+    '<div style="background:#fff;border-radius:8px;padding:28px 32px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25);font-family:Inter,sans-serif">'+
+    '<div style="font-size:15px;font-weight:700;color:#1a3a5c;margin-bottom:8px">&#128193; Classify Auditee Response</div>'+
+    '<div style="font-size:12.5px;color:#4a6080;margin-bottom:20px;line-height:1.6">Select which heading this response file should appear under in the report. You may choose one or both.</div>'+
+    '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:22px">'+
+    '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 14px;border:2px solid #c8d8ec;border-radius:6px;font-size:13px;font-weight:600;color:#1a3a5c;background:#f5f8fc">'+
+    '<input type="checkbox" id="rtype-bh" style="width:16px;height:16px;accent-color:#1a3a5c"> Auditee Response – Branch Head (BH)</label>'+
+    '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 14px;border:2px solid #c8d8ec;border-radius:6px;font-size:13px;font-weight:600;color:#5b3fa0;background:#f8f5ff">'+
+    '<input type="checkbox" id="rtype-ro" style="width:16px;height:16px;accent-color:#5b3fa0"> Auditee Response – RO / HO</label>'+
+    '</div>'+
+    '<div style="display:flex;gap:10px;justify-content:flex-end">'+
+    '<button onclick="closeRespTypeModal()" style="padding:8px 18px;border:1px solid #c8d8ec;border-radius:5px;background:#f0f4f8;font-family:Inter,sans-serif;font-size:13px;cursor:pointer;color:#4a6080">Cancel</button>'+
+    '<button onclick="applyRespLoad()" style="padding:8px 20px;border:none;border-radius:5px;background:#1a3a5c;color:#fff;font-family:Inter,sans-serif;font-size:13px;font-weight:700;cursor:pointer">Apply</button>'+
+    '</div></div>';
+  document.body.appendChild(el);
+}
+
+function closeRespTypeModal(){
+  var m=document.getElementById('respTypeModal');
+  if(m) m.parentNode.removeChild(m);
+}
+
+function applyRespLoad(){
+  var isBH=document.getElementById('rtype-bh').checked;
+  var isRO=document.getElementById('rtype-ro').checked;
+  if(!isBH&&!isRO){alert('Please select at least one response type.');return;}
+  closeRespTypeModal();
+
+  var pending=window._pendingRespLoad||{};
+  var loadedObs=pending.loadedObs||[];
+  var parsed=pending.parsedResp||{};
+  var doc=window._pendingRespDoc;
+
+  for(var i=0;i<loadedObs.length;i++){
+    var id=loadedObs[i];
+    var val=parsed[id]||'';
+    if(isBH) respBHMap[id]=val;
+    if(isRO) respROMap[id]=val;
+    // keep respMap populated so existing code that reads it still works
+    respMap[id]=val;
+  }
+
+  // Restore Branch & Report Information fields from embedded meta
+  if(doc){
     var metaEl=doc.getElementById('report-meta');
     if(metaEl){
       try{
@@ -10617,28 +10696,22 @@ function loadAuditeeFile(evt){
         setVal('rper_from',m.rper_from); setVal('rper_to',m.rper_to);
         setVal('brvisit_from',m.brvisit_from); setVal('brvisit_to',m.brvisit_to);
         setVal('brprev',m.brprev);
-        // Prepared By: set select if option exists, else add it
         var spb=document.getElementById('spb');
         if(spb&&m.pb){
           var found=false;
           for(var p=0;p<spb.options.length;p++){if(spb.options[p].value===m.pb){spb.value=m.pb;found=true;break;}}
           if(!found){var opt=document.createElement('option');opt.value=m.pb;opt.textContent=m.pb;spb.appendChild(opt);spb.value=m.pb;}
         }
-        // Restore annexures
-        if(m.annexures&&m.annexures.length){
-          annexures=m.annexures;
-          renderAnnexList();
-        }
+        if(m.annexures&&m.annexures.length){annexures=m.annexures;renderAnnexList();}
       }catch(ex){}
     }
-    // Auto-select the observations that appeared in the returned file
-    responseLoaded = true;
-    for(var j=0;j<loadedObs.length;j++) selIds[loadedObs[j]]=true;
-    applyFilter();
-    renderRpt();
-    toast('Loaded '+loadedObs.length+' observation response(s) from auditee file.');
-  };
-  reader.readAsText(file);
+  }
+
+  responseLoaded=true;
+  for(var j=0;j<loadedObs.length;j++) selIds[loadedObs[j]]=true;
+  applyFilter();
+  renderRpt();
+  toast('Loaded '+loadedObs.length+' response(s) — '+(isBH&&isRO?'BH + RO/HO':isBH?'Branch Head':'RO/HO')+'.');
 }
 
 // ============================================================
@@ -10700,7 +10773,11 @@ function finalizeReport(){
     if(obsText) h+=sl('Observation')+st(obsText);
     if(recText) h+=sl('Recommendation')+st(recText);
     if(ax)               h+='<div style="display:flex;align-items:center;gap:7px;margin:8px 0;padding:7px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> '+esc(ax)+'</div>';
-    if(respStored)       h+=sl('Auditee Response')+st(respStored);
+    var bhFin=respBHMap[o.id]!=null?respBHMap[o.id]:null;
+    var roFin=respROMap[o.id]!=null?respROMap[o.id]:null;
+    if(bhFin!==null) h+=sl('Auditee Response – BH')+st(bhFin);
+    if(roFin!==null) h+='<div style="font-size:11.5px;font-weight:700;color:#5b3fa0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Auditee Response – RO/HO</div>'+'<div style="font-size:13px;line-height:1.6;color:#3a2a70;margin-bottom:10px;white-space:pre-wrap;background:#f8f5ff;padding:6px 10px;border-radius:4px;border-left:3px solid #9b6fd0">'+esc(roFin)+'</div>';
+    if(bhFin===null&&roFin===null&&respStored) h+=sl('Auditee Response')+st(respStored);
     if(responseLoaded&&aStatus){
       h+='<div style="margin:8px 0;padding:6px 10px;background:#eef4ff;border:1px solid #4a7fc1;border-radius:4px;font-size:11px;font-weight:700;color:#1a3a5c">Auditor Assessment: '+(aStatus==='agreed'?'Agreed by Auditee':aStatus==='resolved'?'Resolved':aStatus==='partial'?'Partially Resolved':'Not Resolved')+'</div>';
       if(aStatus==='agreed') h+='<div style="padding:8px 12px;background:#e6f7e6;border-left:3px solid #3a8a3a;border-radius:0 4px 4px 0;font-size:12px;color:#2a5a2a;font-weight:600;margin-bottom:6px">&#10003; Accepted by Auditee</div>';
