@@ -9602,14 +9602,18 @@ function doClear(){
   selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
   for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
   responseLoaded=false;
-  _brInfoHasData=false; _brInfoUnlocked=true;
+  _brInfoHasData=false;
+  _brInfoUnlocked=true;
+  setBrInfoDisabled(false);
+  var ov=document.getElementById('brinfo-lock-overlay');
+  var badge=document.getElementById('brinfo-lockbadge');
+  if(ov) ov.style.display='none';
+  if(badge) badge.style.display='none';
   renderAnnexList();
   document.getElementById('qinp').value='';
   document.getElementById('scat').value='All Categories';
   document.getElementById('rpcont').style.display='none';
   document.getElementById('rpempty').style.display='block';
-  document.getElementById('qinp').value='';
-  lockBrInfo();
   showPrompt();
   toast('Cleared.');
 }
@@ -9618,7 +9622,8 @@ function doNewReport(){
   if(!confirm('Start a new blank report? All current data will be cleared.'))return;
   selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
   responseLoaded=false;
-  _brInfoHasData=false; _brInfoUnlocked=true;
+  _brInfoHasData=false;
+  _brInfoUnlocked=false; // force unlock path to run
   // Clear all header/form fields
   var fields=['brcode','brname','brregion','brcity','brhead','braddress','brautype','rno','pb','rdt','rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk'];
   for(var fi=0;fi<fields.length;fi++){var el=document.getElementById(fields[fi]);if(el)el.value='';}
@@ -9628,9 +9633,15 @@ function doNewReport(){
   document.getElementById('scat').value='All Categories';
   document.getElementById('rpcont').style.display='none';
   document.getElementById('rpempty').style.display='block';
-  unlockBrInfo();
+  // Directly enable fields without a confirm prompt
+  _brInfoUnlocked=true;
+  setBrInfoDisabled(false);
+  var ov=document.getElementById('brinfo-lock-overlay');
+  var badge=document.getElementById('brinfo-lockbadge');
+  if(ov) ov.style.display='none';
+  if(badge) badge.style.display='none';
   showPrompt();
-  toast('New report started.');
+  toast('New report started — please fill in branch information.');
 }
 
 // ============================================================
