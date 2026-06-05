@@ -227,6 +227,12 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 .sens-sel.s-mh{background:#fff0e0;color:#b04400;border-color:#f0b070}
 .sens-sel.s-lm{background:#fffbe0;color:#806000;border-color:#e0c030}
 .sens-sel.s-low{background:#e8f8e8;color:#1a6020;border-color:#80c880}
+.coso-sel{padding:2px 7px;font-size:11px;font-weight:700;border-radius:4px;border:1px solid #b8c8e0;cursor:pointer;font-family:inherit;background:#fff;color:#1a3a5c;outline:none;margin-left:4px}
+.coso-sel.c-ce{background:#e8f0ff;color:#1a3080;border-color:#90a8e8}
+.coso-sel.c-ra{background:#fff0e8;color:#803010;border-color:#e8a880}
+.coso-sel.c-ca{background:#e8f8e8;color:#1a6020;border-color:#80c880}
+.coso-sel.c-ic{background:#f8e8ff;color:#5a1a80;border-color:#c880e8}
+.coso-sel.c-m{background:#e8f8f8;color:#0a5060;border-color:#60c0c8}
 .oax strong{font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px}
 
 /* ANNEXURES */
@@ -7995,6 +8001,7 @@ var selIds   = {};   // {obsId: true}
 var annexMap = {};   // {obsId: "text"}
 var obsTypeMap = {}; // {obsId: 'New'|'Repeated'} — per-report type override
 var sensitivityMap = {}; // {obsId: 'High'|'M to H'|'L to M'|'Low'}
+var cosoMap        = {}; // {obsId: 'CE'|'RA'|'CA'|'IC'|'M'}
 var avMap    = {};   // {obsId: manual audit view text}
 var actMap   = {};   // {obsId: action taken text}
 var respMap  = {};   // {obsId: auditee response text}
@@ -8391,8 +8398,13 @@ function validateDates() {
 function setSensitivity(id, sel){
   var val = sel.value;
   if(val) sensitivityMap[id]=val; else delete sensitivityMap[id];
-  // Update dropdown colour class
   sel.className = 'sens-sel'+(val==='High'?' s-high':val==='M to H'?' s-mh':val==='L to M'?' s-lm':val==='Low'?' s-low':'');
+}
+
+function setCoso(id, sel){
+  var val = sel.value;
+  if(val) cosoMap[id]=val; else delete cosoMap[id];
+  sel.className = 'coso-sel'+(val==='CE'?' c-ce':val==='RA'?' c-ra':val==='CA'?' c-ca':val==='IC'?' c-ic':val==='M'?' c-m':'');
 }
 
 function findDbAssessText(id, type){
@@ -8610,6 +8622,7 @@ function captureSession() {
     respROMap: respROMap,
     assessMap: assessMap,
     sensitivityMap: sensitivityMap,
+    cosoMap  : cosoMap,
     obsEdits : obsEdits,
     refMap   : refMap,
     customs  : customs,
@@ -8645,6 +8658,7 @@ function restoreSession(sess) {
   respROMap = sess.respROMap || {};
   assessMap      = sess.assessMap      || {};
   sensitivityMap = sess.sensitivityMap || {};
+  cosoMap        = sess.cosoMap        || {};
   obsEdits       = sess.obsEdits       || {};
   refMap         = sess.refMap         || {};
   // Restore responseLoaded — also infer it if assessMap or respMap has entries
@@ -9145,6 +9159,8 @@ function renderRpt(){
       var resp=respMap[o.id]!=null?respMap[o.id]:'';
       var curSens=sensitivityMap[o.id]||'';
       var sensClass=curSens==='High'?'s-high':curSens==='M to H'?'s-mh':curSens==='L to M'?'s-lm':curSens==='Low'?'s-low':'';
+      var curCoso=cosoMap[o.id]||'';
+      var cosoClass=curCoso==='CE'?'c-ce':curCoso==='RA'?'c-ra':curCoso==='CA'?'c-ca':curCoso==='IC'?'c-ic':curCoso==='M'?'c-m':'';
       h+='<div class="oc '+tc+'" id="oc-'+o.id+'">';
       h+='<div class="och"><span class="onum">Obs. '+num+'</span>';
       h+='<span class="otl">'+esc(o.title)+' <span class="badge '+tc+'">'+esc(effType)+'</span></span>';
@@ -9154,6 +9170,14 @@ function renderRpt(){
       h+='<option value="M to H"'+(curSens==='M to H'?' selected':'')+'>M to H</option>';
       h+='<option value="L to M"'+(curSens==='L to M'?' selected':'')+'>L to M</option>';
       h+='<option value="Low"'+(curSens==='Low'?' selected':'')+'>Low</option>';
+      h+='</select>';
+      h+='<select class="coso-sel '+cosoClass+'" title="COSO Component" onchange="setCoso(\''+o.id+'\',this)">';
+      h+='<option value="">COSO</option>';
+      h+='<option value="CE"'+(curCoso==='CE'?' selected':'')+'>CE</option>';
+      h+='<option value="RA"'+(curCoso==='RA'?' selected':'')+'>RA</option>';
+      h+='<option value="CA"'+(curCoso==='CA'?' selected':'')+'>CA</option>';
+      h+='<option value="IC"'+(curCoso==='IC'?' selected':'')+'>IC</option>';
+      h+='<option value="M"'+(curCoso==='M'?' selected':'')+'>M</option>';
       h+='</select>';
       h+='<input type="checkbox" class="ocb-chk" id="ocbx-'+o.id+'" title="Select for removal" onchange="toggleRptSel(\''+o.id+'\',this.checked)">';
       h+='<button class="odl" title="Remove this observation" onclick="remObs(\''+o.id+'\')">&#10005;</button></div>';
@@ -9448,7 +9472,7 @@ function doCopy(){
 
 function doClear(){
   if(!confirm('Clear all selections?'))return;
-  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
   for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
   responseLoaded=false;
   renderAnnexList();
@@ -9464,7 +9488,7 @@ function doClear(){
 
 function doNewReport(){
   if(!confirm('Start a new blank report? All current data will be cleared.'))return;
-  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
   responseLoaded=false;
   // Clear all header/form fields
   var fields=['brcode','brname','brregion','brcity','brhead','braddress','brautype','rno','pb','rdt','rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk'];
@@ -10769,6 +10793,8 @@ function finalizeReport(){
     h+='<span style="padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;'+(tc==='repeated'?'background:#fff0e6;color:#b04800;border:1px solid #f0b080':'background:#e6f0ff;color:#1050a0;border:1px solid #90b8e8')+'">'+esc(effType)+'</span>';
     var finSens=sensitivityMap[o.id]||'';
     if(finSens){var sc=finSens==='High'?'background:#fde8e8;color:#9b1a1a;border-color:#f0a0a0':finSens==='M to H'?'background:#fff0e0;color:#b04400;border-color:#f0b070':finSens==='L to M'?'background:#fffbe0;color:#806000;border-color:#e0c030':'background:#e8f8e8;color:#1a6020;border-color:#80c880';h+='<span style="padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;border:1px solid;'+sc+'">'+esc(finSens)+'</span>';}
+    var finCoso=cosoMap[o.id]||'';
+    if(finCoso){var cc=finCoso==='CE'?'background:#e8f0ff;color:#1a3080;border-color:#90a8e8':finCoso==='RA'?'background:#fff0e8;color:#803010;border-color:#e8a880':finCoso==='CA'?'background:#e8f8e8;color:#1a6020;border-color:#80c880':finCoso==='IC'?'background:#f8e8ff;color:#5a1a80;border-color:#c880e8':'background:#e8f8f8;color:#0a5060;border-color:#60c0c8';h+='<span style="padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;border:1px solid;'+cc+';margin-left:3px">COSO: '+esc(finCoso)+'</span>';}
     h+='</div><div style="padding:11px 13px">';
     if(obsText) h+=sl('Observation')+st(obsText);
     if(recText) h+=sl('Recommendation')+st(recText);
