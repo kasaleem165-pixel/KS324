@@ -233,6 +233,23 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 .coso-sel.c-ca{background:#e8f8e8;color:#1a6020;border-color:#80c880}
 .coso-sel.c-ic{background:#f8e8ff;color:#5a1a80;border-color:#c880e8}
 .coso-sel.c-m{background:#e8f8f8;color:#0a5060;border-color:#60c0c8}
+.intro-ta{width:100%;resize:vertical;font-size:11.5px;padding:5px 7px;border:1px solid #c8d8ec;border-radius:4px;font-family:Inter,sans-serif;line-height:1.5;box-sizing:border-box;transition:border-color .2s}
+.intro-ta.has-placeholder{border-color:#e07800;background:#fffbf0}
+.intro-expand-btn{font-size:10px;font-weight:600;padding:2px 8px;border:1px solid #c8d8ec;border-radius:4px;background:#f0f5fb;color:#1a3a5c;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap}
+.intro-expand-btn:hover{background:#dde8f5}
+.intro-placeholder-warn{font-size:10.5px;color:#b04400;background:#fff3e0;border:1px solid #f0c070;border-radius:4px;padding:4px 8px;margin-bottom:4px;font-weight:600}
+/* Expand modal */
+#introExpandModal{position:fixed;inset:0;background:rgba(10,20,40,.7);z-index:9998;display:flex;align-items:stretch;justify-content:center;padding:20px;box-sizing:border-box}
+#introExpandBox{display:flex;flex-direction:column;background:#fff;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:900px;overflow:hidden}
+#introExpandHeader{display:flex;align-items:center;padding:12px 18px;background:#1a3a5c;color:#fff;gap:10px}
+#introExpandTitle{flex:1;font-size:14px;font-weight:700;font-family:Inter,sans-serif}
+#introExpandClose{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);color:#fff;padding:5px 14px;border-radius:4px;font-family:Inter,sans-serif;font-size:12px;font-weight:600;cursor:pointer}
+#introExpandClose:hover{background:rgba(255,255,255,.3)}
+#introExpandWarn{display:none;font-size:11px;color:#b04400;background:#fff3e0;border-bottom:1px solid #f0c070;padding:7px 18px;font-weight:600}
+#introExpandTa{flex:1;resize:none;font-size:13px;line-height:1.7;font-family:Inter,sans-serif;padding:16px 20px;border:none;outline:none;color:#1e2d40;background:#fafcff}
+#introExpandFooter{padding:10px 18px;background:#f0f4f8;border-top:1px solid #dde6f0;display:flex;align-items:center;gap:10px;font-size:11px;color:#6a8090}
+#introExpandSave{margin-left:auto;background:#1a3a5c;color:#fff;border:none;border-radius:5px;padding:7px 20px;font-family:Inter,sans-serif;font-size:13px;font-weight:700;cursor:pointer}
+#introExpandSave:hover{background:#2a5080}
 .oax strong{font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px}
 
 /* ANNEXURES */
@@ -7836,20 +7853,36 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
     <div style="font-size:10px;color:var(--gtxt);margin-bottom:8px">Click <strong>Fill from Databank</strong> to populate with standard BHS audit language — branch name and dates are substituted automatically. Then click <strong>Generate</strong> to apply to report. Leave blank to omit.</div>
 
     <div class="fr" style="margin-bottom:6px">
-      <label style="font-weight:700;color:var(--navy);font-size:11.5px">1. Introduction &amp; Background</label>
-      <textarea id="rpt_intro" rows="4" style="width:100%;resize:vertical;font-size:11.5px;padding:5px 7px;border:1px solid #c8d8ec;border-radius:4px;font-family:Inter,sans-serif;line-height:1.5" placeholder="Background and context of this audit…"></textarea>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+        <label style="font-weight:700;color:var(--navy);font-size:11.5px">1. Introduction &amp; Background</label>
+        <button class="intro-expand-btn" onclick="expandIntro('rpt_intro','1. Introduction &amp; Background')">&#11021; Expand</button>
+      </div>
+      <div class="intro-placeholder-warn" id="warn-rpt_intro" style="display:none">&#9888; Highlighted items need your attention — update the bracketed text below.</div>
+      <textarea id="rpt_intro" rows="4" class="intro-ta" oninput="checkIntroPlaceholders('rpt_intro')" placeholder="Background and context of this audit…"></textarea>
     </div>
     <div class="fr" style="margin-bottom:6px">
-      <label style="font-weight:700;color:var(--navy);font-size:11.5px">2. Objectives &amp; Scope</label>
-      <textarea id="rpt_scope" rows="4" style="width:100%;resize:vertical;font-size:11.5px;padding:5px 7px;border:1px solid #c8d8ec;border-radius:4px;font-family:Inter,sans-serif;line-height:1.5" placeholder="Audit objectives and scope…"></textarea>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+        <label style="font-weight:700;color:var(--navy);font-size:11.5px">2. Objectives &amp; Scope</label>
+        <button class="intro-expand-btn" onclick="expandIntro('rpt_scope','2. Objectives &amp; Scope')">&#11021; Expand</button>
+      </div>
+      <div class="intro-placeholder-warn" id="warn-rpt_scope" style="display:none">&#9888; Highlighted items need your attention — update the bracketed text below.</div>
+      <textarea id="rpt_scope" rows="4" class="intro-ta" oninput="checkIntroPlaceholders('rpt_scope')" placeholder="Audit objectives and scope…"></textarea>
     </div>
     <div class="fr" style="margin-bottom:6px">
-      <label style="font-weight:700;color:var(--navy);font-size:11.5px">3. Audit Methodology</label>
-      <textarea id="rpt_methodology" rows="4" style="width:100%;resize:vertical;font-size:11.5px;padding:5px 7px;border:1px solid #c8d8ec;border-radius:4px;font-family:Inter,sans-serif;line-height:1.5" placeholder="Approach and methodology used…"></textarea>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+        <label style="font-weight:700;color:var(--navy);font-size:11.5px">3. Audit Methodology</label>
+        <button class="intro-expand-btn" onclick="expandIntro('rpt_methodology','3. Audit Methodology')">&#11021; Expand</button>
+      </div>
+      <div class="intro-placeholder-warn" id="warn-rpt_methodology" style="display:none">&#9888; Highlighted items need your attention — update the bracketed text below.</div>
+      <textarea id="rpt_methodology" rows="4" class="intro-ta" oninput="checkIntroPlaceholders('rpt_methodology')" placeholder="Approach and methodology used…"></textarea>
     </div>
     <div class="fr" style="margin-bottom:6px">
-      <label style="font-weight:700;color:var(--navy);font-size:11.5px">4. Explanation of Terms &amp; Abbreviations</label>
-      <textarea id="rpt_terms" rows="4" style="width:100%;resize:vertical;font-size:11.5px;padding:5px 7px;border:1px solid #c8d8ec;border-radius:4px;font-family:Inter,sans-serif;line-height:1.5" placeholder="Key terms and abbreviations used in this report…"></textarea>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+        <label style="font-weight:700;color:var(--navy);font-size:11.5px">4. Explanation of Terms &amp; Abbreviations</label>
+        <button class="intro-expand-btn" onclick="expandIntro('rpt_terms','4. Explanation of Terms &amp; Abbreviations')">&#11021; Expand</button>
+      </div>
+      <div class="intro-placeholder-warn" id="warn-rpt_terms" style="display:none">&#9888; Highlighted items need your attention — update the bracketed text below.</div>
+      <textarea id="rpt_terms" rows="4" class="intro-ta" oninput="checkIntroPlaceholders('rpt_terms')" placeholder="Key terms and abbreviations used in this report…"></textarea>
     </div>
   </div>
 
@@ -8673,6 +8706,7 @@ function restoreSession(sess) {
   window.pendingSel = {};
   updateGenBtn();
   validateDates();
+  checkAllIntroPlaceholders();
   updateStageBadge();
   lockBrInfo();
   renderRpt();
@@ -9015,6 +9049,7 @@ function autoFillIntroSections(){
     var el=document.getElementById(INTRO_SECTION_IDS[i]);
     if(el) el.value = map[INTRO_SECTION_IDS[i]] || '';
   }
+  checkAllIntroPlaceholders();
   renderRpt();
   toast('Introduction sections filled from databank. Edit as needed.');
 }
@@ -9027,6 +9062,73 @@ function getIntroSectionVals(){
   }
   return out;
 }
+
+// ---- Intro placeholder highlight ----
+function checkIntroPlaceholders(id){
+  var ta=document.getElementById(id);
+  var warn=document.getElementById('warn-'+id);
+  if(!ta) return;
+  var hasPh=/\[[^\]]+\]/.test(ta.value);
+  ta.className='intro-ta'+(hasPh?' has-placeholder':'');
+  if(warn) warn.style.display=hasPh?'block':'none';
+}
+function checkAllIntroPlaceholders(){
+  for(var i=0;i<INTRO_SECTION_IDS.length;i++) checkIntroPlaceholders(INTRO_SECTION_IDS[i]);
+}
+
+// ---- Intro expand modal ----
+var _expandId='';
+function expandIntro(id, label){
+  _expandId=id;
+  var ta=document.getElementById(id);
+  var val=ta?ta.value:'';
+  var hasPh=/\[[^\]]+\]/.test(val);
+
+  var existing=document.getElementById('introExpandModal');
+  if(existing) existing.parentNode.removeChild(existing);
+
+  var el=document.createElement('div');
+  el.id='introExpandModal';
+  el.innerHTML=
+    '<div id="introExpandBox">'+
+    '<div id="introExpandHeader">'+
+    '<span id="introExpandTitle">'+label+'</span>'+
+    '<button id="introExpandClose" onclick="closeExpandIntro(false)">&#10005; Close without saving</button>'+
+    '</div>'+
+    '<div id="introExpandWarn" style="display:'+(hasPh?'block':'none')+'">'+
+    '&#9888; Items in [ ] brackets need to be replaced with actual values before finalizing.'+
+    '</div>'+
+    '<textarea id="introExpandTa" spellcheck="true" oninput="syncExpandWarn()">'+escAttr(val)+'</textarea>'+
+    '<div id="introExpandFooter">'+
+    '<span>Edit freely — click <strong>Save &amp; Close</strong> when done.</span>'+
+    '<button id="introExpandSave" onclick="closeExpandIntro(true)">&#10003; Save &amp; Close</button>'+
+    '</div></div>';
+  document.body.appendChild(el);
+  // focus and move cursor to end
+  var eta=document.getElementById('introExpandTa');
+  if(eta){eta.focus();eta.setSelectionRange(eta.value.length,eta.value.length);}
+}
+function escAttr(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function syncExpandWarn(){
+  var eta=document.getElementById('introExpandTa');
+  var warn=document.getElementById('introExpandWarn');
+  if(!eta||!warn) return;
+  warn.style.display=/\[[^\]]+\]/.test(eta.value)?'block':'none';
+}
+function closeExpandIntro(save){
+  var el=document.getElementById('introExpandModal');
+  if(save){
+    var eta=document.getElementById('introExpandTa');
+    var ta=document.getElementById(_expandId);
+    if(eta&&ta){ ta.value=eta.value; checkIntroPlaceholders(_expandId); }
+  }
+  if(el) el.parentNode.removeChild(el);
+}
+// Close on backdrop click
+document.addEventListener('click',function(e){
+  var m=document.getElementById('introExpandModal');
+  if(m&&e.target===m) closeExpandIntro(false);
+});
 
 function buildIntroHtml(vals, forPrint){
   var navy = '#1a3a5c';
