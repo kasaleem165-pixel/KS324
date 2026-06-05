@@ -7651,9 +7651,9 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
   <div class="sec" style="position:relative">
     <div class="sh" style="display:flex;align-items:center;justify-content:space-between">
       <span>Branch &amp; Report Information</span>
-      <span id="brinfo-lockbadge" style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;background:#fff3cd;color:#856404;border:1px solid #ffc107;cursor:pointer" onclick="unlockBrInfo()" title="Click to unlock for editing">&#128274; Locked</span>
+      <span id="brinfo-lockbadge" style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;background:#fff3cd;color:#856404;border:1px solid #ffc107;cursor:pointer;display:none" onclick="unlockBrInfo()" title="Click to unlock for editing">&#128274; Locked</span>
     </div>
-    <div id="brinfo-lock-overlay" onclick="unlockBrInfo()" style="position:absolute;top:36px;left:0;right:0;bottom:0;z-index:50;cursor:pointer;background:rgba(255,255,255,0.55);display:flex;align-items:center;justify-content:center;border-radius:0 0 6px 6px">
+    <div id="brinfo-lock-overlay" onclick="unlockBrInfo()" style="position:absolute;top:36px;left:0;right:0;bottom:0;z-index:50;cursor:pointer;background:rgba(255,255,255,0.55);display:none;align-items:center;justify-content:center;border-radius:0 0 6px 6px">
       <div style="background:#fff;border:2px solid #ffc107;border-radius:8px;padding:12px 20px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.12)">
         <div style="font-size:15px;margin-bottom:4px">&#128274;</div>
         <div style="font-size:12px;font-weight:700;color:#856404">Click to edit Branch &amp; Report Information</div>
@@ -8082,12 +8082,14 @@ window.onload = function() {
     var latest=sessions[0];
     var hasWork=latest.selCount>0||(latest.formData&&latest.formData.brname);
     if(hasWork){
+      _brInfoHasData = true;
       restoreSession(latest);
       toast('Session restored: Version '+latest.ver+' ('+fmtTs(latest.ts)+')');
     }
   }
   updateStageBadge();
-  lockBrInfo();
+  // Only lock if restoring existing data — leave free for fresh start
+  if(_brInfoHasData) lockBrInfo();
   showPrompt(); // show prompt until user searches
 };
 
@@ -8708,6 +8710,7 @@ function restoreSession(sess) {
   validateDates();
   checkAllIntroPlaceholders();
   updateStageBadge();
+  _brInfoHasData = true;
   lockBrInfo();
   renderRpt();
 }
@@ -8736,6 +8739,7 @@ function saveVersion() {
 
   // Update autosave indicator and re-lock branch info
   updateAutoSaveLabel();
+  _brInfoHasData = true;
   lockBrInfo();
   return {ver: sess.ver, deleted: deleted};
 }
@@ -9577,6 +9581,7 @@ function doClear(){
   selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
   for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
   responseLoaded=false;
+  _brInfoHasData=false; _brInfoUnlocked=true;
   renderAnnexList();
   document.getElementById('qinp').value='';
   document.getElementById('scat').value='All Categories';
@@ -9592,6 +9597,7 @@ function doNewReport(){
   if(!confirm('Start a new blank report? All current data will be cleared.'))return;
   selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
   responseLoaded=false;
+  _brInfoHasData=false; _brInfoUnlocked=true;
   // Clear all header/form fields
   var fields=['brcode','brname','brregion','brcity','brhead','braddress','brautype','rno','pb','rdt','rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk'];
   for(var fi=0;fi<fields.length;fi++){var el=document.getElementById(fields[fi]);if(el)el.value='';}
@@ -11164,7 +11170,8 @@ function loadReportFile(e){
 // ============================================================
 // BRANCH INFO LOCK
 // ============================================================
-var _brInfoUnlocked = false;
+var _brInfoUnlocked = true;  // start unlocked — locked only after save/load
+var _brInfoHasData  = false; // becomes true once a session is saved or restored
 var BR_INFO_FIELDS = ['brcode','rno','rpt_stage','brname','brregion','brcity','brhead','braddress',
                       'brautype','rdt','rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk','spb'];
 
@@ -11179,6 +11186,8 @@ function setBrInfoDisabled(disabled){
 }
 
 function lockBrInfo(){
+  // Only lock if there is already saved/restored data worth protecting
+  if(!_brInfoHasData) return;
   _brInfoUnlocked = false;
   setBrInfoDisabled(true);
   var ov=document.getElementById('brinfo-lock-overlay');
@@ -11189,13 +11198,12 @@ function lockBrInfo(){
 
 function unlockBrInfo(){
   if(_brInfoUnlocked) return;
-  if(!confirm('You are about to edit Branch & Report Information.\n\nAny changes here will update the report header and all exports.\n\nClick OK to proceed with editing.')) return;
+  if(!confirm('Branch & Report Information is locked.\n\nEditing will update the report header and all exports.\n\nClick OK to unlock and proceed.')) return;
   _brInfoUnlocked = true;
   setBrInfoDisabled(false);
   var ov=document.getElementById('brinfo-lock-overlay');
   var badge=document.getElementById('brinfo-lockbadge');
   if(ov) ov.style.display='none';
-  // Badge hidden while unlocked — overlay being gone is sufficient indication
   if(badge) badge.style.display='none';
 }
 
