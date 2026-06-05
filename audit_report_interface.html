@@ -7760,27 +7760,6 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
   </div>
 
   <div class="sec">
-    <div class="sh">Report Options</div>
-    <div class="fr">
-      <label style="margin-bottom:5px">Audit View in Report</label>
-      <div style="display:flex;gap:14px;flex-wrap:wrap">
-        <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:500;cursor:pointer">
-          <input type="radio" name="avmode" id="av_auto" value="auto" checked onchange="renderRpt()">
-          From Data Bank
-        </label>
-        <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:500;cursor:pointer">
-          <input type="radio" name="avmode" id="av_manual" value="manual" onchange="renderRpt()">
-          Type Manually
-        </label>
-        <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:500;cursor:pointer">
-          <input type="radio" name="avmode" id="av_none" value="none" onchange="renderRpt()">
-          Hide
-        </label>
-      </div>
-    </div>
-  </div>
-
-  <div class="sec">
     <div class="sh">Filter Observations</div>
     <div class="fr"><label>Category</label>
       <select id="scat" onchange="applyFilter()"></select>
@@ -8682,8 +8661,7 @@ function captureSession() {
     var el=document.getElementById(fields[i]);
     if(el) formData[fields[i]]=el.value;
   }
-  var avEl=document.querySelector('input[name="avmode"]:checked');
-  formData.avmode = avEl ? avEl.value : 'auto';
+  formData.avmode = 'auto';
 
   return {
     ts       : new Date().toISOString(),
@@ -8719,10 +8697,7 @@ function restoreSession(sess) {
     var el=document.getElementById(fields[i]);
     if(el && fd[fields[i]]!=null) el.value=fd[fields[i]];
   }
-  if(fd.avmode){
-    var av=document.getElementById('av_'+fd.avmode);
-    if(av) av.checked=true;
-  }
+  // avmode no longer configurable — always 'auto'
   // Restore state maps
   selIds    = sess.selIds    || {};
   obsTypeMap= sess.obsTypeMap|| {};
@@ -9335,8 +9310,7 @@ function renderRpt(){
       h+='<input type="checkbox" class="ocb-chk" id="ocbx-'+o.id+'" title="Select for removal" onchange="toggleRptSel(\''+o.id+'\',this.checked)">';
       h+='<button class="odl" title="Remove this observation" onclick="remObs(\''+o.id+'\')">&#10005;</button></div>';
       h+='<div class="ocb">';
-      var avMode=document.querySelector('input[name="avmode"]:checked');
-      var avVal=avMode?avMode.value:'auto';
+      var avVal='auto';
       var avStored=avMap[o.id]||'';
       var actStored=actMap[o.id]||'';
 
