@@ -120,6 +120,57 @@
   }
   .remark-input:focus { outline: none; border-color: #a07020; box-shadow: 0 0 0 2px rgba(201,150,42,0.15); }
 
+  /* PROGRESS REPORT */
+  #report-tabs { display: flex; gap: 0; margin-bottom: 0; }
+  .report-tab {
+    padding: 8px 22px; font-size: 13px; font-weight: 600; cursor: pointer;
+    border: 1px solid #dde3ec; background: #f0f4f8; color: #5a7090;
+    border-bottom: none; border-radius: 6px 6px 0 0; margin-right: 4px;
+  }
+  .report-tab.active { background: #fff; color: #1a3a5c; border-bottom: 2px solid #fff; }
+  #report-panel {
+    background: #fff; border: 1px solid #dde3ec; border-radius: 0 8px 8px 8px;
+    padding: 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+
+  /* Summary Table */
+  #rpt-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #rpt-table th { background: #1a3a5c; color: #fff; padding: 9px 12px; text-align: center; font-size: 12px; font-weight: 700; }
+  #rpt-table th:first-child { text-align: left; }
+  #rpt-table td { padding: 8px 12px; border-bottom: 1px solid #edf1f5; text-align: center; }
+  #rpt-table td:first-child { text-align: left; font-weight: 600; color: #1a3a5c; }
+  #rpt-table tr:last-child td { font-weight: 700; background: #f0f4f8; color: #1a3a5c; border-top: 2px solid #1a3a5c; }
+  #rpt-table tr:nth-child(even):not(:last-child) { background: #f7f9fc; }
+  .td-clear { color: #276d40; font-weight: 700; }
+  .td-prog  { color: #a04000; }
+  .td-na    { color: #666; }
+  .td-pend  { color: #c0392b; }
+  .td-pct   { font-weight: 700; }
+  .pct-pill {
+    display: inline-block; padding: 2px 10px; border-radius: 12px;
+    font-size: 12px; font-weight: 700; min-width: 48px; text-align: center;
+  }
+  .pill-0   { background: #f8d7da; color: #a00; }
+  .pill-low { background: #ffe8cc; color: #804000; }
+  .pill-mid { background: #fff9c4; color: #806000; }
+  .pill-hi  { background: #d4edda; color: #1a6030; }
+  .pill-full{ background: #b8f0c8; color: #0a5020; }
+
+  /* Bar Chart */
+  #rpt-chart { display: none; }
+  .chart-row { display: flex; align-items: center; margin-bottom: 10px; gap: 10px; }
+  .chart-label { font-size: 11px; font-weight: 600; color: #1a3a5c; width: 180px; flex-shrink: 0; text-align: right; line-height: 1.3; }
+  .chart-bar-wrap { flex: 1; height: 26px; background: #edf1f5; border-radius: 4px; overflow: hidden; display: flex; }
+  .bar-seg { height: 26px; transition: width 0.4s; }
+  .bar-clear  { background: #3cb371; }
+  .bar-prog   { background: #f0a040; }
+  .bar-na     { background: #aaa; }
+  .bar-pend   { background: #e8edf3; }
+  .chart-pct  { font-size: 12px; font-weight: 700; color: #1a3a5c; width: 40px; flex-shrink: 0; }
+  .chart-legend { display: flex; gap: 18px; margin-bottom: 14px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #444; }
+  .legend-dot { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+
   /* PRINT */
   @media print {
     #topbar .controls { display: none; }
@@ -129,6 +180,8 @@
     .cat-section { page-break-inside: avoid; }
     body { background: #fff; }
     .main-wrap { padding: 8px; }
+    #rpt-chart { display: none !important; }
+    #rpt-table-wrap { display: block !important; }
   }
 
   @media (max-width: 700px) {
@@ -169,7 +222,40 @@
     </div>
   </div>
 
-  <div class="section-title">Category Details</div>
+  <div class="section-title">Progress Report</div>
+  <div id="report-tabs">
+    <div class="report-tab active" id="tab-table" onclick="showRptTab('table')">&#128203; Summary Table</div>
+    <div class="report-tab" id="tab-chart" onclick="showRptTab('chart')">&#128200; Bar Chart</div>
+  </div>
+  <div id="report-panel">
+    <div id="rpt-table-wrap">
+      <table id="rpt-table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Total</th>
+            <th>Checked &amp; Clear</th>
+            <th>In Progress</th>
+            <th>Not Applicable</th>
+            <th>Pending</th>
+            <th>% Done</th>
+          </tr>
+        </thead>
+        <tbody id="rpt-tbody"></tbody>
+      </table>
+    </div>
+    <div id="rpt-chart">
+      <div class="chart-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#3cb371"></div>Checked &amp; Clear</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f0a040"></div>In Progress</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#aaa"></div>Not Applicable</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#e8edf3;border:1px solid #ccc"></div>Pending</div>
+      </div>
+      <div id="chart-rows"></div>
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:24px">Category Details</div>
   <div id="cat-sections"></div>
 </div>
 
@@ -249,6 +335,7 @@ function statusClass(status) {
 function renderAll() {
   renderHeatMap();
   renderSummary();
+  renderReport();
   renderCategories();
 }
 
@@ -380,6 +467,7 @@ function setObs(id, field, val) {
   updateRowUI(id);
   renderHeatMap();
   renderSummary();
+  renderReport();
   updateCatHeader(id);
 }
 
@@ -445,6 +533,113 @@ function resetAll() {
   // keep branch
   saveState();
   renderAll();
+}
+
+// ===================== REPORT =====================
+var _rptTab = 'table';
+
+function showRptTab(tab) {
+  _rptTab = tab;
+  var tbl = document.getElementById('tab-table');
+  var cht = document.getElementById('tab-chart');
+  var tw  = document.getElementById('rpt-table-wrap');
+  var cw  = document.getElementById('rpt-chart');
+  if (tab === 'table') {
+    if(tbl) tbl.className = 'report-tab active';
+    if(cht) cht.className = 'report-tab';
+    if(tw)  tw.style.display = '';
+    if(cw)  cw.style.display = 'none';
+  } else {
+    if(tbl) tbl.className = 'report-tab';
+    if(cht) cht.className = 'report-tab active';
+    if(tw)  tw.style.display = 'none';
+    if(cw)  cw.style.display = '';
+  }
+}
+
+function getCatDetailStats(catName) {
+  var list = OBS_DATA.obs[catName] || [];
+  var total = list.length;
+  var clear = 0, inprog = 0, na = 0, pending = 0;
+  for (var i = 0; i < list.length; i++) {
+    var st = aws_state.obs[list[i].id];
+    var status = st ? st.status : 'Not Started';
+    if (status === 'Checked & Clear')  clear++;
+    else if (status === 'In Progress') inprog++;
+    else if (status === 'Not Applicable') na++;
+    else pending++;
+  }
+  var pct = total > 0 ? Math.round(clear / total * 100) : 0;
+  return { total: total, clear: clear, inprog: inprog, na: na, pending: pending, pct: pct };
+}
+
+function pillClass(pct) {
+  if (pct === 0)   return 'pill-0';
+  if (pct <= 33)   return 'pill-low';
+  if (pct <= 66)   return 'pill-mid';
+  if (pct <= 99)   return 'pill-hi';
+  return 'pill-full';
+}
+
+function renderReport() {
+  var tbody = document.getElementById('rpt-tbody');
+  var chartRows = document.getElementById('chart-rows');
+  if (!tbody || !chartRows) return;
+
+  var cats = OBS_DATA.cats;
+  var totTotal=0, totClear=0, totProg=0, totNA=0, totPend=0;
+  var tHtml = '';
+  var cHtml = '';
+
+  for (var i = 0; i < cats.length; i++) {
+    var cat = cats[i];
+    var s = getCatDetailStats(cat);
+    totTotal += s.total; totClear += s.clear; totProg += s.inprog;
+    totNA    += s.na;    totPend  += s.pending;
+
+    // Table row
+    tHtml += '<tr>';
+    tHtml += '<td>' + escH(cat) + '</td>';
+    tHtml += '<td>' + s.total + '</td>';
+    tHtml += '<td class="td-clear">' + s.clear + '</td>';
+    tHtml += '<td class="td-prog">'  + s.inprog + '</td>';
+    tHtml += '<td class="td-na">'    + s.na + '</td>';
+    tHtml += '<td class="td-pend">'  + s.pending + '</td>';
+    tHtml += '<td><span class="pct-pill ' + pillClass(s.pct) + '">' + s.pct + '%</span></td>';
+    tHtml += '</tr>';
+
+    // Chart row
+    var clearW  = s.total > 0 ? (s.clear  / s.total * 100).toFixed(1) : 0;
+    var progW   = s.total > 0 ? (s.inprog / s.total * 100).toFixed(1) : 0;
+    var naW     = s.total > 0 ? (s.na     / s.total * 100).toFixed(1) : 0;
+    var pendW   = s.total > 0 ? (s.pending/ s.total * 100).toFixed(1) : 0;
+    var shortName = cat.length > 26 ? cat.substring(0,24)+'...' : cat;
+    cHtml += '<div class="chart-row">';
+    cHtml += '<div class="chart-label" title="' + escH(cat) + '">' + escH(shortName) + '</div>';
+    cHtml += '<div class="chart-bar-wrap">';
+    cHtml += '<div class="bar-seg bar-clear" style="width:' + clearW + '%" title="Checked & Clear: ' + s.clear + '"></div>';
+    cHtml += '<div class="bar-seg bar-prog"  style="width:' + progW  + '%" title="In Progress: '    + s.inprog + '"></div>';
+    cHtml += '<div class="bar-seg bar-na"    style="width:' + naW    + '%" title="Not Applicable: ' + s.na + '"></div>';
+    cHtml += '<div class="bar-seg bar-pend"  style="width:' + pendW  + '%" title="Pending: '        + s.pending + '"></div>';
+    cHtml += '</div>';
+    cHtml += '<div class="chart-pct">' + s.pct + '%</div>';
+    cHtml += '</div>';
+  }
+
+  // Totals row
+  var totPct = totTotal > 0 ? Math.round(totClear / totTotal * 100) : 0;
+  tHtml += '<tr>';
+  tHtml += '<td>TOTAL</td>';
+  tHtml += '<td>' + totTotal + '</td>';
+  tHtml += '<td class="td-clear">' + totClear + '</td>';
+  tHtml += '<td class="td-prog">'  + totProg  + '</td>';
+  tHtml += '<td class="td-na">'    + totNA    + '</td>';
+  tHtml += '<td class="td-pend">'  + totPend  + '</td>';
+  tHtml += '<td><span class="pct-pill ' + pillClass(totPct) + '">' + totPct + '%</span></td>';
+  tHtml += '</tr>';
+
+  tbody.innerHTML = tHtml;
+  chartRows.innerHTML = cHtml;
 }
 
 // ===================== ESCAPE HELPERS =====================
