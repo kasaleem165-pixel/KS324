@@ -8981,6 +8981,7 @@ function restoreSession(sess) {
   checkAllIntroPlaceholders();
   updateStageBadge();
   _brInfoHasData = true;
+  _brInfoUnlocked = false; // reset so lock takes effect on fresh restore
   lockBrInfo();
   renderAnnexList();
   renderRpt();
@@ -11758,7 +11759,8 @@ function setBrInfoDisabled(disabled){
 function lockBrInfo(){
   // Only lock if there is already saved/restored data worth protecting
   if(!_brInfoHasData) return;
-  _brInfoUnlocked = false;
+  // Don't re-lock if user has explicitly unlocked during this session
+  if(_brInfoUnlocked) return;
   setBrInfoDisabled(true);
   var ov=document.getElementById('brinfo-lock-overlay');
   var badge=document.getElementById('brinfo-lockbadge');
