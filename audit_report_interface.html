@@ -9153,6 +9153,13 @@ function doSaveNow(){
   if(result.deleted) msg+='\n\nOldest version (Ver. '+result.deleted.ver+', saved '+fmtTs(result.deleted.ts)+') has been removed to stay within the 6-version limit.';
   toast(msg.split('\n\n')[0]);
   if(result.deleted) setTimeout(function(){alert(msg);},400);
+  // Also offer Save As dialog to write the session to a file
+  var sess=captureSession();
+  var H=getHdrVals();
+  var brSlug=(H.brname||'BHS').replace(/[^a-zA-Z0-9]+/g,'_').substring(0,25);
+  var fname='BHS_Session_v'+result.ver+'_'+brSlug+'.json';
+  var blob=new Blob([JSON.stringify(sess,null,2)],{type:'application/json'});
+  saveFileAs(blob, fname);
 }
 
 function loadVersion(ver){
@@ -10076,7 +10083,15 @@ function downloadPDF(){
 function doCopy(){
   var c=document.getElementById('rpcont');
   if(!c||c.style.display==='none'){toast('Generate report first.');return;}
-  navigator.clipboard.writeText(c.innerText||'').then(function(){toast('Copied to clipboard.');});
+  var text=c.innerText||'';
+  navigator.clipboard.writeText(text).then(function(){
+    toast('Copied to clipboard.');
+    var H=getHdrVals();
+    var slug=(H.brname||'Report').replace(/[^a-zA-Z0-9]+/g,'_').substring(0,30);
+    var fname='AuditReport_'+slug+'_'+new Date().toISOString().slice(0,10)+'.txt';
+    var blob=new Blob([text],{type:'text/plain'});
+    saveFileAs(blob, fname);
+  });
 }
 
 function doClear(){
