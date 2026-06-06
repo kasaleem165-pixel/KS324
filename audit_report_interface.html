@@ -8382,6 +8382,13 @@ function buildSel(id, arr) {
     o.textContent=(arr[i]==='All Types'?'— All Types —':arr[i]==='All Categories'?'— All Categories —':arr[i]);
     sel.appendChild(o);
   }
+  // Add Nil option to the Category filter only
+  if(id==='scat'){
+    var nilOpt=document.createElement('option');
+    nilOpt.value='__NIL__';
+    nilOpt.textContent='— Nil (No Observations) —';
+    sel.appendChild(nilOpt);
+  }
   for(var j=0;j<sel.options.length;j++){
     if(sel.options[j].value===prev){sel.value=prev;break;}
   }
@@ -8427,7 +8434,13 @@ function applyFilter() {
   var p = document.getElementById('obs-prompt');
   if(p) p.style.display = 'none';
 
-  // No longer block on "All" — show all when no specific filter is set
+  // Nil option — deselect all and show empty list
+  if(catF==='__NIL__'){
+    for(var nk in selIds){ delete selIds[nk]; }
+    renderList([], [], false);
+    renderRpt();
+    return;
+  }
 
   var res = [];
   for(var i=0;i<DB.observations.length;i++){
