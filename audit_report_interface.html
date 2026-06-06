@@ -184,6 +184,10 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 #genbtn-bar{position:sticky;top:0;z-index:100;background:#fff;padding:10px 14px;border-bottom:2px solid var(--gold);box-shadow:0 2px 6px rgba(0,0,0,.10)}
 #genbtn{width:100%;padding:11px;background:var(--gold);color:#111;border:none;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(201,150,42,.3)}
 #genbtn:hover{background:var(--goldlt)}
+#dirty-bar{position:sticky;top:55px;z-index:99;background:#fff8e1;border-bottom:2px solid #f0c040;padding:7px 12px;display:flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;font-size:11.5px;color:#7a5500;animation:dirtySlide .2s ease}
+@keyframes dirtySlide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+#dirty-bar-msg{flex:1;line-height:1.4}
+#dirty-bar-close{background:none;border:none;font-size:13px;color:#a07000;cursor:pointer;flex-shrink:0;padding:0 2px;line-height:1}
 
 /* REPORT */
 #rp{background:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(26,58,92,.1);min-height:300px;padding:30px 34px}
@@ -7856,6 +7860,10 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
   <div id="genbtn-bar">
     <button id="genbtn" onclick="confirmAndGenerate()">&#9889; Generate / Refresh Report</button>
   </div>
+  <div id="dirty-bar" style="display:none">
+    <span id="dirty-bar-msg">&#9888;&#65039; Changes detected — click <strong>&#9889; Generate</strong> to update the report.</span>
+    <button id="dirty-bar-close" onclick="clearReportDirty()" title="Dismiss">&#10005;</button>
+  </div>
 
   <div class="sec" style="position:relative">
     <div class="sh" style="display:flex;align-items:center;justify-content:space-between">
@@ -9128,6 +9136,45 @@ function importSessionFile(e){
 })();
 
 // ============================================================
+// DIRTY-REPORT REMINDER BAR
+// ============================================================
+var _reportDirty = false;
+
+function markReportDirty(){
+  if(_reportDirty) return;
+  _reportDirty = true;
+  var bar = document.getElementById('dirty-bar');
+  if(bar) bar.style.display='flex';
+}
+
+function clearReportDirty(){
+  _reportDirty = false;
+  var bar = document.getElementById('dirty-bar');
+  if(bar) bar.style.display='none';
+}
+
+// Listen for any input/change on the left panel and show the reminder bar.
+// Excludes right panel edits (obs text) which are visually immediate.
+(function(){
+  var lp = document.getElementById('LP');
+  if(!lp) return;
+  lp.addEventListener('input', function(e){
+    // Ignore inputs inside the RA panel (risk assessment) or AWS panel
+    var t = e.target;
+    if(t.closest && (t.closest('#ra-panel') || t.closest('#aws-panel'))) return;
+    // Ignore obs text edits already shown inline in the right panel (oedit class)
+    if(t.className && t.className.indexOf('oedit')>=0) return;
+    markReportDirty();
+  });
+  lp.addEventListener('change', function(e){
+    var t = e.target;
+    if(t.closest && (t.closest('#ra-panel') || t.closest('#aws-panel'))) return;
+    if(t.className && t.className.indexOf('oedit')>=0) return;
+    markReportDirty();
+  });
+})();
+
+// ============================================================
 // PENDING SELECTION & GENERATE CONFIRM
 // ============================================================
 window.pendingSel = {};
@@ -9144,6 +9191,7 @@ function updateGenBtn(){
     if(rems) parts.push(rems+' removal'+(rems>1?'s':''));
     btn.textContent = '⚡ Generate Report — '+parts.join(', ')+' pending';
     btn.style.background='#c07000';
+    markReportDirty();
   } else {
     btn.textContent = '⚡ Generate / Refresh Report';
     btn.style.background='';
@@ -9400,6 +9448,7 @@ function buildIntroHtml(vals, forPrint){
 }
 
 function renderRpt(){
+  clearReportDirty();
   var H=getHdrVals();
   var brcode=H.brcode, brname=H.brname, brregion=H.brregion, brcity=H.brcity,
       brhead=H.brhead, braddress=H.braddress, brautype=H.brautype,
