@@ -7801,6 +7801,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
   <button class="tbtn"              id="aws-tab-btn" onclick="toggleAWSPanel()" data-tip-title="Work Status" data-tip="Opens the Audit Work Status panel — a category-wise checklist to track which observations have been reviewed, drafted, and signed off during fieldwork.">&#128203; Work Status</button>
   <button class="tbtn soft rpt-btn" onclick="downloadSoftCopy()"   data-tip-title="Auditee Copy" data-tip="Generates and downloads an HTML file for the auditee. It contains all observations with blank response fields that the auditee fills in and returns to the auditor.">&#128233; Auditee Copy</button>
   <button class="tbtn draft rpt-btn" onclick="showDraftModal()"    data-tip-title="Draft by Category" data-tip="Downloads a formatted draft report grouped by observation category. Useful for internal review before the final report is issued.">&#128196; Draft by Category</button>
+  <button class="tbtn rpt-btn" id="analysis-btn" onclick="toggleAnalysis()" data-tip-title="Sensitivity &amp; COSO Analysis" data-tip="Displays the Sensitivity Matrix and COSO Framework analysis for all selected observations directly in the report preview area.">&#128200; Analysis</button>
   <button class="tbtn load rpt-btn" onclick="triggerLoad()"        data-tip-title="Load Response" data-tip="Loads the completed auditee response file (returned by the auditee) back into the system. Responses and estimated resolution times are automatically mapped to each observation.">&#128193; Load Response</button>
   <button class="tbtn fin rpt-btn"  onclick="showSaveDialog()"     data-tip-title="Finalize Report" data-tip="Generates the final signed-off audit report for official issuance. Includes all observations, auditee responses, audit views, and annexures in a ready-to-submit format.">&#9989; Finalize</button>
   <button class="tbtn cmp rpt-btn"  onclick="showCompareModal()"   data-tip-title="Compare Versions" data-tip="Side-by-side comparison of two saved report versions. Highlights changes in observations, responses, and wording between drafts.">&#128269; Compare</button>
@@ -8137,6 +8138,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
         <button onclick="bulkRemObs()">Remove Selected</button>
       </div>
     </div>
+    <div id="analysis-cont" style="display:none;border-bottom:2px solid #c8d8ec;background:#f8fafd"></div>
     <div id="rpcont" style="display:none"></div>
   </div>
 </div>
@@ -9297,6 +9299,7 @@ function importSessionFile(e){
 // ============================================================
 var _reportDirty = false;
 var _reportEverGenerated = false;  // dirty popup only active after first generate
+var _showAnalysis = false;
 var _dirtyPopupTimer = null;
 
 // Create the popup element once and append to body
@@ -9899,6 +9902,11 @@ function renderRpt(){
   h+=buildAnnexHtml(false,obsNumMap);
   cont.innerHTML=h;
   captureLpBaseline();
+  // Refresh analysis panel if it's currently showing
+  if(_showAnalysis){
+    var _ac=document.getElementById('analysis-cont');
+    if(_ac) _ac.innerHTML=buildAnalysisHtml();
+  }
 }
 
 function remObs(id){
@@ -10607,50 +10615,22 @@ function downloadDraft(individual){
     }
     var total=allDraftObs.length;
 
-    // ── Sensitivity data ──
+    // Sensitivity and COSO level configs (used for per-obs badges in cards)
     var SENS_LEVELS=[
-      {key:'High',    label:'High',    bg:'#c0392b',fg:'#fff',bar:'#e74c3c'},
-      {key:'M to H',  label:'Medium to High', bg:'#e67e22',fg:'#fff',bar:'#f39c12'},
-      {key:'L to M',  label:'Low to Medium',  bg:'#f1c40f',fg:'#333',bar:'#f39c12'},
-      {key:'Low',     label:'Low',     bg:'#27ae60',fg:'#fff',bar:'#2ecc71'},
-      {key:'',        label:'Not Rated',bg:'#95a5a6',fg:'#fff',bar:'#bdc3c7'}
+      {key:'High',   label:'High',           bg:'#c0392b',fg:'#fff',bar:'#e74c3c'},
+      {key:'M to H', label:'Medium to High', bg:'#e67e22',fg:'#fff',bar:'#f39c12'},
+      {key:'L to M', label:'Low to Medium',  bg:'#f1c40f',fg:'#333',bar:'#f39c12'},
+      {key:'Low',    label:'Low',            bg:'#27ae60',fg:'#fff',bar:'#2ecc71'},
+      {key:'',       label:'Not Rated',      bg:'#95a5a6',fg:'#fff',bar:'#bdc3c7'}
     ];
-    var sensCount={};
-    var sensObs={};
-    for(var sli=0;sli<SENS_LEVELS.length;sli++){
-      sensCount[SENS_LEVELS[sli].key]=0;
-      sensObs[SENS_LEVELS[sli].key]=[];
-    }
-    for(var di=0;di<allDraftObs.length;di++){
-      var dob=allDraftObs[di];
-      var sk=sensitivityMap[dob.id]||'';
-      if(!(sk in sensCount)) sk='';
-      sensCount[sk]++;
-      sensObs[sk].push(obsNums[dob.id]);
-    }
-
-    // ── COSO data ──
     var COSO_COMPS=[
-      {key:'CE',label:'Control Environment',   desc:'Tone at the top, ethics, organizational structure, HR policies',        col:'#1a3a5c'},
-      {key:'RA',label:'Risk Assessment',        desc:'Identification, analysis and response to risks at branch level',         col:'#8e44ad'},
-      {key:'CA',label:'Control Activities',     desc:'Policies and procedures ensuring management directives are carried out', col:'#16a085'},
-      {key:'IC',label:'Information & Communication',desc:'Relevant information identified, captured and communicated timely',  col:'#2980b9'},
-      {key:'M', label:'Monitoring',             desc:'Ongoing assessment of control quality; corrective action taken',         col:'#c0392b'},
-      {key:'',  label:'Not Mapped',             desc:'COSO component not assigned',                                            col:'#95a5a6'}
+      {key:'CE',label:'Control Environment',        col:'#1a3a5c'},
+      {key:'RA',label:'Risk Assessment',            col:'#8e44ad'},
+      {key:'CA',label:'Control Activities',         col:'#16a085'},
+      {key:'IC',label:'Information & Communication',col:'#2980b9'},
+      {key:'M', label:'Monitoring',                 col:'#c0392b'},
+      {key:'',  label:'Not Mapped',                 col:'#95a5a6'}
     ];
-    var cosoCount={};
-    var cosoObs={};
-    for(var coi=0;coi<COSO_COMPS.length;coi++){
-      cosoCount[COSO_COMPS[coi].key]=0;
-      cosoObs[COSO_COMPS[coi].key]=[];
-    }
-    for(var di2=0;di2<allDraftObs.length;di2++){
-      var dob2=allDraftObs[di2];
-      var ck=cosoMap[dob2.id]||'';
-      if(!(ck in cosoCount)) ck='';
-      cosoCount[ck]++;
-      cosoObs[ck].push(obsNums[dob2.id]);
-    }
 
     var navy='#1a3a5c', gold='#c9962a';
     var h='<div style="font-family:Georgia,serif;max-width:820px;margin:0 auto;padding:30px">';
@@ -10663,109 +10643,6 @@ function downloadDraft(individual){
     if(cats.length===1) h+='<div style="font-size:12px;color:#555;margin-top:6px">Category: <strong>'+esc(cats[0])+'</strong></div>';
     else h+='<div style="font-size:12px;color:#555;margin-top:6px">Categories: <strong>'+cats.map(esc).join(', ')+'</strong></div>';
     h+='</div>';
-
-    if(total>0){
-      // ════════════════════════════════════════════════
-      // SENSITIVITY MATRIX
-      // ════════════════════════════════════════════════
-      h+='<div style="margin-bottom:30px;page-break-inside:avoid">';
-      h+='<div style="font-family:Arial,sans-serif;font-size:13px;font-weight:700;color:#fff;background:'+navy+';padding:9px 14px;border-radius:4px 4px 0 0;letter-spacing:.4px">&#9651; Sensitivity Matrix</div>';
-      h+='<div style="border:1px solid #c8d8ec;border-top:none;border-radius:0 0 6px 6px;overflow:hidden">';
-
-      // Summary bar
-      h+='<div style="display:flex;height:18px">';
-      for(var si2=0;si2<SENS_LEVELS.length;si2++){
-        var sl=SENS_LEVELS[si2];
-        var pct=total?Math.round(sensCount[sl.key]/total*100):0;
-        if(!pct) continue;
-        h+='<div style="flex:'+sensCount[sl.key]+';background:'+sl.bar+';transition:flex .3s" title="'+sl.label+': '+sensCount[sl.key]+'"></div>';
-      }
-      h+='</div>';
-
-      // Table
-      h+='<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px">';
-      h+='<thead><tr>';
-      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:left;font-weight:700;border-bottom:2px solid #c8d8ec;width:28%">Sensitivity Level</th>';
-      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:center;font-weight:700;border-bottom:2px solid #c8d8ec;width:12%">Count</th>';
-      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:center;font-weight:700;border-bottom:2px solid #c8d8ec;width:18%">% of Total</th>';
-      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:left;font-weight:700;border-bottom:2px solid #c8d8ec">Bar</th>';
-      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:left;font-weight:700;border-bottom:2px solid #c8d8ec">Observations</th>';
-      h+='</tr></thead><tbody>';
-      for(var sl2i=0;sl2i<SENS_LEVELS.length;sl2i++){
-        var sl2=SENS_LEVELS[sl2i];
-        var cnt=sensCount[sl2.key]; var pct2=total?Math.round(cnt/total*100):0;
-        var refs=sensObs[sl2.key].join(', ')||'—';
-        var isOdd=(sl2i%2===0);
-        h+='<tr style="background:'+(isOdd?'#fff':'#f8fafd')+'">';
-        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6"><span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:'+sl2.bg+';color:'+sl2.fg+'">'+sl2.label+'</span></td>';
-        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;text-align:center;font-weight:700;color:'+navy+'">'+cnt+'</td>';
-        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;text-align:center;color:#4a6080">'+pct2+'%</td>';
-        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6">';
-        if(cnt){
-          h+='<div style="background:#e8eef6;border-radius:3px;height:10px;width:100%"><div style="background:'+sl2.bar+';height:10px;border-radius:3px;width:'+pct2+'%"></div></div>';
-        }
-        h+='</td>';
-        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;color:#3a5070;font-size:11.5px">'+esc(refs)+'</td>';
-        h+='</tr>';
-      }
-      // Totals row
-      h+='<tr style="background:#edf2f8;font-weight:700">';
-      h+='<td style="padding:8px 12px;color:'+navy+'">Total</td>';
-      h+='<td style="padding:8px 12px;text-align:center;color:'+navy+'">'+total+'</td>';
-      h+='<td style="padding:8px 12px;text-align:center;color:'+navy+'">100%</td>';
-      h+='<td colspan="2" style="padding:8px 12px;color:#666;font-size:11px;font-weight:400">Observations across all selected categories</td>';
-      h+='</tr>';
-      h+='</tbody></table></div></div>';
-
-      // ════════════════════════════════════════════════
-      // COSO FRAMEWORK
-      // ════════════════════════════════════════════════
-      h+='<div style="margin-bottom:30px;page-break-inside:avoid">';
-      h+='<div style="font-family:Arial,sans-serif;font-size:13px;font-weight:700;color:#fff;background:'+navy+';padding:9px 14px;border-radius:4px 4px 0 0;letter-spacing:.4px">&#9632; COSO Framework Analysis</div>';
-      h+='<div style="border:1px solid #c8d8ec;border-top:none;border-radius:0 0 6px 6px;overflow:hidden">';
-
-      // Segment bar
-      h+='<div style="display:flex;height:18px">';
-      for(var coi2=0;coi2<COSO_COMPS.length;coi2++){
-        var cc2=COSO_COMPS[coi2];
-        if(!cosoCount[cc2.key]) continue;
-        h+='<div style="flex:'+cosoCount[cc2.key]+';background:'+cc2.col+';opacity:.85" title="'+cc2.label+': '+cosoCount[cc2.key]+'"></div>';
-      }
-      h+='</div>';
-
-      // Table
-      h+='<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px">';
-      h+='<thead><tr>';
-      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:left;font-weight:700;border-bottom:2px solid #c8d8ec;width:10%">Code</th>';
-      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:left;font-weight:700;border-bottom:2px solid #c8d8ec;width:24%">Component</th>';
-      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:left;font-weight:700;border-bottom:2px solid #c8d8ec">Description</th>';
-      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:center;font-weight:700;border-bottom:2px solid #c8d8ec;width:8%">Count</th>';
-      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:left;font-weight:700;border-bottom:2px solid #c8d8ec;width:22%">Observations</th>';
-      h+='</tr></thead><tbody>';
-      for(var coti=0;coti<COSO_COMPS.length;coti++){
-        var cc=COSO_COMPS[coti];
-        var ccnt=cosoCount[cc.key];
-        var crefs=cosoObs[cc.key].join(', ')||'—';
-        var isOdd2=(coti%2===0);
-        h+='<tr style="background:'+(isOdd2?'#fff':'#f8fafd')+'">';
-        if(cc.key){
-          h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;text-align:center"><span style="display:inline-block;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:800;background:'+cc.col+';color:#fff">'+cc.key+'</span></td>';
-        } else {
-          h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;text-align:center"><span style="font-size:11px;color:#aaa">—</span></td>';
-        }
-        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;font-weight:600;color:'+cc.col+'">'+esc(cc.label)+'</td>';
-        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;color:#4a6080;font-size:11px">'+esc(cc.desc)+'</td>';
-        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;text-align:center;font-weight:700;color:'+(ccnt?navy:'#aaa')+'">'+ccnt+'</td>';
-        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;color:#3a5070;font-size:11.5px">'+esc(crefs)+'</td>';
-        h+='</tr>';
-      }
-      h+='<tr style="background:#edf2f8;font-weight:700">';
-      h+='<td colspan="3" style="padding:8px 12px;color:'+navy+'">Total</td>';
-      h+='<td style="padding:8px 12px;text-align:center;color:'+navy+'">'+total+'</td>';
-      h+='<td style="padding:8px 12px;color:#666;font-size:11px;font-weight:400">All draft observations</td>';
-      h+='</tr>';
-      h+='</tbody></table></div></div>';
-    }
 
     // ── Detailed observation sections ──
     var numD=0;
@@ -11167,6 +11044,145 @@ function buildCatGroupsFor(obsList){
   var cats={};
   for(var i=0;i<obsList.length;i++){var c=obsList[i].category||'Others';if(!cats[c])cats[c]=[];cats[c].push(obsList[i]);}
   return {cats:cats,catOrder:catOrderByDef(cats)};
+}
+
+function buildAnalysisHtml(){
+  var labels=getObsReportLabels();
+  var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
+  var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
+  var all=dbObs.concat(cuObs);
+  var total=all.length;
+  var navy='#1a3a5c', gold='#c9962a';
+
+  var SENS_LEVELS=[
+    {key:'High',   label:'High',           bg:'#c0392b',fg:'#fff',bar:'#e74c3c'},
+    {key:'M to H', label:'Medium to High', bg:'#e67e22',fg:'#fff',bar:'#f39c12'},
+    {key:'L to M', label:'Low to Medium',  bg:'#f1c40f',fg:'#333',bar:'#f39c12'},
+    {key:'Low',    label:'Low',            bg:'#27ae60',fg:'#fff',bar:'#2ecc71'},
+    {key:'',       label:'Not Rated',      bg:'#95a5a6',fg:'#fff',bar:'#bdc3c7'}
+  ];
+  var COSO_COMPS=[
+    {key:'CE',label:'Control Environment',        desc:'Tone at the top, ethics, organizational structure, HR policies',        col:'#1a3a5c'},
+    {key:'RA',label:'Risk Assessment',             desc:'Identification, analysis and response to risks at branch level',         col:'#8e44ad'},
+    {key:'CA',label:'Control Activities',          desc:'Policies and procedures ensuring management directives are carried out', col:'#16a085'},
+    {key:'IC',label:'Information & Communication', desc:'Relevant information identified, captured and communicated timely',      col:'#2980b9'},
+    {key:'M', label:'Monitoring',                  desc:'Ongoing assessment of control quality; corrective action taken',         col:'#c0392b'},
+    {key:'',  label:'Not Mapped',                  desc:'COSO component not assigned',                                            col:'#95a5a6'}
+  ];
+
+  var sensCount={}, sensObs={};
+  for(var si=0;si<SENS_LEVELS.length;si++){ sensCount[SENS_LEVELS[si].key]=0; sensObs[SENS_LEVELS[si].key]=[]; }
+  var cosoCount={}, cosoObs={};
+  for(var ci=0;ci<COSO_COMPS.length;ci++){ cosoCount[COSO_COMPS[ci].key]=0; cosoObs[COSO_COMPS[ci].key]=[]; }
+
+  for(var i=0;i<all.length;i++){
+    var ob=all[i];
+    var lbl=labels[ob.id]||'?';
+    var sk=sensitivityMap[ob.id]||'';
+    if(!(sk in sensCount)) sk='';
+    sensCount[sk]++; sensObs[sk].push(lbl);
+    var ck=cosoMap[ob.id]||'';
+    if(!(ck in cosoCount)) ck='';
+    cosoCount[ck]++; cosoObs[ck].push(lbl);
+  }
+
+  if(!total){
+    return '<div style="padding:30px;text-align:center;color:#888;font-family:Inter,sans-serif">No observations selected. Generate the report first.</div>';
+  }
+
+  var h='<div style="padding:16px 20px;font-family:Inter,Arial,sans-serif">';
+  h+='<div style="font-size:13px;font-weight:700;color:'+navy+';letter-spacing:.3px;border-bottom:2px solid '+gold+';padding-bottom:6px;margin-bottom:16px">&#9651; Sensitivity Matrix &nbsp;&nbsp;&#9632; COSO Framework Analysis</div>';
+
+  // ── SENSITIVITY MATRIX ──
+  h+='<div style="margin-bottom:22px">';
+  h+='<div style="font-size:12.5px;font-weight:700;color:#fff;background:'+navy+';padding:7px 12px;border-radius:4px 4px 0 0">&#9651; Sensitivity Matrix</div>';
+  h+='<div style="border:1px solid #c8d8ec;border-top:none;border-radius:0 0 6px 6px;overflow:hidden">';
+  h+='<div style="display:flex;height:14px">';
+  for(var sj=0;sj<SENS_LEVELS.length;sj++){
+    var sl=SENS_LEVELS[sj];
+    if(!sensCount[sl.key]) continue;
+    h+='<div style="flex:'+sensCount[sl.key]+';background:'+sl.bar+'" title="'+sl.label+': '+sensCount[sl.key]+'"></div>';
+  }
+  h+='</div>';
+  h+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  h+='<thead><tr>';
+  h+='<th style="padding:7px 10px;background:#edf2f8;color:'+navy+';text-align:left;border-bottom:2px solid #c8d8ec;width:28%">Sensitivity Level</th>';
+  h+='<th style="padding:7px 10px;background:#edf2f8;color:'+navy+';text-align:center;border-bottom:2px solid #c8d8ec;width:10%">Count</th>';
+  h+='<th style="padding:7px 10px;background:#edf2f8;color:'+navy+';text-align:center;border-bottom:2px solid #c8d8ec;width:14%">%</th>';
+  h+='<th style="padding:7px 10px;background:#edf2f8;color:'+navy+';text-align:left;border-bottom:2px solid #c8d8ec;width:18%">Bar</th>';
+  h+='<th style="padding:7px 10px;background:#edf2f8;color:'+navy+';text-align:left;border-bottom:2px solid #c8d8ec">Observations</th>';
+  h+='</tr></thead><tbody>';
+  for(var sk2i=0;sk2i<SENS_LEVELS.length;sk2i++){
+    var sl2=SENS_LEVELS[sk2i];
+    var cnt=sensCount[sl2.key]; var pct=total?Math.round(cnt/total*100):0;
+    h+='<tr style="background:'+(sk2i%2?'#f8fafd':'#fff')+'">';
+    h+='<td style="padding:7px 10px;border-bottom:1px solid #e8eef6"><span style="display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;background:'+sl2.bg+';color:'+sl2.fg+'">'+sl2.label+'</span></td>';
+    h+='<td style="padding:7px 10px;border-bottom:1px solid #e8eef6;text-align:center;font-weight:700;color:'+navy+'">'+cnt+'</td>';
+    h+='<td style="padding:7px 10px;border-bottom:1px solid #e8eef6;text-align:center;color:#4a6080">'+pct+'%</td>';
+    h+='<td style="padding:7px 10px;border-bottom:1px solid #e8eef6">';
+    if(cnt) h+='<div style="background:#e8eef6;border-radius:3px;height:8px;width:100%"><div style="background:'+sl2.bar+';height:8px;border-radius:3px;width:'+pct+'%"></div></div>';
+    h+='</td>';
+    h+='<td style="padding:7px 10px;border-bottom:1px solid #e8eef6;color:#3a5070;font-size:11.5px">'+esc(sensObs[sl2.key].join(', ')||'—')+'</td>';
+    h+='</tr>';
+  }
+  h+='<tr style="background:#edf2f8;font-weight:700"><td style="padding:7px 10px;color:'+navy+'">Total</td><td style="padding:7px 10px;text-align:center;color:'+navy+'">'+total+'</td><td style="padding:7px 10px;text-align:center;color:'+navy+'">100%</td><td colspan="2" style="padding:7px 10px;color:#666;font-size:11px;font-weight:400">All selected observations</td></tr>';
+  h+='</tbody></table></div></div>';
+
+  // ── COSO FRAMEWORK ──
+  h+='<div style="margin-bottom:10px">';
+  h+='<div style="font-size:12.5px;font-weight:700;color:#fff;background:'+navy+';padding:7px 12px;border-radius:4px 4px 0 0">&#9632; COSO Framework Analysis</div>';
+  h+='<div style="border:1px solid #c8d8ec;border-top:none;border-radius:0 0 6px 6px;overflow:hidden">';
+  h+='<div style="display:flex;height:14px">';
+  for(var cj=0;cj<COSO_COMPS.length;cj++){
+    var cc2=COSO_COMPS[cj];
+    if(!cosoCount[cc2.key]) continue;
+    h+='<div style="flex:'+cosoCount[cc2.key]+';background:'+cc2.col+';opacity:.85" title="'+cc2.label+': '+cosoCount[cc2.key]+'"></div>';
+  }
+  h+='</div>';
+  h+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  h+='<thead><tr>';
+  h+='<th style="padding:7px 10px;background:#edf2f8;color:'+navy+';text-align:left;border-bottom:2px solid #c8d8ec;width:8%">Code</th>';
+  h+='<th style="padding:7px 10px;background:#edf2f8;color:'+navy+';text-align:left;border-bottom:2px solid #c8d8ec;width:26%">Component</th>';
+  h+='<th style="padding:7px 10px;background:#edf2f8;color:'+navy+';text-align:left;border-bottom:2px solid #c8d8ec">Description</th>';
+  h+='<th style="padding:7px 10px;background:#edf2f8;color:'+navy+';text-align:center;border-bottom:2px solid #c8d8ec;width:8%">Count</th>';
+  h+='<th style="padding:7px 10px;background:#edf2f8;color:'+navy+';text-align:left;border-bottom:2px solid #c8d8ec;width:20%">Observations</th>';
+  h+='</tr></thead><tbody>';
+  for(var ck2i=0;ck2i<COSO_COMPS.length;ck2i++){
+    var cc=COSO_COMPS[ck2i];
+    var ccnt=cosoCount[cc.key];
+    h+='<tr style="background:'+(ck2i%2?'#f8fafd':'#fff')+'">';
+    if(cc.key){
+      h+='<td style="padding:7px 10px;border-bottom:1px solid #e8eef6;text-align:center"><span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:800;background:'+cc.col+';color:#fff">'+cc.key+'</span></td>';
+    } else {
+      h+='<td style="padding:7px 10px;border-bottom:1px solid #e8eef6;text-align:center"><span style="font-size:11px;color:#aaa">—</span></td>';
+    }
+    h+='<td style="padding:7px 10px;border-bottom:1px solid #e8eef6;font-weight:600;color:'+cc.col+'">'+esc(cc.label)+'</td>';
+    h+='<td style="padding:7px 10px;border-bottom:1px solid #e8eef6;color:#4a6080;font-size:11px">'+esc(cc.desc)+'</td>';
+    h+='<td style="padding:7px 10px;border-bottom:1px solid #e8eef6;text-align:center;font-weight:700;color:'+(ccnt?navy:'#aaa')+'">'+ccnt+'</td>';
+    h+='<td style="padding:7px 10px;border-bottom:1px solid #e8eef6;color:#3a5070;font-size:11.5px">'+esc(cosoObs[cc.key].join(', ')||'—')+'</td>';
+    h+='</tr>';
+  }
+  h+='<tr style="background:#edf2f8;font-weight:700"><td colspan="3" style="padding:7px 10px;color:'+navy+'">Total</td><td style="padding:7px 10px;text-align:center;color:'+navy+'">'+total+'</td><td style="padding:7px 10px;color:#666;font-size:11px;font-weight:400">All selected observations</td></tr>';
+  h+='</tbody></table></div></div>';
+
+  h+='</div>';
+  return h;
+}
+
+function toggleAnalysis(){
+  _showAnalysis=!_showAnalysis;
+  var ac=document.getElementById('analysis-cont');
+  var btn=document.getElementById('analysis-btn');
+  if(!ac) return;
+  if(_showAnalysis){
+    ac.style.display='block';
+    ac.innerHTML=buildAnalysisHtml();
+    if(btn){ btn.style.background='#c9962a'; btn.style.color='#111'; btn.style.borderColor='#f0c040'; }
+  } else {
+    ac.style.display='none';
+    ac.innerHTML='';
+    if(btn){ btn.style.background=''; btn.style.color=''; btn.style.borderColor=''; }
+  }
 }
 
 function renderAnnexList(){
