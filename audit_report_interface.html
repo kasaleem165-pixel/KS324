@@ -8984,6 +8984,7 @@ function restoreSession(sess) {
   lockBrInfo();
   renderAnnexList();
   renderRpt();
+  captureLpBaseline();
 }
 
 function saveVersion() {
@@ -9258,6 +9259,21 @@ function clearReportDirty(){
   if(popup) popup.classList.remove('dp-show');
 }
 
+// Snapshot of left-panel field values at the last baseline (session restore / report generated).
+// Fields that were blank at baseline do not trigger the dirty popup.
+var _lpBaseline = {};
+
+function captureLpBaseline(){
+  var lp = document.getElementById('LP');
+  if(!lp) return;
+  _lpBaseline = {};
+  var els = lp.querySelectorAll('input, select, textarea');
+  for(var i=0;i<els.length;i++){
+    var el=els[i]; var key=el.id||el.name;
+    if(key) _lpBaseline[key] = (el.value||'').trim();
+  }
+}
+
 // Listen for input/change on the left panel; position popup near changed field.
 (function(){
   var lp = document.getElementById('LP');
@@ -9266,7 +9282,9 @@ function clearReportDirty(){
     var t = e.target;
     if(t.closest && (t.closest('#ra-panel') || t.closest('#aws-panel'))) return;
     if(t.className && t.className.indexOf('oedit') >= 0) return;
-    // Debounce: reset timer on every keystroke, show popup on first change
+    // Skip dirty popup if the field had no content in the saved baseline
+    var key=t.id||t.name;
+    if(key && (!_lpBaseline.hasOwnProperty(key) || _lpBaseline[key]==='')) return;
     markReportDirty(t);
   }
   lp.addEventListener('input',  handle);
@@ -9770,6 +9788,7 @@ function renderRpt(){
   syncAnnexTextFromDom();
   h+=buildAnnexHtml(false,obsNumMap);
   cont.innerHTML=h;
+  captureLpBaseline();
 }
 
 function remObs(id){
