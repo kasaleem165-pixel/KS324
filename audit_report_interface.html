@@ -11061,7 +11061,45 @@ function buildAnnexHtml(inline, obsNumMap){
   if(!annexures.length) return '';
   var navy='#1a3a5c', gbor='#dde2ea', gtxt='#6a7888';
   obsNumMap=obsNumMap||{};
-  var h='<div style="margin-top:32px;border-top:3px solid '+navy+';padding-top:20px">';
+
+  // For exported HTML (inline=true), non-image/non-PDF files need a Blob-based
+  // download button because browsers block data: URI downloads from file:// context.
+  // Collect those files and emit a helper script + hidden data holders.
+  var blobFiles=[];   // {uid, dataUrl, mime, name}
+  if(inline){
+    for(var ai=0;ai<annexures.length;ai++){
+      var afs=annexures[ai].files||[];
+      for(var afi=0;afi<afs.length;afi++){
+        var af=afs[afi];
+        var isImgX=af.type&&af.type.indexOf('image/')===0;
+        var isPdfX=af.type&&af.type==='application/pdf';
+        if(!isImgX&&!isPdfX){
+          blobFiles.push({uid:'baf-'+ai+'-'+afi, dataUrl:af.dataUrl, mime:af.type||'application/octet-stream', name:af.name});
+        }
+      }
+    }
+  }
+
+  var h='';
+  // Inject blob-download helper + data holders into exported HTML
+  if(blobFiles.length){
+    h+='<script>function _dlAF(id){var el=document.getElementById(id);if(!el)return;'+
+       'var raw=atob(el.textContent.trim());var arr=new Uint8Array(raw.length);'+
+       'for(var i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);'+
+       'var blob=new Blob([arr],{type:el.getAttribute("data-mime")});'+
+       'var url=URL.createObjectURL(blob);var a=document.createElement("a");'+
+       'a.href=url;a.download=el.getAttribute("data-name");'+
+       'document.body.appendChild(a);a.click();'+
+       'setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},2000);}'+
+       '<\/script>';
+    for(var bi=0;bi<blobFiles.length;bi++){
+      var bf=blobFiles[bi];
+      var b64=bf.dataUrl.indexOf(',')>=0?bf.dataUrl.split(',')[1]:bf.dataUrl;
+      h+='<script type="application/json" id="'+bf.uid+'" data-mime="'+bf.mime+'" data-name="'+esc(bf.name)+'">'+b64+'<\/script>';
+    }
+  }
+
+  h+='<div style="margin-top:32px;border-top:3px solid '+navy+';padding-top:20px">';
   h+='<h2 style="font-family:Merriweather,serif;font-size:16px;font-weight:700;color:'+navy+';margin-bottom:20px;text-align:center;letter-spacing:1px">ANNEXURES</h2>';
   for(var i=0;i<annexures.length;i++){
     var a=annexures[i];
@@ -11075,7 +11113,7 @@ function buildAnnexHtml(inline, obsNumMap){
       var refs=[];
       for(var li=0;li<a.linkedObs.length;li++){
         var n=obsNumMap[a.linkedObs[li]];
-        refs.push(n?'Obs. '+n:a.linkedObs[li]);  // n is already "R-1"/"N-2" from getObsReportLabels
+        refs.push(n?'Obs. '+n:a.linkedObs[li]);
       }
       h+='<div style="font-size:11px;color:'+gtxt+';margin-bottom:10px">Referenced by: <strong style="color:'+navy+'">'+esc(refs.join(', '))+'</strong></div>';
     } else {
@@ -11101,7 +11139,15 @@ function buildAnnexHtml(inline, obsNumMap){
           h+='<embed src="'+fi.dataUrl+'" type="application/pdf" style="width:100%;height:500px;border:1px solid '+gbor+';border-radius:4px">';
           h+='<div style="margin-top:5px"><a href="'+fi.dataUrl+'" download="'+esc(fi.name)+'" style="font-size:12px;color:'+navy+'">&#8595; Download PDF</a></div>';
         } else {
-          h+='<a href="'+fi.dataUrl+'" download="'+esc(fi.name)+'" style="display:inline-flex;align-items:center;gap:8px;padding:9px 14px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12.5px;font-weight:600;color:'+navy+';text-decoration:none">&#128196; '+esc(fi.name)+'</a>';
+          // Non-image/non-PDF: use blob-URL button (works from file:// in all browsers)
+          var uid='baf-'+i+'-'+f;
+          if(inline){
+            // Blob-based download for exported HTML files
+            h+='<button onclick="_dlAF(\''+uid+'\')" style="display:inline-flex;align-items:center;gap:8px;padding:9px 14px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12.5px;font-weight:600;color:'+navy+';cursor:pointer;font-family:Inter,sans-serif">&#128229; Download '+esc(fi.name)+'</button>';
+          } else {
+            // In-app preview: direct data: link is fine (full browser context)
+            h+='<a href="'+fi.dataUrl+'" download="'+esc(fi.name)+'" style="display:inline-flex;align-items:center;gap:8px;padding:9px 14px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12.5px;font-weight:600;color:'+navy+';text-decoration:none">&#128196; '+esc(fi.name)+'</a>';
+          }
         }
         h+='</div>';
       }
