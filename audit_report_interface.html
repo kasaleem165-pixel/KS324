@@ -10464,9 +10464,10 @@ function downloadDraft(individual){
       }
     }
     if(num===0) h+='<p style="color:#888;text-align:center">No observations in selected categories.</p>';
-    h+=buildAnnexHtml(true);
+    var annexParts=buildAnnexHtml(true);
+    h+=annexParts.body;
     h+='</div>';
-    return h;
+    return {html:h, annexHead:annexParts.head, annexData:annexParts.data};
   }
 
   var saveScript='<script>'+
@@ -10491,14 +10492,17 @@ function downloadDraft(individual){
     '}'+
     '<\/script>';
 
-  function triggerDownload(html, filename){
+  function triggerDownload(parts, filename){
+    var html=parts.html||parts;
+    var annexHead=parts.annexHead||'';
+    var annexData=parts.annexData||'';
     var notice='<div style="background:#fff8e1;border:1px solid #f0c040;border-radius:6px;padding:12px 16px;margin-bottom:24px;font-family:Arial,sans-serif;font-size:13px;color:#5a4000">'+
       '<strong>&#9432; Instructions for Auditee:</strong> Please read each observation carefully and type your response in the yellow-highlighted <em>Auditee Response</em> fields. '+
       'When complete, click the <strong>"Save My Responses"</strong> button below.</div>';
     var saveBtn='<div style="text-align:center;margin-top:30px;padding:20px 0;border-top:2px solid #1a3a5c">'+
       '<button onclick="saveDraftResponses()" style="padding:12px 32px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial,sans-serif">&#128190; Save My Responses</button>'+
       '</div>';
-    var full='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+filename+'</title>'+saveScript+'</head><body>'+notice+html+saveBtn+'</body></html>';
+    var full='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+filename+'</title>'+saveScript+annexHead+'</head><body>'+notice+html+saveBtn+annexData+'</body></html>';
     var blob=new Blob([full],{type:'text/html'});
     var a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
@@ -10663,7 +10667,8 @@ function downloadSoftCopy(){
   softHtml+='#progressfill{height:100%;background:#2a8a40;border-radius:4px;transition:width .3s}\n';
   softHtml+='#progresslbl{font-size:11px;color:#4a6080;margin-top:4px;text-align:right}\n';
   softHtml+='@media print{#notice,#savebtn{display:none!important}body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}}\n';
-  softHtml+='</style>\n</head>\n<body>\n<div id="wrap">\n';
+  var annexParts=buildAnnexHtml(true);
+  softHtml+='</style>\n'+annexParts.head+'\n</head>\n<body>\n<div id="wrap">\n';
   softHtml+='<div id="notice"><strong>&#9432; Instructions for Auditee:</strong> Please read each observation carefully and enter your response in the yellow-highlighted <em>Auditee Response</em> field (required). Also fill in the <em>Estimated Time to Resolve</em> field to indicate the expected timeframe for resolving each observation (e.g. 2 weeks, 30 days, by 31-Dec-2025). Use <strong>"Save Draft"</strong> to save progress at any time. When all responses are complete, click <strong>"&#10003; Submit Final Responses"</strong> to download the completed file for submission. <em>The final submit button will be blocked if any Auditee Response field is blank.</em></div>\n';
   softHtml+='<div id="rp">\n';
   // Report header
@@ -10679,7 +10684,7 @@ function downloadSoftCopy(){
   softHtml+='</div></div>\n';
   softHtml+=misHtml;
   softHtml+=obsSection;
-  softHtml+=buildAnnexHtml(true);
+  softHtml+=annexParts.body;
   softHtml+='</div>\n'; // end #rp
   // Progress bar and action buttons
   softHtml+='<div id="progressbar"><div id="progressfill" style="width:0%"></div></div>\n';
@@ -10773,6 +10778,7 @@ function downloadSoftCopy(){
   softHtml+='  a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);},2000);\n';
   softHtml+='}\n';
   softHtml+='</scr'+'ipt>\n';
+  softHtml+=annexParts.data+'\n';
   softHtml+='</body>\n</html>';
 
   var blob=new Blob([softHtml],{type:'text/html'});
@@ -11057,15 +11063,16 @@ function annexTextToHtml(text, navy, gbor){
   return html;
 }
 
+// buildAnnexHtml — returns {head:'', body:''} when inline=true so caller can
+// place the helper script in <head> and data holders outside #rp.
+// When inline=false (in-app preview) returns a plain HTML string as before.
 function buildAnnexHtml(inline, obsNumMap){
-  if(!annexures.length) return '';
+  if(!annexures.length) return inline ? {head:'',body:'',data:''} : '';
   var navy='#1a3a5c', gbor='#dde2ea', gtxt='#6a7888';
   obsNumMap=obsNumMap||{};
 
-  // For exported HTML (inline=true), non-image/non-PDF files need a Blob-based
-  // download button because browsers block data: URI downloads from file:// context.
-  // Collect those files and emit a helper script + hidden data holders.
-  var blobFiles=[];   // {uid, dataUrl, mime, name}
+  // Collect non-image/non-PDF files that need blob-URL download in exported HTML
+  var blobFiles=[];
   if(inline){
     for(var ai=0;ai<annexures.length;ai++){
       var afs=annexures[ai].files||[];
@@ -11080,25 +11087,44 @@ function buildAnnexHtml(inline, obsNumMap){
     }
   }
 
-  var h='';
-  // Inject blob-download helper + data holders into exported HTML
-  if(blobFiles.length){
-    h+='<script>function _dlAF(id){var el=document.getElementById(id);if(!el)return;'+
-       'var raw=atob(el.textContent.trim());var arr=new Uint8Array(raw.length);'+
-       'for(var i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);'+
-       'var blob=new Blob([arr],{type:el.getAttribute("data-mime")});'+
-       'var url=URL.createObjectURL(blob);var a=document.createElement("a");'+
-       'a.href=url;a.download=el.getAttribute("data-name");'+
-       'document.body.appendChild(a);a.click();'+
-       'setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},2000);}'+
-       '<\/script>';
+  // Build the <head> helper script (only when there are non-image/PDF files)
+  var headScript='';
+  if(inline && blobFiles.length){
+    headScript='<script>'+
+      'function _dlAF(id){'+
+        'var el=document.getElementById(id);'+
+        'if(!el)return;'+
+        'var b64=el.getAttribute("data-b64");'+
+        'if(!b64)return;'+
+        'var mime=el.getAttribute("data-mime")||"application/octet-stream";'+
+        'var name=el.getAttribute("data-name")||"file";'+
+        'var raw=atob(b64);'+
+        'var arr=new Uint8Array(raw.length);'+
+        'for(var i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);'+
+        'var blob=new Blob([arr],{type:mime});'+
+        'var url=URL.createObjectURL(blob);'+
+        'var a=document.createElement("a");'+
+        'a.href=url;a.download=name;'+
+        'document.body.appendChild(a);a.click();'+
+        'setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},3000);'+
+      '}'+
+    '<\/script>';
+  }
+
+  // Build hidden data holders (placed just before </body> or anywhere outside #rp)
+  var dataHolders='';
+  if(inline && blobFiles.length){
+    dataHolders+='<div id="baf-store" style="display:none">';
     for(var bi=0;bi<blobFiles.length;bi++){
       var bf=blobFiles[bi];
       var b64=bf.dataUrl.indexOf(',')>=0?bf.dataUrl.split(',')[1]:bf.dataUrl;
-      h+='<script type="application/json" id="'+bf.uid+'" data-mime="'+bf.mime+'" data-name="'+esc(bf.name)+'">'+b64+'<\/script>';
+      dataHolders+='<span id="'+bf.uid+'" data-b64="'+b64+'" data-mime="'+bf.mime+'" data-name="'+esc(bf.name)+'"></span>';
     }
+    dataHolders+='</div>';
   }
 
+  // Build main annexure HTML block
+  var h='';
   h+='<div style="margin-top:32px;border-top:3px solid '+navy+';padding-top:20px">';
   h+='<h2 style="font-family:Merriweather,serif;font-size:16px;font-weight:700;color:'+navy+';margin-bottom:20px;text-align:center;letter-spacing:1px">ANNEXURES</h2>';
   for(var i=0;i<annexures.length;i++){
@@ -11139,13 +11165,11 @@ function buildAnnexHtml(inline, obsNumMap){
           h+='<embed src="'+fi.dataUrl+'" type="application/pdf" style="width:100%;height:500px;border:1px solid '+gbor+';border-radius:4px">';
           h+='<div style="margin-top:5px"><a href="'+fi.dataUrl+'" download="'+esc(fi.name)+'" style="font-size:12px;color:'+navy+'">&#8595; Download PDF</a></div>';
         } else {
-          // Non-image/non-PDF: use blob-URL button (works from file:// in all browsers)
           var uid='baf-'+i+'-'+f;
           if(inline){
-            // Blob-based download for exported HTML files
+            // Blob-based download button; data stored in hidden #baf-store spans
             h+='<button onclick="_dlAF(\''+uid+'\')" style="display:inline-flex;align-items:center;gap:8px;padding:9px 14px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12.5px;font-weight:600;color:'+navy+';cursor:pointer;font-family:Inter,sans-serif">&#128229; Download '+esc(fi.name)+'</button>';
           } else {
-            // In-app preview: direct data: link is fine (full browser context)
             h+='<a href="'+fi.dataUrl+'" download="'+esc(fi.name)+'" style="display:inline-flex;align-items:center;gap:8px;padding:9px 14px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12.5px;font-weight:600;color:'+navy+';text-decoration:none">&#128196; '+esc(fi.name)+'</a>';
           }
         }
@@ -11155,6 +11179,8 @@ function buildAnnexHtml(inline, obsNumMap){
     h+='</div>';
   }
   h+='</div>';
+
+  if(inline) return {head:headScript, body:h, data:dataHolders};
   return h;
 }
 
@@ -11438,10 +11464,12 @@ function finalizeReport(){
   }
 
   var today=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
+  var finalAnnexParts=buildAnnexHtml(true);
   var finalHtml='<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n';
   finalHtml+='<title>FINAL – Audit Report'+(H.brcode?' '+H.brcode:'')+(H.brname?' '+H.brname:'')+'</title>\n';
   finalHtml+='<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">\n';
   finalHtml+='<style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{font-family:Inter,sans-serif;font-size:13.5px;color:#1e2d40;background:#f3f5f8;padding:20px}#wrap{max-width:860px;margin:0 auto}#rp{background:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(26,58,92,.1);padding:30px 34px}#finalbanner{background:#e6f4ea;border:1px solid #5a9a6a;border-radius:6px;padding:10px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:#2a6040}#prtbtn{margin-bottom:16px;padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-family:Inter,sans-serif;font-size:13px;font-weight:600;cursor:pointer}#prtbtn:hover{background:#2a5080}@media print{#finalbanner,#prtbtn{display:none!important}body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}div{page-break-inside:avoid}}</style>\n';
+  finalHtml+=finalAnnexParts.head+'\n';
   finalHtml+='</head>\n<body>\n<div id="wrap">\n';
   finalHtml+='<div id="finalbanner">&#9989; FINAL AUDIT REPORT &nbsp;|&nbsp; Finalized: '+today+'&nbsp;&nbsp;<span style="margin-left:auto;font-weight:400;font-size:11px;color:#3a7050">This is the finalized version. All fields are locked.</span></div>\n';
   finalHtml+='<button id="prtbtn" onclick="window.print()">&#128462; Print / Save as PDF</button>\n';
@@ -11460,12 +11488,13 @@ function finalizeReport(){
   finalHtml+=buildIntroHtml(getIntroSectionVals(), true);
   finalHtml+='<p style="font-size:12px;color:#6a7888;margin-bottom:16px">Total Observations: <strong>'+num+'</strong></p>';
   finalHtml+=obsSection;
-  finalHtml+=buildAnnexHtml(true);
+  finalHtml+=finalAnnexParts.body;
   // Embed full session so this HTML can be re-loaded into the app
   var embeddedSess=captureSession();
   embeddedSess.ts=new Date().toISOString();
   embeddedSess.ver=0; // marker: came from exported HTML
   finalHtml+='<script id="bhs-session-data" type="application/json">'+JSON.stringify(embeddedSess)+'<\/script>';
+  finalHtml+=finalAnnexParts.data+'\n';
   finalHtml+='</div>\n</div>\n</body>\n</html>';
 
   // Store built report for save dialog to use
