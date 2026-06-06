@@ -339,6 +339,13 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 #toolbar{background:linear-gradient(90deg,#0d1f35 0%,#1a3a5c 100%);border-bottom:2px solid #c9962a;flex-wrap:nowrap}
 .tbtn{transition:filter .15s,transform .1s,box-shadow .15s}
 .tbtn:hover{filter:brightness(1.18);transform:translateY(-1px);box-shadow:0 3px 8px rgba(0,0,0,.25)}
+
+/* ===== DASHBOARD BUTTON TOOLTIPS ===== */
+#btn-tip{position:fixed;z-index:99999;pointer-events:none;display:none;max-width:240px;
+  background:#1a2a3c;color:#f0f4fa;border:1px solid #3a5a8c;border-radius:7px;
+  padding:9px 13px;box-shadow:0 4px 18px rgba(0,0,0,.38);font-family:Inter,sans-serif;font-size:12px;line-height:1.55}
+#btn-tip .bt-title{font-weight:700;font-size:12.5px;color:#f0c040;margin-bottom:3px}
+#btn-tip .bt-body{color:#c8d8ee}
 .tbtn:active{transform:translateY(0);box-shadow:none}
 /* Toolbar button groups and separators */
 .tb-grp{display:flex;gap:5px;align-items:center}
@@ -7784,20 +7791,23 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
 
 <div id="toolbar">
   <div class="brand">BHS <small>Internal Audit — Report Builder</small></div>
-  <button class="tbtn new rpt-btn"  onclick="doNewReport()"       title="Start a new report">&#43; New</button>
-  <button class="tbtn load rpt-btn" onclick="triggerLoadReport()"  title="Load a saved report file">&#128228; Load Report</button>
-  <button class="tbtn"              id="ra-tab-btn" onclick="toggleRAPanel()" title="Risk Assessment tool">&#128202; Risk Assessment</button>
-  <button class="tbtn save rpt-btn" onclick="showVersionHistory()" title="Save or restore versions">&#128190; Save / Versions</button>
-  <button class="tbtn cp rpt-btn"   onclick="doCopy()"             title="Copy report text">&#128203; Copy</button>
-  <button class="tbtn r rpt-btn"    onclick="doClear()"            title="Clear all data">&#10005; Clear</button>
-  <button class="tbtn"              id="aws-tab-btn" onclick="toggleAWSPanel()" title="Audit Work Status">&#128203; Work Status</button>
-  <button class="tbtn soft rpt-btn" onclick="downloadSoftCopy()"   title="Download Auditee Copy">&#128233; Auditee Copy</button>
-  <button class="tbtn draft rpt-btn" onclick="showDraftModal()"    title="Draft report by category">&#128196; Draft by Category</button>
-  <button class="tbtn load rpt-btn" onclick="triggerLoad()"        title="Load auditee response file">&#128193; Load Response</button>
-  <button class="tbtn fin rpt-btn"  onclick="showSaveDialog()"     title="Finalize and export report">&#9989; Finalize</button>
-  <button class="tbtn cmp rpt-btn"  onclick="showCompareModal()"   title="Compare two report versions">&#128269; Compare</button>
-  <button class="tbtn rpt-btn" id="demo-btn" style="background:#c9962a;color:#111;border:2px solid #f0c040;font-weight:700" onclick="loadDemoData()" title="Load sample data for demonstration">&#127919; Demo</button>
+  <button class="tbtn new rpt-btn"  onclick="doNewReport()"       data-tip-title="New Report" data-tip="Clears all current data and starts a completely blank report. Use this when beginning an audit for a new branch.">&#43; New</button>
+  <button class="tbtn load rpt-btn" onclick="triggerLoadReport()"  data-tip-title="Load Report" data-tip="Reloads a previously saved report file (HTML or JSON session). Restores all observations, branch info, responses, and annexures exactly as they were saved.">&#128228; Load Report</button>
+  <button class="tbtn"              id="ra-tab-btn" onclick="toggleRAPanel()" data-tip-title="Risk Assessment" data-tip="Opens the Risk Assessment panel where you can rate each observation by likelihood, impact, and control effectiveness to compute an overall risk score.">&#128202; Risk Assessment</button>
+  <button class="tbtn save rpt-btn" onclick="showVersionHistory()" data-tip-title="Save / Versions" data-tip="Saves the current report as a new version and shows the version history. You can restore any earlier version at any time.">&#128190; Save / Versions</button>
+  <button class="tbtn cp rpt-btn"   onclick="doCopy()"             data-tip-title="Copy Report" data-tip="Copies the full text of the generated report to your clipboard so you can paste it into Word, email, or any other document.">&#128203; Copy</button>
+  <button class="tbtn r rpt-btn"    onclick="doClear()"            data-tip-title="Clear Draft" data-tip="Removes all selected observations and clears the draft report content. Branch &amp; Report Information is preserved. Use this to reset observation selections without losing the header data.">&#10005; Clear</button>
+  <button class="tbtn"              id="aws-tab-btn" onclick="toggleAWSPanel()" data-tip-title="Work Status" data-tip="Opens the Audit Work Status panel — a category-wise checklist to track which observations have been reviewed, drafted, and signed off during fieldwork.">&#128203; Work Status</button>
+  <button class="tbtn soft rpt-btn" onclick="downloadSoftCopy()"   data-tip-title="Auditee Copy" data-tip="Generates and downloads an HTML file for the auditee. It contains all observations with blank response fields that the auditee fills in and returns to the auditor.">&#128233; Auditee Copy</button>
+  <button class="tbtn draft rpt-btn" onclick="showDraftModal()"    data-tip-title="Draft by Category" data-tip="Downloads a formatted draft report grouped by observation category. Useful for internal review before the final report is issued.">&#128196; Draft by Category</button>
+  <button class="tbtn load rpt-btn" onclick="triggerLoad()"        data-tip-title="Load Response" data-tip="Loads the completed auditee response file (returned by the auditee) back into the system. Responses and estimated resolution times are automatically mapped to each observation.">&#128193; Load Response</button>
+  <button class="tbtn fin rpt-btn"  onclick="showSaveDialog()"     data-tip-title="Finalize Report" data-tip="Generates the final signed-off audit report for official issuance. Includes all observations, auditee responses, audit views, and annexures in a ready-to-submit format.">&#9989; Finalize</button>
+  <button class="tbtn cmp rpt-btn"  onclick="showCompareModal()"   data-tip-title="Compare Versions" data-tip="Side-by-side comparison of two saved report versions. Highlights changes in observations, responses, and wording between drafts.">&#128269; Compare</button>
+  <button class="tbtn rpt-btn" id="demo-btn" style="background:#c9962a;color:#111;border:2px solid #f0c040;font-weight:700" onclick="loadDemoData()" data-tip-title="Demo Mode" data-tip="Loads sample branch data and observations so you can explore all features of the system without creating a real report.">&#127919; Demo</button>
 </div>
+
+<!-- Dashboard button tooltip -->
+<div id="btn-tip"><div class="bt-title" id="btn-tip-title"></div><div class="bt-body" id="btn-tip-body"></div></div>
 
 <!-- ===== AUDIT WORK STATUS PANEL ===== -->
 <div id="aws-panel">
@@ -9181,6 +9191,62 @@ function importSessionFile(e){
       saveVersion();
     }
   },60000);
+})();
+
+// ============================================================
+// DASHBOARD BUTTON TOOLTIPS
+// ============================================================
+(function(){
+  var tip=document.getElementById('btn-tip');
+  var tipTitle=document.getElementById('btn-tip-title');
+  var tipBody=document.getElementById('btn-tip-body');
+  var _showTimer=null;
+
+  function show(btn){
+    var title=btn.getAttribute('data-tip-title')||'';
+    var body=btn.getAttribute('data-tip')||'';
+    if(!body) return;
+    tipTitle.textContent=title;
+    tipBody.innerHTML=body;
+    tip.style.display='block';
+    position(btn);
+  }
+
+  function position(btn){
+    var r=btn.getBoundingClientRect();
+    var tw=tip.offsetWidth||240;
+    var th=tip.offsetHeight||60;
+    var left=r.left;
+    // Clamp to viewport
+    if(left+tw>window.innerWidth-8) left=window.innerWidth-tw-8;
+    if(left<8) left=8;
+    var top=r.bottom+6;
+    // If not enough space below, show above
+    if(top+th>window.innerHeight-8) top=r.top-th-6;
+    tip.style.left=left+'px';
+    tip.style.top=top+'px';
+  }
+
+  function hide(){
+    clearTimeout(_showTimer);
+    tip.style.display='none';
+  }
+
+  var toolbar=document.getElementById('toolbar');
+  if(!toolbar) return;
+  toolbar.addEventListener('mouseover',function(e){
+    var btn=e.target.closest('[data-tip]');
+    if(!btn){hide();return;}
+    clearTimeout(_showTimer);
+    _showTimer=setTimeout(function(){show(btn);},500);
+  });
+  toolbar.addEventListener('mouseout',function(e){
+    var to=e.relatedTarget;
+    if(to&&to.closest&&to.closest('[data-tip]')) return;
+    clearTimeout(_showTimer);
+    hide();
+  });
+  toolbar.addEventListener('click',function(){hide();});
 })();
 
 // ============================================================
