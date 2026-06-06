@@ -8924,7 +8924,11 @@ function captureSession() {
     refMap   : refMap,
     customs  : customs,
     responseLoaded: responseLoaded,
-    introSections: getIntroSectionVals()
+    introSections: getIntroSectionVals(),
+    annexures: annexures.map(function(a){
+      return {id:a.id,label:a.label,title:a.title,text:a.text||'',linkedObs:a.linkedObs||[],open:a.open,
+              files:(a.files||[]).map(function(f){return {name:f.name,type:f.type,dataUrl:f.dataUrl};})};
+    })
   };
 }
 
@@ -8958,6 +8962,12 @@ function restoreSession(sess) {
   // Restore responseLoaded — also infer it if assessMap or respMap has entries
   responseLoaded = sess.responseLoaded || Object.keys(assessMap).length>0 || Object.keys(sess.respMap||{}).length>0;
   customs   = sess.customs   || [];
+  // Restore annexures (files are preserved as dataUrls if they were saved)
+  annexures = (sess.annexures||[]).map(function(a){
+    return {id:a.id,label:a.label||'',title:a.title||'',text:a.text||'',
+            linkedObs:a.linkedObs||[],open:a.open||false,
+            files:(a.files||[]).map(function(f){return {name:f.name,type:f.type,dataUrl:f.dataUrl};})};
+  });
   // Restore intro sections
   var iSec = sess.introSections || {};
   for(var ii=0;ii<INTRO_SECTION_IDS.length;ii++){
@@ -8971,6 +8981,7 @@ function restoreSession(sess) {
   updateStageBadge();
   _brInfoHasData = true;
   lockBrInfo();
+  renderAnnexList();
   renderRpt();
 }
 
@@ -8994,7 +9005,23 @@ function saveVersion() {
     deleted = sessions.shift();
   }
   sessions.push(sess);
-  ss(VH_KEY, sessions);
+  // Try saving with full file data; if localStorage quota is exceeded, strip file blobs and retry
+  try {
+    localStorage.setItem(VH_KEY, JSON.stringify(sessions));
+  } catch(e) {
+    // Strip file dataUrls (can be large) to fit in storage; user will need to re-attach files after restore
+    var stripped = sessions.map(function(s){
+      if(!s.annexures) return s;
+      var sc = JSON.parse(JSON.stringify(s));
+      sc.annexures = sc.annexures.map(function(a){
+        var ac=JSON.parse(JSON.stringify(a));
+        ac.files=(a.files||[]).map(function(f){return {name:f.name,type:f.type,dataUrl:'',_stripped:true};});
+        return ac;
+      });
+      return sc;
+    });
+    try { localStorage.setItem(VH_KEY, JSON.stringify(stripped)); } catch(e2) {}
+  }
 
   // Update autosave indicator and re-lock branch info
   updateAutoSaveLabel();
@@ -10854,10 +10881,15 @@ function renderAnnexList(){
         var fi=a.files[f];
         var isImg=fi.type&&fi.type.indexOf('image/')===0;
         h+='<div class="anxfile">';
-        if(isImg) h+='<img src="'+fi.dataUrl+'" style="max-width:100%;max-height:120px;object-fit:contain;border-radius:3px;margin-bottom:5px;display:block">';
-        h+='<div style="display:flex;align-items:center;gap:5px">';
-        h+='<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(fi.name)+'">&#128196; '+esc(fi.name)+'</span>';
-        h+='<button class="mib d" onclick="removeFile(\''+a.id+'\','+f+')">Remove</button></div></div>';
+        if(fi._stripped){
+          h+='<div style="font-size:11px;color:#b05000;background:#fff3e0;border:1px solid #f0c060;border-radius:3px;padding:4px 8px;margin-bottom:4px">&#9888; <strong>'+esc(fi.name)+'</strong> — file data was too large to save in session. Please re-attach the file.</div>';
+        } else {
+          if(isImg) h+='<img src="'+fi.dataUrl+'" style="max-width:100%;max-height:120px;object-fit:contain;border-radius:3px;margin-bottom:5px;display:block">';
+          h+='<div style="display:flex;align-items:center;gap:5px">';
+          h+='<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(fi.name)+'">&#128196; '+esc(fi.name)+'</span>';
+          h+='<button class="mib d" onclick="removeFile(\''+a.id+'\','+f+')">Remove</button></div>';
+        }
+        h+='</div>';
       }
     }
     // Linked Observations checkboxes
@@ -11078,6 +11110,7 @@ function buildAnnexHtml(inline, obsNumMap){
       var afs=annexures[ai].files||[];
       for(var afi=0;afi<afs.length;afi++){
         var af=afs[afi];
+        if(af._stripped||!af.dataUrl) continue;
         var isImgX=af.type&&af.type.indexOf('image/')===0;
         var isPdfX=af.type&&af.type==='application/pdf';
         if(!isImgX&&!isPdfX){
@@ -11154,6 +11187,10 @@ function buildAnnexHtml(inline, obsNumMap){
     } else {
       for(var f=0;f<a.files.length;f++){
         var fi=a.files[f];
+        if(fi._stripped||!fi.dataUrl){
+          h+='<div style="margin-bottom:8px;font-size:12px;color:#b05000;font-style:italic">&#9888; '+esc(fi.name)+' — file not available (needs to be re-attached)</div>';
+          continue;
+        }
         var isImg=fi.type&&fi.type.indexOf('image/')===0;
         var isPdf=fi.type&&fi.type==='application/pdf';
         h+='<div style="margin-bottom:14px">';
@@ -12204,6 +12241,7 @@ function loadDemoData(){
 
   // Render the report
   flushObsEditsToDb();
+  renderAnnexList();
   renderRpt();
 
   // Scroll to report
