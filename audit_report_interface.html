@@ -10579,18 +10579,197 @@ function downloadDraft(individual){
       var effT=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
       if(effT==='repeated') sections[0].obs.push(o); else sections[1].obs.push(o);
     }
+
+    // ── Pre-assign observation numbers so summary tables can reference them ──
+    var obsNums={};   // id -> number string like "R-1", "N-2"
+    var allDraftObs=[];
+    var prefixes=['R','N'];
+    for(var ps=0;ps<sections.length;ps++){
+      var catMapP={};
+      for(var pi=0;pi<sections[ps].obs.length;pi++){
+        var pc=sections[ps].obs[pi].category||'Others';
+        if(!catMapP[pc]) catMapP[pc]=[];
+        catMapP[pc].push(sections[ps].obs[pi]);
+      }
+      var catOrdP=catOrderByDef(catMapP);
+      var pn=0;
+      for(var pci=0;pci<catOrdP.length;pci++){
+        var parr=catMapP[catOrdP[pci]];
+        for(var poi=0;poi<parr.length;poi++){
+          pn++;
+          obsNums[parr[poi].id]=prefixes[ps]+'-'+pn;
+          allDraftObs.push(parr[poi]);
+        }
+      }
+    }
+    var total=allDraftObs.length;
+
+    // ── Sensitivity data ──
+    var SENS_LEVELS=[
+      {key:'High',    label:'High',    bg:'#c0392b',fg:'#fff',bar:'#e74c3c'},
+      {key:'M to H',  label:'Medium to High', bg:'#e67e22',fg:'#fff',bar:'#f39c12'},
+      {key:'L to M',  label:'Low to Medium',  bg:'#f1c40f',fg:'#333',bar:'#f39c12'},
+      {key:'Low',     label:'Low',     bg:'#27ae60',fg:'#fff',bar:'#2ecc71'},
+      {key:'',        label:'Not Rated',bg:'#95a5a6',fg:'#fff',bar:'#bdc3c7'}
+    ];
+    var sensCount={};
+    var sensObs={};
+    for(var sli=0;sli<SENS_LEVELS.length;sli++){
+      sensCount[SENS_LEVELS[sli].key]=0;
+      sensObs[SENS_LEVELS[sli].key]=[];
+    }
+    for(var di=0;di<allDraftObs.length;di++){
+      var dob=allDraftObs[di];
+      var sk=sensitivityMap[dob.id]||'';
+      if(!(sk in sensCount)) sk='';
+      sensCount[sk]++;
+      sensObs[sk].push(obsNums[dob.id]);
+    }
+
+    // ── COSO data ──
+    var COSO_COMPS=[
+      {key:'CE',label:'Control Environment',   desc:'Tone at the top, ethics, organizational structure, HR policies',        col:'#1a3a5c'},
+      {key:'RA',label:'Risk Assessment',        desc:'Identification, analysis and response to risks at branch level',         col:'#8e44ad'},
+      {key:'CA',label:'Control Activities',     desc:'Policies and procedures ensuring management directives are carried out', col:'#16a085'},
+      {key:'IC',label:'Information & Communication',desc:'Relevant information identified, captured and communicated timely',  col:'#2980b9'},
+      {key:'M', label:'Monitoring',             desc:'Ongoing assessment of control quality; corrective action taken',         col:'#c0392b'},
+      {key:'',  label:'Not Mapped',             desc:'COSO component not assigned',                                            col:'#95a5a6'}
+    ];
+    var cosoCount={};
+    var cosoObs={};
+    for(var coi=0;coi<COSO_COMPS.length;coi++){
+      cosoCount[COSO_COMPS[coi].key]=0;
+      cosoObs[COSO_COMPS[coi].key]=[];
+    }
+    for(var di2=0;di2<allDraftObs.length;di2++){
+      var dob2=allDraftObs[di2];
+      var ck=cosoMap[dob2.id]||'';
+      if(!(ck in cosoCount)) ck='';
+      cosoCount[ck]++;
+      cosoObs[ck].push(obsNums[dob2.id]);
+    }
+
+    var navy='#1a3a5c', gold='#c9962a';
     var h='<div style="font-family:Georgia,serif;max-width:820px;margin:0 auto;padding:30px">';
-    h+='<div style="text-align:center;border-bottom:3px solid #1a3a5c;padding-bottom:14px;margin-bottom:20px">';
+
+    // Cover header
+    h+='<div style="text-align:center;border-bottom:3px solid '+navy+';padding-bottom:14px;margin-bottom:20px">';
     h+='<div style="font-size:12px;letter-spacing:1px;color:#888;text-transform:uppercase">Beaconhouse Group &mdash; Systems &amp; Audit</div>';
-    h+='<h1 style="font-size:22px;color:#1a3a5c;margin:6px 0 4px">AUDIT REPORT</h1>';
+    h+='<h1 style="font-size:22px;color:'+navy+';margin:6px 0 4px">AUDIT REPORT</h1>';
     if(H.brname) h+='<h2 style="font-size:16px;color:#2a4a6c;margin:0">'+esc(H.brname)+'</h2>';
     if(cats.length===1) h+='<div style="font-size:12px;color:#555;margin-top:6px">Category: <strong>'+esc(cats[0])+'</strong></div>';
     else h+='<div style="font-size:12px;color:#555;margin-top:6px">Categories: <strong>'+cats.map(esc).join(', ')+'</strong></div>';
     h+='</div>';
+
+    if(total>0){
+      // ════════════════════════════════════════════════
+      // SENSITIVITY MATRIX
+      // ════════════════════════════════════════════════
+      h+='<div style="margin-bottom:30px;page-break-inside:avoid">';
+      h+='<div style="font-family:Arial,sans-serif;font-size:13px;font-weight:700;color:#fff;background:'+navy+';padding:9px 14px;border-radius:4px 4px 0 0;letter-spacing:.4px">&#9651; Sensitivity Matrix</div>';
+      h+='<div style="border:1px solid #c8d8ec;border-top:none;border-radius:0 0 6px 6px;overflow:hidden">';
+
+      // Summary bar
+      h+='<div style="display:flex;height:18px">';
+      for(var si2=0;si2<SENS_LEVELS.length;si2++){
+        var sl=SENS_LEVELS[si2];
+        var pct=total?Math.round(sensCount[sl.key]/total*100):0;
+        if(!pct) continue;
+        h+='<div style="flex:'+sensCount[sl.key]+';background:'+sl.bar+';transition:flex .3s" title="'+sl.label+': '+sensCount[sl.key]+'"></div>';
+      }
+      h+='</div>';
+
+      // Table
+      h+='<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px">';
+      h+='<thead><tr>';
+      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:left;font-weight:700;border-bottom:2px solid #c8d8ec;width:28%">Sensitivity Level</th>';
+      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:center;font-weight:700;border-bottom:2px solid #c8d8ec;width:12%">Count</th>';
+      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:center;font-weight:700;border-bottom:2px solid #c8d8ec;width:18%">% of Total</th>';
+      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:left;font-weight:700;border-bottom:2px solid #c8d8ec">Bar</th>';
+      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:left;font-weight:700;border-bottom:2px solid #c8d8ec">Observations</th>';
+      h+='</tr></thead><tbody>';
+      for(var sl2i=0;sl2i<SENS_LEVELS.length;sl2i++){
+        var sl2=SENS_LEVELS[sl2i];
+        var cnt=sensCount[sl2.key]; var pct2=total?Math.round(cnt/total*100):0;
+        var refs=sensObs[sl2.key].join(', ')||'—';
+        var isOdd=(sl2i%2===0);
+        h+='<tr style="background:'+(isOdd?'#fff':'#f8fafd')+'">';
+        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6"><span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:'+sl2.bg+';color:'+sl2.fg+'">'+sl2.label+'</span></td>';
+        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;text-align:center;font-weight:700;color:'+navy+'">'+cnt+'</td>';
+        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;text-align:center;color:#4a6080">'+pct2+'%</td>';
+        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6">';
+        if(cnt){
+          h+='<div style="background:#e8eef6;border-radius:3px;height:10px;width:100%"><div style="background:'+sl2.bar+';height:10px;border-radius:3px;width:'+pct2+'%"></div></div>';
+        }
+        h+='</td>';
+        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;color:#3a5070;font-size:11.5px">'+esc(refs)+'</td>';
+        h+='</tr>';
+      }
+      // Totals row
+      h+='<tr style="background:#edf2f8;font-weight:700">';
+      h+='<td style="padding:8px 12px;color:'+navy+'">Total</td>';
+      h+='<td style="padding:8px 12px;text-align:center;color:'+navy+'">'+total+'</td>';
+      h+='<td style="padding:8px 12px;text-align:center;color:'+navy+'">100%</td>';
+      h+='<td colspan="2" style="padding:8px 12px;color:#666;font-size:11px;font-weight:400">Observations across all selected categories</td>';
+      h+='</tr>';
+      h+='</tbody></table></div></div>';
+
+      // ════════════════════════════════════════════════
+      // COSO FRAMEWORK
+      // ════════════════════════════════════════════════
+      h+='<div style="margin-bottom:30px;page-break-inside:avoid">';
+      h+='<div style="font-family:Arial,sans-serif;font-size:13px;font-weight:700;color:#fff;background:'+navy+';padding:9px 14px;border-radius:4px 4px 0 0;letter-spacing:.4px">&#9632; COSO Framework Analysis</div>';
+      h+='<div style="border:1px solid #c8d8ec;border-top:none;border-radius:0 0 6px 6px;overflow:hidden">';
+
+      // Segment bar
+      h+='<div style="display:flex;height:18px">';
+      for(var coi2=0;coi2<COSO_COMPS.length;coi2++){
+        var cc2=COSO_COMPS[coi2];
+        if(!cosoCount[cc2.key]) continue;
+        h+='<div style="flex:'+cosoCount[cc2.key]+';background:'+cc2.col+';opacity:.85" title="'+cc2.label+': '+cosoCount[cc2.key]+'"></div>';
+      }
+      h+='</div>';
+
+      // Table
+      h+='<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px">';
+      h+='<thead><tr>';
+      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:left;font-weight:700;border-bottom:2px solid #c8d8ec;width:10%">Code</th>';
+      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:left;font-weight:700;border-bottom:2px solid #c8d8ec;width:24%">Component</th>';
+      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:left;font-weight:700;border-bottom:2px solid #c8d8ec">Description</th>';
+      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:center;font-weight:700;border-bottom:2px solid #c8d8ec;width:8%">Count</th>';
+      h+='<th style="padding:8px 12px;background:#edf2f8;color:'+navy+';text-align:left;font-weight:700;border-bottom:2px solid #c8d8ec;width:22%">Observations</th>';
+      h+='</tr></thead><tbody>';
+      for(var coti=0;coti<COSO_COMPS.length;coti++){
+        var cc=COSO_COMPS[coti];
+        var ccnt=cosoCount[cc.key];
+        var crefs=cosoObs[cc.key].join(', ')||'—';
+        var isOdd2=(coti%2===0);
+        h+='<tr style="background:'+(isOdd2?'#fff':'#f8fafd')+'">';
+        if(cc.key){
+          h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;text-align:center"><span style="display:inline-block;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:800;background:'+cc.col+';color:#fff">'+cc.key+'</span></td>';
+        } else {
+          h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;text-align:center"><span style="font-size:11px;color:#aaa">—</span></td>';
+        }
+        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;font-weight:600;color:'+cc.col+'">'+esc(cc.label)+'</td>';
+        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;color:#4a6080;font-size:11px">'+esc(cc.desc)+'</td>';
+        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;text-align:center;font-weight:700;color:'+(ccnt?navy:'#aaa')+'">'+ccnt+'</td>';
+        h+='<td style="padding:8px 12px;border-bottom:1px solid #e8eef6;color:#3a5070;font-size:11.5px">'+esc(crefs)+'</td>';
+        h+='</tr>';
+      }
+      h+='<tr style="background:#edf2f8;font-weight:700">';
+      h+='<td colspan="3" style="padding:8px 12px;color:'+navy+'">Total</td>';
+      h+='<td style="padding:8px 12px;text-align:center;color:'+navy+'">'+total+'</td>';
+      h+='<td style="padding:8px 12px;color:#666;font-size:11px;font-weight:400">All draft observations</td>';
+      h+='</tr>';
+      h+='</tbody></table></div></div>';
+    }
+
+    // ── Detailed observation sections ──
+    var numD=0;
     for(var si=0;si<sections.length;si++){
       if(!sections[si].obs.length) continue;
-      var num=0;
-      h+='<div style="font-family:Arial,sans-serif;font-size:14px;font-weight:700;color:#fff;background:#1a3a5c;padding:10px 16px;margin:18px 0 12px;border-radius:4px">'+esc(sections[si].label)+'</div>';
+      numD=0;
+      h+='<div style="font-family:Arial,sans-serif;font-size:14px;font-weight:700;color:#fff;background:'+navy+';padding:10px 16px;margin:18px 0 12px;border-radius:4px">'+esc(sections[si].label)+'</div>';
       var catMap={};
       for(var oi=0;oi<sections[si].obs.length;oi++){
         var cat=sections[si].obs[oi].category||'Others';
@@ -10599,30 +10778,39 @@ function downloadDraft(individual){
       }
       var catOrd=catOrderByDef(catMap);
       for(var cii=0;cii<catOrd.length;cii++){
-        h+='<div style="font-size:13px;font-weight:700;color:#1a3a5c;padding:7px 0 4px;border-bottom:2px solid #c8a84b;margin-bottom:10px">'+esc(catOrd[cii])+'</div>';
+        h+='<div style="font-size:13px;font-weight:700;color:'+navy+';padding:7px 0 4px;border-bottom:2px solid #c8a84b;margin-bottom:10px">'+esc(catOrd[cii])+'</div>';
         var obsArr=catMap[catOrd[cii]];
         for(var oii=0;oii<obsArr.length;oii++){
-          num++;
+          numD++;
           var o=obsArr[oii];
           var obsText=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:o.observation||'';
           var recText=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
+          var oNum=obsNums[o.id]||numD;
+          var oSens=sensitivityMap[o.id]||'';
+          var oCoso=cosoMap[o.id]||'';
+          var oSensConf=null;
+          for(var slx=0;slx<SENS_LEVELS.length;slx++){if(SENS_LEVELS[slx].key===oSens){oSensConf=SENS_LEVELS[slx];break;}}
+          var oCosoConf=null;
+          for(var cox=0;cox<COSO_COMPS.length;cox++){if(COSO_COMPS[cox].key===oCoso){oCosoConf=COSO_COMPS[cox];break;}}
           h+='<div style="background:#f8fafd;border:1px solid #c5d5e8;border-radius:6px;padding:14px 16px;margin-bottom:14px">';
           var refLabel=refMap[o.id]||'';
-          h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
-          h+='<span style="font-weight:700;color:#1a3a5c">Obs. '+num+': '+esc(o.title)+'</span>';
+          h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">';
+          h+='<span style="font-weight:700;color:'+navy+'">Obs. '+oNum+': '+esc(o.title)+'</span>';
           if(refLabel) h+='<span style="padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:#fff0e0;color:#7a3000;border:1px solid #e0a060">'+esc(refLabel)+'</span>';
+          if(oSensConf&&oSensConf.key) h+='<span style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:'+oSensConf.bg+';color:'+oSensConf.fg+'">'+oSensConf.label+'</span>';
+          if(oCosoConf&&oCosoConf.key) h+='<span style="padding:2px 8px;border-radius:4px;font-size:10px;font-weight:800;background:'+oCosoConf.col+';color:#fff">'+oCosoConf.key+' — '+esc(oCosoConf.label)+'</span>';
           h+='</div>';
           h+='<div style="font-size:11.5px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Observation</div>';
           h+='<div style="font-size:13px;line-height:1.6;color:#2a3a50;margin-bottom:10px;white-space:pre-wrap">'+esc(obsText)+'</div>';
           h+='<div style="font-size:11.5px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Recommendation</div>';
           h+='<div style="font-size:13px;line-height:1.6;color:#2a3a50;margin-bottom:10px;white-space:pre-wrap">'+esc(recText)+'</div>';
-          h+='<div style="font-size:11.5px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Auditee Response</div>';
+          h+='<div style="font-size:11.5px;font-weight:700;color:'+navy+';text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Auditee Response</div>';
           h+='<textarea name="resp_'+o.id+'" style="width:100%;box-sizing:border-box;border:1px dashed #b0c0d8;border-radius:4px;padding:7px 9px;font-family:Inter,sans-serif;font-size:12.5px;color:#2a3a50;background:#fffef0;resize:vertical;min-height:70px;outline:none" placeholder="Please enter auditee response here..."></textarea>';
           h+='</div>';
         }
       }
     }
-    if(num===0) h+='<p style="color:#888;text-align:center">No observations in selected categories.</p>';
+    if(!numD&&!total) h+='<p style="color:#888;text-align:center">No observations in selected categories.</p>';
     syncAnnexTextFromDom();
     var annexParts=buildAnnexHtml(true);
     h+=annexParts.body;
