@@ -10939,6 +10939,23 @@ function downloadSoftCopy(){
   softHtml+='<script>\n';
   softHtml+='var _meta=JSON.parse(document.getElementById("report-meta").textContent||"{}"),\n';
   softHtml+='    _KEY="bhs_ar_"+(_meta.rno||"")+"|"+(_meta.brcode||"");\n';
+  // Save file with picker (showSaveFilePicker) or fallback
+  softHtml+='function saveFileAs(blob,name){\n';
+  softHtml+='  var ext=(name.split(".").pop()||"").toLowerCase();\n';
+  softHtml+='  var typeMap={html:["text/html",[".html"],"HTML Document"],json:["application/json",[".json"],"JSON File"]};\n';
+  softHtml+='  var tm=typeMap[ext]||[blob.type||"application/octet-stream",["."+ext],ext.toUpperCase()+" File"];\n';
+  softHtml+='  if(window.showSaveFilePicker){\n';
+  softHtml+='    window.showSaveFilePicker({suggestedName:name,types:[{description:tm[2],accept:{[tm[0]]:tm[1]}}]})\n';
+  softHtml+='      .then(function(h){return h.createWritable();})\n';
+  softHtml+='      .then(function(w){w.write(blob).then(function(){w.close();});});\n';
+  softHtml+='      /*.catch used below*/\n';
+  softHtml+='  } else { _legacySave(blob,name); }\n';
+  softHtml+='}\n';
+  softHtml+='function _legacySave(blob,name){\n';
+  softHtml+='  var url=URL.createObjectURL(blob),a=document.createElement("a");\n';
+  softHtml+='  a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);\n';
+  softHtml+='  setTimeout(function(){URL.revokeObjectURL(url);},2000);\n';
+  softHtml+='}\n';
   // Collect all editable fields
   softHtml+='function collectData(){\n';
   softHtml+='  var d={};\n';
@@ -10977,12 +10994,8 @@ function downloadSoftCopy(){
   softHtml+='function saveProgress(){\n';
   softHtml+='  var json=JSON.stringify(collectData(),null,2);\n';
   softHtml+='  var blob=new Blob([json],{type:"application/json"});\n';
-  softHtml+='  var a=document.createElement("a");\n';
-  softHtml+='  a.href=URL.createObjectURL(blob);\n';
   softHtml+='  var slug=((_meta.brcode||_meta.brname||"Progress")+"").replace(/[^a-zA-Z0-9_\\-]/g,"_");\n';
-  softHtml+='  a.download="AuditResponse_Progress_"+slug+".json";\n';
-  softHtml+='  document.body.appendChild(a);a.click();document.body.removeChild(a);\n';
-  softHtml+='  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);\n';
+  softHtml+='  saveFileAs(blob,"AuditResponse_Progress_"+slug+".json");\n';
   softHtml+='}\n';
   // Layer 2: load progress from JSON file
   softHtml+='function loadProgress(){document.getElementById("loadfile").click();}\n';
@@ -10994,7 +11007,7 @@ function downloadSoftCopy(){
   softHtml+='      restoreData(JSON.parse(ev.target.result));\n';
   softHtml+='      autoSave();\n';
   softHtml+='      var l=document.getElementById("autosavelbl");\n';
-  softHtml+='      if(l){l.textContent="\\u2713 Progress loaded successfully — you can continue filling responses";l.style.color="#1a6030";}\n';
+  softHtml+='      if(l){l.textContent="\\u2713 Progress loaded — you can continue filling responses";l.style.color="#1a6030";}\n';
   softHtml+='    }catch(ex){alert("Could not read the progress file. Please make sure you selected the correct .json file.");}\n';
   softHtml+='  };\n';
   softHtml+='  reader.readAsText(file);\n';
@@ -11034,22 +11047,14 @@ function downloadSoftCopy(){
   // Save Draft
   softHtml+='function saveDraft(){\n';
   softHtml+='  var blob=new Blob([buildHtml(collectData(),true)],{type:"text/html"});\n';
-  softHtml+='  var a=document.createElement("a");\n';
-  softHtml+='  a.href=URL.createObjectURL(blob);\n';
-  softHtml+='  a.download="DRAFT_"+document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+".html";\n';
-  softHtml+='  document.body.appendChild(a);a.click();document.body.removeChild(a);\n';
-  softHtml+='  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);\n';
+  softHtml+='  saveFileAs(blob,"DRAFT_"+document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+".html");\n';
   softHtml+='}\n';
   // Submit Final
   softHtml+='function saveResponses(){\n';
   softHtml+='  var blank=checkComplete();\n';
   softHtml+='  if(blank.length){alert("Please complete all Auditee Response fields before submitting.\\n\\nIncomplete:\\n"+blank.join(", "));return;}\n';
   softHtml+='  var blob=new Blob([buildHtml(collectData(),false)],{type:"text/html"});\n';
-  softHtml+='  var a=document.createElement("a");\n';
-  softHtml+='  a.href=URL.createObjectURL(blob);\n';
-  softHtml+='  a.download=document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_Responded.html";\n';
-  softHtml+='  document.body.appendChild(a);a.click();document.body.removeChild(a);\n';
-  softHtml+='  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);\n';
+  softHtml+='  saveFileAs(blob,document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_Responded.html");\n';
   softHtml+='  try{localStorage.removeItem(_KEY);}catch(e){}\n';
   softHtml+='}\n';
   // Wire up all events on load
