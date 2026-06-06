@@ -10889,18 +10889,21 @@ function downloadSoftCopy(){
   softHtml+='#notice strong{color:#7a5000}\n';
   softHtml+='#rp{background:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(26,58,92,.1);padding:30px 34px}\n';
   softHtml+='textarea{font-family:Inter,sans-serif}\n';
-  softHtml+='#draftbtn{display:block;width:100%;margin-top:24px;padding:13px;background:#b04400;color:#fff;border:none;border-radius:6px;font-family:Inter,sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px}\n';
+  softHtml+='#draftbtn{display:block;width:100%;margin-top:10px;padding:13px;background:#b04400;color:#fff;border:none;border-radius:6px;font-family:Inter,sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px}\n';
   softHtml+='#draftbtn:hover{background:#d05000}\n';
   softHtml+='#savebtn{display:block;width:100%;margin-top:10px;padding:13px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-family:Inter,sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px}\n';
   softHtml+='#savebtn:hover{background:#2a5080}\n';
+  softHtml+='.row2btn{display:flex;gap:10px;margin-top:10px}\n';
+  softHtml+='.row2btn button{flex:1;padding:11px;border:none;border-radius:6px;font-family:Inter,sans-serif;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px}\n';
   softHtml+='#progressbar{height:8px;background:#e0e8f0;border-radius:4px;margin-top:16px;overflow:hidden}\n';
   softHtml+='#progressfill{height:100%;background:#2a8a40;border-radius:4px;transition:width .3s}\n';
   softHtml+='#progresslbl{font-size:11px;color:#4a6080;margin-top:4px;text-align:right}\n';
-  softHtml+='@media print{#notice,#savebtn{display:none!important}body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}}\n';
+  softHtml+='#autosavelbl{font-size:11px;margin-top:6px;text-align:center;min-height:16px;color:#2a8a40}\n';
+  softHtml+='@media print{#notice,#actionbar{display:none!important}body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}}\n';
   syncAnnexTextFromDom();
   var annexParts=buildAnnexHtml(true);
   softHtml+='</style>\n'+annexParts.head+'\n</head>\n<body>\n<div id="wrap">\n';
-  softHtml+='<div id="notice"><strong>&#9432; Instructions for Auditee:</strong> Please read each observation carefully and enter your response in the yellow-highlighted <em>Auditee Response</em> field (required). Also fill in the <em>Estimated Time to Resolve</em> field to indicate the expected timeframe for resolving each observation (e.g. 2 weeks, 30 days, by 31-Dec-2025). Use <strong>"Save Draft"</strong> to save progress at any time. When all responses are complete, click <strong>"&#10003; Submit Final Responses"</strong> to download the completed file for submission. <em>The final submit button will be blocked if any Auditee Response field is blank.</em></div>\n';
+  softHtml+='<div id="notice"><strong>&#9432; Instructions for Auditee:</strong> Please read each observation carefully and enter your response in the yellow-highlighted <em>Auditee Response</em> field (required). Also fill in the <em>Estimated Time to Resolve</em> field. <strong>Your work is saved automatically</strong> in this browser — you can close this file and reopen it anytime to continue. To work on a different device, use <strong>&#128190; Save Progress</strong> to back up your work and <strong>&#128194; Load Progress</strong> to restore it. When all responses are complete, click <strong>&#10003; Submit Final Responses</strong> to download the completed file for return to the auditor.</div>\n';
   softHtml+='<div id="rp">\n';
   // Report header
   softHtml+='<div style="text-align:center;border-bottom:3px solid #1a3a5c;padding-bottom:16px;margin-bottom:20px">\n';
@@ -10918,96 +10921,145 @@ function downloadSoftCopy(){
   softHtml+=annexParts.body;
   softHtml+='</div>\n'; // end #rp
   // Progress bar and action buttons
+  softHtml+='<div id="actionbar">\n';
   softHtml+='<div id="progressbar"><div id="progressfill" style="width:0%"></div></div>\n';
   softHtml+='<div id="progresslbl">0 of 0 responses completed</div>\n';
-  softHtml+='<button id="draftbtn" onclick="saveDraft()">&#128190; Save Draft (Incomplete — NOT FOR FORWARDING)</button>\n';
+  softHtml+='<div id="autosavelbl"></div>\n';
+  softHtml+='<div class="row2btn">\n';
+  softHtml+='<button style="background:#1a6030;color:#fff" onclick="saveProgress()">&#128190; Save Progress</button>\n';
+  softHtml+='<button style="background:#4a5568;color:#fff" onclick="loadProgress()">&#128194; Load Progress</button>\n';
+  softHtml+='</div>\n';
+  softHtml+='<button id="draftbtn" onclick="saveDraft()">&#9888; Save Draft (Incomplete &#8212; NOT FOR FORWARDING)</button>\n';
   softHtml+='<button id="savebtn" onclick="saveResponses()">&#10003; Submit Final Responses</button>\n';
+  softHtml+='<input type="file" id="loadfile" accept=".json" style="display:none" onchange="onLoadFile(event)">\n';
+  softHtml+='</div>\n'; // end #actionbar
   softHtml+='</div>\n'; // end #wrap
 
-  // Inline JS for the save-responses feature
+  // Inline JS — Layer 1 (auto-save) + Layer 2 (save/load progress file)
   softHtml+='<script>\n';
-  // Collect all textarea values
+  softHtml+='var _meta=JSON.parse(document.getElementById("report-meta").textContent||"{}"),\n';
+  softHtml+='    _KEY="bhs_ar_"+(_meta.rno||"")+"|"+(_meta.brcode||"");\n';
+  // Collect all editable fields
   softHtml+='function collectData(){\n';
-  softHtml+='  var data={};\n';
-  softHtml+='  var tas=document.querySelectorAll("textarea[name]");\n';
-  softHtml+='  for(var i=0;i<tas.length;i++){if(tas[i].name) data[tas[i].name]=tas[i].value;}\n';
-  softHtml+='  var inps=document.querySelectorAll("input[name^=\\"eta_\\"]");\n';
-  softHtml+='  for(var j=0;j<inps.length;j++){if(inps[j].name) data[inps[j].name]=inps[j].value;}\n';
-  softHtml+='  return data;\n';
+  softHtml+='  var d={};\n';
+  softHtml+='  document.querySelectorAll("textarea[name],input[name^=\\"eta_\\"]").forEach(function(el){if(el.name)d[el.name]=el.value;});\n';
+  softHtml+='  return d;\n';
   softHtml+='}\n';
-  // Check completion — returns array of blank obs labels
-  softHtml+='function checkComplete(){\n';
-  softHtml+='  var respTas=document.querySelectorAll("textarea[name^=\\"resp_\\"]");\n';
-  softHtml+='  var blank=[];\n';
-  softHtml+='  for(var i=0;i<respTas.length;i++){\n';
-  softHtml+='    if(!respTas[i].value.trim()){\n';
-  softHtml+='      var num=respTas[i].getAttribute("data-obs-num")||String(i+1);\n';
-  softHtml+='      blank.push("Obs. "+num);\n';
+  // Restore fields from data object
+  softHtml+='function restoreData(d){\n';
+  softHtml+='  if(!d) return;\n';
+  softHtml+='  Object.keys(d).forEach(function(k){\n';
+  softHtml+='    var el=document.querySelector("[name=\\""+k+"\\"]");\n';
+  softHtml+='    if(el) el.value=d[k]||"";\n';
+  softHtml+='  });\n';
+  softHtml+='  updateProgress();\n';
+  softHtml+='}\n';
+  // Layer 1: auto-save to localStorage
+  softHtml+='function autoSave(){\n';
+  softHtml+='  try{\n';
+  softHtml+='    localStorage.setItem(_KEY,JSON.stringify(collectData()));\n';
+  softHtml+='    var l=document.getElementById("autosavelbl");\n';
+  softHtml+='    if(l){l.textContent="\\u2713 Auto-saved";l.style.color="#2a8a40";}\n';
+  softHtml+='  }catch(e){}\n';
+  softHtml+='}\n';
+  // Layer 1: restore from localStorage on open
+  softHtml+='function autoLoad(){\n';
+  softHtml+='  try{\n';
+  softHtml+='    var raw=localStorage.getItem(_KEY);\n';
+  softHtml+='    if(raw){\n';
+  softHtml+='      restoreData(JSON.parse(raw));\n';
+  softHtml+='      var l=document.getElementById("autosavelbl");\n';
+  softHtml+='      if(l){l.textContent="\\u2713 Previous progress restored automatically";l.style.color="#1a3a5c";}\n';
   softHtml+='    }\n';
-  softHtml+='  }\n';
+  softHtml+='  }catch(e){}\n';
+  softHtml+='}\n';
+  // Layer 2: save progress to JSON file
+  softHtml+='function saveProgress(){\n';
+  softHtml+='  var json=JSON.stringify(collectData(),null,2);\n';
+  softHtml+='  var blob=new Blob([json],{type:"application/json"});\n';
+  softHtml+='  var a=document.createElement("a");\n';
+  softHtml+='  a.href=URL.createObjectURL(blob);\n';
+  softHtml+='  var slug=((_meta.brcode||_meta.brname||"Progress")+"").replace(/[^a-zA-Z0-9_\\-]/g,"_");\n';
+  softHtml+='  a.download="AuditResponse_Progress_"+slug+".json";\n';
+  softHtml+='  document.body.appendChild(a);a.click();document.body.removeChild(a);\n';
+  softHtml+='  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);\n';
+  softHtml+='}\n';
+  // Layer 2: load progress from JSON file
+  softHtml+='function loadProgress(){document.getElementById("loadfile").click();}\n';
+  softHtml+='function onLoadFile(e){\n';
+  softHtml+='  var file=e.target.files&&e.target.files[0];if(!file)return;\n';
+  softHtml+='  var reader=new FileReader();\n';
+  softHtml+='  reader.onload=function(ev){\n';
+  softHtml+='    try{\n';
+  softHtml+='      restoreData(JSON.parse(ev.target.result));\n';
+  softHtml+='      autoSave();\n';
+  softHtml+='      var l=document.getElementById("autosavelbl");\n';
+  softHtml+='      if(l){l.textContent="\\u2713 Progress loaded successfully — you can continue filling responses";l.style.color="#1a6030";}\n';
+  softHtml+='    }catch(ex){alert("Could not read the progress file. Please make sure you selected the correct .json file.");}\n';
+  softHtml+='  };\n';
+  softHtml+='  reader.readAsText(file);\n';
+  softHtml+='  e.target.value="";\n';
+  softHtml+='}\n';
+  // Progress bar
+  softHtml+='function updateProgress(){\n';
+  softHtml+='  var tas=document.querySelectorAll("textarea[name^=\\"resp_\\"]"),total=tas.length,done=0;\n';
+  softHtml+='  for(var i=0;i<tas.length;i++){if(tas[i].value.trim())done++;}\n';
+  softHtml+='  var pct=total?Math.round(done/total*100):0;\n';
+  softHtml+='  var fill=document.getElementById("progressfill"),lbl=document.getElementById("progresslbl");\n';
+  softHtml+='  if(fill)fill.style.width=pct+"%";\n';
+  softHtml+='  if(lbl)lbl.textContent=done+" of "+total+" responses completed";\n';
+  softHtml+='}\n';
+  // Check all resp fields complete
+  softHtml+='function checkComplete(){\n';
+  softHtml+='  var tas=document.querySelectorAll("textarea[name^=\\"resp_\\"]"),blank=[];\n';
+  softHtml+='  for(var i=0;i<tas.length;i++){if(!tas[i].value.trim())blank.push("Obs. "+(tas[i].getAttribute("data-obs-num")||String(i+1)));}\n';
   softHtml+='  return blank;\n';
   softHtml+='}\n';
-  // Update progress bar on input
-  softHtml+='function updateProgress(){\n';
-  softHtml+='  var respTas=document.querySelectorAll("textarea[name^=\\"resp_\\"]");\n';
-  softHtml+='  var total=respTas.length, done=0;\n';
-  softHtml+='  for(var i=0;i<respTas.length;i++){if(respTas[i].value.trim()) done++;}\n';
-  softHtml+='  var pct=total?Math.round(done/total*100):0;\n';
-  softHtml+='  var fill=document.getElementById("progressfill");\n';
-  softHtml+='  var lbl=document.getElementById("progresslbl");\n';
-  softHtml+='  if(fill) fill.style.width=pct+"%";\n';
-  softHtml+='  if(lbl) lbl.textContent=done+" of "+total+" responses completed";\n';
-  softHtml+='}\n';
-  softHtml+='(function(){\n';
-  softHtml+='  var tas=document.querySelectorAll("textarea[name^=\\"resp_\\"]");\n';
-  softHtml+='  for(var i=0;i<tas.length;i++) tas[i].addEventListener("input",updateProgress);\n';
-  softHtml+='  updateProgress();\n';
-  softHtml+='})();\n';
-  // Build downloaded HTML string
-  softHtml+='function buildHtml(data, isDraft){\n';
+  // Build response HTML
+  softHtml+='function buildHtml(data,isDraft){\n';
   softHtml+='  var json=JSON.stringify(data).replace(/<\\/script>/gi,"<\\\\/script>");\n';
-  softHtml+='  var respTas=document.querySelectorAll("textarea[name^=\\"resp_\\"]");\n';
-  softHtml+='  var total=respTas.length, done=0;\n';
-  softHtml+='  for(var i=0;i<respTas.length;i++){if(respTas[i].value.trim()) done++;}\n';
-  softHtml+='  var banner="";\n';
-  softHtml+='  if(isDraft) banner="<div style=\\"background:#c0392b;color:#fff;text-align:center;font-family:Arial,sans-serif;font-size:16px;font-weight:700;padding:14px 20px;letter-spacing:1px\\">&#9888; DRAFT &mdash; NOT FOR FORWARDING &mdash; "+done+" of "+total+" responses completed</div>";\n';
-  softHtml+='  var out="<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>"+(isDraft?"[DRAFT] ":"")+"Auditee Responses<\\/title>"\n';
+  softHtml+='  var tas=document.querySelectorAll("textarea[name^=\\"resp_\\"]"),total=tas.length,done=0;\n';
+  softHtml+='  for(var i=0;i<tas.length;i++){if(tas[i].value.trim())done++;}\n';
+  softHtml+='  var banner=isDraft?"<div style=\\"background:#c0392b;color:#fff;text-align:center;font-family:Arial,sans-serif;font-size:16px;font-weight:700;padding:14px 20px;letter-spacing:1px\\">&#9888; DRAFT &mdash; NOT FOR FORWARDING &mdash; "+done+" of "+total+" responses completed</div>":"";\n';
+  softHtml+='  return "<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>"+(isDraft?"[DRAFT] ":"")+"Auditee Responses<\\/title>"\n';
   softHtml+='    +\'<script id="bhs-resp-data" type="application/json">\'+json+\'<\\/script>\'\n';
   softHtml+='    +"<\\/head><body style=\\"font-family:Arial,sans-serif;padding:0;color:#333\\">"\n';
   softHtml+='    +banner\n';
-  softHtml+='    +"<div style=\\"padding:30px\\">"\n';
-  softHtml+='    +"<h2>&#128203; Auditee Response File<\\/h2>"\n';
-  softHtml+='    +"<p>This file contains your responses. Please email it back to the auditor who will load it via the <strong>Load Response<\\/strong> button.<\\/p>"\n';
+  softHtml+='    +"<div style=\\"padding:30px\\"><h2>&#128203; Auditee Response File<\\/h2>"\n';
+  softHtml+='    +"<p>Please email this file back to the auditor who will load it via the <strong>Load Response<\\/strong> button.<\\/p>"\n';
   softHtml+='    +"<p style=\\"color:#888;font-size:12px\\">Responses completed: "+done+" of "+total+"<\\/p>"\n';
-  softHtml+='    +(isDraft?"<p style=\\"color:#c0392b;font-weight:700;font-size:13px\\">&#9888; This is a DRAFT. Complete all required responses before submitting the final version.<\\/p>":"")\n';
+  softHtml+='    +(isDraft?"<p style=\\"color:#c0392b;font-weight:700;font-size:13px\\">&#9888; DRAFT — Complete all responses before submitting the final version.<\\/p>":"")\n';
   softHtml+='    +"<\\/div><\\/body><\\/html>";\n';
-  softHtml+='  return out;\n';
   softHtml+='}\n';
-  // Save Draft — no validation, marks as DRAFT
+  // Save Draft
   softHtml+='function saveDraft(){\n';
-  softHtml+='  var data=collectData();\n';
-  softHtml+='  var out=buildHtml(data,true);\n';
-  softHtml+='  var blob=new Blob([out],{type:"text/html"});\n';
+  softHtml+='  var blob=new Blob([buildHtml(collectData(),true)],{type:"text/html"});\n';
   softHtml+='  var a=document.createElement("a");\n';
   softHtml+='  a.href=URL.createObjectURL(blob);\n';
   softHtml+='  a.download="DRAFT_"+document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+".html";\n';
-  softHtml+='  a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);},2000);\n';
+  softHtml+='  document.body.appendChild(a);a.click();document.body.removeChild(a);\n';
+  softHtml+='  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);\n';
   softHtml+='}\n';
-  // Save Final — validates all resp_ fields first
+  // Submit Final
   softHtml+='function saveResponses(){\n';
   softHtml+='  var blank=checkComplete();\n';
-  softHtml+='  if(blank.length){\n';
-  softHtml+='    alert("Please complete all Auditee Response fields before submitting.\\n\\nThe following observations have no response:\\n"+blank.join(", "));\n';
-  softHtml+='    return;\n';
-  softHtml+='  }\n';
-  softHtml+='  var data=collectData();\n';
-  softHtml+='  var out=buildHtml(data,false);\n';
-  softHtml+='  var blob=new Blob([out],{type:"text/html"});\n';
+  softHtml+='  if(blank.length){alert("Please complete all Auditee Response fields before submitting.\\n\\nIncomplete:\\n"+blank.join(", "));return;}\n';
+  softHtml+='  var blob=new Blob([buildHtml(collectData(),false)],{type:"text/html"});\n';
   softHtml+='  var a=document.createElement("a");\n';
   softHtml+='  a.href=URL.createObjectURL(blob);\n';
   softHtml+='  a.download=document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_Responded.html";\n';
-  softHtml+='  a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);},2000);\n';
+  softHtml+='  document.body.appendChild(a);a.click();document.body.removeChild(a);\n';
+  softHtml+='  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);\n';
+  softHtml+='  try{localStorage.removeItem(_KEY);}catch(e){}\n';
   softHtml+='}\n';
+  // Wire up all events on load
+  softHtml+='(function(){\n';
+  softHtml+='  document.querySelectorAll("textarea[name],input[name^=\\"eta_\\"]").forEach(function(el){\n';
+  softHtml+='    el.addEventListener("input",function(){autoSave();updateProgress();});\n';
+  softHtml+='  });\n';
+  softHtml+='  autoLoad();\n';
+  softHtml+='  updateProgress();\n';
+  softHtml+='})();\n';
   softHtml+='</scr'+'ipt>\n';
   softHtml+=annexParts.data+'\n';
   softHtml+='</body>\n</html>';
