@@ -8328,6 +8328,43 @@ window.onload = function() {
 function pad(n){return n<10?'0'+n:n;}
 
 // ============================================================
+// FILE SAVE HELPER — uses File System Access API (pick save path)
+// when available; falls back to <a download> for Firefox / Safari
+// ============================================================
+function saveFileAs(blob, suggestedName){
+  if(window.showSaveFilePicker){
+    var ext=(suggestedName.split('.').pop()||'').toLowerCase();
+    var typeMap={
+      'html':['text/html',['.html','.htm'],'HTML Document'],
+      'htm': ['text/html',['.html','.htm'],'HTML Document'],
+      'doc': ['application/msword',['.doc'],'Word Document'],
+      'json':['application/json',['.json'],'JSON File']
+    };
+    var tm=typeMap[ext]||[blob.type||'application/octet-stream',['.'+ext],ext.toUpperCase()+' File'];
+    window.showSaveFilePicker({
+      suggestedName: suggestedName,
+      types:[{description:tm[2], accept:{[tm[0]]:tm[1]}}]
+    }).then(function(handle){
+      return handle.createWritable();
+    }).then(function(writable){
+      writable.write(blob).then(function(){ writable.close(); });
+    }).catch(function(e){
+      if(e&&e.name==='AbortError') return; // user cancelled — no fallback
+      _saveFileAsLegacy(blob, suggestedName);
+    });
+  } else {
+    _saveFileAsLegacy(blob, suggestedName);
+  }
+}
+function _saveFileAsLegacy(blob, name){
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url; a.download=name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(url);},2000);
+}
+
+// ============================================================
 // DROPDOWN BUILDERS
 // ============================================================
 function buildSel(id, arr) {
@@ -9136,12 +9173,8 @@ function exportVersion(ver){
   for(var i=0;i<sessions.length;i++){
     if((sessions[i].ver||0)===ver){
       var blob=new Blob([JSON.stringify(sessions[i],null,2)],{type:'application/json'});
-      var a=document.createElement('a');
       var brSlug=((sessions[i].formData&&sessions[i].formData.brname)||'BHS').replace(/[^a-zA-Z0-9]+/g,'_').substring(0,25);
-      a.download='BHS_Session_v'+ver+'_'+brSlug+'.json';
-      a.href=URL.createObjectURL(blob);
-      a.click();
-      setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+      saveFileAs(blob,'BHS_Session_v'+ver+'_'+brSlug+'.json');
       return;
     }
   }
@@ -10443,11 +10476,7 @@ function exportCmpReport(mode){
   var label=mode==='missing'?'Missing_Observations':'Full_Comparison';
   var catSlug=(cmpState.cat||'All').replace(/[^a-zA-Z0-9]+/g,'_').substring(0,25);
   var blob=new Blob([h],{type:'text/html'});
-  var a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='BHS_Databank_'+label+'_'+catSlug+'_'+new Date().toISOString().slice(0,10)+'.html';
-  a.click();
-  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+  saveFileAs(blob,'BHS_Databank_'+label+'_'+catSlug+'_'+new Date().toISOString().slice(0,10)+'.html');
 }
 
 // ============================================================
@@ -10620,11 +10649,7 @@ function downloadDraft(individual){
       '</div>';
     var full='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+filename+'</title>'+saveScript+annexHead+'</head><body>'+notice+html+saveBtn+annexData+'</body></html>';
     var blob=new Blob([full],{type:'text/html'});
-    var a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);
-    a.download=filename+'.html';
-    a.click();
-    setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+    saveFileAs(blob, filename+'.html');
   }
 
   var brSlug=(H.brname||'Branch').replace(/[^a-zA-Z0-9]+/g,'_').substring(0,30);
@@ -10899,10 +10924,7 @@ function downloadSoftCopy(){
   softHtml+='</body>\n</html>';
 
   var blob=new Blob([softHtml],{type:'text/html'});
-  var url=URL.createObjectURL(blob);
-  var a=document.createElement('a');
-  a.href=url; a.download=fname; a.click();
-  URL.revokeObjectURL(url);
+  saveFileAs(blob, fname);
   toast('Soft copy downloaded.');
 }
 
@@ -11670,7 +11692,7 @@ function showSaveDialog(){
       '<div class="sd-info"><strong>Session File (.json)</strong>'+
       '<span>Saves all working data (observations, responses, annexures). Use this to back up your work and reload it in the app at any time via Save / Versions → Import.</span></div>'+
     '</div>'+
-    '<div class="sd-note">&#9432; &nbsp;Browsers do not allow apps to choose the save folder directly. Files download to your configured Downloads folder. You can change your browser\'s download folder in its Settings.</div>'+
+    '<div class="sd-note">&#9432; &nbsp;A <strong>Save As</strong> dialog will open so you can choose the exact folder and filename. If your browser does not support this (e.g. Firefox), the file will go to your default Downloads folder.</div>'+
     '</div></div>';
   document.body.appendChild(el);
   el.addEventListener('click', function(e){ if(e.target===el) el.remove(); });
@@ -11685,15 +11707,11 @@ function saveAsFinal(fmt){
 
   if(fmt==='html'){
     var blob=new Blob([pf.html],{type:'text/html'});
-    a.href=URL.createObjectURL(blob);
-    a.download=pf.fname;
-    a.click();
-    setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+    saveFileAs(blob, pf.fname);
     toast('Saved as HTML: '+pf.fname);
     lockBrInfo();
 
   } else if(fmt==='word'){
-    // Word-compatible HTML wrapped in Word namespace
     var wordHtml='<html xmlns:o="urn:schemas-microsoft-com:office:office" '+
       'xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'+
       '<head><meta charset="UTF-8">'+
@@ -11709,15 +11727,11 @@ function saveAsFinal(fmt){
       +'</body></html>';
     var wblob=new Blob([wordHtml],{type:'application/msword'});
     var wname=pf.fname.replace(/\.html?$/i,'.doc');
-    a.href=URL.createObjectURL(wblob);
-    a.download=wname;
-    a.click();
-    setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+    saveFileAs(wblob, wname);
     toast('Saved as Word: '+wname);
     lockBrInfo();
 
   } else if(fmt==='pdf'){
-    // Open report HTML in new tab — user uses browser Print → Save as PDF
     var pblob=new Blob([pf.html],{type:'text/html'});
     var purl=URL.createObjectURL(pblob);
     var pw=window.open(purl,'_blank');
@@ -11730,10 +11744,7 @@ function saveAsFinal(fmt){
     var sess=pf.sess||captureSession();
     var jblob=new Blob([JSON.stringify(sess,null,2)],{type:'application/json'});
     var jname=pf.fname.replace(/\.html?$/i,'_session.json');
-    a.href=URL.createObjectURL(jblob);
-    a.download=jname;
-    a.click();
-    setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+    saveFileAs(jblob, jname);
     toast('Session saved: '+jname);
     lockBrInfo();
   }
