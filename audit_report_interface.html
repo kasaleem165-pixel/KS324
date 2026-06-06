@@ -8896,6 +8896,7 @@ var MAX_VERSIONS = 6;
 var VH_KEY = 'bhs_sessions';
 
 function captureSession() {
+  syncAnnexTextFromDom();
   // Collect all form field values
   var fields = ['brcode','rno','rpt_stage','brname','brregion','brcity','brhead','braddress','brautype','rdt',
                 'rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk','spb'];
@@ -9766,6 +9767,7 @@ function renderRpt(){
 
   // Build obsNumMap for annexure back-references (per-section R-/N- numbering)
   var obsNumMap=getObsReportLabels();
+  syncAnnexTextFromDom();
   h+=buildAnnexHtml(false,obsNumMap);
   cont.innerHTML=h;
 }
@@ -10491,6 +10493,7 @@ function downloadDraft(individual){
       }
     }
     if(num===0) h+='<p style="color:#888;text-align:center">No observations in selected categories.</p>';
+    syncAnnexTextFromDom();
     var annexParts=buildAnnexHtml(true);
     h+=annexParts.body;
     h+='</div>';
@@ -10694,6 +10697,7 @@ function downloadSoftCopy(){
   softHtml+='#progressfill{height:100%;background:#2a8a40;border-radius:4px;transition:width .3s}\n';
   softHtml+='#progresslbl{font-size:11px;color:#4a6080;margin-top:4px;text-align:right}\n';
   softHtml+='@media print{#notice,#savebtn{display:none!important}body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}}\n';
+  syncAnnexTextFromDom();
   var annexParts=buildAnnexHtml(true);
   softHtml+='</style>\n'+annexParts.head+'\n</head>\n<body>\n<div id="wrap">\n';
   softHtml+='<div id="notice"><strong>&#9432; Instructions for Auditee:</strong> Please read each observation carefully and enter your response in the yellow-highlighted <em>Auditee Response</em> field (required). Also fill in the <em>Estimated Time to Resolve</em> field to indicate the expected timeframe for resolving each observation (e.g. 2 weeks, 30 days, by 31-Dec-2025). Use <strong>"Save Draft"</strong> to save progress at any time. When all responses are complete, click <strong>"&#10003; Submit Final Responses"</strong> to download the completed file for submission. <em>The final submit button will be blocked if any Auditee Response field is blank.</em></div>\n';
@@ -10873,7 +10877,7 @@ function renderAnnexList(){
     // Text content area
     h+='<div style="margin-bottom:8px">';
     h+='<div style="font-size:10px;font-weight:700;color:var(--gtxt);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">&#9997; Text Content (type or paste)</div>';
-    h+='<textarea id="anxtxt-'+a.id+'" style="width:100%;box-sizing:border-box;min-height:80px;resize:vertical;font-family:Inter,sans-serif;font-size:12px;border:1px dashed #b0c4de;border-radius:4px;padding:6px 8px;background:#fafcff;outline:none" placeholder="Type or paste text here..." oninput="updateAnx(\''+a.id+'\',\'text\',this.value)">'+esc(a.text||'')+'</textarea>';
+    h+='<textarea id="anxtxt-'+a.id+'" style="width:100%;box-sizing:border-box;min-height:80px;resize:vertical;font-family:Inter,sans-serif;font-size:12px;border:1px dashed #b0c4de;border-radius:4px;padding:6px 8px;background:#fafcff;outline:none" placeholder="Type or paste text here..." oninput="updateAnx(\''+a.id+'\',\'text\',this.value)" onchange="updateAnx(\''+a.id+'\',\'text\',this.value)">'+esc(a.text||'')+'</textarea>';
     h+='<button class="mib" style="margin-top:4px" onclick="insertAnnexTable(\''+a.id+'\')">&#8862; Insert Table</button>';
     h+='</div>';
     if(a.files&&a.files.length){
@@ -10995,6 +10999,15 @@ function updateAnx(id,key,val){
     var ttEl=hdr.querySelector('.anxtit'); if(ttEl&&key==='title') ttEl.textContent=val||'(no title)';
   }
   renderRpt();
+}
+
+// Sync text from live DOM textareas into the annexures array before any export or preview.
+// This ensures content is captured even if oninput events were missed (paste, autofill, etc.).
+function syncAnnexTextFromDom(){
+  for(var i=0;i<annexures.length;i++){
+    var ta=document.getElementById('anxtxt-'+annexures[i].id);
+    if(ta) annexures[i].text=ta.value;
+  }
 }
 
 function insertAnnexTable(id){
@@ -11501,6 +11514,7 @@ function finalizeReport(){
   }
 
   var today=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
+  syncAnnexTextFromDom();
   var finalAnnexParts=buildAnnexHtml(true);
   var finalHtml='<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n';
   finalHtml+='<title>FINAL – Audit Report'+(H.brcode?' '+H.brcode:'')+(H.brname?' '+H.brname:'')+'</title>\n';
