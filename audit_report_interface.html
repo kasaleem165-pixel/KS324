@@ -10761,9 +10761,6 @@ function downloadSoftCopy(){
   var all=dbObs.concat(cuObs);
   if(!all.length){toast('No observations selected.');return;}
 
-  var avMode=document.querySelector('input[name="avmode"]:checked');
-  var avVal=avMode?avMode.value:'auto';
-
   // Group by section then category
   var scSections=[
     {key:'repeated',label:'1. Repeated Observations (Un-Resolved)',obs:[]},
@@ -10782,7 +10779,6 @@ function downloadSoftCopy(){
     var effType=obsTypeMap[o.id]||o.type||'New';
     var tc=effType.toLowerCase();
     var ax=annexMap[o.id]||o._annex||'';
-    var avStored=avMap[o.id]||'';
     var bdr=tc==='repeated'?'#d06020':'#2070b8';
     var h='<div style="border:1px solid #dde2ea;border-left:4px solid '+bdr+';border-radius:5px;margin-bottom:18px;overflow:hidden;page-break-inside:avoid">';
     h+='<div style="display:flex;align-items:center;padding:8px 12px;background:#fafbfc;border-bottom:1px solid #dde2ea;gap:8px">';
@@ -10810,11 +10806,6 @@ function downloadSoftCopy(){
     h+='</div>';
     h+='</div>';
     h+='</div>';
-    // Audit View — only show if auditor explicitly typed one (avStored), never from DB
-    if((avVal==='auto'||avVal==='manual')&&avStored){
-      h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Audit View</div>';
-      h+='<div style="font-size:12.5px;line-height:1.65;color:#2a3a50;margin-bottom:8px">'+esc(avStored)+'</div>';
-    }
     h+='</div></div>';
     return h;
   }
