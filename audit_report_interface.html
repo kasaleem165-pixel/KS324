@@ -8138,7 +8138,6 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
         <button onclick="bulkRemObs()">Remove Selected</button>
       </div>
     </div>
-    <div id="analysis-cont" style="display:none;border-bottom:2px solid #c8d8ec;background:#f8fafd"></div>
     <div id="rpcont" style="display:none"></div>
   </div>
 </div>
@@ -9761,6 +9760,9 @@ function renderRpt(){
   // Introduction sections (from left panel textareas)
   h += buildIntroHtml(getIntroSectionVals(), false);
 
+  // Analysis panel placeholder — populated by toggleAnalysis()
+  h += '<div id="analysis-inline">' + (_showAnalysis ? buildAnalysisHtml() : '') + '</div>';
+
   if(!all.length){
     h+='<p style="color:var(--gtxt);text-align:center;padding:26px">No observations selected. Tick observations in the left panel.</p>';
     cont.innerHTML=h; return;
@@ -9902,11 +9904,7 @@ function renderRpt(){
   h+=buildAnnexHtml(false,obsNumMap);
   cont.innerHTML=h;
   captureLpBaseline();
-  // Refresh analysis panel if it's currently showing
-  if(_showAnalysis){
-    var _ac=document.getElementById('analysis-cont');
-    if(_ac) _ac.innerHTML=buildAnalysisHtml();
-  }
+  // analysis-inline is already embedded in h above; no separate refresh needed
 }
 
 function remObs(id){
@@ -11171,17 +11169,14 @@ function buildAnalysisHtml(){
 
 function toggleAnalysis(){
   _showAnalysis=!_showAnalysis;
-  var ac=document.getElementById('analysis-cont');
+  var ac=document.getElementById('analysis-inline');
   var btn=document.getElementById('analysis-btn');
-  if(!ac) return;
-  if(_showAnalysis){
-    ac.style.display='block';
-    ac.innerHTML=buildAnalysisHtml();
-    if(btn){ btn.style.background='#c9962a'; btn.style.color='#111'; btn.style.borderColor='#f0c040'; }
-  } else {
-    ac.style.display='none';
-    ac.innerHTML='';
-    if(btn){ btn.style.background=''; btn.style.color=''; btn.style.borderColor=''; }
+  if(ac){
+    ac.innerHTML=_showAnalysis ? buildAnalysisHtml() : '';
+  }
+  if(btn){
+    if(_showAnalysis){ btn.style.background='#c9962a'; btn.style.color='#111'; btn.style.borderColor='#f0c040'; }
+    else { btn.style.background=''; btn.style.color=''; btn.style.borderColor=''; }
   }
 }
 
