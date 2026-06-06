@@ -184,10 +184,21 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 #genbtn-bar{position:sticky;top:0;z-index:100;background:#fff;padding:10px 14px;border-bottom:2px solid var(--gold);box-shadow:0 2px 6px rgba(0,0,0,.10)}
 #genbtn{width:100%;padding:11px;background:var(--gold);color:#111;border:none;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(201,150,42,.3)}
 #genbtn:hover{background:var(--goldlt)}
-#dirty-bar{position:sticky;top:55px;z-index:99;background:#fff8e1;border-bottom:2px solid #f0c040;padding:7px 12px;display:flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;font-size:11.5px;color:#7a5500;animation:dirtySlide .2s ease}
-@keyframes dirtySlide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-#dirty-bar-msg{flex:1;line-height:1.4}
-#dirty-bar-close{background:none;border:none;font-size:13px;color:#a07000;cursor:pointer;flex-shrink:0;padding:0 2px;line-height:1}
+#dirty-popup{position:fixed;z-index:9999;pointer-events:auto;display:none;flex-direction:column;max-width:230px;filter:drop-shadow(0 4px 14px rgba(0,0,0,.22))}
+#dirty-popup.dp-show{display:flex}
+.dp-bubble{background:linear-gradient(135deg,#fffbe6 0%,#fff3c4 100%);border:2px solid #f0c040;border-radius:8px;padding:9px 12px 9px 10px;position:relative}
+.dp-arrow{width:0;height:0;align-self:flex-start;margin-left:14px;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:8px solid #f0c040;position:relative}
+.dp-arrow::after{content:'';position:absolute;top:2px;left:-7px;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:7px solid #fffbe6}
+.dp-arrow.dp-arr-down{border-bottom:none;border-top:8px solid #f0c040;margin-top:0;align-self:flex-start}
+.dp-arrow.dp-arr-down::after{top:-10px;border-top:7px solid #fffbe6;border-bottom:none}
+.dp-icon{font-size:15px;line-height:1;flex-shrink:0}
+.dp-row{display:flex;align-items:flex-start;gap:7px}
+.dp-text{font-family:'Inter',sans-serif;font-size:11.5px;color:#5a3e00;line-height:1.45;flex:1}
+.dp-text strong{color:#1a3a5c}
+.dp-close{position:absolute;top:5px;right:6px;background:none;border:none;font-size:11px;color:#a07000;cursor:pointer;line-height:1;padding:0}
+.dp-close:hover{color:#5a3e00}
+@keyframes dpFadeIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+.dp-bubble{animation:dpFadeIn .18s ease}
 
 /* REPORT */
 #rp{background:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(26,58,92,.1);min-height:300px;padding:30px 34px}
@@ -7860,10 +7871,6 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
   <div id="genbtn-bar">
     <button id="genbtn" onclick="confirmAndGenerate()">&#9889; Generate / Refresh Report</button>
   </div>
-  <div id="dirty-bar" style="display:none">
-    <span id="dirty-bar-msg">&#9888;&#65039; Changes detected — click <strong>&#9889; Generate</strong> to update the report.</span>
-    <button id="dirty-bar-close" onclick="clearReportDirty()" title="Dismiss">&#10005;</button>
-  </div>
 
   <div class="sec" style="position:relative">
     <div class="sh" style="display:flex;align-items:center;justify-content:space-between">
@@ -9136,42 +9143,93 @@ function importSessionFile(e){
 })();
 
 // ============================================================
-// DIRTY-REPORT REMINDER BAR
+// DIRTY-REPORT FLOATING POPUP
 // ============================================================
 var _reportDirty = false;
+var _dirtyPopupTimer = null;
 
-function markReportDirty(){
-  if(_reportDirty) return;
+// Create the popup element once and append to body
+(function(){
+  var el = document.createElement('div');
+  el.id = 'dirty-popup';
+  el.innerHTML =
+    '<div class="dp-arrow" id="dp-arrow"></div>' +
+    '<div class="dp-bubble">' +
+      '<button class="dp-close" onclick="clearReportDirty()" title="Dismiss">&#10005;</button>' +
+      '<div class="dp-row">' +
+        '<span class="dp-icon">&#9888;&#65039;</span>' +
+        '<span class="dp-text">You have made changes.<br>Click <strong>&#9889; Generate</strong> to update the report.</span>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(el);
+})();
+
+function markReportDirty(anchorEl){
   _reportDirty = true;
-  var bar = document.getElementById('dirty-bar');
-  if(bar) bar.style.display='flex';
+  var popup = document.getElementById('dirty-popup');
+  if(!popup) return;
+
+  // Position near the changed field
+  if(anchorEl){
+    var r = anchorEl.getBoundingClientRect();
+    var arrow = document.getElementById('dp-arrow');
+    var popW = 234; // max-width
+    var spaceBelow = window.innerHeight - r.bottom;
+    var spaceAbove = r.top;
+
+    // Horizontal: align left edge with field, clamp to viewport
+    var left = r.left;
+    if(left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
+    if(left < 8) left = 8;
+    popup.style.left = left + 'px';
+    popup.style.maxWidth = popW + 'px';
+
+    if(spaceBelow >= 90 || spaceBelow >= spaceAbove){
+      // Show below the field
+      popup.style.top  = (r.bottom + 6) + 'px';
+      popup.style.bottom = '';
+      popup.style.flexDirection = 'column';
+      if(arrow){ arrow.className='dp-arrow'; }
+    } else {
+      // Show above the field
+      popup.style.top  = '';
+      popup.style.bottom = (window.innerHeight - r.top + 6) + 'px';
+      popup.style.flexDirection = 'column-reverse';
+      if(arrow){ arrow.className='dp-arrow dp-arr-down'; }
+    }
+  }
+
+  popup.classList.add('dp-show');
+
+  // Re-trigger bubble animation
+  var bubble = popup.querySelector('.dp-bubble');
+  if(bubble){ bubble.style.animation='none'; bubble.offsetHeight; bubble.style.animation=''; }
+
+  // Auto-dismiss after 6 s
+  if(_dirtyPopupTimer) clearTimeout(_dirtyPopupTimer);
+  _dirtyPopupTimer = setTimeout(function(){ clearReportDirty(); }, 6000);
 }
 
 function clearReportDirty(){
   _reportDirty = false;
-  var bar = document.getElementById('dirty-bar');
-  if(bar) bar.style.display='none';
+  if(_dirtyPopupTimer){ clearTimeout(_dirtyPopupTimer); _dirtyPopupTimer=null; }
+  var popup = document.getElementById('dirty-popup');
+  if(popup) popup.classList.remove('dp-show');
 }
 
-// Listen for any input/change on the left panel and show the reminder bar.
-// Excludes right panel edits (obs text) which are visually immediate.
+// Listen for input/change on the left panel; position popup near changed field.
 (function(){
   var lp = document.getElementById('LP');
   if(!lp) return;
-  lp.addEventListener('input', function(e){
-    // Ignore inputs inside the RA panel (risk assessment) or AWS panel
+  function handle(e){
     var t = e.target;
     if(t.closest && (t.closest('#ra-panel') || t.closest('#aws-panel'))) return;
-    // Ignore obs text edits already shown inline in the right panel (oedit class)
-    if(t.className && t.className.indexOf('oedit')>=0) return;
-    markReportDirty();
-  });
-  lp.addEventListener('change', function(e){
-    var t = e.target;
-    if(t.closest && (t.closest('#ra-panel') || t.closest('#aws-panel'))) return;
-    if(t.className && t.className.indexOf('oedit')>=0) return;
-    markReportDirty();
-  });
+    if(t.className && t.className.indexOf('oedit') >= 0) return;
+    // Debounce: reset timer on every keystroke, show popup on first change
+    markReportDirty(t);
+  }
+  lp.addEventListener('input',  handle);
+  lp.addEventListener('change', handle);
 })();
 
 // ============================================================
@@ -9191,7 +9249,7 @@ function updateGenBtn(){
     if(rems) parts.push(rems+' removal'+(rems>1?'s':''));
     btn.textContent = '⚡ Generate Report — '+parts.join(', ')+' pending';
     btn.style.background='#c07000';
-    markReportDirty();
+    markReportDirty(btn);
   } else {
     btn.textContent = '⚡ Generate / Refresh Report';
     btn.style.background='';
