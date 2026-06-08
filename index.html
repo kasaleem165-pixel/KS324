@@ -1,4 +1,14 @@
 <!DOCTYPE html>
+<!--
+  ============================================================
+  Audit Report Management System
+  Beaconhouse Group — Systems & Audit (S&A)
+  © 2026 Beaconhouse Group. All rights reserved.
+  Unauthorised reproduction, modification, or distribution
+  of this software is strictly prohibited.
+  Developed by: Systems & Audit Department, Beaconhouse Group
+  ============================================================
+-->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -461,6 +471,40 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
 </style>
 </head>
 <body>
+
+<!-- PASSWORD PROTECTION SCREEN -->
+<div id="pw-screen" style="position:fixed;inset:0;z-index:999999;background:#1a3a5c;display:flex;align-items:center;justify-content:center;font-family:Inter,Arial,sans-serif">
+  <div style="background:#fff;border-radius:10px;padding:40px 44px;max-width:380px;width:90%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.4)">
+    <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:#c9962a;text-transform:uppercase;margin-bottom:6px">Beaconhouse Group</div>
+    <div style="font-size:18px;font-weight:700;color:#1a3a5c;margin-bottom:4px">Systems &amp; Audit</div>
+    <div style="font-size:12px;color:#666;margin-bottom:24px">Audit Report Management System</div>
+    <div style="font-size:13px;font-weight:600;color:#1a3a5c;margin-bottom:8px">Enter Password to Continue</div>
+    <input id="pw-input" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')pwCheck()"
+      style="width:100%;padding:10px 14px;border:2px solid #c8d8ec;border-radius:6px;font-size:14px;font-family:Inter,Arial,sans-serif;outline:none;box-sizing:border-box;margin-bottom:10px">
+    <div id="pw-err" style="font-size:12px;color:#c0392b;min-height:18px;margin-bottom:8px"></div>
+    <button onclick="pwCheck()" style="width:100%;padding:11px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;font-family:Inter,Arial,sans-serif">Access System</button>
+    <div style="font-size:10px;color:#aaa;margin-top:18px">&copy; 2026 Beaconhouse Group &mdash; S&amp;A Internal Use Only</div>
+  </div>
+</div>
+<script>
+(function(){
+  var _k='sa_auth_2026';
+  try{ if(sessionStorage.getItem(_k)==='1'){ document.getElementById('pw-screen').style.display='none'; } }catch(e){}
+})();
+function pwCheck(){
+  var v=document.getElementById('pw-input').value;
+  if(v==='S&A2026'){
+    try{sessionStorage.setItem('sa_auth_2026','1');}catch(e){}
+    document.getElementById('pw-screen').style.display='none';
+  } else {
+    var err=document.getElementById('pw-err');
+    err.textContent='Incorrect password. Please try again.';
+    document.getElementById('pw-input').value='';
+    document.getElementById('pw-input').focus();
+  }
+}
+</script>
+<!-- END PASSWORD SCREEN -->
 
 <!-- EMBEDDED DATA (safe JSON tag — not executed as JS directly) -->
 <script type="application/json" id="audit-data">
