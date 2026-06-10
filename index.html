@@ -10322,13 +10322,13 @@ function showUpdateDbModal(){
   modal.className = 'updb-bg'; modal.id = 'updbModal';
   modal.innerHTML =
     '<div class="updb-box">' +
-    '<div class="updb-head"><h3>&#128194; Update Databank from Final Report</h3><button onclick="closeUpdbModal()">&#10005;</button></div>' +
+    '<div class="updb-head"><h3>&#128194; Databank Management</h3><button onclick="closeUpdbModal()">&#10005;</button></div>' +
     '<div class="updb-body">' +
 
-    // STEP 1: Load report
+    // SECTION A: HO — Load final report and approve new observations
     '<div class="updb-section">' +
-    '<h4>Step 1 — Load a Final Issued Report</h4>' +
-    '<p>Select the final issued report session file (.json). The system will scan all observations in that report and compare them against the existing databank. Any new observations not currently in the databank will be listed for your approval.</p>' +
+    '<h4>&#127968; HO Only — Step 1: Load a Final Issued Report</h4>' +
+    '<p>Select the final issued report session file (.json). The system will compare its observations against the databank and list any new ones for your approval.</p>' +
     '<div class="updb-drop" onclick="document.getElementById(\'updb-file-input\').click()">' +
     '&#128229; <strong>Click to select a Final Report Session File (.json)</strong>' +
     '<p style="margin:4px 0 0;font-size:11px;color:#888">The session file saved via Save / Versions → Export</p>' +
@@ -10341,11 +10341,26 @@ function showUpdateDbModal(){
     '</div>' +
     '</div>' +
 
-    // STEP 2: Manage existing extensions
+    // SECTION B: HO — Export databank update file to distribute
     '<div class="updb-section">' +
-    '<h4>Databank Extensions (' + extObs.length + ' entries added by your team)</h4>' +
-    '<p>These are observations previously approved and added to your local databank. They appear alongside the built-in observations in all future reports on this computer.</p>' +
+    '<h4>&#127968; HO Only — Step 2: Export &amp; Distribute Databank Update</h4>' +
+    '<p>After approving new observations above, export a <strong>Databank Update File</strong> and send it to all auditors via email or OneDrive. Auditors will import this file to keep their databanks in sync with HO.</p>' +
     '<div id="updb-ext-area">' + buildUpdbExtList(extObs) + '</div>' +
+    '<div class="updb-foot" style="margin-top:8px">' +
+    '<button style="background:#1a3a5c;color:#fff" onclick="updbExportExt()">&#128228; Export Databank Update File</button>' +
+    '</div>' +
+    '</div>' +
+
+    // SECTION C: Field Auditors — Import databank update from HO
+    '<div class="updb-section">' +
+    '<h4>&#128203; Field Auditors — Import Databank Update from HO</h4>' +
+    '<p>Received a Databank Update File from HO? Import it here. New observations will be added to your local databank so you can use them in your reports. Observations already in your databank will be skipped.</p>' +
+    '<div class="updb-drop" onclick="document.getElementById(\'updb-imp-input\').click()">' +
+    '&#128193; <strong>Click to select the Databank Update File received from HO</strong>' +
+    '<p style="margin:4px 0 0;font-size:11px;color:#888">File name starts with: DatabankUpdate_</p>' +
+    '</div>' +
+    '<input type="file" id="updb-imp-input" accept=".json" style="display:none" onchange="updbImportExt(this)">' +
+    '<div id="updb-imp-area"></div>' +
     '</div>' +
 
     '</div></div>';
@@ -10492,8 +10507,6 @@ function updbApproveSelected(){
   // Refresh ext list and clear candidates
   var extArea = document.getElementById('updb-ext-area');
   if(extArea) extArea.innerHTML = buildUpdbExtList(ext);
-  var hdr = document.querySelector('#updbModal .updb-section:last-child h4');
-  if(hdr) hdr.textContent = 'Databank Extensions (' + ext.length + ' entries added by your team)';
   updbClearCandidates();
 }
 
@@ -10502,13 +10515,74 @@ function updbRemoveExt(obsId){
   var ext = sg(DB_EXT_KEY, []);
   ext = ext.filter(function(o){ return o.id !== obsId; });
   ss(DB_EXT_KEY, ext);
-  // Remove from live DB.observations too
   DB.observations = DB.observations.filter(function(o){ return o.id !== obsId; });
   var extArea = document.getElementById('updb-ext-area');
   if(extArea) extArea.innerHTML = buildUpdbExtList(ext);
-  var hdr = document.querySelector('#updbModal .updb-section:last-child h4');
-  if(hdr) hdr.textContent = 'Databank Extensions (' + ext.length + ' entries added by your team)';
   toast('Observation removed from databank extension.');
+}
+
+function updbExportExt(){
+  var ext = sg(DB_EXT_KEY, []);
+  if(!ext.length){
+    toast('No databank extensions to export. Please add new observations first (Step 1).');
+    return;
+  }
+  var exportData = {
+    _type: 'SA_DatabankUpdate',
+    _version: 1,
+    _exportedAt: new Date().toISOString(),
+    _count: ext.length,
+    observations: ext
+  };
+  var fname = 'DatabankUpdate_SA_'+new Date().toISOString().substring(0,10)+'.json';
+  saveFileAs(new Blob([JSON.stringify(exportData,null,2)],{type:'application/json'}), fname);
+  toast('Databank Update File exported ('+ext.length+' observations). Send this file to all auditors.');
+}
+
+function updbImportExt(input){
+  var file = input.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var data = JSON.parse(e.target.result);
+      if(data._type !== 'SA_DatabankUpdate' || !Array.isArray(data.observations)){
+        toast('Invalid file. Please select a valid Databank Update File received from HO.');
+        input.value=''; return;
+      }
+      var incoming = data.observations;
+      var ext = sg(DB_EXT_KEY, []);
+      var existingIds = {};
+      for(var i=0;i<ext.length;i++) existingIds[ext[i].id]=true;
+      for(var j=0;j<DB.observations.length;j++) existingIds[DB.observations[j].id]=true;
+
+      var added=0, skipped=0;
+      for(var k=0;k<incoming.length;k++){
+        if(existingIds[incoming[k].id]){ skipped++; continue; }
+        incoming[k]._dbAddedAt = incoming[k]._dbAddedAt || new Date().toISOString();
+        ext.push(incoming[k]);
+        DB.observations.push(incoming[k]);
+        existingIds[incoming[k].id]=true;
+        added++;
+      }
+      ss(DB_EXT_KEY, ext);
+
+      var impArea = document.getElementById('updb-imp-area');
+      if(impArea){
+        if(added){
+          impArea.innerHTML = '<div style="padding:10px 12px;background:#e8f5e9;border-radius:6px;font-size:12px;color:#2e7d32;font-weight:600;margin-top:6px">&#10003; '+added+' new observation(s) added to your databank'+(skipped?' ('+skipped+' already existed — skipped)':'')+'.</div>';
+        } else {
+          impArea.innerHTML = '<div style="padding:10px 12px;background:#fff8e1;border-radius:6px;font-size:12px;color:#7a6000;font-weight:600;margin-top:6px">All '+incoming.length+' observation(s) in this file already exist in your databank. Nothing new to add.</div>';
+        }
+      }
+      if(added) toast(added+' observation(s) added to your databank from HO update.');
+      else toast('Your databank is already up to date.');
+    } catch(ex){
+      toast('Could not read file. Please select a valid Databank Update File.');
+    }
+    input.value='';
+  };
+  reader.readAsText(file);
 }
 
 // ============================================================
