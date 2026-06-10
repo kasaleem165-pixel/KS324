@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enterprise Risk Management System — COSO ERM 2017</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #1e3a5f;
+    --navy-dark: #152c4a;
+    --navy-light: #2a4f7c;
+    --accent: #3b82f6;
+    --critical: #e74c3c;
+    --high: #e67e22;
+    --medium: #f1c40f;
+    --low: #27ae60;
+    --white: #ffffff;
+    --bg: #f0f4f8;
+    --card: #ffffff;
+    --border: #d1d9e0;
+    --text: #1a2332;
+    --text-light: #5a6a7e;
+    --sidebar-w: 240px;
+  }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; }
+
+  /* ── SIDEBAR ── */
+  #sidebar {
+    width: var(--sidebar-w); min-height: 100vh; background: var(--navy);
+    display: flex; flex-direction: column; position: fixed; left: 0; top: 0; z-index: 200;
+    transition: transform .3s;
+  }
+  .sidebar-logo {
+    padding: 20px 18px; border-bottom: 1px solid rgba(255,255,255,.1);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sidebar-logo .logo-icon {
+    width: 38px; height: 38px; background: var(--accent); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff; font-weight: 700; flex-shrink: 0;
+  }
+  .sidebar-logo .logo-text { color: #fff; font-size: 13px; line-height: 1.3; }
+  .sidebar-logo .logo-text strong { display: block; font-size: 14px; }
+  nav { flex: 1; padding: 10px 0; overflow-y: auto; }
+  .nav-section { padding: 8px 18px 4px; font-size: 10px; font-weight: 700; color: rgba(255,255,255,.4); text-transform: uppercase; letter-spacing: 1px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 18px;
+    color: rgba(255,255,255,.75); cursor: pointer; font-size: 13.5px; transition: background .15s, color .15s;
+    border-left: 3px solid transparent;
+  }
+  .nav-item:hover { background: rgba(255,255,255,.07); color: #fff; }
+  .nav-item.active { background: rgba(59,130,246,.2); color: #fff; border-left-color: var(--accent); }
+  .nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+  .sidebar-footer { padding: 16px 18px; border-top: 1px solid rgba(255,255,255,.1); font-size: 11px; color: rgba(255,255,255,.4); }
+
+  /* ── MAIN ── */
+  #main { margin-left: var(--sidebar-w); flex: 1; min-height: 100vh; display: flex; flex-direction: column; }
+  #topbar {
+    background: var(--white); border-bottom: 1px solid var(--border);
+    padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 14px; }
+  #menu-btn { display: none; background: none; border: none; cursor: pointer; font-size: 20px; color: var(--navy); }
+  #page-title { font-size: 17px; font-weight: 700; color: var(--navy); }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+  .topbar-badge { background: var(--critical); color: #fff; border-radius: 20px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
+  #content { padding: 24px; flex: 1; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── CARDS ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .kpi-card {
+    background: var(--card); border-radius: 10px; padding: 18px 18px 14px;
+    border-top: 4px solid var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,.07);
+  }
+  .kpi-card.critical { border-top-color: var(--critical); }
+  .kpi-card.high { border-top-color: var(--high); }
+  .kpi-card.medium { border-top-color: var(--medium); }
+  .kpi-card.green { border-top-color: var(--low); }
+  .kpi-val { font-size: 32px; font-weight: 800; color: var(--navy); line-height: 1; margin-bottom: 4px; }
+  .kpi-label { font-size: 12px; color: var(--text-light); font-weight: 500; }
+
+  /* ── CHARTS ── */
+  .charts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-bottom: 24px; }
+  .chart-card { background: var(--card); border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+  .chart-card h3 { font-size: 14px; color: var(--navy); font-weight: 700; margin-bottom: 14px; }
+  .chart-card canvas { max-height: 240px; }
+
+  /* ── TABLE ── */
+  .table-card { background: var(--card); border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.07); overflow: hidden; }
+  .table-toolbar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+  }
+  .table-toolbar h3 { font-size: 15px; font-weight: 700; color: var(--navy); flex: 1; }
+  .search-box {
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px;
+    font-size: 13px; outline: none; width: 200px; color: var(--text);
+  }
+  .search-box:focus { border-color: var(--accent); }
+  select.filter-sel {
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px;
+    font-size: 13px; color: var(--text); outline: none; background: #fff; cursor: pointer;
+  }
+  select.filter-sel:focus { border-color: var(--accent); }
+  .btn {
+    padding: 7px 14px; border-radius: 6px; border: none; cursor: pointer;
+    font-size: 13px; font-weight: 600; transition: opacity .15s;
+  }
+  .btn:hover { opacity: .85; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-success { background: var(--low); color: #fff; }
+  .btn-danger { background: var(--critical); color: #fff; }
+  .btn-secondary { background: var(--border); color: var(--text); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-warning { background: var(--high); color: #fff; }
+  .tbl-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    background: var(--navy); color: #fff; padding: 10px 12px; text-align: left;
+    white-space: nowrap; font-weight: 600; font-size: 12px; cursor: pointer; user-select: none;
+  }
+  th:hover { background: var(--navy-light); }
+  th .sort-arrow { margin-left: 4px; opacity: .6; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:hover td { background: #f7f9fb; }
+  tr:last-child td { border-bottom: none; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 20px;
+    font-size: 11px; font-weight: 700; white-space: nowrap;
+  }
+  .badge-critical { background: #fdecea; color: var(--critical); }
+  .badge-high { background: #fef3e7; color: var(--high); }
+  .badge-medium { background: #fefce8; color: #b45309; }
+  .badge-low { background: #ecfdf5; color: var(--low); }
+  .badge-open { background: #fdecea; color: var(--critical); }
+  .badge-inprogress { background: #eff6ff; color: #2563eb; }
+  .badge-closed { background: #ecfdf5; color: var(--low); }
+  .badge-overdue { background: #1e1e1e; color: #ff6b6b; }
+
+  /* ── FORM ── */
+  .form-card { background: var(--card); border-radius: 10px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-group label { font-size: 12px; font-weight: 700; color: var(--navy); text-transform: uppercase; letter-spacing: .4px; }
+  .form-group input, .form-group select, .form-group textarea {
+    border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px;
+    font-size: 13px; color: var(--text); outline: none; font-family: inherit;
+    transition: border-color .15s;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--accent); }
+  .form-group textarea { min-height: 80px; resize: vertical; }
+  .form-group input[readonly] { background: #f0f4f8; color: var(--text-light); }
+  .form-section-title {
+    grid-column: 1 / -1; font-size: 13px; font-weight: 700; color: var(--navy);
+    padding: 6px 0 2px; border-bottom: 2px solid var(--accent); margin-top: 8px; text-transform: uppercase; letter-spacing: .5px;
+  }
+  .form-actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+
+  /* ── HEAT MAP ── */
+  .heatmap-wrap { background: var(--card); border-radius: 10px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+  .heatmap-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
+  .heatmap-header h3 { font-size: 15px; font-weight: 700; color: var(--navy); }
+  .heatmap-toggle { display: flex; gap: 0; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+  .heatmap-toggle button {
+    border: none; padding: 6px 16px; font-size: 13px; cursor: pointer;
+    background: #fff; color: var(--text-light); font-weight: 600; transition: background .15s, color .15s;
+  }
+  .heatmap-toggle button.active { background: var(--navy); color: #fff; }
+  .hm-outer { display: flex; gap: 0; align-items: flex-end; }
+  .hm-ylabel {
+    writing-mode: vertical-lr; transform: rotate(180deg);
+    font-size: 12px; font-weight: 700; color: var(--text-light); text-align: center;
+    margin-right: 6px; letter-spacing: 1px;
+  }
+  .hm-left { display: flex; flex-direction: column; align-items: center; }
+  .hm-row-labels {
+    display: flex; flex-direction: column; justify-content: space-around;
+    height: 300px; margin-right: 6px;
+  }
+  .hm-row-label { font-size: 11px; font-weight: 700; color: var(--text-light); text-align: right; width: 16px; }
+  .hm-grid { display: flex; flex-direction: column; gap: 3px; }
+  .hm-row { display: flex; gap: 3px; }
+  .hm-cell {
+    width: 80px; height: 58px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    flex-wrap: wrap; gap: 2px; padding: 3px; position: relative; overflow: visible;
+  }
+  .hm-cell.score-low { background: #d4edda; }
+  .hm-cell.score-medium { background: #fff3cd; }
+  .hm-cell.score-high { background: #ffe0b2; }
+  .hm-cell.score-critical { background: #f8d7da; }
+  .hm-risk-dot {
+    background: var(--navy); color: #fff; border-radius: 4px;
+    font-size: 9px; font-weight: 700; padding: 1px 4px; cursor: pointer;
+    transition: transform .1s; white-space: nowrap; z-index: 10;
+  }
+  .hm-risk-dot:hover { transform: scale(1.15); background: var(--accent); }
+  .hm-col-labels { display: flex; gap: 3px; margin-left: 25px; margin-top: 4px; }
+  .hm-col-label { width: 80px; font-size: 11px; font-weight: 700; color: var(--text-light); text-align: center; }
+  .hm-xlabel { text-align: center; margin-left: 25px; margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--text-light); letter-spacing: 1px; }
+  .hm-legend { display: flex; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
+  .hm-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .hm-legend-box { width: 16px; height: 16px; border-radius: 3px; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    z-index: 1000; align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--white); border-radius: 12px; max-width: 560px; width: 94%;
+    max-height: 88vh; overflow-y: auto; padding: 24px; position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .modal-header h3 { font-size: 16px; font-weight: 700; color: var(--navy); }
+  .modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-light); line-height: 1; }
+  .modal-close:hover { color: var(--critical); }
+  .modal-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .modal-field label { font-size: 10px; font-weight: 700; color: var(--text-light); text-transform: uppercase; }
+  .modal-field p { font-size: 13px; color: var(--text); margin-top: 2px; }
+  .modal-field.full { grid-column: 1/-1; }
+
+  /* ── ACTION TRACKER ── */
+  .at-overdue td { background: #fff5f5 !important; }
+
+  /* ── REPORT / PRINT ── */
+  .report-wrap { background: var(--card); border-radius: 10px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+  .report-header-bar {
+    background: var(--navy); color: #fff; padding: 20px 24px; border-radius: 8px; margin-bottom: 20px;
+  }
+  .report-header-bar h2 { font-size: 20px; font-weight: 800; }
+  .report-header-bar p { font-size: 13px; opacity: .75; margin-top: 4px; }
+  .report-stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .report-stat { background: #f0f4f8; border-radius: 8px; padding: 10px 16px; font-size: 13px; }
+  .report-stat strong { display: block; font-size: 20px; font-weight: 800; color: var(--navy); }
+
+  @media print {
+    #sidebar, #topbar, .no-print { display: none !important; }
+    #main { margin-left: 0 !important; }
+    body { background: #fff; }
+    .page { display: block !important; }
+    .page:not(#page-report) { display: none !important; }
+    .report-wrap { box-shadow: none; }
+    table { font-size: 10px; }
+    th, td { padding: 5px 7px; }
+  }
+
+  @media (max-width: 768px) {
+    :root { --sidebar-w: 0px; }
+    #sidebar { transform: translateX(-240px); width: 240px; }
+    #sidebar.open { transform: translateX(0); }
+    #main { margin-left: 0; }
+    #menu-btn { display: block; }
+    .hm-cell { width: 52px; height: 44px; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px; background: var(--navy); color: #fff;
+    padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    opacity: 0; transform: translateY(10px); transition: all .3s; z-index: 9999; pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  /* ── MISC ── */
+  .empty-state { text-align: center; padding: 40px; color: var(--text-light); font-size: 14px; }
+  .score-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 20px; font-size: 12px; font-weight: 700;
+  }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+  .page-header h2 { font-size: 20px; font-weight: 800; color: var(--navy); }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">ERM</div>
+    <div class="logo-text"><strong>Risk Management</strong>COSO ERM 2017</div>
+  </div>
+  <nav>
+    <div class="nav-section">Overview</div>
+    <div class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span> Dashboard</div>
+    <div class="nav-section">Risk Management</div>
+    <div class="nav-item" data-page="register"><span class="nav-icon">📋</span> Risk Register</div>
+    <div class="nav-item" data-page="addedit"><span class="nav-icon">➕</span> Add / Edit Risk</div>
+    <div class="nav-item" data-page="heatmap"><span class="nav-icon">🗺️</span> Risk Heat Map</div>
+    <div class="nav-section">Actions & Reports</div>
+    <div class="nav-item" data-page="actions"><span class="nav-icon">✅</span> Action Tracker</div>
+    <div class="nav-item" data-page="report"><span class="nav-icon">📄</span> Export / Report</div>
+  </nav>
+  <div class="sidebar-footer">ERM System v1.0 · COSO 2017<br>Educational Institution</div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <div id="topbar">
+    <div class="topbar-left">
+      <button id="menu-btn" onclick="toggleSidebar()">☰</button>
+      <span id="page-title">Dashboard</span>
+    </div>
+    <div class="topbar-right">
+      <span id="topbar-critical" class="topbar-badge" style="display:none"></span>
+      <span style="font-size:12px;color:var(--text-light)" id="topbar-date"></span>
+    </div>
+  </div>
+
+  <div id="content">
+
+    <!-- ══ DASHBOARD ══ -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-header">
+        <h2>Risk Dashboard</h2>
+        <span style="font-size:12px;color:var(--text-light)">All figures reflect current risk register</span>
+      </div>
+      <div class="kpi-grid" id="kpi-grid"></div>
+      <div class="charts-grid">
+        <div class="chart-card"><h3>Risks by Category</h3><canvas id="chart-category"></canvas></div>
+        <div class="chart-card"><h3>Residual Risk Rating Distribution</h3><canvas id="chart-rating"></canvas></div>
+        <div class="chart-card"><h3>Risks by Status</h3><canvas id="chart-status"></canvas></div>
+        <div class="chart-card"><h3>Inherent vs Residual Scores</h3><canvas id="chart-comparison"></canvas></div>
+      </div>
+      <div class="table-card">
+        <div class="table-toolbar"><h3>Top Critical &amp; High Risks</h3></div>
+        <div class="tbl-wrap"><table id="dash-top-table"></table></div>
+      </div>
+    </div>
+
+    <!-- ══ RISK REGISTER ══ -->
+    <div id="page-register" class="page">
+      <div class="page-header">
+        <h2>Risk Register</h2>
+        <button class="btn btn-primary" onclick="navTo('addedit'); clearForm()">+ Add New Risk</button>
+      </div>
+      <div class="table-card">
+        <div class="table-toolbar">
+          <h3 id="register-count"></h3>
+          <input type="text" class="search-box" id="reg-search" placeholder="🔍 Search risks…" oninput="renderRegister()">
+          <select class="filter-sel" id="reg-cat" onchange="renderRegister()"><option value="">All Categories</option></select>
+          <select class="filter-sel" id="reg-rating" onchange="renderRegister()">
+            <option value="">All Ratings</option>
+            <option value="Critical">Critical</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+          <select class="filter-sel" id="reg-status" onchange="renderRegister()">
+            <option value="">All Statuses</option>
+            <option value="Open">Open</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Closed">Closed</option>
+            <option value="Overdue">Overdue</option>
+          </select>
+        </div>
+        <div class="tbl-wrap"><table id="register-table"></table></div>
+      </div>
+    </div>
+
+    <!-- ══ ADD/EDIT RISK ══ -->
+    <div id="page-addedit" class="page">
+      <div class="page-header">
+        <h2 id="form-page-title">Add New Risk</h2>
+        <button class="btn btn-secondary" onclick="navTo('register')">← Back to Register</button>
+      </div>
+      <div class="form-card">
+        <form id="risk-form" onsubmit="saveRisk(event)">
+          <div class="form-grid">
+            <div class="form-section-title">Risk Identification</div>
+            <div class="form-group">
+              <label>Risk ID</label>
+              <input type="text" id="f-id" readonly placeholder="Auto-generated">
+            </div>
+            <div class="form-group">
+              <label>Risk Category *</label>
+              <select id="f-category" required onchange="updateRiskId()">
+                <option value="">Select category…</option>
+                <option value="Financial & Fiduciary">Financial &amp; Fiduciary</option>
+                <option value="HR & People">HR &amp; People</option>
+                <option value="Operational">Operational</option>
+                <option value="Compliance & Legal">Compliance &amp; Legal</option>
+                <option value="IT & Systems">IT &amp; Systems</option>
+                <option value="Physical & Security">Physical &amp; Security</option>
+                <option value="Reputational">Reputational</option>
+                <option value="Strategic">Strategic</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Sub-Category</label>
+              <input type="text" id="f-subcategory" placeholder="e.g., Procurement">
+            </div>
+            <div class="form-group">
+              <label>Risk Title *</label>
+              <input type="text" id="f-title" required placeholder="Brief risk title">
+            </div>
+            <div class="form-group full">
+              <label>Risk Description *</label>
+              <textarea id="f-description" required placeholder="Risk of [X] caused by [Y] resulting in [Z]…"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Risk Owner *</label>
+              <input type="text" id="f-owner" required placeholder="Name / Role">
+            </div>
+            <div class="form-group">
+              <label>Linked Audit Reference</label>
+              <input type="text" id="f-audit-ref" placeholder="e.g., BR-2024-FIN-001">
+            </div>
+
+            <div class="form-section-title">Inherent Risk Assessment</div>
+            <div class="form-group">
+              <label>Inherent Likelihood (1–5)</label>
+              <select id="f-ilikelihood" required onchange="calcScores()">
+                <option value="">Select…</option>
+                <option value="1">1 – Rare</option>
+                <option value="2">2 – Unlikely</option>
+                <option value="3">3 – Possible</option>
+                <option value="4">4 – Likely</option>
+                <option value="5">5 – Almost Certain</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Inherent Impact (1–5)</label>
+              <select id="f-iimpact" required onchange="calcScores()">
+                <option value="">Select…</option>
+                <option value="1">1 – Negligible</option>
+                <option value="2">2 – Minor</option>
+                <option value="3">3 – Moderate</option>
+                <option value="4">4 – Major</option>
+                <option value="5">5 – Catastrophic</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Inherent Risk Score</label>
+              <input type="text" id="f-iscore" readonly>
+            </div>
+            <div class="form-group">
+              <label>Inherent Risk Rating</label>
+              <input type="text" id="f-irating" readonly>
+            </div>
+
+            <div class="form-section-title">Controls &amp; Residual Risk</div>
+            <div class="form-group full">
+              <label>Existing Controls</label>
+              <textarea id="f-controls" placeholder="Describe existing controls in place…"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Control Effectiveness</label>
+              <select id="f-control-eff">
+                <option value="">Select…</option>
+                <option value="Strong">Strong</option>
+                <option value="Adequate">Adequate</option>
+                <option value="Weak">Weak</option>
+                <option value="None">None</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Residual Likelihood (1–5)</label>
+              <select id="f-rlikelihood" required onchange="calcScores()">
+                <option value="">Select…</option>
+                <option value="1">1 – Rare</option>
+                <option value="2">2 – Unlikely</option>
+                <option value="3">3 – Possible</option>
+                <option value="4">4 – Likely</option>
+                <option value="5">5 – Almost Certain</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Residual Impact (1–5)</label>
+              <select id="f-rimpact" required onchange="calcScores()">
+                <option value="">Select…</option>
+                <option value="1">1 – Negligible</option>
+                <option value="2">2 – Minor</option>
+                <option value="3">3 – Moderate</option>
+                <option value="4">4 – Major</option>
+                <option value="5">5 – Catastrophic</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Residual Risk Score</label>
+              <input type="text" id="f-rscore" readonly>
+            </div>
+            <div class="form-group">
+              <label>Residual Risk Rating</label>
+              <input type="text" id="f-rrating" readonly>
+            </div>
+
+            <div class="form-section-title">Treatment &amp; Action Plan</div>
+            <div class="form-group">
+              <label>Risk Treatment</label>
+              <select id="f-treatment">
+                <option value="">Select…</option>
+                <option value="Mitigate">Mitigate</option>
+                <option value="Accept">Accept</option>
+                <option value="Transfer">Transfer</option>
+                <option value="Avoid">Avoid</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Status</label>
+              <select id="f-status">
+                <option value="Open">Open</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Closed">Closed</option>
+                <option value="Overdue">Overdue</option>
+              </select>
+            </div>
+            <div class="form-group full">
+              <label>Action Plan</label>
+              <textarea id="f-action-plan" placeholder="Describe specific action steps…"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Action Owner</label>
+              <input type="text" id="f-action-owner" placeholder="Name / Role">
+            </div>
+            <div class="form-group">
+              <label>Target Date</label>
+              <input type="date" id="f-target-date">
+            </div>
+            <div class="form-group">
+              <label>Last Reviewed</label>
+              <input type="date" id="f-last-reviewed">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Risk</button>
+            <button type="button" class="btn btn-secondary" onclick="clearForm()">Clear Form</button>
+            <button type="button" class="btn btn-secondary" onclick="navTo('register')">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ══ HEAT MAP ══ -->
+    <div id="page-heatmap" class="page">
+      <div class="page-header"><h2>Risk Heat Map</h2></div>
+      <div class="heatmap-wrap">
+        <div class="heatmap-header">
+          <h3 id="hm-title">Residual Risk Position</h3>
+          <div class="heatmap-toggle">
+            <button id="hm-btn-residual" class="active" onclick="setHmMode('residual')">Residual</button>
+            <button id="hm-btn-inherent" onclick="setHmMode('inherent')">Inherent</button>
+          </div>
+        </div>
+        <div id="heatmap-container"></div>
+        <div class="hm-legend">
+          <div class="hm-legend-item"><div class="hm-legend-box" style="background:#d4edda"></div>Low (1–4)</div>
+          <div class="hm-legend-item"><div class="hm-legend-box" style="background:#fff3cd"></div>Medium (5–9)</div>
+          <div class="hm-legend-item"><div class="hm-legend-box" style="background:#ffe0b2"></div>High (10–16)</div>
+          <div class="hm-legend-item"><div class="hm-legend-box" style="background:#f8d7da"></div>Critical (17–25)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ACTION TRACKER ══ -->
+    <div id="page-actions" class="page">
+      <div class="page-header"><h2>Action Tracker</h2></div>
+      <div class="table-card">
+        <div class="table-toolbar">
+          <h3 id="at-count"></h3>
+          <select class="filter-sel" id="at-status" onchange="renderActions()">
+            <option value="">All Statuses</option>
+            <option value="Open">Open</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Closed">Closed</option>
+            <option value="Overdue">Overdue</option>
+          </select>
+          <input type="text" class="search-box" id="at-owner" placeholder="Filter by owner…" oninput="renderActions()">
+        </div>
+        <div class="tbl-wrap"><table id="actions-table"></table></div>
+      </div>
+    </div>
+
+    <!-- ══ REPORT ══ -->
+    <div id="page-report" class="page">
+      <div class="page-header no-print">
+        <h2>Export / Report</h2>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-primary no-print" onclick="window.print()">🖨️ Print Report</button>
+        </div>
+      </div>
+      <div class="report-wrap" id="report-body"></div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- MODAL -->
+<div class="modal-overlay" id="risk-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Risk Details</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body"></div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-primary btn-sm" id="modal-edit-btn">Edit Risk</button>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════
+//  DATA MODEL & CONSTANTS
+// ════════════════════════════════════════════════
+const CAT_CODES = {
+  'Financial & Fiduciary': 'FIN',
+  'HR & People': 'HRP',
+  'Operational': 'OPS',
+  'Compliance & Legal': 'CMP',
+  'IT & Systems': 'ITS',
+  'Physical & Security': 'PHY',
+  'Reputational': 'REP',
+  'Strategic': 'STR'
+};
+
+const RATING = s => s >= 17 ? 'Critical' : s >= 10 ? 'High' : s >= 5 ? 'Medium' : 'Low';
+const SCORE_COLOR = r => ({Critical:'badge-critical', High:'badge-high', Medium:'badge-medium', Low:'badge-low'}[r] || '');
+const STATUS_COLOR = s => ({Open:'badge-open','In Progress':'badge-inprogress', Closed:'badge-closed', Overdue:'badge-overdue'}[s] || '');
+
+const SAMPLE_RISKS = [
+  { category:'Financial & Fiduciary', subcategory:'Procurement', title:'Quotation Splitting to Circumvent Procurement Threshold', description:'Risk of procurement fraud caused by deliberate splitting of purchase orders below approval thresholds resulting in loss of institutional funds and audit exceptions.', owner:'Finance Manager', iL:4, iI:4, controls:'Procurement policy in place; periodic internal audit', controlEff:'Weak', rL:3, rI:4, treatment:'Mitigate', actionPlan:'Implement automated procurement system with cumulative spend tracking; train staff on procurement policy; quarterly spend analysis by Finance Manager.', actionOwner:'Finance Manager', targetDate:'2025-03-31', status:'Open', lastReviewed:'2024-10-01', auditRef:'BR-2024-FIN-003' },
+  { category:'Financial & Fiduciary', subcategory:'Cash Management', title:'Imprest Fund Misappropriation', description:'Risk of misappropriation of petty cash caused by inadequate controls on imprest fund resulting in financial loss and breach of fiduciary duty.', owner:'Branch Accountant', iL:3, iI:4, controls:'Monthly imprest reconciliation; dual authorisation for payments', controlEff:'Adequate', rL:2, rI:3, treatment:'Mitigate', actionPlan:'Introduce surprise cash counts; enforce segregation of duties for imprest custodian and approver; review imprest ceiling.', actionOwner:'Internal Audit', targetDate:'2025-02-28', status:'In Progress', lastReviewed:'2024-10-15', auditRef:'BR-2024-FIN-007' },
+  { category:'Financial & Fiduciary', subcategory:'Vendor Management', title:'Ghost Vendor Payments', description:'Risk of fictitious vendor payments caused by weak vendor registration controls resulting in financial loss and reputational damage to the institution.', owner:'Finance Director', iL:3, iI:5, controls:'Vendor approval committee; bank account verification required', controlEff:'Adequate', rL:2, rI:4, treatment:'Mitigate', actionPlan:'Conduct full vendor database cleanse; implement vendor blacklist checks; require physical verification before new vendor activation.', actionOwner:'Finance Director', targetDate:'2025-04-30', status:'Open', lastReviewed:'2024-09-30', auditRef:'BR-2024-FIN-011' },
+  { category:'HR & People', subcategory:'Employee Records', title:'Incomplete Staff Personnel Files', description:'Risk of HR compliance failure caused by missing or outdated employee documentation resulting in inability to verify qualifications and exposure to legal liability.', owner:'HR Manager', iL:4, iI:3, controls:'Annual HR records audit; new-hire onboarding checklist', controlEff:'Weak', rL:3, rI:3, treatment:'Mitigate', actionPlan:'Launch immediate file completeness review; implement HRIS module for document tracking; set 30-day deadline for all staff to submit outstanding documents.', actionOwner:'HR Manager', targetDate:'2025-01-31', status:'In Progress', lastReviewed:'2024-11-01', auditRef:'BR-2024-HR-002' },
+  { category:'HR & People', subcategory:'Payroll & Benefits', title:'Terminal Benefits Settlement Delays', description:'Risk of staff grievances and legal action caused by delayed processing of terminal benefit payments resulting in reputational harm and potential litigation costs.', owner:'HR Manager', iL:3, iI:3, controls:'HR policy sets 30-day settlement target', controlEff:'Weak', rL:3, rI:3, treatment:'Mitigate', actionPlan:'Establish terminal benefits processing SLA; create dedicated settlement tracker; HR Manager to report monthly to management on status.', actionOwner:'HR Manager', targetDate:'2025-02-28', status:'Open', lastReviewed:'2024-10-20', auditRef:'BR-2024-HR-005' },
+  { category:'HR & People', subcategory:'Statutory Compliance', title:'Social Security Contribution Non-Compliance', description:'Risk of regulatory penalties caused by non-remittance of staff social security contributions resulting in fines and reputational harm.', owner:'Payroll Officer', iL:3, iI:4, controls:'Monthly payroll checklist includes SSNIT deductions', controlEff:'Adequate', rL:2, rI:3, treatment:'Mitigate', actionPlan:'Automate SSNIT remittance via payroll system; reconcile contributions quarterly; maintain evidence file of all remittance receipts.', actionOwner:'Payroll Officer', targetDate:'2025-03-15', status:'In Progress', lastReviewed:'2024-10-10', auditRef:'BR-2024-HR-008' },
+  { category:'Operational', subcategory:'Fixed Assets', title:'Untraced / Missing Fixed Assets', description:'Risk of asset loss caused by lack of robust asset tracking system resulting in financial loss and inaccurate balance sheet.', owner:'Assets Manager', iL:4, iI:4, controls:'Annual fixed asset verification exercise', controlEff:'Weak', rL:3, rI:4, treatment:'Mitigate', actionPlan:'Conduct immediate physical asset count; implement barcode tagging for all assets; update asset register monthly; assign asset custodians per department.', actionOwner:'Assets Manager', targetDate:'2025-03-31', status:'Open', lastReviewed:'2024-09-15', auditRef:'BR-2024-FA-001' },
+  { category:'Operational', subcategory:'Fixed Assets', title:'Untagged / Unregistered Assets', description:'Risk of asset management breakdown caused by assets acquired without registration in the fixed asset register resulting in inability to track and manage institutional property.', owner:'Assets Manager', iL:4, iI:3, controls:'Procurement policy requires asset registration on receipt', controlEff:'Weak', rL:3, rI:3, treatment:'Mitigate', actionPlan:'Tag all unregistered assets within 60 days; enforce GRN-to-asset-register workflow; quarterly random compliance checks by Internal Audit.', actionOwner:'Assets Manager', targetDate:'2025-02-28', status:'Open', lastReviewed:'2024-10-01', auditRef:'BR-2024-FA-003' },
+  { category:'Operational', subcategory:'Fixed Assets', title:'Delay in Disposal of Condemned Assets', description:'Risk of accumulation of obsolete assets caused by absence of a formal disposal policy resulting in security risk, space constraints and potential misuse.', owner:'Assets Manager', iL:3, iI:2, controls:'Disposal committee in place but rarely convened', controlEff:'Weak', rL:3, rI:2, treatment:'Mitigate', actionPlan:'Convene disposal board quarterly; complete pending disposals within 90 days; document disposal process and update policy.', actionOwner:'Assets Manager', targetDate:'2025-04-30', status:'Open', lastReviewed:'2024-09-30', auditRef:'BR-2024-FA-006' },
+  { category:'Physical & Security', subcategory:'Surveillance', title:'CCTV Coverage Gaps on Campus', description:'Risk of security incidents going undetected caused by inadequate CCTV coverage in key areas resulting in inability to investigate incidents and increased safety risk.', owner:'Security Manager', iL:4, iI:4, controls:'Existing CCTV system covers main entrance and admin block', controlEff:'Weak', rL:4, rI:4, treatment:'Mitigate', actionPlan:'Commission security audit to map coverage gaps; install cameras in blind spots; procure cloud storage for 30-day footage retention.', actionOwner:'Security Manager', targetDate:'2025-03-31', status:'Open', lastReviewed:'2024-11-01', auditRef:'BR-2024-SEC-002' },
+  { category:'Physical & Security', subcategory:'Security Personnel', title:'Irregular Security Guard Rotation and Records', description:'Risk of security breaches caused by poor supervision and undocumented guard duty changes resulting in campus vulnerability and liability gaps.', owner:'Security Manager', iL:3, iI:3, controls:'Security firm contract in place; supervisor spot checks', controlEff:'Adequate', rL:2, rI:3, treatment:'Mitigate', actionPlan:'Implement biometric clock-in for guards; require daily occurrence book sign-off; monthly review of guard deployment rosters.', actionOwner:'Security Manager', targetDate:'2025-02-15', status:'In Progress', lastReviewed:'2024-10-25', auditRef:'BR-2024-SEC-005' },
+  { category:'Physical & Security', subcategory:'Emergency Preparedness', title:'Obstructed or Unmarked Emergency Exit Routes', description:'Risk of injury and regulatory non-compliance caused by emergency exits that are blocked or poorly marked resulting in life safety hazard and liability.', owner:'Facilities Manager', iL:3, iI:5, controls:'Annual health and safety inspection', controlEff:'Weak', rL:2, rI:5, treatment:'Mitigate', actionPlan:'Conduct immediate walkthrough and clear all blocked exits; install illuminated exit signage; quarterly fire safety drills with checklist documentation.', actionOwner:'Facilities Manager', targetDate:'2025-01-31', status:'In Progress', lastReviewed:'2024-10-30', auditRef:'BR-2024-SEC-008' },
+  { category:'IT & Systems', subcategory:'Student Information System', title:'Incomplete Student Records in BEAMS', description:'Risk of academic and compliance failure caused by missing or inaccurate data entries in BEAMS resulting in incorrect fee billing, transcript errors and accreditation risk.', owner:'IT Manager', iL:4, iI:4, controls:'Data entry checklist provided to admissions staff', controlEff:'Weak', rL:3, rI:3, treatment:'Mitigate', actionPlan:'Initiate BEAMS data quality audit; assign data stewards per department; implement mandatory field validation rules; monthly data completeness KPI report.', actionOwner:'IT Manager', targetDate:'2025-04-30', status:'Open', lastReviewed:'2024-09-20', auditRef:'BR-2024-IT-001' },
+  { category:'IT & Systems', subcategory:'Data Integrity', title:'Unauthorised Modification of Student Grades', description:'Risk of academic fraud caused by weak access controls on the student records system resulting in grade manipulation, reputational damage and accreditation loss.', owner:'IT Manager', iL:3, iI:5, controls:'Role-based access in BEAMS; IT admin manages user rights', controlEff:'Adequate', rL:2, rI:4, treatment:'Mitigate', actionPlan:'Enable full audit trail logging for grade fields; quarterly access review; implement two-person approval for grade amendments; pen-testing of BEAMS.', actionOwner:'IT Manager', targetDate:'2025-03-31', status:'Open', lastReviewed:'2024-10-05', auditRef:'BR-2024-IT-004' },
+  { category:'Compliance & Legal', subcategory:'Staff Attendance', title:'Non-Compliance with Attendance Policy', description:'Risk of productivity loss and payroll abuse caused by inadequate monitoring of staff attendance resulting in ghost employee exposure and operational inefficiencies.', owner:'HR Manager', iL:4, iI:3, controls:'Manual attendance registers maintained at branches', controlEff:'Weak', rL:3, rI:3, treatment:'Mitigate', actionPlan:'Deploy biometric attendance system at all branches; integrate with payroll; HR to review monthly reports and flag anomalies to Branch Manager.', actionOwner:'HR Manager', targetDate:'2025-03-31', status:'Open', lastReviewed:'2024-10-15', auditRef:'BR-2024-CMP-003' },
+  { category:'Compliance & Legal', subcategory:'Staff Confirmation', title:'Delayed Staff Confirmation After Probation', description:'Risk of employee disputes and payroll inconsistencies caused by failure to formally confirm staff after probation period resulting in unclear employment terms and legal exposure.', owner:'HR Manager', iL:3, iI:3, controls:'HR policy requires confirmation within 6 months', controlEff:'Weak', rL:3, rI:2, treatment:'Mitigate', actionPlan:'Build automated probation expiry alerts in HRIS; HR Manager to review pending confirmations bi-monthly; issue confirmation letters within 5 working days of approval.', actionOwner:'HR Manager', targetDate:'2025-02-28', status:'Open', lastReviewed:'2024-10-20', auditRef:'BR-2024-CMP-007' },
+  { category:'Operational', subcategory:'Library Management', title:'Missing Library Books and Unprocessed AIDNs', description:'Risk of resource loss caused by inadequate library management and unprocessed acquisition/disposal notifications resulting in inaccurate library inventory and financial exposure.', owner:'Head Librarian', iL:3, iI:3, controls:'Annual library stock-take; borrowing register in place', controlEff:'Weak', rL:3, rI:3, treatment:'Mitigate', actionPlan:'Conduct full library audit within 30 days; implement library management software; process all outstanding AIDNs; introduce overdue book penalty system.', actionOwner:'Head Librarian', targetDate:'2025-02-28', status:'Open', lastReviewed:'2024-09-15', auditRef:'BR-2024-OPS-012' },
+  { category:'Operational', subcategory:'Laboratory', title:'Laboratory Equipment Inventory Discrepancies', description:'Risk of loss of expensive laboratory assets caused by inadequate inventory management resulting in financial exposure and inability to deliver quality science education.', owner:'Head of Science', iL:3, iI:4, controls:'Lab equipment list maintained by HOD', controlEff:'Weak', rL:2, rI:4, treatment:'Mitigate', actionPlan:'Reconcile lab equipment against fixed asset register; tag all lab assets; appoint lab technician as equipment custodian; quarterly physical count.', actionOwner:'Head of Science', targetDate:'2025-03-31', status:'In Progress', lastReviewed:'2024-10-10', auditRef:'BR-2024-OPS-015' },
+  { category:'Strategic', subcategory:'Institutional Planning', title:'Absence of Formal Branch Strategic Plan', description:'Risk of strategic drift caused by branches operating without documented strategic plans resulting in misaligned resources, duplicated efforts and failure to meet institutional goals.', owner:'Branch Principal', iL:3, iI:4, controls:'Annual work plan submitted to head office', controlEff:'Weak', rL:3, rI:4, treatment:'Mitigate', actionPlan:'Facilitate branch strategic planning workshop by Q1; prepare 3-year branch plan aligned to institutional strategy; quarterly review meetings with head office.', actionOwner:'Branch Principal', targetDate:'2025-06-30', status:'Open', lastReviewed:'2024-09-30', auditRef:'BR-2024-STR-001' },
+  { category:'Reputational', subcategory:'Student Welfare', title:'Unresolved Student Complaints Affecting Institutional Reputation', description:'Risk of reputational damage caused by inadequate student complaint handling resulting in negative publicity, enrollment decline and regulatory scrutiny.', owner:'Student Affairs Manager', iL:3, iI:4, controls:'Student complaints register maintained; escalation policy exists', controlEff:'Adequate', rL:2, rI:3, treatment:'Mitigate', actionPlan:'Implement 5-day complaint resolution SLA; publish anonymous feedback mechanism; report complaint statistics to management monthly; staff training on student relations.', actionOwner:'Student Affairs Manager', targetDate:'2025-03-31', status:'Open', lastReviewed:'2024-11-01', auditRef:'BR-2024-REP-002' }
+];
+
+// ════════════════════════════════════════════════
+//  STATE & STORAGE
+// ════════════════════════════════════════════════
+let risks = [];
+let editingId = null;
+let sortCol = null, sortDir = 1;
+let hmMode = 'residual';
+let chartInstances = {};
+
+function loadData() {
+  const stored = localStorage.getItem('erm_risks');
+  if (stored) {
+    risks = JSON.parse(stored);
+  } else {
+    risks = SAMPLE_RISKS.map((r, i) => buildRisk(r, i));
+    saveData();
+  }
+}
+
+function saveData() {
+  localStorage.setItem('erm_risks', JSON.stringify(risks));
+}
+
+function buildRisk(r, existingIdx) {
+  const iScore = r.iL * r.iI;
+  const rScore = r.rL * r.rI;
+  const catCode = CAT_CODES[r.category] || 'OTH';
+  const idx = (existingIdx !== undefined) ? existingIdx : risks.filter(x => x.category === r.category).length;
+  const id = r.id || `${catCode}-${String(idx + 1).padStart(3, '0')}`;
+  return {
+    id, category: r.category, subcategory: r.subcategory || '', title: r.title,
+    description: r.description, owner: r.owner,
+    iL: r.iL, iI: r.iI, iScore, iRating: RATING(iScore),
+    controls: r.controls || '', controlEff: r.controlEff || '',
+    rL: r.rL, rI: r.rI, rScore, rRating: RATING(rScore),
+    treatment: r.treatment || '', actionPlan: r.actionPlan || '',
+    actionOwner: r.actionOwner || '', targetDate: r.targetDate || '',
+    status: r.status || 'Open', lastReviewed: r.lastReviewed || '',
+    auditRef: r.auditRef || ''
+  };
+}
+
+// ════════════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════════════
+function navTo(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const pg = document.getElementById(`page-${page}`);
+  if (pg) pg.classList.add('active');
+  const nav = document.querySelector(`[data-page="${page}"]`);
+  if (nav) nav.classList.add('active');
+  const titles = { dashboard:'Dashboard', register:'Risk Register', addedit: editingId ? 'Edit Risk' : 'Add New Risk', heatmap:'Risk Heat Map', actions:'Action Tracker', report:'Export / Report' };
+  document.getElementById('page-title').textContent = titles[page] || '';
+  document.getElementById('form-page-title').textContent = editingId ? 'Edit Risk' : 'Add New Risk';
+  // Render page-specific content
+  if (page === 'dashboard') renderDashboard();
+  if (page === 'register') { populateCatFilter(); renderRegister(); }
+  if (page === 'heatmap') renderHeatmap();
+  if (page === 'actions') renderActions();
+  if (page === 'report') renderReport();
+  // Close sidebar on mobile
+  if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open');
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => navTo(el.dataset.page));
+});
+
+// ════════════════════════════════════════════════
+//  DASHBOARD
+// ════════════════════════════════════════════════
+function renderDashboard() {
+  const total = risks.length;
+  const critical = risks.filter(r => r.rRating === 'Critical').length;
+  const high = risks.filter(r => r.rRating === 'High').length;
+  const openActions = risks.filter(r => r.status === 'Open' || r.status === 'In Progress').length;
+  const overdueActions = risks.filter(r => r.status === 'Overdue' || isOverdue(r)).length;
+  const withPlan = risks.filter(r => r.actionPlan && r.actionPlan.trim()).length;
+  const pctPlan = total ? Math.round(withPlan / total * 100) : 0;
+
+  document.getElementById('kpi-grid').innerHTML = `
+    <div class="kpi-card"><div class="kpi-val">${total}</div><div class="kpi-label">Total Risks</div></div>
+    <div class="kpi-card critical"><div class="kpi-val" style="color:var(--critical)">${critical}</div><div class="kpi-label">Critical Risks</div></div>
+    <div class="kpi-card high"><div class="kpi-val" style="color:var(--high)">${high}</div><div class="kpi-label">High Risks</div></div>
+    <div class="kpi-card"><div class="kpi-val">${openActions}</div><div class="kpi-label">Open Actions</div></div>
+    <div class="kpi-card critical"><div class="kpi-val" style="color:var(--critical)">${overdueActions}</div><div class="kpi-label">Overdue Actions</div></div>
+    <div class="kpi-card green"><div class="kpi-val" style="color:var(--low)">${pctPlan}%</div><div class="kpi-label">Risks with Treatment Plans</div></div>
+  `;
+
+  // Update topbar badge
+  const tb = document.getElementById('topbar-critical');
+  if (critical > 0) { tb.textContent = `${critical} Critical`; tb.style.display = ''; }
+  else tb.style.display = 'none';
+
+  renderCharts();
+  renderDashTopTable();
+}
+
+function destroyChart(id) {
+  if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+}
+
+function renderCharts() {
+  // By Category
+  destroyChart('chart-category');
+  const cats = {};
+  risks.forEach(r => { cats[r.category] = (cats[r.category] || 0) + 1; });
+  chartInstances['chart-category'] = new Chart(document.getElementById('chart-category').getContext('2d'), {
+    type: 'bar',
+    data: { labels: Object.keys(cats), datasets: [{ data: Object.values(cats), backgroundColor: '#3b82f6', borderRadius: 4 }] },
+    options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { stepSize: 1 } } }, responsive: true }
+  });
+
+  // By Rating
+  destroyChart('chart-rating');
+  const ratingCounts = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+  risks.forEach(r => { ratingCounts[r.rRating] = (ratingCounts[r.rRating] || 0) + 1; });
+  chartInstances['chart-rating'] = new Chart(document.getElementById('chart-rating').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(ratingCounts),
+      datasets: [{ data: Object.values(ratingCounts), backgroundColor: ['#e74c3c','#e67e22','#f1c40f','#27ae60'], borderWidth: 2 }]
+    },
+    options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }, responsive: true }
+  });
+
+  // By Status
+  destroyChart('chart-status');
+  const statuses = {};
+  risks.forEach(r => { statuses[r.status] = (statuses[r.status] || 0) + 1; });
+  chartInstances['chart-status'] = new Chart(document.getElementById('chart-status').getContext('2d'), {
+    type: 'pie',
+    data: {
+      labels: Object.keys(statuses),
+      datasets: [{ data: Object.values(statuses), backgroundColor: ['#e74c3c','#3b82f6','#27ae60','#111'], borderWidth: 2 }]
+    },
+    options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }, responsive: true }
+  });
+
+  // Inherent vs Residual (horizontal bar comparison)
+  destroyChart('chart-comparison');
+  const topRisks = [...risks].sort((a, b) => b.iScore - a.iScore).slice(0, 8);
+  chartInstances['chart-comparison'] = new Chart(document.getElementById('chart-comparison').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: topRisks.map(r => r.id),
+      datasets: [
+        { label: 'Inherent', data: topRisks.map(r => r.iScore), backgroundColor: 'rgba(231,76,60,.7)', borderRadius: 3 },
+        { label: 'Residual', data: topRisks.map(r => r.rScore), backgroundColor: 'rgba(39,174,96,.7)', borderRadius: 3 }
+      ]
+    },
+    options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }, scales: { y: { max: 25 } }, responsive: true }
+  });
+}
+
+function renderDashTopTable() {
+  const top = [...risks].filter(r => r.rRating === 'Critical' || r.rRating === 'High').sort((a, b) => b.rScore - a.rScore).slice(0, 8);
+  const tbl = document.getElementById('dash-top-table');
+  if (!top.length) { tbl.innerHTML = '<tr><td colspan="7" class="empty-state">No critical or high risks found.</td></tr>'; return; }
+  tbl.innerHTML = `<thead><tr><th>Risk ID</th><th>Category</th><th>Title</th><th>Owner</th><th>Residual Score</th><th>Rating</th><th>Status</th></tr></thead>
+  <tbody>${top.map(r => `<tr>
+    <td><b>${r.id}</b></td>
+    <td>${r.category}</td>
+    <td style="max-width:200px">${r.title}</td>
+    <td>${r.owner}</td>
+    <td><span class="score-pill ${SCORE_COLOR(r.rRating)}">${r.rScore}</span></td>
+    <td><span class="badge ${SCORE_COLOR(r.rRating)}">${r.rRating}</span></td>
+    <td><span class="badge ${STATUS_COLOR(r.status)}">${r.status}</span></td>
+  </tr>`).join('')}</tbody>`;
+}
+
+// ════════════════════════════════════════════════
+//  RISK REGISTER
+// ════════════════════════════════════════════════
+function populateCatFilter() {
+  const sel = document.getElementById('reg-cat');
+  const cats = [...new Set(risks.map(r => r.category))].sort();
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option value="${c}"${c===cur?' selected':''}>${c}</option>`).join('');
+}
+
+let regSort = { col: null, dir: 1 };
+
+function renderRegister() {
+  const search = document.getElementById('reg-search').value.toLowerCase();
+  const cat = document.getElementById('reg-cat').value;
+  const rating = document.getElementById('reg-rating').value;
+  const status = document.getElementById('reg-status').value;
+
+  let data = risks.filter(r => {
+    const text = [r.id, r.category, r.title, r.owner, r.treatment, r.status].join(' ').toLowerCase();
+    return (!search || text.includes(search))
+      && (!cat || r.category === cat)
+      && (!rating || r.rRating === rating)
+      && (!status || r.status === status);
+  });
+
+  if (regSort.col) {
+    data.sort((a, b) => {
+      let av = a[regSort.col], bv = b[regSort.col];
+      if (typeof av === 'number') return (av - bv) * regSort.dir;
+      return String(av).localeCompare(String(bv)) * regSort.dir;
+    });
+  }
+
+  document.getElementById('register-count').textContent = `${data.length} risk${data.length !== 1 ? 's' : ''} found`;
+
+  const cols = [
+    { key:'id', label:'Risk ID' }, { key:'category', label:'Category' },
+    { key:'title', label:'Title' }, { key:'owner', label:'Owner' },
+    { key:'iScore', label:'Inherent' }, { key:'rScore', label:'Residual' },
+    { key:'treatment', label:'Treatment' }, { key:'status', label:'Status' }, { key:'_actions', label:'Actions' }
+  ];
+
+  const thead = `<thead><tr>${cols.map(c => c.key === '_actions' ? `<th>Actions</th>` :
+    `<th onclick="sortRegister('${c.key}')" style="cursor:pointer">${c.label} <span class="sort-arrow">${regSort.col===c.key?(regSort.dir===1?'▲':'▼'):'⇅'}</span></th>`
+  ).join('')}</tr></thead>`;
+
+  const tbody = data.length ? `<tbody>${data.map(r => `<tr>
+    <td><b>${r.id}</b></td>
+    <td style="font-size:11px">${r.category}</td>
+    <td style="max-width:200px;font-size:12px">${r.title}</td>
+    <td style="font-size:12px">${r.owner}</td>
+    <td><span class="badge ${SCORE_COLOR(r.iRating)}">${r.iScore} ${r.iRating}</span></td>
+    <td><span class="badge ${SCORE_COLOR(r.rRating)}">${r.rScore} ${r.rRating}</span></td>
+    <td>${r.treatment || '—'}</td>
+    <td><span class="badge ${STATUS_COLOR(r.status)}">${r.status}</span></td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-primary btn-sm" onclick="editRisk('${r.id}')">Edit</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteRisk('${r.id}')">Del</button>
+    </td>
+  </tr>`).join('')}</tbody>` : `<tbody><tr><td colspan="9" class="empty-state">No risks match the current filters.</td></tr></tbody>`;
+
+  document.getElementById('register-table').innerHTML = thead + tbody;
+}
+
+function sortRegister(col) {
+  if (regSort.col === col) regSort.dir *= -1; else { regSort.col = col; regSort.dir = 1; }
+  renderRegister();
+}
+
+// ════════════════════════════════════════════════
+//  ADD / EDIT FORM
+// ════════════════════════════════════════════════
+function calcScores() {
+  const iL = +document.getElementById('f-ilikelihood').value || 0;
+  const iI = +document.getElementById('f-iimpact').value || 0;
+  const rL = +document.getElementById('f-rlikelihood').value || 0;
+  const rI = +document.getElementById('f-rimpact').value || 0;
+  const iS = iL * iI, rS = rL * rI;
+  document.getElementById('f-iscore').value = iS || '';
+  document.getElementById('f-irating').value = iS ? RATING(iS) : '';
+  document.getElementById('f-rscore').value = rS || '';
+  document.getElementById('f-rrating').value = rS ? RATING(rS) : '';
+}
+
+function updateRiskId() {
+  if (editingId) return;
+  const cat = document.getElementById('f-category').value;
+  if (!cat) return;
+  const code = CAT_CODES[cat] || 'OTH';
+  const count = risks.filter(r => r.category === cat).length + 1;
+  document.getElementById('f-id').value = `${code}-${String(count).padStart(3, '0')}`;
+}
+
+function clearForm() {
+  editingId = null;
+  document.getElementById('risk-form').reset();
+  document.getElementById('f-id').value = '';
+  document.getElementById('f-iscore').value = '';
+  document.getElementById('f-irating').value = '';
+  document.getElementById('f-rscore').value = '';
+  document.getElementById('f-rrating').value = '';
+  document.getElementById('form-page-title').textContent = 'Add New Risk';
+  document.getElementById('form-submit-btn').textContent = 'Save Risk';
+}
+
+function editRisk(id) {
+  const r = risks.find(x => x.id === id);
+  if (!r) return;
+  editingId = id;
+  navTo('addedit');
+  document.getElementById('form-page-title').textContent = 'Edit Risk';
+  document.getElementById('form-submit-btn').textContent = 'Update Risk';
+  document.getElementById('f-id').value = r.id;
+  document.getElementById('f-category').value = r.category;
+  document.getElementById('f-subcategory').value = r.subcategory;
+  document.getElementById('f-title').value = r.title;
+  document.getElementById('f-description').value = r.description;
+  document.getElementById('f-owner').value = r.owner;
+  document.getElementById('f-audit-ref').value = r.auditRef;
+  document.getElementById('f-ilikelihood').value = r.iL;
+  document.getElementById('f-iimpact').value = r.iI;
+  document.getElementById('f-controls').value = r.controls;
+  document.getElementById('f-control-eff').value = r.controlEff;
+  document.getElementById('f-rlikelihood').value = r.rL;
+  document.getElementById('f-rimpact').value = r.rI;
+  document.getElementById('f-treatment').value = r.treatment;
+  document.getElementById('f-status').value = r.status;
+  document.getElementById('f-action-plan').value = r.actionPlan;
+  document.getElementById('f-action-owner').value = r.actionOwner;
+  document.getElementById('f-target-date').value = r.targetDate;
+  document.getElementById('f-last-reviewed').value = r.lastReviewed;
+  calcScores();
+}
+
+function saveRisk(e) {
+  e.preventDefault();
+  const d = {
+    id: document.getElementById('f-id').value,
+    category: document.getElementById('f-category').value,
+    subcategory: document.getElementById('f-subcategory').value,
+    title: document.getElementById('f-title').value,
+    description: document.getElementById('f-description').value,
+    owner: document.getElementById('f-owner').value,
+    auditRef: document.getElementById('f-audit-ref').value,
+    iL: +document.getElementById('f-ilikelihood').value,
+    iI: +document.getElementById('f-iimpact').value,
+    controls: document.getElementById('f-controls').value,
+    controlEff: document.getElementById('f-control-eff').value,
+    rL: +document.getElementById('f-rlikelihood').value,
+    rI: +document.getElementById('f-rimpact').value,
+    treatment: document.getElementById('f-treatment').value,
+    status: document.getElementById('f-status').value,
+    actionPlan: document.getElementById('f-action-plan').value,
+    actionOwner: document.getElementById('f-action-owner').value,
+    targetDate: document.getElementById('f-target-date').value,
+    lastReviewed: document.getElementById('f-last-reviewed').value
+  };
+  d.iScore = d.iL * d.iI;
+  d.iRating = RATING(d.iScore);
+  d.rScore = d.rL * d.rI;
+  d.rRating = RATING(d.rScore);
+
+  if (editingId) {
+    const idx = risks.findIndex(r => r.id === editingId);
+    if (idx > -1) risks[idx] = d;
+    showToast('Risk updated successfully');
+  } else {
+    if (risks.find(r => r.id === d.id)) {
+      // Ensure unique ID
+      const code = CAT_CODES[d.category] || 'OTH';
+      const count = risks.filter(r => r.category === d.category).length + 1;
+      d.id = `${code}-${String(count).padStart(3,'0')}`;
+    }
+    risks.push(d);
+    showToast('Risk added successfully');
+  }
+  saveData();
+  clearForm();
+  navTo('register');
+}
+
+function deleteRisk(id) {
+  if (!confirm(`Delete risk ${id}? This cannot be undone.`)) return;
+  risks = risks.filter(r => r.id !== id);
+  saveData();
+  renderRegister();
+  showToast('Risk deleted');
+}
+
+// ════════════════════════════════════════════════
+//  HEAT MAP
+// ════════════════════════════════════════════════
+function setHmMode(mode) {
+  hmMode = mode;
+  document.getElementById('hm-btn-residual').classList.toggle('active', mode === 'residual');
+  document.getElementById('hm-btn-inherent').classList.toggle('active', mode === 'inherent');
+  document.getElementById('hm-title').textContent = mode === 'residual' ? 'Residual Risk Position' : 'Inherent Risk Position';
+  renderHeatmap();
+}
+
+function renderHeatmap() {
+  const container = document.getElementById('heatmap-container');
+  const lKey = hmMode === 'residual' ? 'rL' : 'iL';
+  const iKey = hmMode === 'residual' ? 'rI' : 'iI';
+
+  // Build 5x5 grid indexed [likelihood][impact]
+  const cells = {};
+  for (let l = 1; l <= 5; l++) for (let i = 1; i <= 5; i++) cells[`${l}_${i}`] = [];
+  risks.forEach(r => {
+    const key = `${r[lKey]}_${r[iKey]}`;
+    if (cells[key]) cells[key].push(r);
+  });
+
+  function cellClass(l, i) {
+    const s = l * i;
+    if (s >= 17) return 'score-critical';
+    if (s >= 10) return 'score-high';
+    if (s >= 5) return 'score-medium';
+    return 'score-low';
+  }
+
+  let gridHtml = '<div class="hm-row">';
+  for (let l = 5; l >= 1; l--) {
+    gridHtml = `<div class="hm-row">${[1,2,3,4,5].map(i => {
+      const key = `${l}_${i}`;
+      const cellRisks = cells[key];
+      const dots = cellRisks.map(r => `<span class="hm-risk-dot" onclick="showModal('${r.id}')" title="${r.title}">${r.id}</span>`).join('');
+      return `<div class="hm-cell ${cellClass(l,i)}">${dots}</div>`;
+    }).join('')}</div>` + (l < 5 ? gridHtml : '');
+  }
+
+  // Actually build top-to-bottom
+  let rows = '';
+  for (let l = 5; l >= 1; l--) {
+    const rowCells = [1,2,3,4,5].map(i => {
+      const key = `${l}_${i}`;
+      const cellRisks = cells[key];
+      const dots = cellRisks.map(r => `<span class="hm-risk-dot" onclick="showModal('${r.id}')" title="${r.title}">${r.id}</span>`).join('');
+      return `<div class="hm-cell ${cellClass(l,i)}">${dots}</div>`;
+    }).join('');
+    rows += `<div class="hm-row">${rowCells}</div>`;
+  }
+
+  container.innerHTML = `
+    <div class="hm-outer">
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;margin-right:4px">
+        <div class="hm-ylabel">LIKELIHOOD</div>
+      </div>
+      <div>
+        <div style="display:flex">
+          <div class="hm-row-labels">
+            ${[5,4,3,2,1].map(n => `<div class="hm-row-label">${n}</div>`).join('')}
+          </div>
+          <div class="hm-grid">${rows}</div>
+        </div>
+        <div class="hm-col-labels">${[1,2,3,4,5].map(n=>`<div class="hm-col-label">${n}</div>`).join('')}</div>
+        <div class="hm-xlabel">IMPACT</div>
+      </div>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════
+//  ACTION TRACKER
+// ════════════════════════════════════════════════
+function isOverdue(r) {
+  if (!r.targetDate) return false;
+  return r.status !== 'Closed' && new Date(r.targetDate) < new Date();
+}
+
+function renderActions() {
+  const statusFilter = document.getElementById('at-status').value;
+  const ownerFilter = document.getElementById('at-owner').value.toLowerCase();
+
+  let data = risks.filter(r => r.actionPlan && r.actionPlan.trim());
+  if (statusFilter) data = data.filter(r => r.status === statusFilter);
+  if (ownerFilter) data = data.filter(r => (r.actionOwner || '').toLowerCase().includes(ownerFilter));
+
+  document.getElementById('at-count').textContent = `${data.length} action${data.length !== 1 ? 's' : ''}`;
+
+  const thead = `<thead><tr><th>Risk ID</th><th>Title</th><th>Action Plan</th><th>Action Owner</th><th>Target Date</th><th>Status</th><th>Actions</th></tr></thead>`;
+  const tbody = data.length ? `<tbody>${data.map(r => {
+    const od = isOverdue(r);
+    const effStatus = od && r.status !== 'Closed' ? 'Overdue' : r.status;
+    return `<tr class="${od ? 'at-overdue' : ''}">
+      <td><b>${r.id}</b></td>
+      <td style="max-width:180px;font-size:12px">${r.title}</td>
+      <td style="max-width:250px;font-size:12px">${r.actionPlan}</td>
+      <td>${r.actionOwner || '—'}</td>
+      <td style="white-space:nowrap">${r.targetDate ? new Date(r.targetDate).toLocaleDateString('en-GB') : '—'}${od ? ' <span style="color:var(--critical);font-weight:700">⚠</span>' : ''}</td>
+      <td><span class="badge ${STATUS_COLOR(effStatus)}">${effStatus}</span></td>
+      <td><button class="btn btn-primary btn-sm" onclick="editRisk('${r.id}')">Edit</button></td>
+    </tr>`;
+  }).join('')}</tbody>` : `<tbody><tr><td colspan="7" class="empty-state">No actions found.</td></tr></tbody>`;
+  document.getElementById('actions-table').innerHTML = thead + tbody;
+}
+
+// ════════════════════════════════════════════════
+//  REPORT
+// ════════════════════════════════════════════════
+function renderReport() {
+  const total = risks.length;
+  const critical = risks.filter(r => r.rRating === 'Critical').length;
+  const high = risks.filter(r => r.rRating === 'High').length;
+  const medium = risks.filter(r => r.rRating === 'Medium').length;
+  const low = risks.filter(r => r.rRating === 'Low').length;
+  const open = risks.filter(r => r.status === 'Open').length;
+  const today = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' });
+
+  const rows = [...risks].sort((a, b) => b.rScore - a.rScore).map(r => `<tr>
+    <td>${r.id}</td>
+    <td style="font-size:10px">${r.category}</td>
+    <td style="max-width:160px">${r.title}</td>
+    <td>${r.owner}</td>
+    <td style="text-align:center">${r.iScore}<br><small>${r.iRating}</small></td>
+    <td style="text-align:center">${r.rScore}<br><small>${r.rRating}</small></td>
+    <td style="font-size:10px">${r.controls || '—'}</td>
+    <td>${r.controlEff || '—'}</td>
+    <td>${r.treatment || '—'}</td>
+    <td>${r.status}</td>
+    <td>${r.actionOwner || '—'}</td>
+    <td>${r.targetDate ? new Date(r.targetDate).toLocaleDateString('en-GB') : '—'}</td>
+  </tr>`).join('');
+
+  document.getElementById('report-body').innerHTML = `
+    <div class="report-header-bar">
+      <h2>Enterprise Risk Assessment Register</h2>
+      <p>Educational Institution — Branch Risk Management | COSO ERM 2017 Framework | Generated: ${today}</p>
+    </div>
+    <div class="report-stats">
+      <div class="report-stat"><strong>${total}</strong>Total Risks</div>
+      <div class="report-stat" style="border-left:4px solid var(--critical)"><strong style="color:var(--critical)">${critical}</strong>Critical</div>
+      <div class="report-stat" style="border-left:4px solid var(--high)"><strong style="color:var(--high)">${high}</strong>High</div>
+      <div class="report-stat" style="border-left:4px solid #b45309"><strong style="color:#b45309">${medium}</strong>Medium</div>
+      <div class="report-stat" style="border-left:4px solid var(--low)"><strong style="color:var(--low)">${low}</strong>Low</div>
+      <div class="report-stat"><strong>${open}</strong>Open Risks</div>
+    </div>
+    <div class="tbl-wrap">
+      <table style="font-size:11px">
+        <thead>
+          <tr style="background:var(--navy);color:#fff">
+            <th>Risk ID</th><th>Category</th><th>Title</th><th>Owner</th>
+            <th>Inherent Score</th><th>Residual Score</th>
+            <th>Controls</th><th>Control Eff.</th><th>Treatment</th>
+            <th>Status</th><th>Action Owner</th><th>Target Date</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:24px;font-size:11px;color:var(--text-light);border-top:1px solid var(--border);padding-top:12px">
+      <strong>Rating Scale:</strong> &nbsp;
+      <span class="badge badge-critical">Critical 17–25</span> &nbsp;
+      <span class="badge badge-high">High 10–16</span> &nbsp;
+      <span class="badge badge-medium">Medium 5–9</span> &nbsp;
+      <span class="badge badge-low">Low 1–4</span>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <strong>Risk Score</strong> = Likelihood × Impact (each rated 1–5)
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      Confidential — Internal Use Only
+    </div>`;
+}
+
+// ════════════════════════════════════════════════
+//  MODAL
+// ════════════════════════════════════════════════
+function showModal(id) {
+  const r = risks.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('modal-title').textContent = `${r.id} — ${r.title}`;
+  document.getElementById('modal-body').innerHTML = `
+    <div class="modal-detail-grid">
+      <div class="modal-field"><label>Category</label><p>${r.category}</p></div>
+      <div class="modal-field"><label>Sub-Category</label><p>${r.subcategory || '—'}</p></div>
+      <div class="modal-field full"><label>Description</label><p>${r.description}</p></div>
+      <div class="modal-field"><label>Owner</label><p>${r.owner}</p></div>
+      <div class="modal-field"><label>Audit Ref</label><p>${r.auditRef || '—'}</p></div>
+      <div class="modal-field"><label>Inherent Score</label><p><span class="badge ${SCORE_COLOR(r.iRating)}">${r.iScore} — ${r.iRating}</span></p></div>
+      <div class="modal-field"><label>Residual Score</label><p><span class="badge ${SCORE_COLOR(r.rRating)}">${r.rScore} — ${r.rRating}</span></p></div>
+      <div class="modal-field"><label>Control Effectiveness</label><p>${r.controlEff || '—'}</p></div>
+      <div class="modal-field"><label>Treatment</label><p>${r.treatment || '—'}</p></div>
+      <div class="modal-field full"><label>Existing Controls</label><p>${r.controls || '—'}</p></div>
+      <div class="modal-field full"><label>Action Plan</label><p>${r.actionPlan || '—'}</p></div>
+      <div class="modal-field"><label>Action Owner</label><p>${r.actionOwner || '—'}</p></div>
+      <div class="modal-field"><label>Target Date</label><p>${r.targetDate ? new Date(r.targetDate).toLocaleDateString('en-GB') : '—'}</p></div>
+      <div class="modal-field"><label>Status</label><p><span class="badge ${STATUS_COLOR(r.status)}">${r.status}</span></p></div>
+      <div class="modal-field"><label>Last Reviewed</label><p>${r.lastReviewed ? new Date(r.lastReviewed).toLocaleDateString('en-GB') : '—'}</p></div>
+    </div>`;
+  document.getElementById('modal-edit-btn').onclick = () => { closeModal(); editRisk(id); };
+  document.getElementById('risk-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('risk-modal').classList.remove('open');
+}
+
+document.getElementById('risk-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ════════════════════════════════════════════════
+//  TOAST
+// ════════════════════════════════════════════════
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════
+document.getElementById('topbar-date').textContent = new Date().toLocaleDateString('en-GB', { weekday:'short', day:'2-digit', month:'short', year:'numeric' });
+
+loadData();
+renderDashboard();
+</script>
+</body>
+</html>
