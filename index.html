@@ -8402,44 +8402,112 @@ window.onload = function() {
       }
     }
   }
-  // Auto-restore latest saved session if available
-  var sessions=sg(VH_KEY,[]);
+  // Auto-restore: prefer auto-save if newer than latest manual version
+  var sessions = sg(VH_KEY, []);
+  var autoSaved = sg(AS_KEY, null);
+  var restored = false;
+
+  // Pick the most recent source
+  var manualLatest = null;
   if(sessions.length){
     sessions.sort(function(a,b){return (b.ver||0)-(a.ver||0);});
-    var latest=sessions[0];
-    var hasWork=latest.selCount>0||(latest.formData&&latest.formData.brname);
-    if(hasWork){
-      _brInfoHasData = true;
-      restoreSession(latest);
-      toast('Session restored: Version '+latest.ver+' ('+fmtTs(latest.ts)+')');
+    manualLatest = sessions[0];
+  }
+
+  var useAuto = false;
+  if(autoSaved && autoSaved._autoSavedAt){
+    if(!manualLatest){
+      useAuto = true;
+    } else {
+      useAuto = (autoSaved._autoSavedAt > (manualLatest.ts||''));
     }
   }
-  updateStageBadge();
-  // Only lock if restoring existing data — leave free for fresh start
-  if(_brInfoHasData) lockBrInfo();
-  showPrompt(); // show prompt until user searches
 
-  // Warn before closing/navigating away if work hasn't been saved
+  var sourceSession = useAuto ? autoSaved : manualLatest;
+
+  if(sourceSession){
+    var hasWork = (sourceSession.selCount > 0) ||
+                  (sourceSession.formData && sourceSession.formData.brname);
+    if(hasWork){
+      _brInfoHasData = true;
+      restoreSession(sourceSession);
+      var brn = (sourceSession.formData && sourceSession.formData.brname) || 'your last session';
+      var savedAt = useAuto ? sourceSession._autoSavedAt : sourceSession.ts;
+      var savedLabel = savedAt ? fmtTs(savedAt) : '';
+      showWelcomeBack(brn, savedLabel, useAuto);
+      restored = true;
+    }
+  }
+
+  updateStageBadge();
+  if(_brInfoHasData) lockBrInfo();
+  showPrompt();
+
+  // Warn before closing if any data exists
   window.onbeforeunload = function(e){
-    if(Object.keys(selIds).length > 0){
-      var msg = 'You have unsaved work. Please save your session before closing so you can continue on another computer.';
+    if(hasAnyData()){
+      autoSaveNow(); // last-chance auto-save
+      var msg = 'Your work will be saved automatically. To access it on another computer, use Save / Versions to export a session file before closing.';
       e.returnValue = msg;
       return msg;
     }
   };
 
-  // Periodic reminder every 20 minutes if observations are selected and no recent save
+  // Auto-save every 60 seconds silently
   setInterval(function(){
-    if(Object.keys(selIds).length > 0){
+    if(hasAnyData()) autoSaveNow();
+  }, 60000);
+
+  // Periodic toast reminder every 20 minutes if no manual save
+  setInterval(function(){
+    if(hasAnyData()){
       var sinceMs = Date.now() - (_lastSavedTs || 0);
       if(sinceMs > 20 * 60 * 1000){
-        toast('Reminder: Save your session (💾 Save / Versions) so you can continue your work on any computer.');
+        toast('Reminder: Use 💾 Save / Versions to create a backup you can share across computers.');
       }
     }
   }, 20 * 60 * 1000);
 };
 
 function pad(n){return n<10?'0'+n:n;}
+
+function showWelcomeBack(branchName, savedAt, wasAuto){
+  // Remove any existing banner first
+  var old = document.getElementById('wb-banner');
+  if(old) old.remove();
+
+  var banner = document.createElement('div');
+  banner.id = 'wb-banner';
+  banner.style.cssText = 'position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:9998;'+
+    'background:#1a3a5c;color:#fff;padding:10px 20px 10px 16px;border-radius:8px;'+
+    'box-shadow:0 4px 16px rgba(0,0,0,.35);display:flex;align-items:center;gap:14px;'+
+    'font-family:Inter,Arial,sans-serif;font-size:12.5px;min-width:300px;max-width:90vw;'+
+    'border-left:4px solid #f0c040;animation:wbSlide .35s ease';
+  banner.innerHTML =
+    '<span style="font-size:20px">&#128075;</span>'+
+    '<div style="flex:1">'+
+      '<div style="font-weight:700;color:#f0c040;font-size:13px">Welcome back!</div>'+
+      '<div style="margin-top:2px;color:#cce">'+
+        'Restored: <strong style="color:#fff">'+esc(branchName)+'</strong>'+
+        (savedAt ? ' &nbsp;·&nbsp; Last saved: '+savedAt : '')+
+        (wasAuto ? ' &nbsp;<span style="font-size:10px;background:#c9962a;color:#111;padding:1px 6px;border-radius:8px;font-weight:700">AUTO</span>' : '')+
+      '</div>'+
+    '</div>'+
+    '<button onclick="document.getElementById(\'wb-banner\').remove()" '+
+      'style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;padding:0 0 0 8px;line-height:1">&#10005;</button>';
+
+  // Add keyframe if not present
+  if(!document.getElementById('wb-style')){
+    var st = document.createElement('style');
+    st.id = 'wb-style';
+    st.textContent = '@keyframes wbSlide{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}';
+    document.head.appendChild(st);
+  }
+
+  document.body.appendChild(banner);
+  // Auto-dismiss after 6 seconds
+  setTimeout(function(){ if(banner.parentNode) banner.remove(); }, 6000);
+}
 
 // ============================================================
 // FILE SAVE HELPER — uses File System Access API (pick save path)
@@ -8699,6 +8767,7 @@ function handleSel(id, checked, div) {
     if(checked){ injectTypePill(id, div); }
     else if(ax){ ax.parentNode.removeChild(ax); delete obsTypeMap[id]; }
   }
+  autoSaveNow();
 }
 
 function setAx(id,v){ annexMap[id]=v; }
@@ -9475,6 +9544,26 @@ function importSessionFile(e){
 var _reportDirty = false;
 var _lastSavedTs = 0;
 var _reportEverGenerated = false;  // dirty popup only active after first generate
+
+// ============================================================
+// CONTINUOUS AUTO-SAVE
+// ============================================================
+var AS_KEY = 'bhs_autosave_v1'; // separate from version history
+
+function autoSaveNow(){
+  try{
+    var sess = captureSession();
+    sess._autoSavedAt = new Date().toISOString();
+    localStorage.setItem(AS_KEY, JSON.stringify(sess));
+  }catch(e){}
+}
+
+function hasAnyData(){
+  var brname = document.getElementById('brname');
+  if(brname && brname.value.trim()) return true;
+  if(Object.keys(selIds).length > 0) return true;
+  return false;
+}
 var _showAnalysis = false;
 var _dirtyPopupTimer = null;
 
