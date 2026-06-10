@@ -34,6 +34,34 @@ html,body{height:100%;font-family:'Inter',sans-serif;font-size:13.5px;color:#1e2
 .tbtn.draft{background:#156d5a;color:#fff}
 .tbtn.cmp{background:#6a3a8a;color:#fff}
 .tbtn.shr{background:#b84000;color:#fff}
+.tbtn.updb{background:#2e7d32;color:#fff}
+/* Update Databank Modal */
+.updb-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto}
+.updb-box{background:#fff;border-radius:10px;width:680px;max-width:97vw;font-family:'Inter',sans-serif;box-shadow:0 8px 32px rgba(0,0,0,.3);margin-bottom:40px}
+.updb-head{background:#2e7d32;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;border-radius:10px 10px 0 0}
+.updb-head h3{margin:0;font-size:14px;font-weight:700}
+.updb-head button{background:none;border:none;color:#fff;font-size:18px;cursor:pointer}
+.updb-body{padding:18px 20px}
+.updb-section{margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid #e8edf5}
+.updb-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.updb-section h4{font-size:12.5px;font-weight:700;color:#2e7d32;margin-bottom:6px}
+.updb-section p{font-size:12px;color:#555;margin-bottom:10px;line-height:1.5}
+.updb-drop{border:2px dashed #a5d6a7;border-radius:8px;padding:22px;text-align:center;cursor:pointer;background:#f1f8f1;margin-bottom:10px;transition:.15s}
+.updb-drop:hover{border-color:#2e7d32;background:#e8f5e9}
+.updb-cand-list{border:1px solid #c8e6c9;border-radius:6px;max-height:260px;overflow-y:auto;margin-bottom:10px}
+.updb-cand-row{padding:9px 12px;border-bottom:1px solid #e8f5e8;display:flex;align-items:flex-start;gap:10px}
+.updb-cand-row:last-child{border-bottom:none}
+.updb-cand-chk{margin-top:2px;flex-shrink:0}
+.updb-cand-info{flex:1}
+.updb-cand-title{font-size:12.5px;font-weight:600;color:#1e2d40}
+.updb-cand-meta{font-size:11px;color:#888;margin-top:2px}
+.updb-ext-list{border:1px solid #d0dcea;border-radius:6px;max-height:220px;overflow-y:auto;margin-bottom:10px}
+.updb-ext-row{padding:8px 12px;border-bottom:1px solid #eef2f7;display:flex;align-items:center;gap:8px}
+.updb-ext-row:last-child{border-bottom:none}
+.updb-ext-info{flex:1;font-size:12px;color:#1e2d40}
+.updb-ext-meta{font-size:11px;color:#888}
+.updb-foot{display:flex;gap:10px;flex-wrap:wrap;padding-top:2px}
+.updb-foot button{padding:8px 16px;border:none;border-radius:5px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
 /* Share Observations Modal */
 .shr-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding-top:50px}
 .shr-box{background:#fff;border-radius:10px;width:600px;max-width:97vw;font-family:'Inter',sans-serif;box-shadow:0 8px 32px rgba(0,0,0,.3);margin-bottom:40px}
@@ -7874,6 +7902,7 @@ function pwCheck(){
   <button class="tbtn fin rpt-btn"  onclick="showSaveDialog()"     data-tip-title="Finalize Report" data-tip="Generates the final signed-off audit report for official issuance. Includes all observations, auditee responses, audit views, and annexures in a ready-to-submit format.">&#9989; Finalize</button>
   <button class="tbtn cmp rpt-btn"  onclick="showCompareModal()"   data-tip-title="Compare Versions" data-tip="Side-by-side comparison of two saved report versions. Highlights changes in observations, responses, and wording between drafts.">&#128269; Compare</button>
   <button class="tbtn shr rpt-btn"  onclick="showShareObsModal()"  data-tip-title="Share Observations" data-tip="Export new observations added after a specific date as a shareable file. Other auditors can import this file to add the same observations to their app.">&#128257; Share Obs</button>
+  <button class="tbtn updb"         onclick="showUpdateDbModal()"  data-tip-title="Update Databank" data-tip="Load a final issued report and let the system compare its observations against the databank. New observations found in the report can be approved and permanently added to the databank for future use.">&#128194; Update Databank</button>
   <button class="tbtn rpt-btn" id="demo-btn" style="background:#c9962a;color:#111;border:2px solid #f0c040;font-weight:700" onclick="loadDemoData()" data-tip-title="Demo Mode" data-tip="Loads sample branch data and observations so you can explore all features of the system without creating a real report.">&#127919; Demo</button>
 </div>
 
@@ -8305,6 +8334,25 @@ function saveBrAddress(){
 // ============================================================
 var STORE_VER = 'v6';
 function sg(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+
+// ============================================================
+// DATABANK EXTENSION (persisted in localStorage)
+// New observations approved from final reports are stored here
+// and merged into DB.observations so all existing code sees them
+// ============================================================
+var DB_EXT_KEY = 'bhs_dbext_v1';
+(function initDbExt(){
+  var ext = sg(DB_EXT_KEY, []);
+  // Merge into DB.observations — only add if ID not already present
+  var existingIds = {};
+  for(var i=0;i<DB.observations.length;i++) existingIds[DB.observations[i].id]=true;
+  for(var j=0;j<ext.length;j++){
+    if(!existingIds[ext[j].id]){
+      DB.observations.push(ext[j]);
+      existingIds[ext[j].id]=true;
+    }
+  }
+})();
 function ss(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 (function(){
   if(sg('bhs_v','')!==STORE_VER){
@@ -10256,6 +10304,211 @@ function doNewReport(){
   if(badge) badge.style.display='none';
   showPrompt();
   toast('New report started — please fill in branch information.');
+}
+
+// ============================================================
+// UPDATE DATABANK FROM FINAL REPORT
+// ============================================================
+var _updbCandidates = []; // observations pending approval
+
+function showUpdateDbModal(){
+  _updbCandidates = [];
+  var el = document.getElementById('updbModal');
+  if(el) el.remove();
+
+  var extObs = sg(DB_EXT_KEY, []);
+
+  var modal = document.createElement('div');
+  modal.className = 'updb-bg'; modal.id = 'updbModal';
+  modal.innerHTML =
+    '<div class="updb-box">' +
+    '<div class="updb-head"><h3>&#128194; Update Databank from Final Report</h3><button onclick="closeUpdbModal()">&#10005;</button></div>' +
+    '<div class="updb-body">' +
+
+    // STEP 1: Load report
+    '<div class="updb-section">' +
+    '<h4>Step 1 — Load a Final Issued Report</h4>' +
+    '<p>Select the final issued report session file (.json). The system will scan all observations in that report and compare them against the existing databank. Any new observations not currently in the databank will be listed for your approval.</p>' +
+    '<div class="updb-drop" onclick="document.getElementById(\'updb-file-input\').click()">' +
+    '&#128229; <strong>Click to select a Final Report Session File (.json)</strong>' +
+    '<p style="margin:4px 0 0;font-size:11px;color:#888">The session file saved via Save / Versions → Export</p>' +
+    '</div>' +
+    '<input type="file" id="updb-file-input" accept=".json" style="display:none" onchange="updbReadFile(this)">' +
+    '<div id="updb-cand-area"></div>' +
+    '<div class="updb-foot" id="updb-approve-foot" style="display:none">' +
+    '<button style="background:#2e7d32;color:#fff" onclick="updbApproveSelected()">&#10003; Add Selected to Databank</button>' +
+    '<button style="background:#e8edf5;color:#444" onclick="updbClearCandidates()">&#10005; Cancel</button>' +
+    '</div>' +
+    '</div>' +
+
+    // STEP 2: Manage existing extensions
+    '<div class="updb-section">' +
+    '<h4>Databank Extensions (' + extObs.length + ' entries added by your team)</h4>' +
+    '<p>These are observations previously approved and added to your local databank. They appear alongside the built-in observations in all future reports on this computer.</p>' +
+    '<div id="updb-ext-area">' + buildUpdbExtList(extObs) + '</div>' +
+    '</div>' +
+
+    '</div></div>';
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', function(e){ if(e.target===modal) closeUpdbModal(); });
+}
+
+function closeUpdbModal(){
+  var el = document.getElementById('updbModal');
+  if(el) el.remove();
+  _updbCandidates = [];
+}
+
+function buildUpdbExtList(extObs){
+  if(!extObs.length) return '<div style="padding:14px;text-align:center;color:#aaa;font-size:12px">No custom observations have been added to the databank yet.</div>';
+  var h = '<div class="updb-ext-list">';
+  for(var i=0;i<extObs.length;i++){
+    var o = extObs[i];
+    var addedOn = o._dbAddedAt ? o._dbAddedAt.substring(0,10) : '';
+    h += '<div class="updb-ext-row">' +
+         '<div class="updb-ext-info"><strong>'+esc(o.title)+'</strong>' +
+         '<div class="updb-ext-meta">'+esc(o.category)+(addedOn?' &nbsp;|&nbsp; Added to databank: '+addedOn:'')+'</div></div>' +
+         '<button onclick="updbRemoveExt(\''+esc(o.id)+'\')" style="padding:3px 9px;background:#8b1a1a;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">Remove</button>' +
+         '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function updbReadFile(input){
+  var file = input.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var data = JSON.parse(e.target.result);
+      // Accept both a raw session object and a version-history entry
+      var sess = data;
+      if(Array.isArray(data) && data.length && data[0].customs) sess = data[data.length-1]; // version array
+      var reportCustoms = sess.customs || [];
+      if(!reportCustoms.length){
+        toast('No custom observations found in this report file.');
+        input.value='';
+        return;
+      }
+
+      // Build full set of existing IDs (built-in DB + ext already merged into DB.observations)
+      var existingIds = {};
+      for(var i=0;i<DB.observations.length;i++) existingIds[DB.observations[i].id]=true;
+
+      // Also match by title (case-insensitive) to catch re-numbered duplicates
+      var existingTitles = {};
+      for(var j=0;j<DB.observations.length;j++) existingTitles[DB.observations[j].title.toLowerCase().trim()]=true;
+
+      _updbCandidates = [];
+      var alreadyIn = 0;
+      for(var k=0;k<reportCustoms.length;k++){
+        var o = reportCustoms[k];
+        if(existingIds[o.id] || existingTitles[(o.title||'').toLowerCase().trim()]){
+          alreadyIn++;
+          continue;
+        }
+        _updbCandidates.push(o);
+      }
+
+      var candArea = document.getElementById('updb-cand-area');
+      var foot = document.getElementById('updb-approve-foot');
+      if(!_updbCandidates.length){
+        candArea.innerHTML = '<div style="padding:12px 14px;background:#e8f5e9;border-radius:6px;font-size:12px;color:#2e7d32;font-weight:600">&#10003; All '+reportCustoms.length+' observation(s) in this report already exist in the databank'+(alreadyIn?' ('+alreadyIn+' matched)':'')+'.</div>';
+        foot.style.display='none';
+        input.value='';
+        return;
+      }
+
+      var h = '<div style="font-size:12px;font-weight:700;color:#2e7d32;margin:8px 0 6px">'+_updbCandidates.length+' new observation(s) found — select which to add to the databank'+(alreadyIn?' ('+alreadyIn+' already in databank — skipped)':'')+':</div>';
+      h += '<div style="margin-bottom:6px"><label style="font-size:11px;cursor:pointer"><input type="checkbox" id="updb-sel-all" onchange="updbToggleAll(this.checked)" checked> <strong>Select All</strong></label></div>';
+      h += '<div class="updb-cand-list">';
+      for(var m=0;m<_updbCandidates.length;m++){
+        var c = _updbCandidates[m];
+        h += '<div class="updb-cand-row">' +
+             '<input type="checkbox" class="updb-cand-chk" data-idx="'+m+'" checked>' +
+             '<div class="updb-cand-info">' +
+             '<div class="updb-cand-title">'+esc(c.title)+'</div>' +
+             '<div class="updb-cand-meta">'+esc(c.category||'Others')+(c.type?' &nbsp;|&nbsp; '+esc(c.type):'')+'</div>' +
+             (c.observation ? '<div style="font-size:11px;color:#555;margin-top:3px;line-height:1.4">'+esc(c.observation).substring(0,120)+(c.observation.length>120?'…':'')+'</div>' : '') +
+             '</div></div>';
+      }
+      h += '</div>';
+      candArea.innerHTML = h;
+      foot.style.display = 'flex';
+    } catch(ex){
+      toast('Could not read file. Please select a valid session JSON file.');
+    }
+    input.value='';
+  };
+  reader.readAsText(file);
+}
+
+function updbToggleAll(checked){
+  var chks = document.querySelectorAll('.updb-cand-chk');
+  for(var i=0;i<chks.length;i++) chks[i].checked = checked;
+}
+
+function updbClearCandidates(){
+  _updbCandidates = [];
+  var ca = document.getElementById('updb-cand-area');
+  if(ca) ca.innerHTML = '';
+  var foot = document.getElementById('updb-approve-foot');
+  if(foot) foot.style.display='none';
+}
+
+function updbApproveSelected(){
+  var chks = document.querySelectorAll('.updb-cand-chk');
+  var approved = [];
+  for(var i=0;i<chks.length;i++){
+    if(chks[i].checked){
+      var idx = parseInt(chks[i].getAttribute('data-idx'));
+      if(_updbCandidates[idx]) approved.push(_updbCandidates[idx]);
+    }
+  }
+  if(!approved.length){ toast('Please select at least one observation to add.'); return; }
+
+  var ext = sg(DB_EXT_KEY, []);
+  var existingExtIds = {};
+  for(var j=0;j<ext.length;j++) existingExtIds[ext[j].id]=true;
+
+  var added = 0;
+  for(var k=0;k<approved.length;k++){
+    var o = approved[k];
+    if(existingExtIds[o.id]) continue;
+    o._dbAddedAt = new Date().toISOString();
+    o.custom = true;
+    ext.push(o);
+    // Also add to live DB.observations immediately for this session
+    DB.observations.push(o);
+    added++;
+  }
+  ss(DB_EXT_KEY, ext);
+
+  toast(added+' observation(s) added to the databank. They are now available for all future reports.');
+  _updbCandidates = [];
+
+  // Refresh ext list and clear candidates
+  var extArea = document.getElementById('updb-ext-area');
+  if(extArea) extArea.innerHTML = buildUpdbExtList(ext);
+  var hdr = document.querySelector('#updbModal .updb-section:last-child h4');
+  if(hdr) hdr.textContent = 'Databank Extensions (' + ext.length + ' entries added by your team)';
+  updbClearCandidates();
+}
+
+function updbRemoveExt(obsId){
+  if(!confirm('Remove this observation from the databank extension?\n\nIt will no longer appear in future reports on this computer. (Existing reports already using it are not affected.)')) return;
+  var ext = sg(DB_EXT_KEY, []);
+  ext = ext.filter(function(o){ return o.id !== obsId; });
+  ss(DB_EXT_KEY, ext);
+  // Remove from live DB.observations too
+  DB.observations = DB.observations.filter(function(o){ return o.id !== obsId; });
+  var extArea = document.getElementById('updb-ext-area');
+  if(extArea) extArea.innerHTML = buildUpdbExtList(ext);
+  var hdr = document.querySelector('#updbModal .updb-section:last-child h4');
+  if(hdr) hdr.textContent = 'Databank Extensions (' + ext.length + ' entries added by your team)';
+  toast('Observation removed from databank extension.');
 }
 
 // ============================================================
