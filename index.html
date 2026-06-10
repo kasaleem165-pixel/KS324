@@ -7874,7 +7874,7 @@ function pwCheck(){
   <button class="tbtn rpt-btn" id="analysis-btn" onclick="toggleAnalysis()" data-tip-title="Sensitivity &amp; COSO Analysis" data-tip="Displays the Sensitivity Matrix and COSO Framework analysis for all selected observations directly in the report preview area.">&#128200; Analysis</button>
   <button class="tbtn load rpt-btn" onclick="triggerLoad()"        data-tip-title="Load Response" data-tip="Loads the completed auditee response file (returned by the auditee) back into the system. Responses and estimated resolution times are automatically mapped to each observation.">&#128193; Load Response</button>
   <button class="tbtn fin rpt-btn"  onclick="showSaveDialog()"     data-tip-title="Finalize Report" data-tip="Generates the final signed-off audit report for official issuance. Includes all observations, auditee responses, audit views, and annexures in a ready-to-submit format.">&#9989; Finalize</button>
-  <button class="tbtn cmp rpt-btn"  onclick="showCompareModal()"   data-tip-title="Compare Versions" data-tip="Side-by-side comparison of two saved report versions. Highlights changes in observations, responses, and wording between drafts.">&#128269; Compare</button>
+  <button class="tbtn cmp rpt-btn" id="cmp-btn" onclick="showCompareModal()" style="opacity:0.55;filter:grayscale(0.4)" data-tip-title="Compare Report 🔒" data-tip="Restricted to Head Office. Compares a loaded report file against the databank to identify missing or present observations. Requires HO password.">&#128274; Compare</button>
   <button class="tbtn updb" id="updb-btn" onclick="showUpdateDbModal()" style="opacity:0.55;filter:grayscale(0.4)" data-tip-title="Update Databank 🔒" data-tip="Restricted to Head Office. Auditors can import a Databank Update File received from HO. HO users enter the HO password to access full update and export features.">&#128274; Update Databank</button>
   <button class="tbtn rpt-btn" id="demo-btn" style="background:#c9962a;color:#111;border:2px solid #f0c040;font-weight:700" onclick="loadDemoData()" data-tip-title="Demo Mode" data-tip="Loads sample branch data and observations so you can explore all features of the system without creating a real report.">&#127919; Demo</button>
 </div>
@@ -10708,6 +10708,14 @@ function impDbReadFile(input){
 var cmpState = { text:'', results:[], cat:'All Categories', type:'missing' };
 
 function showCompareModal(){
+  if(!_hoAuthed){
+    var pw=prompt('Compare is restricted to Head Office.\n\nEnter the HO password to continue:');
+    if(pw===null) return;
+    if(pw!==_HO_PW){ toast('Incorrect password. Access denied.'); return; }
+    _hoAuthed=true;
+    var btn=document.getElementById('cmp-btn');
+    if(btn){ btn.style.opacity='1'; btn.style.filter='none'; btn.innerHTML='&#128269; Compare'; }
+  }
   cmpState.text=''; cmpState.results=[];
   var catOptions='<option>All Categories</option>';
   var cats=DEF_CA.slice(1);
