@@ -7902,7 +7902,8 @@ function pwCheck(){
   <button class="tbtn fin rpt-btn"  onclick="showSaveDialog()"     data-tip-title="Finalize Report" data-tip="Generates the final signed-off audit report for official issuance. Includes all observations, auditee responses, audit views, and annexures in a ready-to-submit format.">&#9989; Finalize</button>
   <button class="tbtn cmp rpt-btn"  onclick="showCompareModal()"   data-tip-title="Compare Versions" data-tip="Side-by-side comparison of two saved report versions. Highlights changes in observations, responses, and wording between drafts.">&#128269; Compare</button>
   <button class="tbtn shr rpt-btn"  onclick="showShareObsModal()"  data-tip-title="Share Observations" data-tip="Export new observations added after a specific date as a shareable file. Other auditors can import this file to add the same observations to their app.">&#128257; Share Obs</button>
-  <button class="tbtn updb"         onclick="showUpdateDbModal()"  data-tip-title="Update Databank" data-tip="Load a final issued report and let the system compare its observations against the databank. New observations found in the report can be approved and permanently added to the databank for future use.">&#128194; Update Databank</button>
+  <button class="tbtn updb"         onclick="showUpdateDbModal()"      data-tip-title="Update Databank (HO)" data-tip="Head Office only — requires HO password. Load the final report session file (.json) saved alongside the issued PDF, approve new observations, then export a Databank Update File to distribute to all auditors.">&#128194; Update Databank</button>
+  <button class="tbtn updb rpt-btn" onclick="showImportDbModal()" style="background:#1565c0" data-tip-title="Import Databank Update" data-tip="Import a Databank Update File received from Head Office. New observations will be added to your local databank and become available in all future reports.">&#128229; Import DB Update</button>
   <button class="tbtn rpt-btn" id="demo-btn" style="background:#c9962a;color:#111;border:2px solid #f0c040;font-weight:700" onclick="loadDemoData()" data-tip-title="Demo Mode" data-tip="Loads sample branch data and observations so you can explore all features of the system without creating a real report.">&#127919; Demo</button>
 </div>
 
@@ -10311,7 +10312,21 @@ function doNewReport(){
 // ============================================================
 var _updbCandidates = []; // observations pending approval
 
+var _HO_PW = 'HO@S&A2026';
+var _hoAuthed = false; // stays true for the browser session once authenticated
+
 function showUpdateDbModal(){
+  // Require HO password — ask once per browser session
+  if(!_hoAuthed){
+    var pw = prompt('Update Databank is restricted to Head Office users.\n\nPlease enter the HO access password:');
+    if(pw === null) return; // cancelled
+    if(pw !== _HO_PW){
+      alert('Incorrect password. Access denied.\n\nIf you are a field auditor, use the “Import DB Update” button instead.');
+      return;
+    }
+    _hoAuthed = true;
+  }
+
   _updbCandidates = [];
   var el = document.getElementById('updbModal');
   if(el) el.remove();
@@ -10573,6 +10588,79 @@ function updbImportExt(input){
           impArea.innerHTML = '<div style="padding:10px 12px;background:#e8f5e9;border-radius:6px;font-size:12px;color:#2e7d32;font-weight:600;margin-top:6px">&#10003; '+added+' new observation(s) added to your databank'+(skipped?' ('+skipped+' already existed — skipped)':'')+'.</div>';
         } else {
           impArea.innerHTML = '<div style="padding:10px 12px;background:#fff8e1;border-radius:6px;font-size:12px;color:#7a6000;font-weight:600;margin-top:6px">All '+incoming.length+' observation(s) in this file already exist in your databank. Nothing new to add.</div>';
+        }
+      }
+      if(added) toast(added+' observation(s) added to your databank from HO update.');
+      else toast('Your databank is already up to date.');
+    } catch(ex){
+      toast('Could not read file. Please select a valid Databank Update File.');
+    }
+    input.value='';
+  };
+  reader.readAsText(file);
+}
+
+function showImportDbModal(){
+  var el = document.getElementById('impDbModal');
+  if(el) el.remove();
+
+  var modal = document.createElement('div');
+  modal.className = 'updb-bg'; modal.id = 'impDbModal';
+  modal.innerHTML =
+    '<div class="updb-box" style="width:520px">' +
+    '<div class="updb-head" style="background:#1565c0"><h3>&#128229; Import Databank Update from HO</h3><button onclick="document.getElementById(\'impDbModal\').remove()">&#10005;</button></div>' +
+    '<div class="updb-body">' +
+    '<div class="updb-section" style="border:none;margin:0;padding:0">' +
+    '<h4 style="color:#1565c0">Import Databank Update File received from Head Office</h4>' +
+    '<p>Select the Databank Update File sent to you by the Head Office (file name starts with <strong>DatabankUpdate_SA_</strong>). New observations will be added to your local databank and will appear in all future reports on this computer.</p>' +
+    '<div class="updb-drop" onclick="document.getElementById(\'impdb-file-input\').click()" style="border-color:#90caf9;background:#e3f2fd">' +
+    '&#128193; <strong>Click to select the Databank Update File</strong>' +
+    '<p style="margin:4px 0 0;font-size:11px;color:#888">DatabankUpdate_SA_YYYY-MM-DD.json</p>' +
+    '</div>' +
+    '<input type="file" id="impdb-file-input" accept=".json" style="display:none" onchange="impDbReadFile(this)">' +
+    '<div id="impdb-result-area"></div>' +
+    '</div>' +
+    '</div></div>';
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+}
+
+function impDbReadFile(input){
+  // Reuse the same logic as updbImportExt but targets impdb-result-area
+  var file = input.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var data = JSON.parse(e.target.result);
+      if(data._type !== 'SA_DatabankUpdate' || !Array.isArray(data.observations)){
+        toast('Invalid file. Please select a valid Databank Update File received from HO.');
+        input.value=''; return;
+      }
+      var incoming = data.observations;
+      var ext = sg(DB_EXT_KEY, []);
+      var existingIds = {};
+      for(var i=0;i<ext.length;i++) existingIds[ext[i].id]=true;
+      for(var j=0;j<DB.observations.length;j++) existingIds[DB.observations[j].id]=true;
+
+      var added=0, skipped=0;
+      for(var k=0;k<incoming.length;k++){
+        if(existingIds[incoming[k].id]){ skipped++; continue; }
+        incoming[k]._dbAddedAt = incoming[k]._dbAddedAt || new Date().toISOString();
+        ext.push(incoming[k]);
+        DB.observations.push(incoming[k]);
+        existingIds[incoming[k].id]=true;
+        added++;
+      }
+      ss(DB_EXT_KEY, ext);
+
+      var resultArea = document.getElementById('impdb-result-area');
+      if(resultArea){
+        if(added){
+          resultArea.innerHTML = '<div style="padding:12px 14px;background:#e8f5e9;border-radius:6px;font-size:12.5px;color:#2e7d32;font-weight:600;margin-top:8px">&#10003; '+added+' new observation(s) successfully added to your databank'+(skipped?' ('+skipped+' already existed — skipped)':'')+'.<br><span style="font-weight:400;font-size:11px;color:#555">These observations are now available when preparing future reports on this computer.</span></div>';
+        } else {
+          resultArea.innerHTML = '<div style="padding:12px 14px;background:#fff8e1;border-radius:6px;font-size:12px;color:#7a6000;font-weight:600;margin-top:8px">Your databank is already up to date. All '+incoming.length+' observation(s) in this file already exist.</div>';
         }
       }
       if(added) toast(added+' observation(s) added to your databank from HO update.');
