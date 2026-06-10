@@ -7902,8 +7902,7 @@ function pwCheck(){
   <button class="tbtn fin rpt-btn"  onclick="showSaveDialog()"     data-tip-title="Finalize Report" data-tip="Generates the final signed-off audit report for official issuance. Includes all observations, auditee responses, audit views, and annexures in a ready-to-submit format.">&#9989; Finalize</button>
   <button class="tbtn cmp rpt-btn"  onclick="showCompareModal()"   data-tip-title="Compare Versions" data-tip="Side-by-side comparison of two saved report versions. Highlights changes in observations, responses, and wording between drafts.">&#128269; Compare</button>
   <button class="tbtn shr rpt-btn"  onclick="showShareObsModal()"  data-tip-title="Share Observations" data-tip="Export new observations added after a specific date as a shareable file. Other auditors can import this file to add the same observations to their app.">&#128257; Share Obs</button>
-  <button class="tbtn updb"         onclick="showUpdateDbModal()"      data-tip-title="Update Databank (HO)" data-tip="Head Office only — requires HO password. Load the final report session file (.json) saved alongside the issued PDF, approve new observations, then export a Databank Update File to distribute to all auditors.">&#128194; Update Databank</button>
-  <button class="tbtn updb rpt-btn" onclick="showImportDbModal()" style="background:#1565c0" data-tip-title="Import Databank Update" data-tip="Import a Databank Update File received from Head Office. New observations will be added to your local databank and become available in all future reports.">&#128229; Import DB Update</button>
+  <button class="tbtn updb" id="updb-btn" onclick="showUpdateDbModal()" style="opacity:0.55;filter:grayscale(0.4)" data-tip-title="Update Databank 🔒" data-tip="Restricted to Head Office. Auditors can import a Databank Update File received from HO. HO users enter the HO password to access full update and export features.">&#128274; Update Databank</button>
   <button class="tbtn rpt-btn" id="demo-btn" style="background:#c9962a;color:#111;border:2px solid #f0c040;font-weight:700" onclick="loadDemoData()" data-tip-title="Demo Mode" data-tip="Loads sample branch data and observations so you can explore all features of the system without creating a real report.">&#127919; Demo</button>
 </div>
 
@@ -10316,15 +10315,20 @@ var _HO_PW = 'HO@S&A2026';
 var _hoAuthed = false; // stays true for the browser session once authenticated
 
 function showUpdateDbModal(){
-  // Require HO password — ask once per browser session
   if(!_hoAuthed){
-    var pw = prompt('Update Databank is restricted to Head Office users.\n\nPlease enter the HO access password:');
-    if(pw === null) return; // cancelled
+    var pw = prompt('Update Databank is restricted to Head Office.\n\nEnter the HO password to access full features.\n(Field auditors: press Cancel to go to the Import screen.)');
+    if(pw === null){
+      // User cancelled — show import-only modal for field auditors
+      showImportDbModal(); return;
+    }
     if(pw !== _HO_PW){
-      alert('Incorrect password. Access denied.\n\nIf you are a field auditor, use the “Import DB Update” button instead.');
-      return;
+      toast('Incorrect password. Opening import screen for field auditors.');
+      showImportDbModal(); return;
     }
     _hoAuthed = true;
+    // Unlock button appearance for this session
+    var btn = document.getElementById('updb-btn');
+    if(btn){ btn.style.opacity='1'; btn.style.filter='none'; btn.innerHTML='&#128194; Update Databank'; }
   }
 
   _updbCandidates = [];
