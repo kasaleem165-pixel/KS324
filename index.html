@@ -12659,31 +12659,41 @@ function showSaveDialog(){
   var el=document.createElement('div');
   el.className='vh-bg'; el.id='sdModal';
   el.innerHTML=
-    '<div class="vh-box" style="width:500px">'+
-    '<div class="vh-head"><h3>&#128190; Save Report</h3><button onclick="document.getElementById(\'sdModal\').remove()">&#10005;</button></div>'+
+    '<div class="vh-box" style="width:520px">'+
+    '<div class="vh-head"><h3>&#9989; Finalize &amp; Save Report</h3><button onclick="document.getElementById(\'sdModal\').remove()">&#10005;</button></div>'+
     '<div class="vh-body">'+
-    '<p>Choose format and the file will download to your browser\'s <strong>Downloads folder</strong>.<br>To save to a specific folder, move the file after downloading.</p>'+
+    '<p style="margin-bottom:12px">Choose how to save your final report.</p>'+
+
+    // Save All option (recommended)
+    '<div class="sd-opt" style="border-color:#1a7a4a;background:#f2fbf5" onclick="saveAsFinal(\'all\')">'+
+      '<span class="sd-icon">&#128230;</span>'+
+      '<div class="sd-info"><strong style="color:#1a7a4a">&#10003; Save All — HTML + Word + Session (Recommended)</strong>'+
+      '<span>Downloads all three files in one go: the final HTML report, a Word (.doc) copy, and the session backup (.json). Best practice for every issued report.</span></div>'+
+    '</div>'+
+
+    '<div style="border-top:1px solid #e0e8f0;margin:10px 0 8px;font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px">Or save individually</div>'+
+
     '<div class="sd-opt" onclick="saveAsFinal(\'html\')">'+
       '<span class="sd-icon">&#128196;</span>'+
-      '<div class="sd-info"><strong>HTML Report (Re-loadable)</strong>'+
-      '<span>Saves the complete final report as an HTML file.<br>Can be re-opened in a browser and re-loaded into this app to resume editing.</span></div>'+
+      '<div class="sd-info"><strong>HTML Report</strong>'+
+      '<span>Complete final report as HTML. Can be re-opened in a browser.</span></div>'+
     '</div>'+
     '<div class="sd-opt" onclick="saveAsFinal(\'word\')">'+
       '<span class="sd-icon">&#128462;</span>'+
       '<div class="sd-info"><strong>Word Document (.doc)</strong>'+
       '<span>Opens in Microsoft Word or LibreOffice. Ideal for sharing and printing.</span></div>'+
     '</div>'+
-    '<div class="sd-opt" onclick="saveAsFinal(\'pdf\')">'+
-      '<span class="sd-icon">&#128443;</span>'+
-      '<div class="sd-info"><strong>PDF (Print / Save as PDF)</strong>'+
-      '<span>Opens the report in a new tab with a print dialog. Choose "Save as PDF" in your printer options.</span></div>'+
-    '</div>'+
     '<div class="sd-opt" onclick="saveAsFinal(\'json\')">'+
       '<span class="sd-icon">&#128190;</span>'+
       '<div class="sd-info"><strong>Session File (.json)</strong>'+
-      '<span>Saves all working data (observations, responses, annexures). Use this to back up your work and reload it in the app at any time via Save / Versions → Import.</span></div>'+
+      '<span>Working data backup — reload into the app at any time. Required for Update Databank at HO.</span></div>'+
     '</div>'+
-    '<div class="sd-note">&#9432; &nbsp;A <strong>Save As</strong> dialog will open so you can choose the exact folder and filename. If your browser does not support this (e.g. Firefox), the file will go to your default Downloads folder.</div>'+
+    '<div class="sd-opt" onclick="saveAsFinal(\'pdf\')">'+
+      '<span class="sd-icon">&#128443;</span>'+
+      '<div class="sd-info"><strong>PDF (Print / Save as PDF)</strong>'+
+      '<span>Opens the report in a new tab. Choose <em>Save as PDF</em> in your printer options. PDF cannot be automated — this step is always separate.</span></div>'+
+    '</div>'+
+    '<div class="sd-note">&#9432; &nbsp;<strong>Save All</strong> downloads HTML + Word + Session together. PDF must always be done separately as it requires your browser\'s print dialog.</div>'+
     '</div></div>';
   document.body.appendChild(el);
   el.addEventListener('click', function(e){ if(e.target===el) el.remove(); });
@@ -12694,6 +12704,37 @@ function saveAsFinal(fmt){
   if(modal) modal.remove();
   var pf=window._pendingFinal;
   if(!pf) return;
+
+  if(fmt==='all'){
+    // Download HTML, Word, and JSON together; PDF must be done separately
+    var htmlBlob=new Blob([pf.html],{type:'text/html'});
+    _saveFileAsLegacy(htmlBlob, pf.fname);
+
+    var wordHtmlAll='<html xmlns:o="urn:schemas-microsoft-com:office:office" '+
+      'xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'+
+      '<head><meta charset="UTF-8">'+
+      '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom>'+
+      '<w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->'+
+      '<style>body{font-family:Calibri,sans-serif;font-size:11pt;margin:2cm}'+
+      'h1{font-size:16pt;color:#1a3a5c}h2{font-size:13pt;color:#2a5080}'+
+      'table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;font-size:10pt}'+
+      '</style></head><body>'+
+      pf.html.replace(/<!DOCTYPE[^>]*>/i,'').replace(/<html[^>]*>/i,'').replace(/<\/html>/i,'')
+      .replace(/<head>[\s\S]*?<\/head>/i,'')
+      .replace(/<body[^>]*>/i,'').replace(/<\/body>/i,'')
+      +'</body></html>';
+    var wblobAll=new Blob([wordHtmlAll],{type:'application/msword'});
+    setTimeout(function(){ _saveFileAsLegacy(wblobAll, pf.fname.replace(/\.html?$/i,'.doc')); }, 600);
+
+    var sessAll=pf.sess||captureSession();
+    var jblobAll=new Blob([JSON.stringify(sessAll,null,2)],{type:'application/json'});
+    setTimeout(function(){ _saveFileAsLegacy(jblobAll, pf.fname.replace(/\.html?$/i,'_session.json')); }, 1200);
+
+    toast('3 files saved: HTML, Word, and Session. For PDF — use the PDF option separately.');
+    lockBrInfo();
+    return;
+  }
+
   var a=document.createElement('a');
 
   if(fmt==='html'){
