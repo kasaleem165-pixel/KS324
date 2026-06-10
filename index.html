@@ -8370,6 +8370,25 @@ window.onload = function() {
   // Only lock if restoring existing data — leave free for fresh start
   if(_brInfoHasData) lockBrInfo();
   showPrompt(); // show prompt until user searches
+
+  // Warn before closing/navigating away if work hasn't been saved
+  window.onbeforeunload = function(e){
+    if(Object.keys(selIds).length > 0){
+      var msg = 'You have unsaved work. Please save your session before closing so you can continue on another computer.';
+      e.returnValue = msg;
+      return msg;
+    }
+  };
+
+  // Periodic reminder every 20 minutes if observations are selected and no recent save
+  setInterval(function(){
+    if(Object.keys(selIds).length > 0){
+      var sinceMs = Date.now() - (_lastSavedTs || 0);
+      if(sinceMs > 20 * 60 * 1000){
+        toast('Reminder: Save your session (💾 Save / Versions) so you can continue your work on any computer.');
+      }
+    }
+  }, 20 * 60 * 1000);
 };
 
 function pad(n){return n<10?'0'+n:n;}
@@ -9208,6 +9227,7 @@ function closeVH(){var m=document.getElementById('vhModal');if(m)m.parentNode.re
 
 function doSaveNow(){
   var result=saveVersion();
+  _lastSavedTs = Date.now();
   closeVH();
   var msg='Version '+result.ver+' saved.';
   if(result.deleted) msg+='\n\nOldest version (Ver. '+result.deleted.ver+', saved '+fmtTs(result.deleted.ts)+') has been removed to stay within the 6-version limit.';
@@ -9353,6 +9373,7 @@ function importSessionFile(e){
 // DIRTY-REPORT FLOATING POPUP
 // ============================================================
 var _reportDirty = false;
+var _lastSavedTs = 0;
 var _reportEverGenerated = false;  // dirty popup only active after first generate
 var _showAnalysis = false;
 var _dirtyPopupTimer = null;
