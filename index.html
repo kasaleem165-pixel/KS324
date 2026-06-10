@@ -7982,6 +7982,7 @@ function pwCheck(){
 </div>
 <input type="file" id="fileinp" accept=".html" style="display:none" onchange="loadAuditeeFile(event)">
 <input type="file" id="sessioninp" accept=".json" style="display:none" onchange="importSessionFile(event)">
+<input type="file" id="fullbackupinp" accept=".json" style="display:none" onchange="importFullBackup(event)">
 <input type="file" id="rptinp" accept=".html,.htm,.json" style="display:none" onchange="loadReportFile(event)">
 <input type="file" id="cmpinp" accept=".html,.htm,.docx" style="display:none" onchange="cmpFileLoaded(event)">
 
@@ -9293,12 +9294,63 @@ function showVersionHistory(){
     '<div class="vh-foot">'+
     '<button class="vh-save-now" onclick="doSaveNow()">&#128190; Save Now</button>'+
     '<button class="vh-imp" onclick="document.getElementById(\'sessioninp\').click()">&#128194; Import from File</button>'+
+    '<button style="background:#b84000;color:#fff" class="vh-btn" onclick="exportFullBackup()">&#128230; Full Data Backup</button>'+
+    '<button style="background:#5b3fa0;color:#fff" class="vh-btn" onclick="document.getElementById(\'fullbackupinp\').click()">&#128229; Restore Backup</button>'+
     '<button class="vh-close-btn" onclick="closeVH()">Close</button>'+
     '</div></div>';
   document.body.appendChild(el);
 }
 
 function closeVH(){var m=document.getElementById('vhModal');if(m)m.parentNode.removeChild(m);}
+
+// ============================================================
+// FULL DATA BACKUP — export / restore all app localStorage data
+// Use before replacing the app file with a new version from HO
+// ============================================================
+var APP_DATA_KEYS = ['bhs_sessions','bhs_dbext_v1','bhs_v','bhs_br','bhs_pb','bhs_ty','bhs_ca','bhs_br_addr'];
+
+function exportFullBackup(){
+  var backup = { _type:'SA_FullDataBackup', _version:1, _exportedAt:new Date().toISOString(), data:{} };
+  for(var i=0;i<APP_DATA_KEYS.length;i++){
+    try{
+      var raw = localStorage.getItem(APP_DATA_KEYS[i]);
+      if(raw !== null) backup.data[APP_DATA_KEYS[i]] = JSON.parse(raw);
+    }catch(e){}
+  }
+  var count = Object.keys(backup.data).length;
+  if(!count){ toast('No app data found to back up.'); return; }
+  var fname = 'SA_AppDataBackup_'+new Date().toISOString().substring(0,10)+'.json';
+  saveFileAs(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}), fname);
+  toast('Full data backup saved ('+count+' data stores). Keep this file safe before updating the app.');
+}
+
+function importFullBackup(event){
+  var file = event.target.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var backup = JSON.parse(e.target.result);
+      if(backup._type !== 'SA_FullDataBackup' || !backup.data){
+        toast('Invalid file. Please select a valid Full Data Backup file.');
+        event.target.value=''; return;
+      }
+      if(!confirm('Restore all data from backup?\n\nThis will replace your current sessions, databank extensions, and settings with the data from the backup file.\n\nYour current data will be overwritten. Proceed?')){
+        event.target.value=''; return;
+      }
+      var keys = Object.keys(backup.data);
+      for(var i=0;i<keys.length;i++){
+        try{ localStorage.setItem(keys[i], JSON.stringify(backup.data[keys[i]])); }catch(e){}
+      }
+      toast('Data restored from backup ('+keys.length+' stores). Reloading app...');
+      setTimeout(function(){ window.location.reload(); }, 1500);
+    }catch(ex){
+      toast('Could not read backup file. Please select a valid SA_AppDataBackup file.');
+    }
+    event.target.value='';
+  };
+  reader.readAsText(file);
+}
 
 function doSaveNow(){
   var result=saveVersion();
