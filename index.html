@@ -12682,7 +12682,7 @@ function generateIssuedReport(){
     if(resp.bh===null&&resp.ro===null&&resp.gen) iboxes+='<div class="ibox iresp"><span class="ibox-lbl">&#128172; Auditee Response</span>'+e(resp.gen)+'</div>';
     if(av) iboxes+='<div class="ibox iview"><span class="ibox-lbl">&#128065; Audit View</span>'+e(av)+'</div>';
     if(at) iboxes+='<div class="ibox iaction"><span class="ibox-lbl">&#10004; Action Taken</span>'+e(at)+'</div>';
-    iboxes+='<div style="margin-top:.7rem"><button class="rep-btn" onclick="openRepModal(\'rmod-'+id+'\')">&#128196; View as Written in Report</button></div>';
+    iboxes+='<div style="margin-top:.7rem"><button class="rep-btn" onclick="openReportModal(\''+id+'\')">&#128196; View as Written in Report</button></div>';
     return '<tr id="syn-row-'+id+'">'
       +'<td style="white-space:nowrap"><a href="#obs-'+id+'" class="full-obs-link" data-syn="syn-row-'+id+'">'+lbl+'</a></td>'
       +'<td><a href="#obs-'+id+'" class="full-obs-link" data-syn="syn-row-'+id+'">'+e(o.title)+'</a>'+(o.category?'<br><span class="cat">'+e(o.category)+'</span>':'')+'</td>'
@@ -12692,6 +12692,9 @@ function generateIssuedReport(){
       +'</tr>'
       +'<tr id="dt-'+id+'" class="detail-row" style="display:none"><td colspan="5" style="padding:0"><div class="detail-panel">'+iboxes+'</div></td></tr>';
   }
+
+  // Verbatim data store — keyed by obs id string e.g. "1-2"
+  var vbData = {};
 
   // Full obs card builder
   function obsCard(o){
@@ -12718,9 +12721,12 @@ function generateIssuedReport(){
     if(respHtml){h+='<div class="accordion"><div class="acc-toggle" onclick="toggleAcc(this)"><span>&#128172; Auditee Response</span><span class="acc-arrow">&#9660;</span></div><div class="acc-body open">'+respHtml+'</div></div>';}
     if(av) h+='<div class="box-label" style="margin-top:.6rem">Audit View</div><div class="view-box">'+e(av)+'</div>';
     if(at) h+='<div class="action-box">&#10004; Action Taken — '+e(at)+'</div>';
-    h+='<a href="#synopsis" class="back-link" onclick="highlightSynRow(\'syn-row-'+id+'\')">&#8593; Back to Synopsis</a>';
+    h+='<div style="margin-top:.7rem;display:flex;gap:.6rem;flex-wrap:wrap">'
+      +'<button class="rep-btn" onclick="openReportModal(\''+id+'\')">&#128196; View as Written in Report</button>'
+      +'<a href="#syn-row-'+id+'" class="back-link" onclick="event.preventDefault();highlightSynRow(\'syn-row-'+id+'\')">&#8593; Back to Synopsis</a>'
+      +'</div>';
     h+='</div>';
-    // Modal content (verbatim)
+    // Store verbatim data for shared modal
     var mBody='';
     if(ot) mBody+='<div class="modal-badge mb-find">Finding</div><div class="modal-section ms-find">'+e(ot)+'</div>';
     if(rt) mBody+='<div class="modal-badge mb-rec">Recommendation</div><div class="modal-section ms-rec">'+e(rt)+'</div>';
@@ -12729,10 +12735,7 @@ function generateIssuedReport(){
     if(resp.bh===null&&resp.ro===null&&resp.gen) mBody+='<div class="modal-badge mb-resp">Auditee Response</div><div class="modal-section ms-resp">'+e(resp.gen)+'</div>';
     if(av) mBody+='<div class="modal-badge mb-view">Audit View</div><div class="modal-section ms-view">'+e(av)+'</div>';
     if(at) mBody+='<div class="modal-badge mb-action">Action Taken</div><div class="modal-section ms-action">'+e(at)+'</div>';
-    h+='<div class="modal-overlay" id="rmod-'+id+'" onclick="if(event.target===this)this.classList.remove(\'active\')">'
-      +'<div class="modal-box"><div class="modal-head"><h3>'+lbl+' — '+e(o.title)+'</h3>'
-      +'<button class="modal-close" onclick="document.getElementById(\'rmod-'+id+'\').classList.remove(\'active\')">&#10005;</button></div>'
-      +'<div class="modal-body">'+mBody+'<div class="modal-srcnote">Verbatim from issued audit report</div></div></div></div>';
+    vbData[id] = {title: lbl+' — '+e(o.title), body: mBody};
     return h;
   }
 
@@ -12824,15 +12827,25 @@ function generateIssuedReport(){
       list.push(all[i]);
     }
     if(!list.length) return '<p style="font-size:.88rem;color:#aaa;padding:.5rem">None found.</p>';
+    var RISK_BG_MAP={High:'#fdecea','M to H':'#fef3e2','L to M':'#eaf4fb',Low:'#e9f7ef'};
+    var RISK_BC_MAP={High:'#f5b7b1','M to H':'#fad7a0','L to M':'#aed6f1',Low:'#a9dfbf'};
     var h='<div class="kpi-obs-list">';
     for(var i=0;i<list.length;i++){
       var lbl=labMap[list[i].id]||'?'; var id=lbl.replace('.','-');
       var sk=sensitivityMap[list[i].id]||''; var rc=riskClass(sk);
-      h+='<div class="kpi-obs-item">'
+      var isRes=(assessMap[list[i].id]==='resolved');
+      var bg=RISK_BG_MAP[sk]||'#f7f9fc'; var bc=RISK_BC_MAP[sk]||'#dde2ea';
+      h+='<div class="kpi-obs-item" style="background:'+bg+';border-color:'+bc+'">'
         +'<span class="obs-num-sm">'+lbl+'</span>'
-        +e(list[i].title)
-        +(rc?'<span class="risk '+rc+'" style="margin-left:.5rem">'+e(sk)+'</span>':'')
+        +(level==='unresolved'||level==='resolved'?'<span class="risk '+rc+'">'+e(sk)+'</span> ':'')
+        +'<span style="flex:1;font-weight:600">'+e(list[i].title)
+        +(isRes?'<span style="color:var(--low);font-size:.7rem;font-weight:700;margin-left:.4rem">&#10004; Resolved</span>':'')
+        +'</span>'
         +'<span class="obs-cat">'+e(list[i].category||'')+'</span>'
+        +'<div style="margin-top:.4rem;display:flex;gap:.5rem;flex-wrap:wrap">'
+        +'<button class="det-btn" onclick="kpiDetail(\''+id+'\')" style="font-size:.7rem;padding:.2rem .65rem">&#9660; Detail</button>'
+        +'<button class="rep-btn" onclick="kpiReport(\''+id+'\')" style="font-size:.7rem;padding:.2rem .65rem">&#128196; View as in Report</button>'
+        +'</div>'
         +'</div>';
     }
     h+='</div>';
@@ -12869,17 +12882,30 @@ function generateIssuedReport(){
     +'<td class="cell-low">&#128995; LOW'+(mLow.length?'<br><small>'+mLow.join(', ')+'</small>':'')+'</td></tr>'
     +'</table></div></div></div>';
 
-  // KPI modal HTML blocks
-  var kpiModals='';
-  var kpiLevels=['high','mh','lm','low','unresolved','resolved'];
-  var kpiTitles={high:'High Risk Observations',mh:'Medium-High Observations',lm:'Low-Medium Observations',low:'Low Risk Observations',unresolved:'All Unresolved Observations',resolved:'Resolved This Cycle'};
-  for(var ki=0;ki<kpiLevels.length;ki++){
-    var lv=kpiLevels[ki];
-    kpiModals+='<div class="modal-overlay" id="kmod-'+lv+'" onclick="if(event.target===this)this.classList.remove(\'active\')">'
-      +'<div class="modal-box"><div class="modal-head"><h3>'+kpiTitles[lv]+'</h3>'
-      +'<button class="modal-close" onclick="document.getElementById(\'kmod-'+lv+'\').classList.remove(\'active\')">&#10005;</button></div>'
-      +'<div class="modal-body">'+kpiModalItems(lv)+'</div></div></div>';
+  // Build OBS_INDEX for JS (used by openKpiModal at runtime in the issued report)
+  var obsIndexJs='var OBS_INDEX=[\n';
+  for(var oi2=0;oi2<all.length;oi2++){
+    var o2=all[oi2]; var lbl2=labMap[o2.id]||'?'; var id2=lbl2.replace('.','-');
+    var sk2=sensitivityMap[o2.id]||'';
+    var rc2=riskClass(sk2);
+    var res2=(assessMap[o2.id]==='resolved');
+    obsIndexJs+='{id:'+JSON.stringify(id2)+',num:'+JSON.stringify(lbl2)+',title:'+JSON.stringify(o2.title||'')+',cat:'+JSON.stringify(o2.category||'')+',risk:'+JSON.stringify(rc2||'lm')+',sk:'+JSON.stringify(sk2)+',resolved:'+(res2?'true':'false')+'}';
+    if(oi2<all.length-1) obsIndexJs+=',\n';
   }
+  obsIndexJs+='\n];\n';
+
+  // Serialize VB verbatim data (built during obsCard calls above)
+  var vbJs='var VB='+JSON.stringify(vbData)+';\n';
+
+  // Single shared modal HTML (used for both KPI list view and verbatim "View as in Report")
+  var sharedModal='<div class="modal-overlay" id="repModal" onclick="if(event.target===this)closeModal()">'
+    +'<div class="modal-box"><div class="modal-head"><h3 id="modalTitle"></h3>'
+    +'<button class="modal-close" onclick="closeModal()">&#10005;</button></div>'
+    +'<div class="modal-body" id="modalBody"></div></div></div>'
+    // Floating KPI back-banner (hidden by default)
+    +'<div id="kpi-back-banner" style="display:none;position:fixed;bottom:1.4rem;right:1.4rem;z-index:9000;background:var(--primary);color:#fff;padding:.55rem 1.1rem;border-radius:24px;font-size:.82rem;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.25);align-items:center;gap:.4rem;white-space:nowrap" onclick="_kpiBannerClick()"></div>';
+
+  var kpiModals=sharedModal;
 
   // Resolution summary table
   var tRO=roBH.ro; var tBH=roBH.bh;
@@ -13040,39 +13066,181 @@ function generateIssuedReport(){
 
     // JS
     +'<script>\n'
-    +'function toggleDetail(id,btn){'
-    +'  var r=document.getElementById(id);'
-    +'  if(!r)return;'
-    +'  var show=r.style.display===\'none\'||r.style.display===\'\';'
-    +'  r.style.display=show?\'table-row\':\'none\';'
-    +'  btn.classList.toggle(\'open\',show);'
-    +'  btn.innerHTML=show?\'&#9650; Close\':\'&#9660; Detail\';'
+    +obsIndexJs
+    +vbJs
+    +'var RISK_LABELS={high:"High Risk",mh:"Medium-High",lm:"Low-Medium",low:"Low Risk"};\n'
+    +'var RISK_COLORS={high:"var(--high)",mh:"var(--mh)",lm:"var(--lm)",low:"var(--low)"};\n'
+    +'var RISK_BG={high:"#fdecea",mh:"#fef3e2",lm:"#eaf4fb",low:"#e9f7ef"};\n'
+    +'var _lastKpiFilter=null;\n'
+    +'var _reportReturnAction=null;\n'
+    +'var _hlRow=null;\n'
+
+    // toggleDetail
+    +'function toggleDetail(id,btn){\n'
+    +'  var r=document.getElementById(id);\n'
+    +'  if(!r)return;\n'
+    +'  var show=r.style.display==="none"||r.style.display==="";\n'
+    +'  r.style.display=show?"table-row":"none";\n'
+    +'  btn.classList.toggle("open",show);\n'
+    +'  btn.innerHTML=show?"&#9650; Close":"&#9660; Detail";\n'
+    +'  if(show){\n'
+    +'    setTimeout(function(){\n'
+    +'      var synRow=document.getElementById(btn.id.replace("btn-","syn-row-"));\n'
+    +'      if(synRow)synRow.scrollIntoView({behavior:"smooth",block:"nearest"});\n'
+    +'    },50);\n'
+    +'  }\n'
     +'}\n'
-    +'function toggleAcc(hdr){'
-    +'  var body=hdr.nextElementSibling;'
-    +'  if(!body)return;'
-    +'  var open=body.classList.toggle(\'open\');'
-    +'  var arr=hdr.querySelector(\'.acc-arrow\');'
-    +'  if(arr)arr.classList.toggle(\'open\',open);'
+
+    // toggleAcc
+    +'function toggleAcc(hdr){\n'
+    +'  var body=hdr.nextElementSibling;\n'
+    +'  if(!body)return;\n'
+    +'  var open=body.classList.toggle("open");\n'
+    +'  var arr=hdr.querySelector(".acc-arrow");\n'
+    +'  if(arr)arr.classList.toggle("open",open);\n'
     +'}\n'
-    +'function openKpiModal(level){'
-    +'  var m=document.getElementById(\'kmod-\'+level);'
-    +'  if(m)m.classList.add(\'active\');'
+
+    // smoothScrollTo
+    +'function smoothScrollTo(y,dur){\n'
+    +'  var s=window.pageYOffset,diff=y-s,t0=null;\n'
+    +'  function step(ts){if(!t0)t0=ts;var p=Math.min((ts-t0)/dur,1);var e2=p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;window.scrollTo(0,s+diff*e2);if(p<1)requestAnimationFrame(step);}\n'
+    +'  requestAnimationFrame(step);\n'
     +'}\n'
-    +'function openRepModal(id){'
-    +'  var m=document.getElementById(id);'
-    +'  if(m)m.classList.add(\'active\');'
+
+    // highlightSynRow
+    +'function highlightSynRow(synId){\n'
+    +'  if(_hlRow)_hlRow.classList.remove("syn-highlight");\n'
+    +'  var row=document.getElementById(synId);\n'
+    +'  if(!row)return;\n'
+    +'  var rect=row.getBoundingClientRect();\n'
+    +'  var mid=window.pageYOffset+rect.top+rect.height/2;\n'
+    +'  smoothScrollTo(Math.max(0,mid-window.innerHeight/2),700);\n'
+    +'  setTimeout(function(){row.classList.add("syn-highlight");_hlRow=row;},720);\n'
     +'}\n'
-    +'function highlightSynRow(id){'
-    +'  document.querySelectorAll(\'.syn-highlight\').forEach(function(r){r.classList.remove(\'syn-highlight\');});'
-    +'  var r=document.getElementById(id);'
-    +'  if(r){r.classList.add(\'syn-highlight\');setTimeout(function(){r.classList.remove(\'syn-highlight\');},4000);}'
+
+    // closeModal
+    +'function closeModal(){\n'
+    +'  var m=document.getElementById("repModal");\n'
+    +'  if(m)m.classList.remove("active");\n'
+    +'  document.body.style.overflow="";\n'
+    +'  if(_reportReturnAction){var fn=_reportReturnAction;_reportReturnAction=null;setTimeout(fn,200);}\n'
     +'}\n'
-    +'document.querySelectorAll(\'.full-obs-link\').forEach(function(a){'
-    +'  a.addEventListener(\'click\',function(){'
-    +'    var syn=this.getAttribute(\'data-syn\');'
-    +'    if(syn)setTimeout(function(){highlightSynRow(syn);},300);'
-    +'  });'
+
+    // KPI back-banner
+    +'function _removeKpiBanner(){\n'
+    +'  var b=document.getElementById("kpi-back-banner");\n'
+    +'  if(b){b.style.display="none";}\n'
+    +'}\n'
+    +'function _showKpiBanner(filter){\n'
+    +'  var b=document.getElementById("kpi-back-banner");\n'
+    +'  if(!b)return;\n'
+    +'  var label=filter==="resolved"?"&#10004; Resolved This Cycle":filter==="unresolved"?"All Unresolved":(RISK_LABELS[filter]||filter)+" Observations";\n'
+    +'  b.innerHTML="&#8592; Back to <strong>"+label+"</strong>";\n'
+    +'  b.style.display="flex";\n'
+    +'}\n'
+    +'function _kpiBannerClick(){\n'
+    +'  _removeKpiBanner();\n'
+    +'  if(_lastKpiFilter)openKpiModal(_lastKpiFilter);\n'
+    +'}\n'
+
+    // kpiDetail — close modal, scroll to syn-row, expand detail, show banner
+    +'function kpiDetail(obsId){\n'
+    +'  var filter=_lastKpiFilter;\n'
+    +'  closeModal();\n'
+    +'  setTimeout(function(){\n'
+    +'    var btn=document.getElementById("btn-"+obsId);\n'
+    +'    if(btn){\n'
+    +'      var synRow=document.getElementById("syn-row-"+obsId);\n'
+    +'      if(synRow)synRow.scrollIntoView({behavior:"smooth",block:"center"});\n'
+    +'      setTimeout(function(){\n'
+    +'        // open detail if not already open\n'
+    +'        var dtRow=document.getElementById("dt-"+obsId);\n'
+    +'        if(dtRow&&(dtRow.style.display==="none"||dtRow.style.display===""))btn.click();\n'
+    +'        if(filter)_showKpiBanner(filter);\n'
+    +'      },400);\n'
+    +'    }\n'
+    +'  },350);\n'
+    +'}\n'
+
+    // kpiReport — close modal, open verbatim report modal, return action re-opens KPI
+    +'function kpiReport(obsId){\n'
+    +'  var filter=_lastKpiFilter;\n'
+    +'  closeModal();\n'
+    +'  setTimeout(function(){\n'
+    +'    openReportModal(obsId,function(){openKpiModal(filter);});\n'
+    +'  },350);\n'
+    +'}\n'
+
+    // openKpiModal — build list in shared modal
+    +'function openKpiModal(filter){\n'
+    +'  _lastKpiFilter=filter;\n'
+    +'  _removeKpiBanner();\n'
+    +'  var filtered,title;\n'
+    +'  if(filter==="resolved"){\n'
+    +'    filtered=OBS_INDEX.filter(function(o){return o.resolved;});\n'
+    +'    title="&#10004; Resolved This Cycle ("+filtered.length+" observations)";\n'
+    +'  } else if(filter==="unresolved"){\n'
+    +'    filtered=OBS_INDEX.filter(function(o){return !o.resolved;});\n'
+    +'    title="Total Unresolved ("+filtered.length+" observations)";\n'
+    +'  } else {\n'
+    +'    filtered=OBS_INDEX.filter(function(o){return o.risk===filter;});\n'
+    +'    title=(RISK_LABELS[filter]||filter)+" Observations ("+filtered.length+")";\n'
+    +'  }\n'
+    +'  if(!filtered.length){\n'
+    +'    document.getElementById("modalTitle").innerHTML=title;\n'
+    +'    document.getElementById("modalBody").innerHTML=\'<p style="font-size:.88rem;color:#aaa;padding:.5rem">None found.</p>\';\n'
+    +'    document.getElementById("repModal").classList.add("active");\n'
+    +'    document.body.style.overflow="hidden";\n'
+    +'    return;\n'
+    +'  }\n'
+    +'  var showRisk=(filter==="resolved"||filter==="unresolved");\n'
+    +'  var rows=filtered.map(function(o){\n'
+    +'    var badge=showRisk?\'<span class="risk \'+o.risk+\'">\'+( RISK_LABELS[o.risk]||o.risk)+\'</span> \':\'\'\n'
+    +'    var resBadge=o.resolved?\'<span style="color:var(--low);font-size:.7rem;font-weight:700;margin-left:.4rem">&#10004; Resolved</span>\':\'\'\n'
+    +'    return \'<div class="kpi-obs-item" style="background:\'+RISK_BG[o.risk]+\';border-color:\'+RISK_COLORS[o.risk]+\'">\'\n'
+    +'      +\'<span class="obs-num-sm">\'+o.num+\'</span>\'\n'
+    +'      +badge\n'
+    +'      +\'<span style="flex:1;font-weight:600">\'+o.title+resBadge+\'</span>\'\n'
+    +'      +\'<div class="obs-cat">\'+o.cat+\'</div>\'\n'
+    +'      +\'<div style="margin-top:.4rem;display:flex;gap:.5rem;flex-wrap:wrap">\'\n'
+    +'      +\'<button class="det-btn" onclick="kpiDetail(\\\'\'+o.id+\'\\\')" style="font-size:.7rem;padding:.2rem .65rem">&#9660; Detail</button>\'\n'
+    +'      +\'<button class="rep-btn" onclick="kpiReport(\\\'\'+o.id+\'\\\')" style="font-size:.7rem;padding:.2rem .65rem">&#128196; View as in Report</button>\'\n'
+    +'      +\'</div></div>\';\n'
+    +'  }).join("");\n'
+    +'  document.getElementById("modalTitle").innerHTML=title;\n'
+    +'  document.getElementById("modalBody").innerHTML=\'<div class="kpi-obs-list">\'+rows+\'</div>\';\n'
+    +'  document.getElementById("repModal").classList.add("active");\n'
+    +'  document.body.style.overflow="hidden";\n'
+    +'}\n'
+
+    // openReportModal — show verbatim in shared modal
+    +'function openReportModal(obsId,returnAction){\n'
+    +'  var data=VB[obsId];\n'
+    +'  if(!data){alert("Verbatim data not found for observation "+obsId);return;}\n'
+    +'  _reportReturnAction=returnAction||null;\n'
+    +'  document.getElementById("modalTitle").innerHTML=data.title;\n'
+    +'  document.getElementById("modalBody").innerHTML=data.body+\'<div class="modal-srcnote">Verbatim from issued audit report</div>\';\n'
+    +'  document.getElementById("repModal").classList.add("active");\n'
+    +'  document.body.style.overflow="hidden";\n'
+    +'}\n'
+
+    // back-link intercept — smooth scroll + highlight
+    +'document.querySelectorAll(\'a.back-link[href^="#syn-row-"]\').forEach(function(link){\n'
+    +'  link.addEventListener("click",function(e){\n'
+    +'    e.preventDefault();\n'
+    +'    highlightSynRow(this.getAttribute("href").slice(1));\n'
+    +'  });\n'
+    +'});\n'
+
+    // Remove highlight on outside click
+    +'document.addEventListener("click",function(e){\n'
+    +'  if(!_hlRow)return;\n'
+    +'  if(_hlRow.contains(e.target))return;\n'
+    +'  var dtId=_hlRow.id.replace("syn-row-","dt-");\n'
+    +'  var dtRow=document.getElementById(dtId);\n'
+    +'  if(dtRow&&dtRow.contains(e.target))return;\n'
+    +'  _hlRow.classList.remove("syn-highlight");\n'
+    +'  _hlRow=null;\n'
     +'});\n'
     +'<\/script>\n'
     +'</body>\n</html>';
