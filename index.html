@@ -7874,6 +7874,7 @@ function pwCheck(){
   <button class="tbtn rpt-btn" id="analysis-btn" onclick="toggleAnalysis()" data-tip-title="Sensitivity &amp; COSO Analysis" data-tip="Displays the Sensitivity Matrix and COSO Framework analysis for all selected observations directly in the report preview area.">&#128200; Analysis</button>
   <button class="tbtn load rpt-btn" onclick="triggerLoad()"        data-tip-title="Load Response" data-tip="Loads the completed auditee response file (returned by the auditee) back into the system. Responses and estimated resolution times are automatically mapped to each observation.">&#128193; Load Response</button>
   <button class="tbtn fin rpt-btn"  onclick="showSaveDialog()"     data-tip-title="Finalize Report" data-tip="Generates the final signed-off audit report for official issuance. Includes all observations, auditee responses, audit views, and annexures in a ready-to-submit format.">&#9989; Finalize</button>
+  <button class="tbtn rpt-btn" style="background:#1a3557;color:#fff" onclick="generateIssuedReport()" data-tip-title="Issue Report" data-tip="Generates a polished, interactive issued audit report HTML file — with management synopsis, KPI tiles, sensitivity matrix, inline detail panels, and full observation cards — matching the official issued report format.">&#128203; Issue Report</button>
   <button class="tbtn cmp rpt-btn" id="cmp-btn" onclick="showCompareModal()" style="opacity:0.55;filter:grayscale(0.4)" data-tip-title="Compare Report 🔒" data-tip="Restricted to Head Office. Compares a loaded report file against the databank to identify missing or present observations. Requires HO password.">&#128274; Compare</button>
   <button class="tbtn updb" id="updb-btn" onclick="showUpdateDbModal()" style="opacity:0.55;filter:grayscale(0.4)" data-tip-title="Update Databank 🔒" data-tip="Restricted to Head Office. Auditors can import a Databank Update File received from HO. HO users enter the HO password to access full update and export features.">&#128274; Update Databank</button>
   <button class="tbtn rpt-btn" id="demo-btn" style="background:#c9962a;color:#111;border:2px solid #f0c040;font-weight:700" onclick="loadDemoData()" data-tip-title="Demo Mode" data-tip="Loads sample branch data and observations so you can explore all features of the system without creating a real report.">&#127919; Demo</button>
@@ -12576,6 +12577,508 @@ function finalizeReport(){
 
   // Store built report for save dialog to use
   window._pendingFinal = {html: finalHtml, fname: fname, sess: embeddedSess};
+}
+
+// ============================================================
+// ISSUED REPORT — polished interactive HTML (matching sample)
+// ============================================================
+function generateIssuedReport(){
+  var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
+  var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
+  var all=dbObs.concat(cuObs);
+  if(!all.length){toast('No observations selected. Please select observations first.');return;}
+
+  syncAnnexTextFromDom();
+  var H=getHdrVals();
+
+  // Read live text from DOM
+  function liveText(id){var el=document.getElementById(id);return el?el.value:'';}
+  function obsText(o){return (obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:(liveText('oe-'+o.id)||o.observation||'');}
+  function recText(o){return (obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:(liveText('re-'+o.id)||o.recommendation||'');}
+  function avText(o){return liveText('av-'+o.id)||liveText('av-ta-'+o.id)||avMap[o.id]||'';}
+  function atText(o){return liveText('act-'+o.id)||liveText('act-ta-'+o.id)||actMap[o.id]||'';}
+  function respText(o){
+    var bh=respBHMap[o.id]!=null?respBHMap[o.id]:null;
+    var ro=respROMap[o.id]!=null?respROMap[o.id]:null;
+    var gen=liveText('r-'+o.id)||respMap[o.id]||'';
+    if(bh!==null||ro!==null) return {bh:bh,ro:ro,gen:''};
+    return {bh:null,ro:null,gen:gen};
+  }
+  function refLabel(o){
+    var r=refMap[o.id]!=null?refMap[o.id]:null;
+    var el=document.getElementById('ref-sel-'+o.id);
+    if(el&&r!=null) r=el.value||r;
+    if(r==='BH'||r==='RO') return r;
+    if(!r){var rr=document.getElementById('ref-sel-'+o.id);if(rr&&rr.value)return rr.value;}
+    return r||'BH';
+  }
+  function riskClass(s){
+    if(!s)return''; if(s==='High')return'high'; if(s==='M to H')return'mh'; if(s==='L to M')return'lm'; if(s==='Low')return'low'; return'';
+  }
+
+  // Separate Repeated / New
+  var repeated=[], newObs=[];
+  for(var a=0;a<all.length;a++){
+    var t=(obsTypeMap[all[a].id]||all[a].type||'New').toLowerCase();
+    if(t==='repeated') repeated.push(all[a]); else newObs.push(all[a]);
+  }
+
+  // Assign numbered labels e.g. 1.1, 1.2, 2.1, 2.2
+  var labMap={};
+  function assignLabels(list, sec){
+    var n=0;
+    var grp=buildCatGroupsFor(list);
+    for(var ci=0;ci<grp.catOrder.length;ci++){
+      var obs=grp.cats[grp.catOrder[ci]];
+      for(var oi=0;oi<obs.length;oi++){n++;labMap[obs[oi].id]=sec+'.'+n;}
+    }
+  }
+  assignLabels(repeated,1); assignLabels(newObs,2);
+
+  // KPI counts
+  var kpi={High:0,mh:0,lm:0,Low:0,total:all.length};
+  for(var i=0;i<all.length;i++){
+    var s=sensitivityMap[all[i].id]||'';
+    if(s==='High')kpi.High++; else if(s==='M to H')kpi.mh++; else if(s==='L to M')kpi.lm++; else if(s==='Low')kpi.Low++;
+  }
+  var roBH={ro:{last:0,res:0,unres:0,newO:0,newRes:0,newUnres:0,totalUnres:0},bh:{last:0,res:0,unres:0,newO:0,newRes:0,newUnres:0,totalUnres:0}};
+  for(var i=0;i<all.length;i++){
+    var isRO=(refLabel(all[i])==='RO');
+    var key=isRO?'ro':'bh';
+    var typ=(obsTypeMap[all[i].id]||all[i].type||'New').toLowerCase();
+    var st=assessMap[all[i].id]||'';
+    if(typ==='repeated'){roBH[key].last++; if(st==='resolved'){roBH[key].res++;}else{roBH[key].unres++;roBH[key].totalUnres++;}}
+    else{roBH[key].newO++; if(st==='resolved'){roBH[key].newRes++;}else{roBH[key].newUnres++;roBH[key].totalUnres++;}}
+  }
+
+  // High risk observations for attention box
+  var highList=[];
+  for(var i=0;i<all.length;i++){if(sensitivityMap[all[i].id]==='High')highList.push(all[i]);}
+
+  // Sensitivity matrix data
+  var mHigh=[], mMH=[], mLM=[], mLow=[];
+  for(var i=0;i<all.length;i++){
+    var lbl=labMap[all[i].id]||'?';
+    var s=sensitivityMap[all[i].id]||'';
+    if(s==='High')mHigh.push(lbl); else if(s==='M to H')mMH.push(lbl); else if(s==='L to M')mLM.push(lbl); else if(s==='Low')mLow.push(lbl);
+  }
+
+  function e(s){return esc(s||'');}
+
+  // Synopsis row builder
+  function synRow(o){
+    var lbl=labMap[o.id]||'?'; var id=lbl.replace('.','-');
+    var sk=sensitivityMap[o.id]||''; var rc=riskClass(sk);
+    var rk=rc?'<span class="risk '+rc+'">'+e(sk)+'</span>':'<span style="color:#aaa;font-size:.8rem">—</span>';
+    var ref=refLabel(o);
+    var resp=respText(o);
+    var av=avText(o); var at=atText(o);
+    var rt=recText(o); var ot=obsText(o);
+    var iboxes='';
+    if(ot) iboxes+='<div class="ibox ifind"><span class="ibox-lbl">&#128269; Finding</span>'+e(ot)+'</div>';
+    if(rt) iboxes+='<div class="ibox irec"><span class="ibox-lbl">&#9989; Recommendation</span>'+e(rt)+'</div>';
+    if(resp.bh!==null&&resp.bh!=='') iboxes+='<div class="ibox iresp"><span class="ibox-lbl">&#128172; Auditee Response (BH)</span>'+e(resp.bh)+'</div>';
+    if(resp.ro!==null&&resp.ro!=='') iboxes+='<div class="ibox iresp"><span class="ibox-lbl">&#128172; RO Response</span>'+e(resp.ro)+'</div>';
+    if(resp.bh===null&&resp.ro===null&&resp.gen) iboxes+='<div class="ibox iresp"><span class="ibox-lbl">&#128172; Auditee Response</span>'+e(resp.gen)+'</div>';
+    if(av) iboxes+='<div class="ibox iview"><span class="ibox-lbl">&#128065; Audit View</span>'+e(av)+'</div>';
+    if(at) iboxes+='<div class="ibox iaction"><span class="ibox-lbl">&#10004; Action Taken</span>'+e(at)+'</div>';
+    iboxes+='<div style="margin-top:.7rem"><button class="rep-btn" onclick="openRepModal(\'rmod-'+id+'\')">&#128196; View as Written in Report</button></div>';
+    return '<tr id="syn-row-'+id+'">'
+      +'<td style="white-space:nowrap"><a href="#obs-'+id+'" class="full-obs-link" data-syn="syn-row-'+id+'">'+lbl+'</a></td>'
+      +'<td><a href="#obs-'+id+'" class="full-obs-link" data-syn="syn-row-'+id+'">'+e(o.title)+'</a>'+(o.category?'<br><span class="cat">'+e(o.category)+'</span>':'')+'</td>'
+      +'<td>'+rk+'</td>'
+      +'<td>'+e(ref)+'</td>'
+      +'<td style="white-space:nowrap"><button class="det-btn" id="btn-'+id+'" onclick="toggleDetail(\'dt-'+id+'\',this)" title="Expand inline detail">&#9660; Detail</button></td>'
+      +'</tr>'
+      +'<tr id="dt-'+id+'" class="detail-row" style="display:none"><td colspan="5" style="padding:0"><div class="detail-panel">'+iboxes+'</div></td></tr>';
+  }
+
+  // Full obs card builder
+  function obsCard(o){
+    var lbl=labMap[o.id]||'?'; var id=lbl.replace('.','-');
+    var sk=sensitivityMap[o.id]||''; var rc=riskClass(sk);
+    var rk=rc?'<span class="risk '+rc+'">'+e(sk)+'</span>':'';
+    var ref=refLabel(o);
+    var resp=respText(o);
+    var av=avText(o); var at=atText(o);
+    var rt=recText(o); var ot=obsText(o);
+    var h='<div class="card obs-block" id="obs-'+id+'">';
+    h+='<div class="obs-header"><span class="obs-num">'+lbl+'</span><span class="obs-title">'+e(o.title)+'</span>'+rk+'</div>';
+    h+='<div class="obs-meta">';
+    if(o.category) h+='<span class="tag">'+e(o.category)+'</span>';
+    h+='<span class="tag">Referred to: '+e(ref)+'</span>';
+    var effType=obsTypeMap[o.id]||o.type||'New'; h+='<span class="tag">'+e(effType)+'</span>';
+    h+='</div>';
+    if(ot) h+='<div class="box-label">Finding</div><div class="finding-box">'+e(ot)+'</div>';
+    if(rt){h+='<div class="accordion"><div class="acc-toggle" onclick="toggleAcc(this)"><span>&#9989; Recommendation</span><span class="acc-arrow">&#9660;</span></div><div class="acc-body open">'+e(rt)+'</div></div>';}
+    var respHtml='';
+    if(resp.bh!==null&&resp.bh!=='') respHtml+='<div><strong style="font-size:.75rem;color:#2980b9">BH:</strong> '+e(resp.bh)+'</div>';
+    if(resp.ro!==null&&resp.ro!=='') respHtml+='<div><strong style="font-size:.75rem;color:#2980b9">RO/HO:</strong> '+e(resp.ro)+'</div>';
+    if(resp.bh===null&&resp.ro===null&&resp.gen) respHtml=e(resp.gen);
+    if(respHtml){h+='<div class="accordion"><div class="acc-toggle" onclick="toggleAcc(this)"><span>&#128172; Auditee Response</span><span class="acc-arrow">&#9660;</span></div><div class="acc-body open">'+respHtml+'</div></div>';}
+    if(av) h+='<div class="box-label" style="margin-top:.6rem">Audit View</div><div class="view-box">'+e(av)+'</div>';
+    if(at) h+='<div class="action-box">&#10004; Action Taken — '+e(at)+'</div>';
+    h+='<a href="#synopsis" class="back-link" onclick="highlightSynRow(\'syn-row-'+id+'\')">&#8593; Back to Synopsis</a>';
+    h+='</div>';
+    // Modal content (verbatim)
+    var mBody='';
+    if(ot) mBody+='<div class="modal-badge mb-find">Finding</div><div class="modal-section ms-find">'+e(ot)+'</div>';
+    if(rt) mBody+='<div class="modal-badge mb-rec">Recommendation</div><div class="modal-section ms-rec">'+e(rt)+'</div>';
+    if(resp.bh!==null&&resp.bh!=='') mBody+='<div class="modal-badge mb-resp">Auditee Response (BH)</div><div class="modal-section ms-resp">'+e(resp.bh)+'</div>';
+    if(resp.ro!==null&&resp.ro!=='') mBody+='<div class="modal-badge mb-roresp">RO Response</div><div class="modal-section ms-resp">'+e(resp.ro)+'</div>';
+    if(resp.bh===null&&resp.ro===null&&resp.gen) mBody+='<div class="modal-badge mb-resp">Auditee Response</div><div class="modal-section ms-resp">'+e(resp.gen)+'</div>';
+    if(av) mBody+='<div class="modal-badge mb-view">Audit View</div><div class="modal-section ms-view">'+e(av)+'</div>';
+    if(at) mBody+='<div class="modal-badge mb-action">Action Taken</div><div class="modal-section ms-action">'+e(at)+'</div>';
+    h+='<div class="modal-overlay" id="rmod-'+id+'" onclick="if(event.target===this)this.classList.remove(\'active\')">'
+      +'<div class="modal-box"><div class="modal-head"><h3>'+lbl+' — '+e(o.title)+'</h3>'
+      +'<button class="modal-close" onclick="document.getElementById(\'rmod-'+id+'\').classList.remove(\'active\')">&#10005;</button></div>'
+      +'<div class="modal-body">'+mBody+'<div class="modal-srcnote">Verbatim from issued audit report</div></div></div></div>';
+    return h;
+  }
+
+  // Build synopsis tables
+  function synTable(list, secLabel, secId){
+    if(!list.length) return '';
+    var h='<div class="card" id="'+secId+'">';
+    h+='<div style="font-weight:700;color:var(--primary);margin-bottom:.8rem">'+secLabel+' <span style="font-weight:400;font-size:.8rem;color:var(--muted)">('+list.length+' observations)</span></div>';
+    h+='<table class="syn-table"><thead><tr>'
+      +'<th style="width:48px">#</th><th>Observation</th><th style="width:88px">Risk</th>'
+      +'<th style="width:60px">Ref.</th><th style="width:90px">Detail</th></tr></thead><tbody>';
+    var grp=buildCatGroupsFor(list);
+    for(var ci=0;ci<grp.catOrder.length;ci++){
+      var obs=grp.cats[grp.catOrder[ci]];
+      for(var oi=0;oi<obs.length;oi++) h+=synRow(obs[oi]);
+    }
+    h+='</tbody></table></div>';
+    return h;
+  }
+
+  // Build full obs cards section
+  function cardSection(list, secLabel, secId){
+    if(!list.length) return '';
+    var h='<div class="section" id="'+secId+'">';
+    h+='<div class="section-title">'+secLabel+'</div>';
+    var grp=buildCatGroupsFor(list);
+    for(var ci=0;ci<grp.catOrder.length;ci++){
+      var cat=grp.catOrder[ci];
+      h+='<div class="cat-header">'+e(cat)+'</div>';
+      var obs=grp.cats[cat];
+      for(var oi=0;oi<obs.length;oi++) h+=obsCard(obs[oi]);
+    }
+    h+='</div>';
+    return h;
+  }
+
+  // Annexures section
+  var annexHtml='';
+  if(annexures.length){
+    annexHtml='<div class="section" id="annexures"><div class="section-title">&#128196; Annexures</div>';
+    for(var ai=0;ai<annexures.length;ai++){
+      var ax=annexures[ai];
+      annexHtml+='<div class="card" id="ann-'+e((ax.label||'').toLowerCase().replace(/[^a-z0-9]/g,''))+'"><div class="acc-toggle" onclick="toggleAcc(this)" style="background:var(--primary);color:#fff;border-radius:6px">'
+        +'<span>'+e(ax.label||('Annexure-'+(ai+1)))+(ax.title?' — '+e(ax.title):'')+'</span>'
+        +'<span class="acc-arrow" style="color:#fff">&#9660;</span></div>'
+        +'<div class="acc-body open" style="padding:1rem">';
+      if(ax.text&&ax.text.trim()) annexHtml+='<p style="white-space:pre-wrap;font-size:.87rem;margin-bottom:.8rem">'+e(ax.text)+'</p>';
+      if(ax.files&&ax.files.length){
+        for(var af=0;af<ax.files.length;af++){
+          var fi=ax.files[af];
+          if(fi._stripped||!fi.dataUrl){annexHtml+='<p style="font-size:.8rem;color:#b05000;font-style:italic">&#9888; '+e(fi.name)+' — file not embedded</p>';continue;}
+          var isImg=fi.type&&fi.type.indexOf('image/')===0;
+          var isPdf=fi.type&&fi.type==='application/pdf';
+          if(isImg) annexHtml+='<img src="'+fi.dataUrl+'" style="max-width:100%;border:1px solid #dde;border-radius:4px;margin-bottom:.5rem;display:block">';
+          else if(isPdf) annexHtml+='<iframe src="'+fi.dataUrl+'" style="width:100%;height:500px;border:1px solid #dde;border-radius:4px;margin-bottom:.5rem"></iframe>';
+          else annexHtml+='<p style="font-size:.8rem;color:#666">'+e(fi.name)+'</p>';
+        }
+      }
+      if(!ax.text&&(!ax.files||!ax.files.length)) annexHtml+='<p style="font-size:.8rem;color:#aaa;font-style:italic">No content attached.</p>';
+      annexHtml+='</div></div>';
+    }
+    annexHtml+='</div>';
+  }
+
+  // High risk attention box
+  var highBox='';
+  if(highList.length){
+    highBox='<div style="background:#fdecea;border:1.5px solid #f5b7b1;border-radius:10px;padding:1rem 1.2rem;margin-bottom:1.2rem">'
+      +'<div style="font-weight:800;color:var(--high);font-size:.95rem;margin-bottom:.5rem">&#128308; Immediate Attention — HIGH RISK</div>'
+      +'<ul style="list-style:none;display:flex;flex-direction:column;gap:.4rem;font-size:.88rem">';
+    for(var i=0;i<highList.length;i++){
+      var lbl=labMap[highList[i].id]||'?'; var id=lbl.replace('.','-');
+      highBox+='<li><a href="#obs-'+id+'" class="full-obs-link" data-syn="syn-row-'+id+'" style="color:var(--high);font-weight:700">&#8594; '+lbl+' '+e(highList[i].title)+'</a></li>';
+    }
+    highBox+='</ul></div>';
+  }
+
+  // KPI modals content
+  function kpiModalItems(level){
+    var list=[];
+    for(var i=0;i<all.length;i++){
+      var s=sensitivityMap[all[i].id]||'';
+      if(level==='high'&&s!=='High')continue;
+      if(level==='mh'&&s!=='M to H')continue;
+      if(level==='lm'&&s!=='L to M')continue;
+      if(level==='low'&&s!=='Low')continue;
+      if(level==='unresolved'&&assessMap[all[i].id]==='resolved')continue;
+      if(level==='resolved'&&assessMap[all[i].id]!=='resolved')continue;
+      list.push(all[i]);
+    }
+    if(!list.length) return '<p style="font-size:.88rem;color:#aaa;padding:.5rem">None found.</p>';
+    var h='<div class="kpi-obs-list">';
+    for(var i=0;i<list.length;i++){
+      var lbl=labMap[list[i].id]||'?'; var id=lbl.replace('.','-');
+      var sk=sensitivityMap[list[i].id]||''; var rc=riskClass(sk);
+      h+='<div class="kpi-obs-item">'
+        +'<span class="obs-num-sm">'+lbl+'</span>'
+        +e(list[i].title)
+        +(rc?'<span class="risk '+rc+'" style="margin-left:.5rem">'+e(sk)+'</span>':'')
+        +'<span class="obs-cat">'+e(list[i].category||'')+'</span>'
+        +'</div>';
+    }
+    h+='</div>';
+    return h;
+  }
+
+  var today=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
+  var brDisp=(H.brcode?H.brcode+' ':'')+(H.brname||'Branch');
+  var fname='IssuedReport'+(H.brcode?'_'+H.brcode:'')+(H.brname?'_'+H.brname.replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_'):'')+'_'+new Date().toISOString().slice(0,10)+'.html';
+
+  // COSO analysis strip (simple, reusing sensitivityMap data)
+  var cosoHtml='<div id="analysis" style="margin-bottom:1.2rem">'
+    +'<div class="section-title" style="font-size:1.1rem">E. Analysis of Observations &amp; Controls (COSO Framework)</div>'
+    +'<div class="card" style="font-size:.9rem"><p>Observations are analysed per the COSO Internal Control — Integrated Framework across three components: <strong>Control Environment (CE)</strong>, <strong>Control Activities (CA)</strong>, and <strong>Monitoring</strong>. Risk tiers:</p>'
+    +'<div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.8rem">'
+    +'<span class="risk high">High — Immediate action required</span>'
+    +'<span class="risk mh">Medium-High — Priority attention</span>'
+    +'<span class="risk lm">Low-Medium — Planned action</span>'
+    +'<span class="risk low">Low — Monitor &amp; review</span>'
+    +'</div></div></div>';
+
+  var matrixHtml='<div id="matrix" style="margin-bottom:1.2rem">'
+    +'<div class="section-title" style="font-size:1.1rem">F. Sensitivity Matrix</div>'
+    +'<div class="card"><div class="matrix-wrap"><table class="matrix">'
+    +'<tr><td class="axis" colspan="2" rowspan="2"></td><td class="axis" colspan="3">LIKELIHOOD / NON-COMPLIANCE</td></tr>'
+    +'<tr><td class="axis">HIGH</td><td class="axis">MEDIUM</td><td class="axis">LOW</td></tr>'
+    +'<tr><td class="axis" rowspan="3">IMPACT</td><td class="axis">HIGH</td>'
+    +'<td class="cell-high">&#128308; HIGH RISK'+(mHigh.length?'<br><small>'+mHigh.join(', ')+'</small>':'')+'</td>'
+    +'<td class="cell-mh">&#128992; MED-HIGH'+(mMH.length?'<br><small>'+mMH.join(', ')+'</small>':'')+'</td>'
+    +'<td class="cell-lm">&#128994; LOW-MED'+(mLM.length?'<br><small>'+mLM.join(', ')+'</small>':'')+'</td>'
+    +'</tr>'
+    +'<tr><td class="axis">MEDIUM</td><td class="cell-mh">&#128992;</td><td class="cell-lm">&#128994;</td><td class="cell-low">&#128995; LOW</td></tr>'
+    +'<tr><td class="axis">LOW</td><td class="cell-lm">&#128994;</td><td class="cell-low">&#128995;</td>'
+    +'<td class="cell-low">&#128995; LOW'+(mLow.length?'<br><small>'+mLow.join(', ')+'</small>':'')+'</td></tr>'
+    +'</table></div></div></div>';
+
+  // KPI modal HTML blocks
+  var kpiModals='';
+  var kpiLevels=['high','mh','lm','low','unresolved','resolved'];
+  var kpiTitles={high:'High Risk Observations',mh:'Medium-High Observations',lm:'Low-Medium Observations',low:'Low Risk Observations',unresolved:'All Unresolved Observations',resolved:'Resolved This Cycle'};
+  for(var ki=0;ki<kpiLevels.length;ki++){
+    var lv=kpiLevels[ki];
+    kpiModals+='<div class="modal-overlay" id="kmod-'+lv+'" onclick="if(event.target===this)this.classList.remove(\'active\')">'
+      +'<div class="modal-box"><div class="modal-head"><h3>'+kpiTitles[lv]+'</h3>'
+      +'<button class="modal-close" onclick="document.getElementById(\'kmod-'+lv+'\').classList.remove(\'active\')">&#10005;</button></div>'
+      +'<div class="modal-body">'+kpiModalItems(lv)+'</div></div></div>';
+  }
+
+  // Resolution summary table
+  var tRO=roBH.ro; var tBH=roBH.bh;
+  var totLast=tRO.last+tBH.last, totRes=tRO.res+tBH.res, totUnres=tRO.unres+tBH.unres;
+  var totNew=tRO.newO+tBH.newO, totNR=tRO.newRes+tBH.newRes, totNU=tRO.newUnres+tBH.newUnres;
+  var totTU=tRO.totalUnres+tBH.totalUnres;
+  var resTable='<div class="card"><div style="font-weight:700;color:var(--primary);margin-bottom:.8rem">Observation Resolution Summary</div>'
+    +'<div style="overflow-x:auto"><table class="stat-table">'
+    +'<thead><tr><th>Referred To</th><th>Last Audit Total</th><th>Resolved</th><th>Unresolved</th><th>New Obs.</th><th>New Resolved</th><th>New Unresolved</th><th>Total Unresolved</th></tr></thead><tbody>'
+    +'<tr><td>Regional Office</td><td>'+tRO.last+'</td><td>'+tRO.res+'</td><td>'+tRO.unres+'</td><td>'+(tRO.newO||'—')+'</td><td>'+(tRO.newRes||'—')+'</td><td>'+(tRO.newUnres||'—')+'</td><td><strong>'+tRO.totalUnres+'</strong></td></tr>'
+    +'<tr><td>Branch Head</td><td>'+tBH.last+'</td><td>'+tBH.res+'</td><td>'+tBH.unres+'</td><td>'+(tBH.newO||'—')+'</td><td>'+(tBH.newRes||'—')+'</td><td>'+(tBH.newUnres||'—')+'</td><td><strong>'+tBH.totalUnres+'</strong></td></tr>'
+    +'<tr class="total-row"><td>Total</td><td>'+totLast+'</td><td>'+totRes+'</td><td>'+totUnres+'</td><td>'+totNew+'</td><td>'+totNR+'</td><td>'+totNU+'</td><td><strong>'+totTU+'</strong></td></tr>'
+    +'</tbody></table></div></div>';
+
+  var html='<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n'
+    +'<meta name="viewport" content="width=device-width,initial-scale=1.0">\n'
+    +'<title>Audit Report | '+e(brDisp)+(H.rno?' | Report No. '+e(H.rno):'')+'</title>\n'
+    +'<style>\n'
+    +'  :root{--primary:#1a3557;--accent:#c8960c;--high:#c0392b;--mh:#e67e22;--lm:#2980b9;--low:#27ae60;--bg:#f4f6f9;--card:#fff;--border:#dde2ea;--text:#2c3e50;--muted:#7f8c8d}\n'
+    +'  *{box-sizing:border-box;margin:0;padding:0}\n'
+    +'  body{font-family:\'Segoe UI\',Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.6}\n'
+    +'  .topnav{background:var(--primary);color:#fff;padding:0 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:999;box-shadow:0 2px 8px rgba(0,0,0,.25);height:54px}\n'
+    +'  .topnav .brand{font-size:1rem;font-weight:700}.topnav .brand span{color:var(--accent)}\n'
+    +'  .topnav a{color:#cfd8e3;text-decoration:none;font-size:.82rem;margin-left:1.2rem;transition:color .2s}.topnav a:hover{color:#fff}\n'
+    +'  .cover{background:linear-gradient(135deg,var(--primary) 60%,#24527a 100%);color:#fff;padding:3.5rem 3rem 3rem;display:flex;flex-direction:column;gap:1rem}\n'
+    +'  .cover .badge{background:var(--accent);color:#fff;display:inline-block;padding:.2rem .8rem;border-radius:20px;font-size:.75rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;width:fit-content}\n'
+    +'  .cover h1{font-size:2rem;font-weight:800;line-height:1.25}\n'
+    +'  .cover .meta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.8rem;margin-top:.5rem}\n'
+    +'  .cover .meta-item{background:rgba(255,255,255,.08);border-radius:8px;padding:.7rem 1rem}\n'
+    +'  .cover .meta-item .label{font-size:.7rem;color:#7fb3d3;text-transform:uppercase;letter-spacing:.8px}\n'
+    +'  .cover .meta-item .value{font-size:.9rem;font-weight:600;margin-top:.15rem}\n'
+    +'  .confidential{background:rgba(200,150,12,.15);border:1px solid var(--accent);border-radius:6px;padding:.4rem 1rem;font-size:.78rem;color:var(--accent);font-weight:700;letter-spacing:1px;width:fit-content;margin-top:.3rem}\n'
+    +'  .section{max-width:1100px;margin:2rem auto;padding:0 1.5rem}\n'
+    +'  .section-title{font-size:1.35rem;font-weight:700;color:var(--primary);border-left:5px solid var(--accent);padding-left:.9rem;margin-bottom:1.2rem}\n'
+    +'  .card{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:1.5rem;margin-bottom:1rem;box-shadow:0 1px 4px rgba(0,0,0,.06)}\n'
+    +'  .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem}\n'
+    +'  .kpi{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:1.1rem 1rem;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06)}\n'
+    +'  .kpi .num{font-size:2.2rem;font-weight:800;line-height:1}.kpi .lbl{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:.35rem}\n'
+    +'  .kpi.red .num{color:var(--high)}.kpi.org .num{color:var(--mh)}.kpi.blu .num{color:var(--lm)}.kpi.grn .num{color:var(--low)}\n'
+    +'  .risk{display:inline-block;padding:.18rem .65rem;border-radius:20px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}\n'
+    +'  .risk.high{background:#fdecea;color:var(--high);border:1px solid #f5b7b1}.risk.mh{background:#fef3e2;color:var(--mh);border:1px solid #fad7a0}\n'
+    +'  .risk.lm{background:#eaf4fb;color:var(--lm);border:1px solid #aed6f1}.risk.low{background:#e9f7ef;color:var(--low);border:1px solid #a9dfbf}\n'
+    +'  .syn-table{width:100%;border-collapse:collapse;font-size:.88rem}\n'
+    +'  .syn-table th{background:var(--primary);color:#fff;padding:.6rem .8rem;text-align:left;font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.5px}\n'
+    +'  .syn-table td{padding:.55rem .8rem;border-bottom:1px solid var(--border);vertical-align:middle}\n'
+    +'  .syn-table tr[id^="syn-row-"]:hover td{background:#f0f4f9}\n'
+    +'  .syn-table a{color:var(--primary);text-decoration:none;font-weight:600}.syn-table a:hover{text-decoration:underline;color:var(--accent)}\n'
+    +'  .syn-table .cat{font-size:.7rem;color:var(--muted)}\n'
+    +'  tr[id^="syn-row-"]{scroll-margin-top:70px}\n'
+    +'  .det-btn{background:var(--primary);color:#fff;border:none;border-radius:20px;padding:.25rem .75rem;font-size:.73rem;font-weight:600;cursor:pointer;letter-spacing:.3px;transition:background .2s,transform .15s}.det-btn:hover{background:var(--accent)}.det-btn.open{background:var(--accent)}\n'
+    +'  .detail-row td{padding:0 !important;border-bottom:2px solid var(--accent) !important}\n'
+    +'  .detail-panel{padding:.9rem 1.1rem 1rem;background:#fffef7;border-left:4px solid var(--accent);display:flex;flex-direction:column;gap:.5rem;font-size:.86rem}\n'
+    +'  .ibox{padding:.5rem .8rem;border-radius:0 6px 6px 0;line-height:1.55}\n'
+    +'  .ibox-lbl{display:block;font-size:.67rem;font-weight:800;text-transform:uppercase;letter-spacing:.7px;margin-bottom:.2rem}\n'
+    +'  .ifind{border-left:3px solid var(--accent);background:#fffdf0}.ifind .ibox-lbl{color:var(--accent)}\n'
+    +'  .irec{border-left:3px solid var(--low);background:#f0faf4}.irec .ibox-lbl{color:var(--low)}\n'
+    +'  .iresp{border-left:3px solid var(--lm);background:#f0f7ff}.iresp .ibox-lbl{color:var(--lm)}\n'
+    +'  .iview{border-left:3px solid var(--mh);background:#fffaf0}.iview .ibox-lbl{color:var(--mh)}\n'
+    +'  .iaction{border-left:3px solid var(--low);background:#e9f7ef;font-weight:600}.iaction .ibox-lbl{color:var(--low)}\n'
+    +'  .full-obs-link{color:var(--primary);text-decoration:none;font-weight:600}.full-obs-link:hover{color:var(--accent);text-decoration:underline}\n'
+    +'  a.detail-panel-link{display:inline-flex;align-items:center;gap:.35rem;color:#fff;background:var(--primary);font-size:.8rem;font-weight:600;text-decoration:none;padding:.3rem .8rem;border-radius:20px;margin-top:.2rem;transition:background .2s}a.detail-panel-link:hover{background:var(--accent)}\n'
+    +'  tr.syn-highlight td{background:#fff3b0 !important;border-left:4px solid var(--accent);transition:background .3s}tr.syn-highlight td a{color:var(--accent) !important;font-weight:700}\n'
+    +'  .obs-block{scroll-margin-top:65px}\n'
+    +'  .obs-header{display:flex;align-items:flex-start;gap:.8rem;margin-bottom:.9rem;flex-wrap:wrap}\n'
+    +'  .obs-num{background:var(--primary);color:#fff;border-radius:6px;padding:.25rem .6rem;font-size:.78rem;font-weight:700;white-space:nowrap}\n'
+    +'  .obs-title{font-size:1.05rem;font-weight:700;color:var(--text);flex:1}\n'
+    +'  .obs-meta{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.8rem}\n'
+    +'  .obs-meta .tag{background:#eef1f5;color:var(--text);border-radius:4px;padding:.15rem .5rem;font-size:.72rem}\n'
+    +'  .accordion{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:.5rem}\n'
+    +'  .acc-toggle{background:#f7f9fc;padding:.6rem 1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.85rem;font-weight:600;color:var(--primary);user-select:none}.acc-toggle:hover{background:#edf1f7}\n'
+    +'  .acc-arrow{transition:transform .25s;font-size:.7rem}.acc-body{display:none;padding:.8rem 1rem;font-size:.87rem;background:#fff;border-top:1px solid var(--border)}.acc-body.open{display:block}.acc-arrow.open{transform:rotate(180deg)}\n'
+    +'  .finding-box{border-left:3px solid var(--accent);padding:.6rem .9rem;background:#fffdf5;border-radius:0 6px 6px 0;font-size:.87rem;margin-bottom:.6rem}\n'
+    +'  .view-box{border-left:3px solid var(--mh);padding:.6rem .9rem;background:#fffaf0;border-radius:0 6px 6px 0;font-size:.87rem;margin-bottom:.6rem}\n'
+    +'  .action-box{border-left:3px solid var(--low);padding:.4rem .9rem;background:#e9f7ef;border-radius:0 6px 6px 0;font-size:.82rem;font-weight:600;color:var(--low)}\n'
+    +'  .box-label{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:.25rem}\n'
+    +'  .back-link{display:inline-flex;align-items:center;gap:.35rem;color:var(--primary);font-size:.8rem;font-weight:600;text-decoration:none;margin-top:.5rem;padding:.3rem .75rem;border:1px solid var(--border);border-radius:20px;background:#fff;transition:all .2s}.back-link:hover{background:var(--primary);color:#fff;border-color:var(--primary)}\n'
+    +'  .sec-divider{border:none;border-top:2px solid var(--border);margin:2.5rem 0}\n'
+    +'  .cat-header{background:linear-gradient(90deg,#eef1f7,#f7f9fc);border-left:4px solid var(--primary);padding:.5rem .9rem;font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--primary);border-radius:0 6px 6px 0;margin:1.2rem 0 .6rem}\n'
+    +'  .ann-table{width:100%;border-collapse:collapse;font-size:.82rem}.ann-table th{background:var(--primary);color:#fff;padding:.5rem .7rem;text-align:left;font-size:.75rem}.ann-table td{padding:.45rem .7rem;border-bottom:1px solid var(--border)}.ann-table tr:nth-child(even) td{background:#f7f9fc}\n'
+    +'  .stat-table{width:100%;border-collapse:collapse;font-size:.88rem}.stat-table th{background:var(--primary);color:#fff;padding:.55rem .8rem;text-align:center;font-size:.78rem}.stat-table td{padding:.5rem .8rem;border:1px solid var(--border);text-align:center}.stat-table tr:nth-child(even) td{background:#f7f9fc}.stat-table .total-row td{background:var(--primary);color:#fff;font-weight:700}\n'
+    +'  .matrix-wrap{overflow-x:auto}.matrix{border-collapse:collapse;font-size:.8rem;min-width:520px}.matrix td{border:1px solid var(--border);padding:.6rem .8rem;text-align:center}\n'
+    +'  .matrix .cell-high{background:#fdecea;color:var(--high);font-weight:700}.matrix .cell-mh{background:#fef3e2;color:var(--mh);font-weight:700}.matrix .cell-lm{background:#eaf4fb;color:var(--lm);font-weight:700}.matrix .cell-low{background:#e9f7ef;color:var(--low);font-weight:700}.matrix .axis{background:var(--primary);color:#fff;font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px}\n'
+    +'  .kpi-btn{cursor:pointer;transition:transform .15s,box-shadow .15s}.kpi-btn:hover{transform:translateY(-3px);box-shadow:0 6px 18px rgba(0,0,0,.13)}.kpi-hint{font-size:.62rem;color:var(--muted);margin-top:.25rem;letter-spacing:.3px}\n'
+    +'  .kpi-obs-list{display:flex;flex-direction:column;gap:.5rem}.kpi-obs-item{border-radius:8px;padding:.6rem .9rem;display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;font-size:.88rem;border:1px solid var(--border)}.kpi-obs-item .obs-num-sm{background:var(--primary);color:#fff;border-radius:5px;padding:.15rem .5rem;font-size:.72rem;font-weight:700;white-space:nowrap}.kpi-obs-item .obs-cat{font-size:.7rem;color:var(--muted);flex-basis:100%}\n'
+    +'  .rep-btn{background:var(--primary);color:#fff;border:none;border-radius:20px;padding:.28rem .85rem;font-size:.76rem;font-weight:600;cursor:pointer;letter-spacing:.3px;transition:background .2s}.rep-btn:hover{background:var(--accent)}\n'
+    +'  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(10,20,40,.55);z-index:9999;align-items:center;justify-content:center}.modal-overlay.active{display:flex}\n'
+    +'  .modal-box{background:#fff;border-radius:12px;max-width:760px;width:94%;max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.35);display:flex;flex-direction:column}\n'
+    +'  .modal-head{background:var(--primary);color:#fff;padding:.9rem 1.2rem;display:flex;align-items:center;justify-content:space-between;border-radius:12px 12px 0 0;position:sticky;top:0;z-index:1}\n'
+    +'  .modal-head h3{font-size:1rem;font-weight:700;margin:0;flex:1;padding-right:.5rem}.modal-head .modal-close{background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.1rem;cursor:pointer;border-radius:50%;width:2rem;height:2rem;display:flex;align-items:center;justify-content:center;transition:background .2s;flex-shrink:0}.modal-head .modal-close:hover{background:var(--accent)}\n'
+    +'  .modal-body{padding:1.2rem 1.4rem;display:flex;flex-direction:column;gap:.9rem;font-size:.88rem}\n'
+    +'  .modal-badge{display:inline-block;font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.7px;padding:.15rem .6rem;border-radius:20px;margin-bottom:.3rem;width:fit-content}\n'
+    +'  .mb-find{background:#fff8e1;color:var(--accent);border:1px solid #f0d070}.mb-rec{background:#e9f7ef;color:var(--low);border:1px solid #a9dfbf}.mb-resp{background:#eaf4fb;color:var(--lm);border:1px solid #aed6f1}.mb-roresp{background:#eaf4fb;color:var(--lm);border:1px solid #aed6f1}.mb-view{background:#fef3e2;color:var(--mh);border:1px solid #fad7a0}.mb-action{background:#e9f7ef;color:var(--low);border:1px solid #a9dfbf}\n'
+    +'  .modal-section{border-left:3px solid var(--border);padding:.5rem .9rem;line-height:1.65;white-space:pre-wrap;word-break:break-word}.modal-section.ms-find{border-color:var(--accent);background:#fffdf5}.modal-section.ms-rec{border-color:var(--low);background:#f5fdf7}.modal-section.ms-resp{border-color:var(--lm);background:#f3f9ff}.modal-section.ms-view{border-color:var(--mh);background:#fffaf0}.modal-section.ms-action{border-color:var(--low);background:#e9f7ef;font-weight:600}\n'
+    +'  .modal-srcnote{font-size:.7rem;color:var(--muted);text-align:right;margin-top:.5rem;border-top:1px solid var(--border);padding-top:.5rem}\n'
+    +'  footer{background:var(--primary);color:#7fb3d3;text-align:center;padding:1.5rem;font-size:.78rem;margin-top:3rem}footer strong{color:#fff}\n'
+    +'  @media print{.topnav,.back-link,.det-btn,.rep-btn{display:none}.acc-body,.detail-row{display:block!important}.detail-panel{border:1px solid #ccc}}\n'
+    +'  @media(max-width:640px){.cover h1{font-size:1.4rem}.topnav a{display:none}}\n'
+    +'</style>\n'
+    +'</head>\n<body>\n'
+
+    // Top nav
+    +'<nav class="topnav">'
+    +'<div class="brand">Beaconhouse &nbsp;<span>Systems &amp; Audit</span></div>'
+    +'<div><a href="#synopsis">Synopsis</a><a href="#repeated-obs">Repeated</a><a href="#new-obs">New Findings</a>'+(annexures.length?'<a href="#annexures">Annexures</a>':'')+'</div>'
+    +'</nav>\n'
+
+    // Cover
+    +'<div class="cover" id="top">'
+    +'<div class="badge">Confidential &nbsp;|&nbsp; Internal Audit</div>'
+    +'<h1>Audit Report — '+e(brDisp)+(H.rno?'<br><small style="font-weight:400;font-size:1rem;color:#a8c8e0">Report No. '+e(H.rno)+' &nbsp;|&nbsp; Systems &amp; Audit Department</small>':'')+'</h1>'
+    +'<div class="confidential">&#9888; Confidential &amp; Proprietary Document</div>'
+    +'<div class="meta-grid">'
+    +(H.brname?'<div class="meta-item"><div class="label">Branch</div><div class="value">'+e(H.brname)+'</div></div>':'')
+    +(H.brregion?'<div class="meta-item"><div class="label">Region</div><div class="value">'+e(H.brregion)+'</div></div>':'')
+    +(H.brvisit?'<div class="meta-item"><div class="label">Audit Visit</div><div class="value">'+e(H.brvisit)+'</div></div>':'')
+    +(H.per?'<div class="meta-item"><div class="label">Period Covered</div><div class="value">'+e(H.per)+'</div></div>':'')
+    +(H.brhead?'<div class="meta-item"><div class="label">Branch Head</div><div class="value">'+e(H.brhead)+'</div></div>':'')
+    +(H.brautype?'<div class="meta-item"><div class="label">Audit Type</div><div class="value">'+e(H.brautype)+'</div></div>':'')
+    +(H.dt?'<div class="meta-item"><div class="label">Report Date</div><div class="value">'+e(fmtDt(H.dt))+'</div></div>':'')
+    +(H.pb?'<div class="meta-item"><div class="label">Prepared By</div><div class="value">'+e(H.pb)+'</div></div>':'')
+    +'</div>'
+    +'</div>\n'
+
+    // Synopsis section
+    +'<div class="section" id="synopsis">'
+    +'<div class="section-title">&#128203; Management Synopsis &amp; Executive Dashboard</div>'
+    +'<p style="font-size:.9rem;color:var(--muted);margin-bottom:1.2rem">This page is designed for senior management. Each row has a <strong>&#9660; Detail</strong> button to read the Finding, Recommendation, Auditee Response and Audit View inline. Use <strong>&#128196; View as Written in Report</strong> inside the panel to read the verbatim text. <strong>Click any risk tile</strong> to view all observations in that category.</p>'
+
+    // KPI tiles
+    +'<div class="kpi-row">'
+    +'<div class="kpi red kpi-btn" onclick="openKpiModal(\'high\')" title="Click to view High Risk"><div class="num">'+kpi.High+'</div><div class="lbl">High Risk</div><div class="kpi-hint">click to view</div></div>'
+    +'<div class="kpi org kpi-btn" onclick="openKpiModal(\'mh\')" title="Click to view Medium-High"><div class="num">'+kpi.mh+'</div><div class="lbl">Medium-High</div><div class="kpi-hint">click to view</div></div>'
+    +'<div class="kpi blu kpi-btn" onclick="openKpiModal(\'lm\')" title="Click to view Low-Medium"><div class="num">'+kpi.lm+'</div><div class="lbl">Low-Medium</div><div class="kpi-hint">click to view</div></div>'
+    +'<div class="kpi grn kpi-btn" onclick="openKpiModal(\'low\')" title="Click to view Low Risk"><div class="num">'+kpi.Low+'</div><div class="lbl">Low Risk</div><div class="kpi-hint">click to view</div></div>'
+    +'<div class="kpi kpi-btn" style="border-top:3px solid var(--primary)" onclick="openKpiModal(\'unresolved\')" title="All Unresolved"><div class="num" style="color:var(--primary)">'+totTU+'</div><div class="lbl">Total Unresolved</div><div class="kpi-hint">click to view</div></div>'
+    +'<div class="kpi kpi-btn" style="border-top:3px solid var(--low)" onclick="openKpiModal(\'resolved\')" title="Resolved This Cycle"><div class="num" style="color:var(--low)">'+totRes+'</div><div class="lbl">Resolved This Cycle</div><div class="kpi-hint">click to view</div></div>'
+    +'</div>'
+
+    +resTable
+    +highBox
+    +cosoHtml
+    +matrixHtml
+
+    // Synopsis tables
+    +synTable(repeated, 'Section 1 — Repeated (Unresolved) Observations', 'repeated-syn')
+    +synTable(newObs,   'Section 2 — New Observations', 'new-syn')
+    +'</div>\n'
+
+    // Full observation cards
+    +cardSection(repeated, '&#128308; Section 1 — Repeated (Unresolved) Observations', 'repeated-obs')
+    +cardSection(newObs,   '&#128310; Section 2 — New Observations', 'new-obs')
+
+    +annexHtml
+    +kpiModals
+
+    // Footer
+    +'<footer><strong>Beaconhouse Group — Systems &amp; Audit Department</strong><br>This report is confidential and intended solely for the addressee. Report generated: '+e(today)+'</footer>\n'
+
+    // JS
+    +'<script>\n'
+    +'function toggleDetail(id,btn){'
+    +'  var r=document.getElementById(id);'
+    +'  if(!r)return;'
+    +'  var show=r.style.display===\'none\'||r.style.display===\'\';'
+    +'  r.style.display=show?\'table-row\':\'none\';'
+    +'  btn.classList.toggle(\'open\',show);'
+    +'  btn.innerHTML=show?\'&#9650; Close\':\'&#9660; Detail\';'
+    +'}\n'
+    +'function toggleAcc(hdr){'
+    +'  var body=hdr.nextElementSibling;'
+    +'  if(!body)return;'
+    +'  var open=body.classList.toggle(\'open\');'
+    +'  var arr=hdr.querySelector(\'.acc-arrow\');'
+    +'  if(arr)arr.classList.toggle(\'open\',open);'
+    +'}\n'
+    +'function openKpiModal(level){'
+    +'  var m=document.getElementById(\'kmod-\'+level);'
+    +'  if(m)m.classList.add(\'active\');'
+    +'}\n'
+    +'function openRepModal(id){'
+    +'  var m=document.getElementById(id);'
+    +'  if(m)m.classList.add(\'active\');'
+    +'}\n'
+    +'function highlightSynRow(id){'
+    +'  document.querySelectorAll(\'.syn-highlight\').forEach(function(r){r.classList.remove(\'syn-highlight\');});'
+    +'  var r=document.getElementById(id);'
+    +'  if(r){r.classList.add(\'syn-highlight\');setTimeout(function(){r.classList.remove(\'syn-highlight\');},4000);}'
+    +'}\n'
+    +'document.querySelectorAll(\'.full-obs-link\').forEach(function(a){'
+    +'  a.addEventListener(\'click\',function(){'
+    +'    var syn=this.getAttribute(\'data-syn\');'
+    +'    if(syn)setTimeout(function(){highlightSynRow(syn);},300);'
+    +'  });'
+    +'});\n'
+    +'<\/script>\n'
+    +'</body>\n</html>';
+
+  saveFileAs(new Blob([html],{type:'text/html'}), fname);
+  toast('Issued report saved as '+fname);
 }
 
 function showSaveDialog(){
