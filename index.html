@@ -10426,13 +10426,9 @@ function doNewReport(){
 // ============================================================
 var _updbCandidates = []; // observations pending approval
 
-// HO password stored as char codes to avoid any HTML/encoding ambiguity
-// Codes for: H O @ S & A 2 0 2 6
-var _HO_PW_CODES = [72,79,64,83,38,65,50,48,50,54];
+// HO password check using btoa hash — immune to any encoding issues
 function _hoCheckPw(v){
-  if(v.length !== _HO_PW_CODES.length) return false;
-  for(var i=0;i<v.length;i++) if(v.charCodeAt(i) !== _HO_PW_CODES[i]) return false;
-  return true;
+  try{ return btoa(v)==='SE9AUyZBMjAyNg=='; }catch(e){ return false; }
 }
 var _hoAuthed = false; // stays true for the browser session once authenticated
 
@@ -10450,13 +10446,14 @@ function showHOAuthModal(callback, showFieldOption){
     '</div>' +
     '<div style="padding:18px 20px">' +
     '<p style="font-size:13px;color:#444;margin-bottom:12px">This feature is restricted to Head Office. Enter the HO password to continue.</p>' +
-    '<div style="position:relative;margin-bottom:10px">' +
+    '<div style="position:relative;margin-bottom:6px">' +
     '<input id="ho-pw-input" type="password" placeholder="HO Password" autocomplete="new-password" style="width:100%;padding:9px 36px 9px 12px;border:1px solid #c8d8ec;border-radius:6px;font-size:14px;font-family:inherit;box-sizing:border-box" ' +
-    'onkeydown="if(event.key===\'Enter\')_hoAuthSubmit()">' +
-    '<button type="button" onclick="var i=document.getElementById(\'ho-pw-input\');i.type=i.type===\'password\'?\'text\':\'password\';this.textContent=i.type===\'password\'?\'👁\':\' 🙈\'" ' +
+    'onkeydown="if(event.key===\'Enter\')_hoAuthSubmit()" oninput="document.getElementById(\'ho-pw-count\').textContent=this.value.length+\' / 10 characters\'">' +
+    '<button type="button" onclick="var i=document.getElementById(\'ho-pw-input\');i.type=i.type===\'password\'?\'text\':\'password\';this.innerHTML=i.type===\'password\'?\'&#128065;\':\'&#128584;\'" ' +
     'style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:15px;padding:0;line-height:1">&#128065;</button>' +
     '</div>' +
-    '<div id="ho-pw-err" style="font-size:12px;color:#c0392b;min-height:18px;margin-bottom:8px"></div>' +
+    '<div id="ho-pw-count" style="font-size:11px;color:#888;margin-bottom:6px">0 / 10 characters</div>' +
+    '<div id="ho-pw-err" style="font-size:12px;color:#c0392b;min-height:16px;margin-bottom:8px"></div>' +
     '<div style="display:flex;gap:8px">' +
     '<button onclick="_hoAuthSubmit()" style="flex:1;padding:9px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Confirm</button>' +
     (showFieldOption
