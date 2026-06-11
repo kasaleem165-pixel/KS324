@@ -12894,8 +12894,7 @@ function generateIssuedReport(){
   }
   obsIndexJs+='\n];\n';
 
-  // Serialize VB verbatim data (built during obsCard calls above)
-  var vbJs='var VB='+JSON.stringify(vbData)+';\n';
+  // vbJs is serialized AFTER cardSection() calls populate vbData (see below)
 
   // Single shared modal HTML (used for both KPI list view and verbatim "View as in Report")
   var sharedModal='<div class="modal-overlay" id="repModal" onclick="if(event.target===this)closeModal()">'
@@ -13064,10 +13063,10 @@ function generateIssuedReport(){
     // Footer
     +'<footer><strong>Beaconhouse Group — Systems &amp; Audit Department</strong><br>This report is confidential and intended solely for the addressee. Report generated: '+e(today)+'</footer>\n'
 
-    // JS
+    // JS — vbData is now fully populated by the cardSection() calls above
     +'<script>\n'
     +obsIndexJs
-    +vbJs
+    +('var VB='+JSON.stringify(vbData)+';\n')
     +'var RISK_LABELS={high:"High Risk",mh:"Medium-High",lm:"Low-Medium",low:"Low Risk"};\n'
     +'var RISK_COLORS={high:"var(--high)",mh:"var(--mh)",lm:"var(--lm)",low:"var(--low)"};\n'
     +'var RISK_BG={high:"#fdecea",mh:"#fef3e2",lm:"#eaf4fb",low:"#e9f7ef"};\n'
@@ -13220,7 +13219,7 @@ function generateIssuedReport(){
     // openReportModal — show verbatim in shared modal
     +'function openReportModal(obsId,returnAction){\n'
     +'  var data=VB[obsId];\n'
-    +'  if(!data){alert("Verbatim data not found for observation "+obsId);return;}\n'
+    +'  if(!data)return;\n'
     +'  _reportReturnAction=returnAction||null;\n'
     +'  document.getElementById("modalTitle").innerHTML=data.title;\n'
     +'  document.getElementById("modalBody").innerHTML=data.body+\'<div class="modal-srcnote">Verbatim from issued audit report</div>\';\n'
