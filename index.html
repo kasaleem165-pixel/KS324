@@ -10426,10 +10426,11 @@ function doNewReport(){
 // ============================================================
 var _updbCandidates = []; // observations pending approval
 
-// HO password check using btoa hash — immune to any encoding issues
-function _hoCheckPw(v){
-  try{ return btoa(v)==='SE9AUyZBMjAyNg=='; }catch(e){ return false; }
-}
+// HO password — built from char codes to avoid any source-encoding issues
+var _HO_PW = (function(){
+  return [72,79,64,83,38,65,50,48,50,54].map(function(c){return String.fromCharCode(c);}).join('');
+})();
+function _hoCheckPw(v){ return typeof v==='string' && v===_HO_PW; }
 var _hoAuthed = false; // stays true for the browser session once authenticated
 
 function showHOAuthModal(callback, showFieldOption){
@@ -10438,53 +10439,98 @@ function showHOAuthModal(callback, showFieldOption){
   var el = document.createElement('div');
   el.id = 'ho-auth-modal';
   el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center';
-  el.innerHTML =
-    '<div style="background:#fff;border-radius:10px;width:360px;max-width:94vw;box-shadow:0 8px 32px rgba(0,0,0,.3);overflow:hidden">' +
-    '<div style="background:#1a3a5c;color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between">' +
-    '<strong style="font-size:14px">&#128274; Head Office Access</strong>' +
-    '<button onclick="document.getElementById(\'ho-auth-modal\').remove()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:14px;line-height:1">&#10005;</button>' +
-    '</div>' +
-    '<div style="padding:18px 20px">' +
-    '<p style="font-size:13px;color:#444;margin-bottom:12px">This feature is restricted to Head Office. Enter the HO password to continue.</p>' +
-    '<div style="position:relative;margin-bottom:6px">' +
-    '<input id="ho-pw-input" type="password" placeholder="HO Password" autocomplete="new-password" style="width:100%;padding:9px 36px 9px 12px;border:1px solid #c8d8ec;border-radius:6px;font-size:14px;font-family:inherit;box-sizing:border-box" ' +
-    'onkeydown="if(event.key===\'Enter\')_hoAuthSubmit()" oninput="document.getElementById(\'ho-pw-count\').textContent=this.value.length+\' / 10 characters\'">' +
-    '<button type="button" onclick="var i=document.getElementById(\'ho-pw-input\');i.type=i.type===\'password\'?\'text\':\'password\';this.innerHTML=i.type===\'password\'?\'&#128065;\':\'&#128584;\'" ' +
-    'style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:15px;padding:0;line-height:1">&#128065;</button>' +
-    '</div>' +
-    '<div id="ho-pw-count" style="font-size:11px;color:#888;margin-bottom:6px">0 / 10 characters</div>' +
-    '<div id="ho-pw-err" style="font-size:12px;color:#c0392b;min-height:16px;margin-bottom:8px"></div>' +
-    '<div style="display:flex;gap:8px">' +
-    '<button onclick="_hoAuthSubmit()" style="flex:1;padding:9px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Confirm</button>' +
-    (showFieldOption
-      ? '<button onclick="_hoAuthFieldUser()" style="flex:1;padding:9px;background:#e8edf5;color:#444;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit">Field Auditor View</button>'
-      : '<button onclick="document.getElementById(\'ho-auth-modal\').remove()" style="padding:9px 16px;background:#e8edf5;color:#444;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit">Cancel</button>') +
-    '</div>' +
-    '</div></div>';
-  document.body.appendChild(el);
-  el.addEventListener('click', function(e){ if(e.target===el) el.remove(); });
-  setTimeout(function(){ var i=document.getElementById('ho-pw-input'); if(i) i.focus(); }, 80);
 
-  window._hoAuthCallback = callback;
-  window._hoAuthShowField = showFieldOption;
+  var innerDiv = document.createElement('div');
+  innerDiv.style.cssText = 'background:#fff;border-radius:10px;width:360px;max-width:94vw;box-shadow:0 8px 32px rgba(0,0,0,.3);overflow:hidden';
 
-  window._hoAuthSubmit = function(){
-    var inp = document.getElementById('ho-pw-input');
-    var err = document.getElementById('ho-pw-err');
-    if(!inp) return;
+  var hdr = document.createElement('div');
+  hdr.style.cssText = 'background:#1a3a5c;color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between';
+  hdr.innerHTML = '<strong style="font-size:14px">🔒 Head Office Access</strong>';
+  var closeHdr = document.createElement('button');
+  closeHdr.innerHTML = '✕';
+  closeHdr.style.cssText = 'background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:14px;line-height:1';
+  closeHdr.addEventListener('click', function(){ el.remove(); });
+  hdr.appendChild(closeHdr);
+
+  var body = document.createElement('div');
+  body.style.cssText = 'padding:18px 20px';
+  body.innerHTML = '<p style="font-size:13px;color:#444;margin-bottom:12px">This feature is restricted to Head Office. Enter the HO password to continue.</p>';
+
+  var pwWrap = document.createElement('div');
+  pwWrap.style.cssText = 'position:relative;margin-bottom:6px';
+  var inp = document.createElement('input');
+  inp.id = 'ho-pw-input';
+  inp.type = 'password';
+  inp.placeholder = 'HO Password';
+  inp.autocomplete = 'new-password';
+  inp.style.cssText = 'width:100%;padding:9px 36px 9px 12px;border:1px solid #c8d8ec;border-radius:6px;font-size:14px;font-family:inherit;box-sizing:border-box';
+  var cntDiv = document.createElement('div');
+  cntDiv.id = 'ho-pw-count';
+  cntDiv.style.cssText = 'font-size:11px;color:#888;margin-bottom:6px';
+  cntDiv.textContent = '0 / 10 characters';
+  inp.addEventListener('input', function(){ cntDiv.textContent = inp.value.length + ' / 10 characters'; });
+  var eyeBtn = document.createElement('button');
+  eyeBtn.type = 'button';
+  eyeBtn.innerHTML = '👁';
+  eyeBtn.style.cssText = 'position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:15px;padding:0;line-height:1';
+  eyeBtn.addEventListener('click', function(){
+    inp.type = inp.type==='password' ? 'text' : 'password';
+    eyeBtn.innerHTML = inp.type==='password' ? '👁' : '🙈';
+  });
+  pwWrap.appendChild(inp);
+  pwWrap.appendChild(eyeBtn);
+
+  var errDiv = document.createElement('div');
+  errDiv.id = 'ho-pw-err';
+  errDiv.style.cssText = 'font-size:12px;color:#c0392b;min-height:16px;margin-bottom:8px';
+
+  var btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px';
+
+  var confirmBtn = document.createElement('button');
+  confirmBtn.textContent = 'Confirm';
+  confirmBtn.style.cssText = 'flex:1;padding:9px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit';
+
+  function doSubmit(){
     if(_hoCheckPw(inp.value)){
       el.remove();
-      if(window._hoAuthCallback) window._hoAuthCallback(true);
+      if(callback) callback(true);
     } else {
-      err.textContent = 'Incorrect password. Please try again.';
+      errDiv.textContent = 'Incorrect password. Please try again.';
       inp.value = '';
       inp.focus();
     }
-  };
-  window._hoAuthFieldUser = function(){
-    el.remove();
-    if(window._hoAuthCallback) window._hoAuthCallback(false);
-  };
+  }
+
+  confirmBtn.addEventListener('click', doSubmit);
+  inp.addEventListener('keydown', function(e){ if(e.key==='Enter') doSubmit(); });
+
+  btnRow.appendChild(confirmBtn);
+
+  if(showFieldOption){
+    var fieldBtn = document.createElement('button');
+    fieldBtn.textContent = 'Field Auditor View';
+    fieldBtn.style.cssText = 'flex:1;padding:9px;background:#e8edf5;color:#444;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit';
+    fieldBtn.addEventListener('click', function(){ el.remove(); if(callback) callback(false); });
+    btnRow.appendChild(fieldBtn);
+  } else {
+    var cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.style.cssText = 'padding:9px 16px;background:#e8edf5;color:#444;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit';
+    cancelBtn.addEventListener('click', function(){ el.remove(); });
+    btnRow.appendChild(cancelBtn);
+  }
+
+  body.appendChild(pwWrap);
+  body.appendChild(cntDiv);
+  body.appendChild(errDiv);
+  body.appendChild(btnRow);
+  innerDiv.appendChild(hdr);
+  innerDiv.appendChild(body);
+  el.appendChild(innerDiv);
+  document.body.appendChild(el);
+  el.addEventListener('click', function(e){ if(e.target===el) el.remove(); });
+  setTimeout(function(){ inp.focus(); }, 80);
 }
 
 function showUpdateDbModal(){
