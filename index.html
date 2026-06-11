@@ -10426,24 +10426,69 @@ function doNewReport(){
 // ============================================================
 var _updbCandidates = []; // observations pending approval
 
-var _HO_PW = 'HO@S\x26A2026';
+var _HO_PW = 'HO@S&A2026';
 var _hoAuthed = false; // stays true for the browser session once authenticated
+
+function showHOAuthModal(callback, showFieldOption){
+  var existing = document.getElementById('ho-auth-modal');
+  if(existing) existing.remove();
+  var el = document.createElement('div');
+  el.id = 'ho-auth-modal';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center';
+  el.innerHTML =
+    '<div style="background:#fff;border-radius:10px;width:360px;max-width:94vw;box-shadow:0 8px 32px rgba(0,0,0,.3);overflow:hidden">' +
+    '<div style="background:#1a3a5c;color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between">' +
+    '<strong style="font-size:14px">&#128274; Head Office Access</strong>' +
+    '<button onclick="document.getElementById(\'ho-auth-modal\').remove()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:14px;line-height:1">&#10005;</button>' +
+    '</div>' +
+    '<div style="padding:18px 20px">' +
+    '<p style="font-size:13px;color:#444;margin-bottom:12px">This feature is restricted to Head Office. Enter the HO password to continue.</p>' +
+    '<input id="ho-pw-input" type="password" placeholder="HO Password" autocomplete="off" style="width:100%;padding:9px 12px;border:1px solid #c8d8ec;border-radius:6px;font-size:14px;font-family:inherit;margin-bottom:10px;box-sizing:border-box" ' +
+    'onkeydown="if(event.key===\'Enter\')_hoAuthSubmit()">' +
+    '<div id="ho-pw-err" style="font-size:12px;color:#c0392b;min-height:18px;margin-bottom:8px"></div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<button onclick="_hoAuthSubmit()" style="flex:1;padding:9px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Confirm</button>' +
+    (showFieldOption
+      ? '<button onclick="_hoAuthFieldUser()" style="flex:1;padding:9px;background:#e8edf5;color:#444;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit">Field Auditor View</button>'
+      : '<button onclick="document.getElementById(\'ho-auth-modal\').remove()" style="padding:9px 16px;background:#e8edf5;color:#444;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit">Cancel</button>') +
+    '</div>' +
+    '</div></div>';
+  document.body.appendChild(el);
+  el.addEventListener('click', function(e){ if(e.target===el) el.remove(); });
+  setTimeout(function(){ var i=document.getElementById('ho-pw-input'); if(i) i.focus(); }, 80);
+
+  window._hoAuthCallback = callback;
+  window._hoAuthShowField = showFieldOption;
+
+  window._hoAuthSubmit = function(){
+    var inp = document.getElementById('ho-pw-input');
+    var err = document.getElementById('ho-pw-err');
+    if(!inp) return;
+    if(inp.value === _HO_PW){
+      el.remove();
+      if(window._hoAuthCallback) window._hoAuthCallback(true);
+    } else {
+      err.textContent = 'Incorrect password. Please try again.';
+      inp.value = '';
+      inp.focus();
+    }
+  };
+  window._hoAuthFieldUser = function(){
+    el.remove();
+    if(window._hoAuthCallback) window._hoAuthCallback(false);
+  };
+}
 
 function showUpdateDbModal(){
   if(!_hoAuthed){
-    var pw = prompt('Update Databank is restricted to Head Office.\n\nEnter the HO password to access full features.\n(Field auditors: press Cancel to go to the Import screen.)');
-    if(pw === null){
-      // User cancelled — show import-only modal for field auditors
-      showImportDbModal(); return;
-    }
-    if(pw !== _HO_PW){
-      toast('Incorrect password. Opening import screen for field auditors.');
-      showImportDbModal(); return;
-    }
-    _hoAuthed = true;
-    // Unlock button appearance for this session
-    var btn = document.getElementById('updb-btn');
-    if(btn){ btn.style.opacity='1'; btn.style.filter='none'; btn.innerHTML='&#128194; Update Databank'; }
+    showHOAuthModal(function(granted){
+      if(!granted){ showImportDbModal(); return; }
+      _hoAuthed = true;
+      var btn = document.getElementById('updb-btn');
+      if(btn){ btn.style.opacity='1'; btn.style.filter='none'; btn.innerHTML='&#128194; Update Databank'; }
+      showUpdateDbModal();
+    }, true);
+    return;
   }
 
   _updbCandidates = [];
@@ -10799,12 +10844,14 @@ var cmpState = { text:'', results:[], cat:'All Categories', type:'missing' };
 
 function showCompareModal(){
   if(!_hoAuthed){
-    var pw=prompt('Compare is restricted to Head Office.\n\nEnter the HO password to continue:');
-    if(pw===null) return;
-    if(pw!==_HO_PW){ toast('Incorrect password. Access denied.'); return; }
-    _hoAuthed=true;
-    var btn=document.getElementById('cmp-btn');
-    if(btn){ btn.style.opacity='1'; btn.style.filter='none'; btn.innerHTML='&#128269; Compare'; }
+    showHOAuthModal(function(granted){
+      if(!granted) return;
+      _hoAuthed=true;
+      var btn=document.getElementById('cmp-btn');
+      if(btn){ btn.style.opacity='1'; btn.style.filter='none'; btn.innerHTML='&#128269; Compare'; }
+      showCompareModal();
+    }, false);
+    return;
   }
   cmpState.text=''; cmpState.results=[];
   var catOptions='<option>All Categories</option>';
