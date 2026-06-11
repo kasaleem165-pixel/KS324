@@ -12682,7 +12682,7 @@ function generateIssuedReport(){
     if(resp.bh===null&&resp.ro===null&&resp.gen) iboxes+='<div class="ibox iresp"><span class="ibox-lbl">&#128172; Auditee Response</span>'+e(resp.gen)+'</div>';
     if(av) iboxes+='<div class="ibox iview"><span class="ibox-lbl">&#128065; Audit View</span>'+e(av)+'</div>';
     if(at) iboxes+='<div class="ibox iaction"><span class="ibox-lbl">&#10004; Action Taken</span>'+e(at)+'</div>';
-    iboxes+='<div style="margin-top:.7rem"><button class="rep-btn" onclick="openReportModal(\''+id+'\')">&#128196; View as Written in Report</button></div>';
+    iboxes+='<div style="margin-top:.7rem"><button class="rep-btn" onclick="_navStack.push(function(){var r=document.getElementById(\'syn-row-'+id+'\');if(r)r.scrollIntoView({behavior:\'smooth\',block:\'center\'});});openReportModal(\''+id+'\')">&#128196; View as Written in Report</button></div>';
     return '<tr id="syn-row-'+id+'">'
       +'<td style="white-space:nowrap"><a href="#obs-'+id+'" class="full-obs-link" data-syn="syn-row-'+id+'">'+lbl+'</a></td>'
       +'<td><a href="#obs-'+id+'" class="full-obs-link" data-syn="syn-row-'+id+'">'+e(o.title)+'</a>'+(o.category?'<br><span class="cat">'+e(o.category)+'</span>':'')+'</td>'
@@ -12722,7 +12722,7 @@ function generateIssuedReport(){
     if(av) h+='<div class="box-label" style="margin-top:.6rem">Audit View</div><div class="view-box">'+e(av)+'</div>';
     if(at) h+='<div class="action-box">&#10004; Action Taken — '+e(at)+'</div>';
     h+='<div style="margin-top:.7rem;display:flex;gap:.6rem;flex-wrap:wrap">'
-      +'<button class="rep-btn" onclick="openReportModal(\''+id+'\')">&#128196; View as Written in Report</button>'
+      +'<button class="rep-btn" onclick="_navStack.push(function(){var r=document.getElementById(\'obs-'+id+'\');if(r)r.scrollIntoView({behavior:\'smooth\',block:\'start\'});});openReportModal(\''+id+'\')">&#128196; View as Written in Report</button>'
       +'<a href="#syn-row-'+id+'" class="back-link" onclick="event.preventDefault();highlightSynRow(\'syn-row-'+id+'\')">&#8593; Back to Synopsis</a>'
       +'</div>';
     h+='</div>';
@@ -13072,8 +13072,14 @@ function generateIssuedReport(){
     +'var RISK_COLORS={high:"var(--high)",mh:"var(--mh)",lm:"var(--lm)",low:"var(--low)"};\n'
     +'var RISK_BG={high:"#fdecea",mh:"#fef3e2",lm:"#eaf4fb",low:"#e9f7ef"};\n'
     +'var _lastKpiFilter=null;\n'
-    +'var _reportReturnAction=null;\n'
     +'var _hlRow=null;\n'
+    // Navigation history stack — each entry is a function that restores the previous state
+    +'var _navStack=[];\n'
+    +'function _navPush(fn){_navStack.push(fn);}\n'
+    +'function _navBack(){\n'
+    +'  var fn=_navStack.pop();\n'
+    +'  if(fn)setTimeout(fn,220);\n'
+    +'}\n'
 
     // toggleDetail
     +'function toggleDetail(id,btn){\n'
@@ -13118,18 +13124,18 @@ function generateIssuedReport(){
     +'  setTimeout(function(){row.classList.add("syn-highlight");_hlRow=row;},720);\n'
     +'}\n'
 
-    // closeModal
+    // closeModal — pops nav stack and runs restore function
     +'function closeModal(){\n'
     +'  var m=document.getElementById("repModal");\n'
     +'  if(m)m.classList.remove("active");\n'
     +'  document.body.style.overflow="";\n'
-    +'  if(_reportReturnAction){var fn=_reportReturnAction;_reportReturnAction=null;setTimeout(fn,200);}\n'
+    +'  _navBack();\n'
     +'}\n'
 
     // KPI back-banner
     +'function _removeKpiBanner(){\n'
     +'  var b=document.getElementById("kpi-back-banner");\n'
-    +'  if(b){b.style.display="none";}\n'
+    +'  if(b)b.style.display="none";\n'
     +'}\n'
     +'function _showKpiBanner(filter){\n'
     +'  var b=document.getElementById("kpi-back-banner");\n'
@@ -13138,22 +13144,34 @@ function generateIssuedReport(){
     +'  b.innerHTML="&#8592; Back to <strong>"+label+"</strong>";\n'
     +'  b.style.display="flex";\n'
     +'}\n'
+    // Back-banner click: collapse the detail panel, then re-open KPI modal
     +'function _kpiBannerClick(){\n'
     +'  _removeKpiBanner();\n'
-    +'  if(_lastKpiFilter)openKpiModal(_lastKpiFilter);\n'
+    +'  _navBack();\n'
     +'}\n'
 
-    // kpiDetail — close modal, scroll to syn-row, expand detail, show banner
+    // kpiDetail — push "re-open KPI modal" onto stack, then navigate
     +'function kpiDetail(obsId){\n'
     +'  var filter=_lastKpiFilter;\n'
-    +'  closeModal();\n'
+    +'  // Close KPI modal without triggering navBack (pop the scroll-to-synopsis entry first)\n'
+    +'  var m=document.getElementById("repModal");\n'
+    +'  if(m)m.classList.remove("active");\n'
+    +'  document.body.style.overflow="";\n'
+    +'  var scrollEntry=_navStack.pop(); // remove the scroll-to-synopsis entry placed by openKpiModal\n'
+    +'  // Push: back from detail panel → re-open KPI modal\n'
+    +'  _navPush(function(){\n'
+    +'    _removeKpiBanner();\n'
+    +'    var dtRow=document.getElementById("dt-"+obsId);\n'
+    +'    var btn=document.getElementById("btn-"+obsId);\n'
+    +'    if(dtRow&&btn&&dtRow.style.display==="table-row")btn.click(); // collapse detail\n'
+    +'    openKpiModal(filter);\n'
+    +'  });\n'
     +'  setTimeout(function(){\n'
     +'    var btn=document.getElementById("btn-"+obsId);\n'
     +'    if(btn){\n'
     +'      var synRow=document.getElementById("syn-row-"+obsId);\n'
     +'      if(synRow)synRow.scrollIntoView({behavior:"smooth",block:"center"});\n'
     +'      setTimeout(function(){\n'
-    +'        // open detail if not already open\n'
     +'        var dtRow=document.getElementById("dt-"+obsId);\n'
     +'        if(dtRow&&(dtRow.style.display==="none"||dtRow.style.display===""))btn.click();\n'
     +'        if(filter)_showKpiBanner(filter);\n'
@@ -13162,19 +13180,28 @@ function generateIssuedReport(){
     +'  },350);\n'
     +'}\n'
 
-    // kpiReport — close modal, open verbatim report modal, return action re-opens KPI
+    // kpiReport — push "re-open KPI modal" onto stack, then open verbatim modal
     +'function kpiReport(obsId){\n'
     +'  var filter=_lastKpiFilter;\n'
-    +'  closeModal();\n'
-    +'  setTimeout(function(){\n'
-    +'    openReportModal(obsId,function(){openKpiModal(filter);});\n'
-    +'  },350);\n'
+    +'  var m=document.getElementById("repModal");\n'
+    +'  if(m)m.classList.remove("active");\n'
+    +'  document.body.style.overflow="";\n'
+    +'  _navStack.pop(); // remove scroll-to-synopsis entry\n'
+    +'  _navPush(function(){openKpiModal(filter);}); // back from verbatim → KPI modal\n'
+    +'  setTimeout(function(){openReportModal(obsId);},350);\n'
     +'}\n'
 
-    // openKpiModal — build list in shared modal
+    // openKpiModal — push "scroll back to synopsis/KPI tiles" onto stack, then open modal
     +'function openKpiModal(filter){\n'
     +'  _lastKpiFilter=filter;\n'
     +'  _removeKpiBanner();\n'
+    +'  // Push restore: scroll back to synopsis section (KPI tiles area)\n'
+    +'  var savedY=window.pageYOffset;\n'
+    +'  _navPush(function(){\n'
+    +'    var synopsis=document.getElementById("synopsis");\n'
+    +'    if(synopsis)synopsis.scrollIntoView({behavior:"smooth",block:"start"});\n'
+    +'    else smoothScrollTo(savedY,500);\n'
+    +'  });\n'
     +'  var filtered,title;\n'
     +'  if(filter==="resolved"){\n'
     +'    filtered=OBS_INDEX.filter(function(o){return o.resolved;});\n'
@@ -13213,18 +13240,17 @@ function generateIssuedReport(){
     +'  document.body.style.overflow="hidden";\n'
     +'}\n'
 
-    // openReportModal — show verbatim in shared modal
-    +'function openReportModal(obsId,returnAction){\n'
+    // openReportModal — open verbatim in shared modal (caller must have already pushed restore onto stack)
+    +'function openReportModal(obsId){\n'
     +'  var data=VB[obsId];\n'
-    +'  if(!data){alert("Verbatim data not found for observation "+obsId);return;}\n'
-    +'  _reportReturnAction=returnAction||null;\n'
+    +'  if(!data)return;\n'
     +'  document.getElementById("modalTitle").innerHTML=data.title;\n'
     +'  document.getElementById("modalBody").innerHTML=data.body+\'<div class="modal-srcnote">Verbatim from issued audit report</div>\';\n'
     +'  document.getElementById("repModal").classList.add("active");\n'
     +'  document.body.style.overflow="hidden";\n'
     +'}\n'
 
-    // back-link intercept — smooth scroll + highlight
+    // back-link intercept — smooth scroll + highlight, push restore for obs-card back-link
     +'document.querySelectorAll(\'a.back-link[href^="#syn-row-"]\').forEach(function(link){\n'
     +'  link.addEventListener("click",function(e){\n'
     +'    e.preventDefault();\n'
