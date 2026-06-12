@@ -197,11 +197,14 @@ tbl(
 # ── SLIDE 5 ── INTERVIEWS & STATEMENTS ───────────────────────────────────────
 h1('Step 5 — Interviews & Statements')
 
-h2('Interviews Conducted')
+h2('Interviews & Statements')
 b('Administrative and IT staff at Northern Operations Hub')
 b('Purpose: verify attendance discrepancies and system admin practices')
 b('Verbal confirmations obtained where documentation was absent')
-body('Mr. Shakeel has not yet provided a formal written statement responding to the specific findings in this report.', italic=True)
+h2('Show-Cause Notice & Response')
+b('A formal show-cause notice was issued to Mr. Shakeel citing the identified attendance irregularities.')
+b('Mr. Shakeel submitted a written reply in which he accepted and acknowledged the misappropriation of attendance records.')
+b('His acceptance is on record and constitutes a key piece of evidence supporting the disciplinary case.')
 
 h2('Interviews Required')
 tbl(
