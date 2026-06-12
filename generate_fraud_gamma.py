@@ -343,12 +343,16 @@ simple_table(
 )
 
 h2('Financial Quantification')
-body('Full quantification is pending payroll data. The preliminary framework covers:')
-b('Direct Loss: Wages paid for disguised absences/late arrivals across 96 dates')
-b('Benefit Loss: Bonuses or incentives tied to attendance metrics')
-b('Avoided Penalties: Late deductions and sanctions that should have applied')
-b('Indirect Costs: Investigation, remediation, and reputational risk')
-body('Status: Not yet quantified — pending payroll data and HR policy review across all 96 suspect dates.', italic=True)
+body('Recoverable amounts calculated based on entitled leave encashment and treatment of late arrivals:')
+simple_table(
+    ['Head', 'Basis', 'Amount'],
+    [
+        ('Leave Encashment', 'Recoverable amount based on entitled leave encashment', 'Rs. 70,000'),
+        ('Late Arrival Deduction', 'Excessive late arrivals treated as Leave Without Pay (LWP)', 'Approx. Rs. 150,000'),
+        ('Total Estimated Recovery', '', 'Approx. Rs. 220,000'),
+    ],
+    col_widths_cm=[4.5, 7.0, 3.5]
+)
 
 h2('Pattern Analysis — Historical Data Significance')
 body('96 entries falling within a 2-minute window over 17 months cannot occur by chance — confirming deliberate, systematic back-dating targeting the exact 09:00 reporting threshold.')
