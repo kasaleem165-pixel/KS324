@@ -2046,9 +2046,9 @@ function openKpiModal(filter){
       +'<span style="flex:1;font-weight:600">'+o.title.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</span>'
       +'<div class="obs-cat">'+o.cat.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>'
       +'<div style="margin-top:.4rem;display:flex;gap:.5rem;flex-wrap:wrap">'
-      +'<button class="det-btn" onclick="kpiDetail(\'"+o.id+"\')" style="font-size:.7rem;padding:.2rem .65rem">&#9660; Detail</button>'
-      +'<button class="rep-btn" onclick="kpiReport(\'"+o.id+"\')" style="font-size:.7rem;padding:.2rem .65rem">&#128196; View as in Report</button>'
-      +'<button class="rep-btn" onclick="kpiGoFull(\'"+o.id+"\')" style="font-size:.7rem;padding:.2rem .65rem;background:var(--low)">&#8595; Full Card</button>'
+      +'<button class="det-btn kpi-action" data-action="detail" data-id="'+o.id+'" style="font-size:.7rem;padding:.2rem .65rem">&#9660; Detail</button>'
+      +'<button class="rep-btn kpi-action" data-action="view" data-id="'+o.id+'" style="font-size:.7rem;padding:.2rem .65rem">&#128196; View as in Report</button>'
+      +'<button class="rep-btn kpi-action" data-action="full" data-id="'+o.id+'" style="font-size:.7rem;padding:.2rem .65rem;background:var(--low)">&#8595; Full Card</button>'
       +'</div></div>';
   }).join('');
 
@@ -2077,6 +2077,15 @@ function closeModal(){
 }
 document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeModal();_removeKpiBanner();}});
 document.getElementById('repModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+// Event delegation for KPI modal buttons (avoids inline onclick quoting issues)
+document.getElementById('modalBody').addEventListener('click',function(e){
+  var btn=e.target.closest('.kpi-action');
+  if(!btn) return;
+  var action=btn.dataset.action, id=btn.dataset.id;
+  if(action==='detail') kpiDetail(id);
+  else if(action==='view') kpiReport(id);
+  else if(action==='full') kpiGoFull(id);
+});
 </script>
 </body>
 </html>
