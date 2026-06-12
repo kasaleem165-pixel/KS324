@@ -523,7 +523,7 @@ function pwCheck(){
   var isHO = (v === [72,79,64,83,38,65,50,48,50,54].map(function(c){return String.fromCharCode(c);}).join(''));
   if(v==='S&A2026' || isHO){
     try{sessionStorage.setItem('sa_auth_2026','1');}catch(e){}
-    if(isHO){ try{ window._hoAuthed=true; }catch(e){} }
+    if(isHO){ try{ window._hoAuthed=true; _hoActivateBtns(); }catch(e){} }
     document.getElementById('pw-screen').style.display='none';
   } else {
     var err=document.getElementById('pw-err');
@@ -8380,9 +8380,17 @@ var cOpen    = false;
 var curM     = null;
 
 // ============================================================
+function _hoActivateBtns(){
+  var updb = document.getElementById('updb-btn');
+  var cmp  = document.getElementById('cmp-btn');
+  if(updb){ updb.style.opacity='1'; updb.style.filter='none'; updb.innerHTML='&#128194; Update Databank'; }
+  if(cmp){  cmp.style.opacity='1';  cmp.style.filter='none';  cmp.innerHTML='&#128269; Compare'; }
+}
+
 // INIT
 // ============================================================
 window.onload = function() {
+  if(_hoAuthed) _hoActivateBtns();
   buildSel('spb', PREPBY);
   buildSel('scat', CATS);
   buildCatSel();
@@ -10540,8 +10548,7 @@ function showUpdateDbModal(){
     showHOAuthModal(function(granted){
       if(!granted){ showImportDbModal(); return; }
       _hoAuthed = true;
-      var btn = document.getElementById('updb-btn');
-      if(btn){ btn.style.opacity='1'; btn.style.filter='none'; btn.innerHTML='&#128194; Update Databank'; }
+      _hoActivateBtns();
       showUpdateDbModal();
     }, true);
     return;
@@ -10903,8 +10910,7 @@ function showCompareModal(){
     showHOAuthModal(function(granted){
       if(!granted) return;
       _hoAuthed=true;
-      var btn=document.getElementById('cmp-btn');
-      if(btn){ btn.style.opacity='1'; btn.style.filter='none'; btn.innerHTML='&#128269; Compare'; }
+      _hoActivateBtns();
       showCompareModal();
     }, false);
     return;
