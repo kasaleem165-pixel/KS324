@@ -3,461 +3,407 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Preliminary Fraud Assessment – Systems Administrator Attendance Manipulation</title>
+<title>Preliminary Fraud Assessment — KS School System</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; background: #0a0e1a; color: #e8ecf0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: #0a0e1a; color: #e8ecf0; }
 
-  .slide {
-    width: 100%; min-height: 100vh; padding: 36px 52px;
-    display: flex; flex-direction: column; justify-content: center;
-    border-bottom: 3px solid #1e2740; page-break-after: always;
-    overflow: hidden;
-  }
-  .slide-cover  { background: linear-gradient(135deg, #0d1b3e 0%, #1a2f5e 60%, #0a0e1a 100%); }
-  .slide-1      { background: linear-gradient(160deg, #0f1d3a 0%, #122040 100%); }
-  .slide-2      { background: linear-gradient(160deg, #1a0f2e 0%, #2a1a4a 100%); }
-  .slide-3      { background: linear-gradient(160deg, #0f2a1a 0%, #0f3020 100%); }
-  .slide-4      { background: linear-gradient(160deg, #2a1a00 0%, #3a2200 100%); }
-  .slide-5      { background: linear-gradient(160deg, #1a2a00 0%, #203000 100%); }
-  .slide-6      { background: linear-gradient(160deg, #1a0a1a 0%, #2a102a 100%); }
-  .slide-7      { background: linear-gradient(160deg, #0a1a2a 0%, #0f2035 100%); }
-  .slide-close  { background: linear-gradient(135deg, #0d1b3e 0%, #1a2f5e 60%, #0a0e1a 100%); }
+.slide {
+  width: 100%; min-height: 100vh; padding: 36px 56px;
+  display: flex; flex-direction: column; justify-content: center;
+  border-bottom: 3px solid #1e2740; overflow: hidden;
+}
+.cover  { background: linear-gradient(135deg,#0d1b3e 0%,#1a2f5e 55%,#0a0e1a 100%); }
+.s1     { background: linear-gradient(150deg,#0f1d3a,#122040); }
+.s2     { background: linear-gradient(150deg,#1a0f2e,#2a1a4a); }
+.s3     { background: linear-gradient(150deg,#0f2a1a,#0f3020); }
+.s4     { background: linear-gradient(150deg,#2a1800,#3a2200); }
+.s5     { background: linear-gradient(150deg,#1a2800,#203000); }
+.s6     { background: linear-gradient(150deg,#1a0a1a,#2a102a); }
+.s7     { background: linear-gradient(150deg,#0a1a2a,#0f2035); }
+.close  { background: linear-gradient(135deg,#0d1b3e 0%,#1a2f5e 55%,#0a0e1a 100%); }
 
-  .org-tag { font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: #7eb8f0; margin-bottom: 10px; }
-  h1 { font-size: 2.4rem; font-weight: 700; line-height: 1.2; color: #fff; margin-bottom: 12px; }
-  h2 { font-size: 1.5rem; font-weight: 600; color: #fff; margin-bottom: 4px; }
-  .step-badge {
-    display: inline-block; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 6px; padding: 3px 12px; font-size: 11px; letter-spacing: 2px;
-    text-transform: uppercase; color: #a8c8f0; margin-bottom: 10px;
-  }
-  .subtitle { font-size: 1rem; color: #9ab8d8; margin-bottom: 6px; }
+/* Typography */
+.tag  { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#7eb8f0; margin-bottom:8px; }
+h1    { font-size:2.2rem; font-weight:700; color:#fff; margin-bottom:8px; line-height:1.2; }
+h2    { font-size:1.4rem; font-weight:600; color:#fff; margin-bottom:4px; }
+.sub  { font-size:0.95rem; color:#9ab8d8; }
 
-  .section-bar { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
-  .section-num {
-    width: 44px; height: 44px; border-radius: 50%; display: flex;
-    align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 700; flex-shrink: 0;
-  }
-  .num-1 { background:#1e4a8a; color:#7eb8f0; } .num-2 { background:#3a1e6a; color:#b07ef0; }
-  .num-3 { background:#1e5a2a; color:#7ef0a0; } .num-4 { background:#5a3a00; color:#f0c07e; }
-  .num-5 { background:#3a5a00; color:#c0f07e; } .num-6 { background:#4a1a4a; color:#f07ec8; }
-  .num-7 { background:#1a3a5a; color:#7ec8f0; }
+/* Step header */
+.step-hdr { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+.step-num {
+  width:42px; height:42px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.2rem; font-weight:700;
+}
+.badge {
+  display:inline-block; background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.15); border-radius:4px;
+  padding:2px 10px; font-size:10px; letter-spacing:2px;
+  text-transform:uppercase; color:#a8c8f0; margin-bottom:6px;
+}
 
-  .card-grid { display: grid; gap: 14px; }
-  .card-grid-2 { grid-template-columns: 1fr 1fr; }
-  .card-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
-  .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10); border-radius: 10px; padding: 16px 18px; }
-  .card h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 7px; }
-  .card p, .card li { font-size: 0.84rem; color: #b0c4d8; line-height: 1.55; }
-  .card ul { padding-left: 15px; }
-  .card ul li { margin-bottom: 3px; }
+/* Grid */
+.g2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.g3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+.g4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; }
 
-  .acc-blue{color:#7eb8f0;} .acc-purple{color:#b07ef0;} .acc-green{color:#7ef0a0;}
-  .acc-orange{color:#f0c07e;} .acc-lime{color:#c0f07e;} .acc-pink{color:#f07ec8;} .acc-cyan{color:#7ec8f0;}
+/* Cards */
+.card {
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.09);
+  border-radius:8px; padding:14px 16px;
+}
+.card h3 { font-size:0.88rem; font-weight:600; margin-bottom:7px; }
+.card p, .card li { font-size:0.82rem; color:#b0c4d8; line-height:1.55; }
+.card ul { padding-left:14px; }
+.card ul li { margin-bottom:3px; }
 
-  .card.accent-blue   { border-left:4px solid #7eb8f0; }
-  .card.accent-purple { border-left:4px solid #b07ef0; }
-  .card.accent-green  { border-left:4px solid #7ef0a0; }
-  .card.accent-orange { border-left:4px solid #f0c07e; }
-  .card.accent-lime   { border-left:4px solid #c0f07e; }
-  .card.accent-pink   { border-left:4px solid #f07ec8; }
-  .card.accent-cyan   { border-left:4px solid #7ec8f0; }
+/* Accent borders */
+.ab { border-left:3px solid; }
+.ab-blue   { border-left-color:#4a90d9; }
+.ab-purple { border-left-color:#9060d0; }
+.ab-green  { border-left-color:#40a060; }
+.ab-orange { border-left-color:#c07020; }
+.ab-lime   { border-left-color:#70a020; }
+.ab-pink   { border-left-color:#c04080; }
+.ab-cyan   { border-left-color:#3080b0; }
+.ab-red    { border-left-color:#c03030; }
 
-  .ev-table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:10px; }
-  .ev-table th { background:rgba(255,255,255,0.10); color:#c8d8e8; padding:7px 9px; text-align:left; border-bottom:2px solid rgba(255,255,255,0.15); }
-  .ev-table td { padding:6px 9px; border-bottom:1px solid rgba(255,255,255,0.06); color:#b0c4d8; }
+/* Accent text colours */
+.tc-blue  {color:#7eb8f0;} .tc-purple{color:#b07ef0;} .tc-green {color:#60c080;}
+.tc-orange{color:#d09040;} .tc-lime  {color:#90c040;} .tc-pink  {color:#e06090;}
+.tc-cyan  {color:#60b0d0;} .tc-red   {color:#f08080;} .tc-yellow{color:#e0c060;}
 
-  .pill { display:inline-block; border-radius:20px; padding:2px 10px; font-size:0.76rem; font-weight:600; margin:2px 2px 2px 0; }
-  .pill-red    { background:rgba(220,50,50,0.20);  color:#f08080; border:1px solid rgba(220,50,50,0.30); }
-  .pill-yellow { background:rgba(220,180,50,0.20); color:#f0d080; border:1px solid rgba(220,180,50,0.30); }
-  .pill-green  { background:rgba(50,180,80,0.20);  color:#80f0a0; border:1px solid rgba(50,180,80,0.30); }
-  .pill-blue   { background:rgba(50,120,220,0.20); color:#80c0f0; border:1px solid rgba(50,120,220,0.30); }
+/* Stat row */
+.stats { display:flex; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+.stat  {
+  flex:1; min-width:110px; text-align:center;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.10);
+  border-radius:8px; padding:10px 8px;
+}
+.stat .n { font-size:1.8rem; font-weight:700; }
+.stat .l { font-size:0.72rem; color:#8a9eb4; margin-top:2px; line-height:1.3; }
 
-  .stat-row { display:flex; gap:14px; margin-bottom:16px; flex-wrap:wrap; }
-  .stat-box { flex:1; min-width:120px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:12px 14px; text-align:center; }
-  .stat-box .num { font-size:1.9rem; font-weight:700; }
-  .stat-box .lbl { font-size:0.76rem; color:#8a9eb4; margin-top:3px; line-height:1.3; }
+/* Hypothesis boxes */
+.hyp-a { background:rgba(200,40,40,0.10); border:1px solid rgba(200,40,40,0.25); border-radius:8px; padding:12px 14px; }
+.hyp-b { background:rgba(40,160,80,0.10); border:1px solid rgba(40,160,80,0.25); border-radius:8px; padding:12px 14px; }
+.hyp-lbl { font-size:0.72rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:6px; }
 
-  .tl-item { margin-bottom:10px; }
-  .tl-date { font-size:0.76rem; color:#7eb8f0; font-weight:600; }
-  .tl-text { font-size:0.83rem; color:#b0c4d8; margin-top:2px; line-height:1.45; }
+/* Table */
+.tbl { width:100%; border-collapse:collapse; font-size:0.78rem; margin-top:8px; }
+.tbl th { background:rgba(255,255,255,0.10); color:#c8d8e8; padding:6px 8px; text-align:left; border-bottom:2px solid rgba(255,255,255,0.12); }
+.tbl td { padding:5px 8px; border-bottom:1px solid rgba(255,255,255,0.05); color:#b0c4d8; }
+.tbl tr:nth-child(even) td { background:rgba(255,255,255,0.03); }
 
-  .cover-line { width:70px; height:4px; border-radius:2px; background:linear-gradient(90deg,#2a6adf,#6a2adf); margin:16px 0; }
-  .cover-tags { display:flex; gap:8px; margin-top:22px; flex-wrap:wrap; }
-  .divider { height:1px; background:rgba(255,255,255,0.08); margin:14px 0; }
+/* Pills */
+.pill { display:inline-block; border-radius:20px; padding:2px 9px; font-size:0.72rem; font-weight:600; margin:2px 2px 2px 0; }
+.pr { background:rgba(200,50,50,0.20); color:#f08080; border:1px solid rgba(200,50,50,0.30); }
+.py { background:rgba(200,160,40,0.20); color:#e8c860; border:1px solid rgba(200,160,40,0.30); }
+.pb { background:rgba(50,110,200,0.20); color:#80b8f0; border:1px solid rgba(50,110,200,0.30); }
+.pg { background:rgba(40,160,80,0.20); color:#70d890; border:1px solid rgba(40,160,80,0.30); }
 
-  @media print { .slide { page-break-after:always; min-height:0; } }
-  @media(max-width:768px){ .slide{padding:24px 20px;} .card-grid-2,.card-grid-3{grid-template-columns:1fr;} h1{font-size:1.7rem;} }
+/* Divider */
+.div { height:1px; background:rgba(255,255,255,0.08); margin:10px 0; }
+
+/* Cover line */
+.cline { width:60px; height:3px; border-radius:2px; background:linear-gradient(90deg,#2a6adf,#6a2adf); margin:12px 0; }
+
+/* Step colours */
+.sn1 { background:#1e4a8a; color:#7eb8f0; }
+.sn2 { background:#3a1e6a; color:#b07ef0; }
+.sn3 { background:#1e5a2a; color:#7ef0a0; }
+.sn4 { background:#5a3a00; color:#f0c07e; }
+.sn5 { background:#3a5a00; color:#c0f07e; }
+.sn6 { background:#4a1a4a; color:#f07ec8; }
+.sn7 { background:#1a3a5a; color:#7ec8f0; }
+
+@media(max-width:768px){ .g2,.g3,.g4{grid-template-columns:1fr;} .slide{padding:24px 22px;} h1{font-size:1.6rem;} }
 </style>
 </head>
 <body>
 
-<!-- COVER -->
-<div class="slide slide-cover">
-  <div class="org-tag">Knowledge &amp; Skill (KS) School System · Compliance &amp; Risk Division</div>
+<!-- ══ COVER ══════════════════════════════════════════════════════════════ -->
+<div class="slide cover">
+  <div class="tag">Knowledge &amp; Skill (KS) School System · Compliance &amp; Risk Division</div>
   <h1>Preliminary Fraud Assessment</h1>
   <h2 style="color:#a0c0e0;font-weight:400;">Attendance Record Manipulation — Systems Administrator</h2>
-  <div class="cover-line"></div>
-  <p class="subtitle">Northern Operations Hub (400) &nbsp;|&nbsp; January 2026</p>
-  <p style="font-size:0.88rem;color:#8090a8;margin-top:8px;">
+  <div class="cline"></div>
+  <p class="sub">Northern Operations Hub (400) &nbsp;|&nbsp; January 2026</p>
+  <p style="font-size:0.85rem;color:#8090a8;margin-top:8px;">
     Subject: <strong style="color:#c0d8f0;">Mr. Shakeel</strong> &nbsp;|&nbsp;
-    Employee ID: <strong style="color:#c0d8f0;">47291</strong> &nbsp;|&nbsp;
+    EID: <strong style="color:#c0d8f0;">47291</strong> &nbsp;|&nbsp;
     Designation: <strong style="color:#c0d8f0;">Systems Administrator</strong>
   </p>
-  <div class="cover-tags">
-    <span class="pill pill-red">Confidential</span>
-    <span class="pill pill-yellow">Preliminary Assessment</span>
-    <span class="pill pill-blue">Attendance Fraud</span>
-    <span class="pill pill-blue">Privilege Misuse</span>
-    <span class="pill pill-blue">Data Manipulation</span>
+  <div style="margin-top:18px;display:flex;gap:8px;flex-wrap:wrap;">
+    <span class="pill pr">Confidential</span>
+    <span class="pill py">Preliminary Assessment</span>
+    <span class="pill pb">Attendance Fraud</span>
+    <span class="pill pb">Privilege Misuse</span>
   </div>
-  <div class="divider" style="margin-top:32px;"></div>
-  <p style="font-size:0.8rem;color:#506070;">7-Point Preliminary Fraud Assessment &nbsp;·&nbsp; Fact Finding Report — C&amp;R Division</p>
+  <div class="div" style="margin-top:24px;"></div>
+  <p style="font-size:0.76rem;color:#506070;">7-Point Preliminary Fraud Assessment &nbsp;·&nbsp; C&amp;R Division Fact Finding Report</p>
 </div>
 
-<!-- SLIDE 1 -->
-<div class="slide slide-1">
-  <div class="section-bar">
-    <div class="section-num num-1">1</div>
-    <div>
-      <div class="step-badge acc-blue">Step 1 of 7</div>
-      <h2 class="acc-blue">Situation, Red Flags &amp; Hypothesis</h2>
-    </div>
+<!-- ══ SLIDE 1 ─ SITUATION, RED FLAGS & HYPOTHESIS ═══════════════════════ -->
+<div class="slide s1">
+  <div class="step-hdr">
+    <div class="step-num sn1">1</div>
+    <div><div class="badge tc-blue">Step 1 of 7</div><h2 class="tc-blue">Situation, Red Flags &amp; Hypothesis</h2></div>
   </div>
 
-  <div class="stat-row">
-    <div class="stat-box"><div class="num acc-blue">96</div><div class="lbl">Suspect entries<br>Jul 2024–Nov 2025</div></div>
-    <div class="stat-box"><div class="num acc-blue">10</div><div class="lbl">Confirmed altered<br>entries Oct–Nov 2025</div></div>
-    <div class="stat-box"><div class="num acc-blue">17+</div><div class="lbl">Months of<br>sustained pattern</div></div>
-    <div class="stat-box"><div class="num acc-blue">5</div><div class="lbl">Dates CCTV-<br>corroborated</div></div>
+  <div class="stats">
+    <div class="stat"><div class="n tc-blue">96</div><div class="l">Suspect entries<br>Jul 2024–Nov 2025</div></div>
+    <div class="stat"><div class="n tc-blue">10</div><div class="l">Confirmed altered<br>Oct–Nov 2025</div></div>
+    <div class="stat"><div class="n tc-blue">17+</div><div class="l">Months sustained<br>pattern</div></div>
+    <div class="stat"><div class="n tc-blue">5</div><div class="l">CCTV-corroborated<br>dates</div></div>
   </div>
 
-  <div class="card-grid card-grid-2">
-    <div class="card accent-blue">
-      <h3 class="acc-blue">Situation</h3>
-      <p>The C&amp;R Division at KS School System's Northern Operations Hub (400) detected anomalies in the facial recognition attendance system (ATLAS). The Systems Administrator — custodian of the system — allegedly exploited admin access to back-date and alter his own "Time In" entries to conceal late arrivals and absences.</p>
+  <div class="g2" style="margin-bottom:12px;">
+    <div class="card ab ab-blue">
+      <h3 class="tc-blue">Situation</h3>
+      <p>C&amp;R Division detected anomalies in the ATLAS facial recognition attendance system. The Systems Administrator — system custodian — allegedly exploited admin access to back-date and alter his "Time In" entries, concealing late arrivals and absences.</p>
     </div>
-    <div class="card accent-blue">
-      <h3 class="acc-blue">Red Flags</h3>
+    <div class="card ab ab-blue">
+      <h3 class="tc-blue">Red Flags</h3>
       <ul>
-        <li style="margin-bottom:8px;">
-          <strong style="color:#7eb8f0;">RF-1 &nbsp;|&nbsp; Direct Observation (SOMOTO):</strong>
-          Auditor observed Mr. Shakeel routinely arriving late and leaving late, yet his leave balance reflected no corresponding deductions for late arrivals.
-        </li>
-        <li>
-          <strong style="color:#7eb8f0;">RF-2 &nbsp;|&nbsp; Anomalous Attendance Pattern:</strong>
-          96 instances over 17 months (Jul 2024–Nov 2025) where "Time In" was recorded within seconds of the 09:00 threshold — a clustering too precise to be natural and indicative of deliberate manipulation.
-        </li>
+        <li><strong class="tc-blue">RF-1 | SOMOTO:</strong> Auditor observed routine late arrivals and late departures, yet no corresponding leave deductions were recorded.</li>
+        <li style="margin-top:6px;"><strong class="tc-blue">RF-2 | Pattern:</strong> 96 "Time In" entries over 17 months all fall within seconds of the 09:00 threshold — statistically impossible by chance.</li>
       </ul>
     </div>
-    <div class="card accent-blue" style="grid-column: span 2;">
-      <h3 class="acc-blue">Hypothesis</h3>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px;">
-        <div style="background:rgba(240,80,80,0.08);border:1px solid rgba(240,80,80,0.25);border-radius:8px;padding:12px 14px;">
-          <div style="font-size:0.78rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#f08080;margin-bottom:7px;">⚠ Hypothesis A — Guilty</div>
-          <p style="font-size:0.83rem;color:#d0b0b0;line-height:1.55;">Mr. Shakeel knowingly misused admin access to fabricate and overwrite "Time In" records, concealing habitual late arrivals to avoid salary deductions and disciplinary action — constituting <strong style="color:#f08080;">payroll / time-and-attendance fraud</strong>.</p>
-        </div>
-        <div style="background:rgba(80,200,120,0.08);border:1px solid rgba(80,200,120,0.25);border-radius:8px;padding:12px 14px;">
-          <div style="font-size:0.78rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#7ef0a0;margin-bottom:7px;">✓ Hypothesis B — Not Guilty</div>
-          <ul style="font-size:0.83rem;color:#a0c8a8;line-height:1.55;padding-left:15px;">
-            <li style="margin-bottom:6px;">System glitch caused missed morning scans; subject corrected records in good faith, unaware that supervisor approval was required.</li>
-            <li>Subject believed his routine late sittings entitled him to offset late arrivals informally, without knowledge of the formal policy or approval process for such adjustments.</li>
-          </ul>
-        </div>
-      </div>
+  </div>
+
+  <div class="g2">
+    <div class="hyp-a">
+      <div class="hyp-lbl" style="color:#f08080;">⚠ Hypothesis A — Guilty</div>
+      <p style="font-size:0.82rem;color:#d0a0a0;">Mr. Shakeel knowingly misused admin access to fabricate "Time In" records, concealing late arrivals to avoid salary deductions and disciplinary action — constituting <strong style="color:#f08080;">payroll / time-and-attendance fraud</strong>.</p>
     </div>
-    <div class="card accent-blue">
-      <h3 class="acc-blue">Why It Matters</h3>
-      <ul>
-        <li>Undermines integrity of the organization's attendance controls</li>
-        <li>Financial loss through unearned pay and avoided deductions</li>
-        <li>Abuse of privileged IT role and position of trust</li>
-        <li>17-month pattern confirms willful, sustained conduct</li>
-        <li>Same privileges could be used to manipulate other employees' records</li>
+    <div class="hyp-b">
+      <div class="hyp-lbl" style="color:#60d080;">✓ Hypothesis B — Not Guilty</div>
+      <ul style="font-size:0.82rem;color:#90c8a0;padding-left:14px;">
+        <li>System glitch caused missed morning scans; corrections made in good faith without knowing supervisor approval was needed.</li>
+        <li style="margin-top:4px;">Subject believed late sittings entitled him to offset late arrivals informally, unaware of the formal policy and approval process.</li>
       </ul>
     </div>
   </div>
 </div>
 
-<!-- SLIDE 2 -->
-<div class="slide slide-2">
-  <div class="section-bar">
-    <div class="section-num num-2">2</div>
-    <div>
-      <div class="step-badge acc-purple">Step 2 of 7</div>
-      <h2 class="acc-purple">Legal Destination &amp; Case Strategy</h2>
-    </div>
+<!-- ══ SLIDE 2 ─ LEGAL DESTINATION & CASE STRATEGY ══════════════════════ -->
+<div class="slide s2">
+  <div class="step-hdr">
+    <div class="step-num sn2">2</div>
+    <div><div class="badge tc-purple">Step 2 of 7</div><h2 class="tc-purple">Legal Destination &amp; Case Strategy</h2></div>
   </div>
 
-  <div class="card accent-purple" style="margin-bottom:14px;">
-    <h3 class="acc-purple">Legal Destination — Disciplinary Action</h3>
-    <p style="font-size:0.84rem;color:#c0b0d8;margin-top:6px;line-height:1.55;">
-      This case is classified as an <strong style="color:#d0b0f0;">internal employment disciplinary matter</strong>. The subject holds a position of trust as the custodian of the attendance system, and the evidence indicates a breach of that trust through unauthorized use of admin privileges to alter official records. The appropriate legal destination is a formal disciplinary proceeding under the organization's HR and employment policies — not a criminal or civil referral at this stage.
-    </p>
+  <div class="card ab ab-purple" style="margin-bottom:12px;">
+    <h3 class="tc-purple">Legal Destination — Internal Disciplinary Action</h3>
+    <p>Classified as an internal employment disciplinary matter. The subject breached the trust placed in his privileged role as system custodian. A formal disciplinary proceeding under the organization's HR and employment policies is the appropriate legal destination.</p>
   </div>
 
-  <div class="card-grid card-grid-3" style="margin-bottom:14px;">
-    <div class="card accent-purple">
-      <h3 class="acc-purple">Grounds for Disciplinary Action</h3>
+  <div class="g3">
+    <div class="card ab ab-purple">
+      <h3 class="tc-purple">Grounds</h3>
       <ul>
-        <li><strong style="color:#d0b0f0;">Misconduct:</strong> Unauthorized modification of official attendance records using admin privileges</li>
-        <li><strong style="color:#d0b0f0;">Breach of Trust:</strong> Abuse of a privileged role specifically entrusted to safeguard data integrity</li>
-        <li><strong style="color:#d0b0f0;">Policy Violation:</strong> Bypassing the approved process for attendance corrections without supervisor authorization</li>
-        <li><strong style="color:#d0b0f0;">Misrepresentation:</strong> Submitting inaccurate records that affected payroll and leave calculations</li>
+        <li><strong>Misconduct:</strong> Unauthorized modification of attendance records</li>
+        <li><strong>Breach of Trust:</strong> Abuse of data custodian role</li>
+        <li><strong>Policy Violation:</strong> Corrections made without supervisor authorization</li>
+        <li><strong>Misrepresentation:</strong> Inaccurate records affecting payroll</li>
       </ul>
     </div>
-    <div class="card accent-purple">
-      <h3 class="acc-purple">Disciplinary Case Strategy</h3>
+    <div class="card ab ab-purple">
+      <h3 class="tc-purple">Case Strategy</h3>
       <ul>
-        <li><strong style="color:#d0b0f0;">Immediate:</strong> Preserve all digital evidence and secure system logs</li>
-        <li><strong style="color:#d0b0f0;">Short-term:</strong> Issue show-cause notice; obtain subject's written explanation</li>
-        <li><strong style="color:#d0b0f0;">Formal Hearing:</strong> Constitute an inquiry committee; present findings and evidence to subject</li>
-        <li><strong style="color:#d0b0f0;">Decision:</strong> Determine penalty based on intent, duration, and financial impact — ranging from written warning to termination</li>
-        <li><strong style="color:#d0b0f0;">Recovery:</strong> Recover any salary/benefit amounts confirmed as improperly obtained</li>
+        <li><strong>Immediate:</strong> Preserve evidence; secure system logs</li>
+        <li><strong>Short-term:</strong> Show-cause notice; written explanation</li>
+        <li><strong>Hearing:</strong> Inquiry committee; present evidence</li>
+        <li><strong>Decision:</strong> Penalty based on intent &amp; financial impact</li>
+        <li><strong>Recovery:</strong> Recover improperly obtained amounts</li>
       </ul>
     </div>
-    <div class="card accent-purple">
-      <h3 class="acc-purple">Key Open Questions</h3>
+    <div class="card ab ab-purple">
+      <h3 class="tc-purple">Key Open Questions</h3>
       <ul>
-        <li>Does the subject have a prior disciplinary record?</li>
-        <li>Was he formally informed of the attendance correction policy?</li>
-        <li>Was there any implicit tolerance of such adjustments by management?</li>
-        <li>What is the exact financial value of benefit improperly obtained?</li>
-        <li>Did his line manager have any awareness of the late arrivals?</li>
+        <li>Prior disciplinary record?</li>
+        <li>Was subject formally informed of correction policy?</li>
+        <li>Any implicit management tolerance?</li>
+        <li>Exact financial value of benefit obtained?</li>
+        <li>Line manager awareness of late arrivals?</li>
       </ul>
-    </div>
-  </div>
-
-  <div class="card accent-purple">
-    <h3 class="acc-purple">Classification</h3>
-    <p style="margin-top:6px;">
-      <span class="pill pill-yellow">Disciplinary Misconduct</span>
-      <span class="pill pill-red">Breach of Trust</span>
-      <span class="pill pill-blue">Unauthorized System Use</span>
-      <span class="pill pill-blue">Attendance Policy Violation</span>
-    </p>
-  </div>
-</div>
-
-<!-- SLIDE 3 -->
-<div class="slide slide-3">
-  <div class="section-bar">
-    <div class="section-num num-3">3</div>
-    <div>
-      <div class="step-badge acc-green">Step 3 of 7</div>
-      <h2 class="acc-green">Scheme Mechanics</h2>
-    </div>
-  </div>
-
-  <div class="card-grid card-grid-3" style="margin-bottom:14px;">
-    <div class="card accent-green">
-      <h3 class="acc-green">Method A — Retroactive Creation</h3>
-      <p>No "Time In" recorded in the morning. At departure, subject punched a back-dated "Time In" of ≈08:59–09:00 using admin access.</p>
-      <p style="margin-top:7px;"><span class="pill pill-red">8 instances — Oct 2025</span></p>
-    </div>
-    <div class="card accent-green">
-      <h3 class="acc-green">Method B — Overwriting Late Entry</h3>
-      <p>A genuine late "Time In" existed (e.g., 09:34 or 10:20). Subject replaced it with an earlier fabricated timestamp (e.g., 08:50) via admin access.</p>
-      <p style="margin-top:7px;"><span class="pill pill-red">2 instances — 3 &amp; 24 Oct 2025</span></p>
-    </div>
-    <div class="card accent-green">
-      <h3 class="acc-green">Method C — Cross-Day Back-Dating</h3>
-      <p>Previous day's attendance not recorded. On the next day, both days' fabricated entries were submitted together.</p>
-      <p style="margin-top:7px;"><span class="pill pill-red">1 instance — 3 &amp; 4 Nov 2025</span></p>
-    </div>
-  </div>
-
-  <div class="card accent-green" style="margin-bottom:14px;">
-    <h3 class="acc-green">How the Scheme Operated</h3>
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:8px;text-align:center;">
-      <div style="background:rgba(126,240,160,0.08);border-radius:8px;padding:10px 6px;">
-        <div style="font-size:1.3rem;">🕐</div>
-        <div style="font-size:0.78rem;color:#7ef0a0;margin-top:5px;font-weight:600;">Step 1</div>
-        <div style="font-size:0.76rem;color:#b0c8b8;margin-top:3px;">Arrives late or absent — no morning facial scan recorded.</div>
-      </div>
-      <div style="background:rgba(126,240,160,0.08);border-radius:8px;padding:10px 6px;">
-        <div style="font-size:1.3rem;">🖥️</div>
-        <div style="font-size:0.78rem;color:#7ef0a0;margin-top:5px;font-weight:600;">Step 2</div>
-        <div style="font-size:0.76rem;color:#b0c8b8;margin-top:3px;">Logs into ATLAS at end of day with admin credentials.</div>
-      </div>
-      <div style="background:rgba(126,240,160,0.08);border-radius:8px;padding:10px 6px;">
-        <div style="font-size:1.3rem;">✏️</div>
-        <div style="font-size:0.78rem;color:#7ef0a0;margin-top:5px;font-weight:600;">Step 3</div>
-        <div style="font-size:0.76rem;color:#b0c8b8;margin-top:3px;">Enters or replaces "Time In" with a fabricated timestamp just before 09:00.</div>
-      </div>
-      <div style="background:rgba(126,240,160,0.08);border-radius:8px;padding:10px 6px;">
-        <div style="font-size:1.3rem;">📋</div>
-        <div style="font-size:0.78rem;color:#7ef0a0;margin-top:5px;font-weight:600;">Step 4</div>
-        <div style="font-size:0.76rem;color:#b0c8b8;margin-top:3px;">Report shows on-time arrival. Late/absence hidden from HR and payroll.</div>
-      </div>
-      <div style="background:rgba(126,240,160,0.08);border-radius:8px;padding:10px 6px;">
-        <div style="font-size:1.3rem;">💰</div>
-        <div style="font-size:0.78rem;color:#7ef0a0;margin-top:5px;font-weight:600;">Step 5</div>
-        <div style="font-size:0.76rem;color:#b0c8b8;margin-top:3px;">Full salary maintained. Deductions and penalties avoided.</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card accent-green">
-    <h3 class="acc-green">Enabling Control Failures</h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:8px;">
-      <div><span class="pill pill-red">No Segregation of Duties</span><p style="font-size:0.8rem;color:#b0c8b8;margin-top:3px;">IT custodian could modify their own records without independent approval.</p></div>
-      <div><span class="pill pill-red">No Audit Alert</span><p style="font-size:0.8rem;color:#b0c8b8;margin-top:3px;">Back-dated entries triggered no automated flag or supervisor notification.</p></div>
-      <div><span class="pill pill-red">Unrestricted Admin Access</span><p style="font-size:0.8rem;color:#b0c8b8;margin-top:3px;">Records could be overwritten with no secondary authorization required.</p></div>
+      <div class="div"></div>
+      <p style="margin-top:4px;">
+        <span class="pill pr">Disciplinary Misconduct</span>
+        <span class="pill py">Breach of Trust</span>
+        <span class="pill pb">Policy Violation</span>
+      </p>
     </div>
   </div>
 </div>
 
-<!-- SLIDE 4 -->
-<div class="slide slide-4">
-  <div class="section-bar">
-    <div class="section-num num-4">4</div>
-    <div>
-      <div class="step-badge acc-orange">Step 4 of 7</div>
-      <h2 class="acc-orange">Evidence Collection &amp; Procedures</h2>
+<!-- ══ SLIDE 3 ─ SCHEME MECHANICS ════════════════════════════════════════ -->
+<div class="slide s3">
+  <div class="step-hdr">
+    <div class="step-num sn3">3</div>
+    <div><div class="badge tc-green">Step 3 of 7</div><h2 class="tc-green">Scheme Mechanics</h2></div>
+  </div>
+
+  <div class="g3" style="margin-bottom:12px;">
+    <div class="card ab ab-green">
+      <h3 class="tc-green">Method A — Retroactive Creation</h3>
+      <p>No morning scan. At departure, subject punched a back-dated "Time In" of ≈08:59 via admin access.</p>
+      <p style="margin-top:6px;"><span class="pill pr">8 instances — Oct 2025</span></p>
+    </div>
+    <div class="card ab ab-green">
+      <h3 class="tc-green">Method B — Overwriting Late Entry</h3>
+      <p>Genuine late entry (e.g., 09:34 or 10:20) replaced with fabricated earlier timestamp via admin access.</p>
+      <p style="margin-top:6px;"><span class="pill pr">2 instances — Oct 2025</span></p>
+    </div>
+    <div class="card ab ab-green">
+      <h3 class="tc-green">Method C — Cross-Day Back-Dating</h3>
+      <p>Previous day's absence not recorded. Next day, both days' fabricated entries submitted together.</p>
+      <p style="margin-top:6px;"><span class="pill pr">1 instance — Nov 2025</span></p>
     </div>
   </div>
 
-  <div class="card-grid card-grid-2" style="margin-bottom:14px;">
-    <div class="card accent-orange">
-      <h3 class="acc-orange">Evidence Collected</h3>
+  <div class="g2">
+    <div class="card ab ab-green">
+      <h3 class="tc-green">Step-by-Step</h3>
+      <ol style="padding-left:16px;font-size:0.82rem;color:#b0c4d8;line-height:1.6;">
+        <li>Arrives late / absent — no morning scan</li>
+        <li>Logs into ATLAS at end of day with admin credentials</li>
+        <li>Enters fabricated "Time In" just before 09:00</li>
+        <li>Report shows on-time — late/absence hidden from HR</li>
+        <li>Full salary maintained; deductions avoided</li>
+      </ol>
+    </div>
+    <div class="card ab ab-red">
+      <h3 class="tc-red">Control Failures</h3>
       <ul>
-        <li><strong style="color:#f0c07e;">ATLAS Attendance Data:</strong> Actual vs. altered "Time In" records Oct–Nov 2025 (Annexures A–G)</li>
-        <li><strong style="color:#f0c07e;">System Audit Logs:</strong> Timestamps of back-dated entry creation/modification</li>
-        <li><strong style="color:#f0c07e;">CCTV Footage:</strong> Morning arrival footage for 13, 16, 20, 21, 23 Oct and 3, 4 Nov 2025</li>
-        <li><strong style="color:#f0c07e;">CCTV Comparator:</strong> Colleague arrival times vs. ATLAS to validate ~3–4 min system offset</li>
-        <li><strong style="color:#f0c07e;">Historical Data:</strong> 96-instance dataset Jul 2024–Nov 2025 (Annexure H)</li>
-        <li><strong style="color:#f0c07e;">Staff Interviews:</strong> Verbal confirmations from admin and IT staff</li>
+        <li><strong>No Segregation of Duties:</strong> IT custodian could modify own records</li>
+        <li><strong>No Audit Alert:</strong> Back-dated entries triggered no flag</li>
+        <li><strong>Unrestricted Admin Access:</strong> Records overwritten with no secondary authorization</li>
       </ul>
     </div>
-    <div class="card accent-orange">
-      <h3 class="acc-orange">Evidence Still Required</h3>
+  </div>
+</div>
+
+<!-- ══ SLIDE 4 ─ EVIDENCE COLLECTION & PROCEDURES ════════════════════════ -->
+<div class="slide s4">
+  <div class="step-hdr">
+    <div class="step-num sn4">4</div>
+    <div><div class="badge tc-orange">Step 4 of 7</div><h2 class="tc-orange">Evidence Collection &amp; Procedures</h2></div>
+  </div>
+
+  <div class="g2" style="margin-bottom:12px;">
+    <div class="card ab ab-orange">
+      <h3 class="tc-orange">Evidence Collected</h3>
       <ul>
-        <li>Full admin modification logs (who changed what, and when)</li>
-        <li>Authorization records for subject's admin privileges</li>
-        <li>Payroll data for the full 17-month period</li>
-        <li>HR policy on late attendance deductions and thresholds</li>
-        <li>CCTV review for remaining 85 unverified historical dates</li>
+        <li>ATLAS attendance data — actual vs. altered entries, Oct–Nov 2025 (Annexures A–G)</li>
+        <li>System audit logs — timestamps of modifications</li>
+        <li>CCTV footage — 13, 16, 20, 21, 23 Oct &amp; 3, 4 Nov 2025</li>
+        <li>CCTV comparator — colleague times vs. ATLAS (~3–4 min offset)</li>
+        <li>Historical dataset — 96 instances Jul 2024–Nov 2025 (Annexure H)</li>
+        <li>Staff interviews — verbal confirmations obtained</li>
+      </ul>
+    </div>
+    <div class="card ab ab-orange">
+      <h3 class="tc-orange">Evidence Still Required</h3>
+      <ul>
+        <li>Full admin modification logs (who, what, when)</li>
+        <li>Authorization records for admin privileges</li>
+        <li>Payroll data for full 17-month period</li>
+        <li>HR policy on late deductions and thresholds</li>
+        <li>CCTV review for remaining 85 unverified dates</li>
         <li>Forensic image of ATLAS server database</li>
         <li>Formal written statement from subject</li>
       </ul>
     </div>
   </div>
 
-  <div class="card accent-orange">
-    <h3 class="acc-orange">Recommended Evidence Procedures</h3>
-    <table class="ev-table">
+  <div class="card ab ab-orange">
+    <h3 class="tc-orange">Recommended Procedures</h3>
+    <table class="tbl">
       <thead><tr><th>#</th><th>Procedure</th><th>Purpose</th><th>Priority</th></tr></thead>
       <tbody>
-        <tr><td>1</td><td>Forensic imaging of ATLAS server database</td><td>Preserve tamper-proof evidence</td><td><span class="pill pill-red">Immediate</span></td></tr>
-        <tr><td>2</td><td>Extract full system audit log</td><td>Establish who changed what and when</td><td><span class="pill pill-red">Immediate</span></td></tr>
-        <tr><td>3</td><td>Secure CCTV archive for full period</td><td>Prevent overwriting of recordings</td><td><span class="pill pill-red">Immediate</span></td></tr>
-        <tr><td>4</td><td>Revoke subject's admin access</td><td>Prevent further evidence destruction</td><td><span class="pill pill-red">Immediate</span></td></tr>
-        <tr><td>5</td><td>Obtain payroll data for Jul 2024–Nov 2025</td><td>Quantify financial benefit obtained</td><td><span class="pill pill-yellow">Short-term</span></td></tr>
-        <tr><td>6</td><td>CCTV review for all 96 flagged dates</td><td>Corroborate manipulation across full dataset</td><td><span class="pill pill-yellow">Short-term</span></td></tr>
-        <tr><td>7</td><td>Independent IT forensic expert review</td><td>Third-party audit trail validation</td><td><span class="pill pill-yellow">Short-term</span></td></tr>
-        <tr><td>8</td><td>HR file review for prior warnings</td><td>Establish recurrence and prior knowledge</td><td><span class="pill pill-green">Medium-term</span></td></tr>
+        <tr><td>1</td><td>Forensic image of ATLAS database</td><td>Tamper-proof preservation</td><td><span class="pill pr">Immediate</span></td></tr>
+        <tr><td>2</td><td>Extract full admin audit log</td><td>Who changed what and when</td><td><span class="pill pr">Immediate</span></td></tr>
+        <tr><td>3</td><td>Secure CCTV archive</td><td>Prevent overwriting</td><td><span class="pill pr">Immediate</span></td></tr>
+        <tr><td>4</td><td>Obtain payroll data Jul 2024–Nov 2025</td><td>Quantify financial benefit</td><td><span class="pill py">Short-term</span></td></tr>
+        <tr><td>5</td><td>CCTV review for all 96 flagged dates</td><td>Full dataset corroboration</td><td><span class="pill py">Short-term</span></td></tr>
+        <tr><td>6</td><td>Independent IT forensic review</td><td>Third-party validation</td><td><span class="pill py">Short-term</span></td></tr>
       </tbody>
     </table>
   </div>
 </div>
 
-<!-- SLIDE 5 -->
-<div class="slide slide-5">
-  <div class="section-bar">
-    <div class="section-num num-5">5</div>
-    <div>
-      <div class="step-badge acc-lime">Step 5 of 7</div>
-      <h2 class="acc-lime">Interviews &amp; Statements</h2>
-    </div>
+<!-- ══ SLIDE 5 ─ INTERVIEWS & STATEMENTS ════════════════════════════════ -->
+<div class="slide s5">
+  <div class="step-hdr">
+    <div class="step-num sn5">5</div>
+    <div><div class="badge tc-lime">Step 5 of 7</div><h2 class="tc-lime">Interviews &amp; Statements</h2></div>
   </div>
 
-  <div class="card-grid card-grid-2" style="margin-bottom:14px;">
-    <div class="card accent-lime">
-      <h3 class="acc-lime">Interviews Conducted</h3>
+  <div class="g2" style="margin-bottom:12px;">
+    <div class="card ab ab-lime">
+      <h3 class="tc-lime">Interviews Conducted</h3>
       <ul>
-        <li>Discussions held with administrative and IT staff at Northern Operations Hub</li>
-        <li>Purpose: establish facts on attendance discrepancies and system admin practices</li>
+        <li>Administrative and IT staff at Northern Operations Hub</li>
+        <li>Purpose: verify facts on attendance discrepancies and system admin practices</li>
         <li>Verbal confirmations obtained where documentation was absent</li>
-        <li>Statement details maintained in the case file</li>
       </ul>
-      <div class="divider"></div>
-      <p style="font-size:0.81rem;color:#a0c080;">Mr. Shakeel has not yet provided a formal written statement responding to the specific findings in this report.</p>
+      <div class="div"></div>
+      <p style="font-size:0.8rem;color:#a0c080;font-style:italic;">Mr. Shakeel has not yet provided a formal written statement responding to the specific findings in this report.</p>
     </div>
-    <div class="card accent-lime">
-      <h3 class="acc-lime">Interviews Required (Next Phase)</h3>
-      <table class="ev-table">
+    <div class="card ab ab-lime">
+      <h3 class="tc-lime">Interviews Required</h3>
+      <table class="tbl">
         <thead><tr><th>Interviewee</th><th>Relevance</th></tr></thead>
         <tbody>
-          <tr><td>Mr. Shakeel (47291)</td><td>Subject — formal statement, right to respond</td></tr>
-          <tr><td>IT Head / Supervisor</td><td>Admin access authorization; awareness of edits</td></tr>
-          <tr><td>HR Manager</td><td>Payroll processing; attendance discrepancy awareness</td></tr>
-          <tr><td>CCTV-identified colleagues</td><td>Corroborate subject absence on specific dates</td></tr>
-          <tr><td>ATLAS Vendor / IT Provider</td><td>System back-dating capability; log integrity</td></tr>
+          <tr><td>Mr. Shakeel (47291)</td><td>Formal statement; right to respond</td></tr>
+          <tr><td>IT Head / Supervisor</td><td>Admin access authorization</td></tr>
+          <tr><td>HR Manager</td><td>Payroll and attendance policy</td></tr>
+          <tr><td>Identified colleagues</td><td>Corroborate CCTV absence</td></tr>
           <tr><td>Hub Head / Line Manager</td><td>Workplace patterns; prior complaints</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <div class="card-grid card-grid-3">
-    <div class="card accent-lime">
-      <h3 class="acc-lime">Key Questions — Subject</h3>
+  <div class="g2">
+    <div class="card ab ab-lime">
+      <h3 class="tc-lime">Key Questions — Subject</h3>
       <ul>
         <li>Were you authorized to modify your own attendance?</li>
         <li>Why do "Time In" entries appear at departure time?</li>
-        <li>Why do 96 entries cluster at exactly 08:59–09:00 over 17 months?</li>
+        <li>Why do 96 entries cluster at 08:59–09:00 over 17 months?</li>
         <li>Why are you absent from CCTV at your claimed arrival times?</li>
-        <li>Who else knew about your admin access capabilities?</li>
       </ul>
     </div>
-    <div class="card accent-lime">
-      <h3 class="acc-lime">Key Questions — IT / System</h3>
+    <div class="card ab ab-lime">
+      <h3 class="tc-lime">Interview Best Practices</h3>
       <ul>
-        <li>Who granted admin access and under what policy?</li>
-        <li>Is there a policy governing attendance record modification?</li>
-        <li>Are modifications separately logged with a full audit trail?</li>
-        <li>Has anyone else used admin access to alter records?</li>
-      </ul>
-    </div>
-    <div class="card accent-lime">
-      <h3 class="acc-lime">Interview Best Practices</h3>
-      <ul>
-        <li>Interview subject only after all documentary evidence is secured</li>
+        <li>Interview subject after all evidence is secured</li>
         <li>Use signed, witnessed statement format</li>
         <li>Present specific dates for direct response</li>
         <li>Allow subject to provide alternative explanation</li>
-        <li>Retain audio/transcripts in case file</li>
-        <li>Consult legal counsel before formal subject interview</li>
+        <li>Consult legal counsel before formal interview</li>
       </ul>
     </div>
   </div>
 </div>
 
-<!-- SLIDE 6 -->
-<div class="slide slide-6">
-  <div class="section-bar">
-    <div class="section-num num-6">6</div>
-    <div>
-      <div class="step-badge acc-pink">Step 6 of 7</div>
-      <h2 class="acc-pink">Evidence Analysis &amp; Quantification</h2>
-    </div>
+<!-- ══ SLIDE 6 ─ EVIDENCE ANALYSIS & QUANTIFICATION ═════════════════════ -->
+<div class="slide s6">
+  <div class="step-hdr">
+    <div class="step-num sn6">6</div>
+    <div><div class="badge tc-pink">Step 6 of 7</div><h2 class="tc-pink">Evidence Analysis &amp; Quantification</h2></div>
   </div>
 
-  <div class="stat-row">
-    <div class="stat-box"><div class="num acc-pink">10</div><div class="lbl">Confirmed manipulated<br>entries Oct–Nov 2025</div></div>
-    <div class="stat-box"><div class="num acc-pink">96</div><div class="lbl">Historically suspect<br>entries Jul 2024–Nov 2025</div></div>
-    <div class="stat-box"><div class="num acc-pink">5</div><div class="lbl">CCTV-verified<br>absence instances</div></div>
-    <div class="stat-box"><div class="num acc-pink">3–4<br><span style="font-size:0.95rem;">min</span></div><div class="lbl">ATLAS vs CCTV<br>time offset</div></div>
-    <div class="stat-box"><div class="num acc-pink">17+</div><div class="lbl">Months duration<br>of pattern</div></div>
-  </div>
-
-  <div class="card-grid card-grid-2">
-    <div class="card accent-pink">
-      <h3 class="acc-pink">Confirmed Manipulation Cases (Oct–Nov 2025)</h3>
-      <table class="ev-table">
-        <thead><tr><th>Date</th><th>Raw Time In</th><th>Fabricated Entry</th><th>CCTV</th></tr></thead>
+  <div class="g2" style="margin-bottom:12px;">
+    <div class="card ab ab-pink">
+      <h3 class="tc-pink">Confirmed Cases — Oct–Nov 2025</h3>
+      <table class="tbl">
+        <thead><tr><th>Date</th><th>Raw Time In</th><th>Fabricated</th><th>CCTV</th></tr></thead>
         <tbody>
           <tr><td>02-Oct-25</td><td>18:02:45</td><td>08:59:13</td><td>—</td></tr>
           <tr><td>03-Oct-25</td><td>09:34:04</td><td>08:50:18</td><td>—</td></tr>
@@ -468,151 +414,147 @@
           <tr><td>20-Oct-25</td><td>Marked at Time Out</td><td>08:59:41</td><td>✅</td></tr>
           <tr><td>21-Oct-25</td><td>18:59:02</td><td>08:58:17</td><td>✅</td></tr>
           <tr><td>23-Oct-25</td><td>18:33:03</td><td>08:55:52</td><td>✅</td></tr>
-          <tr><td>03–04 Nov-25</td><td>17:57:23 / None</td><td>Backdated 04-Nov</td><td>✅</td></tr>
+          <tr><td>03–04 Nov</td><td>17:57:23 / None</td><td>Backdated 04-Nov</td><td>✅</td></tr>
         </tbody>
       </table>
     </div>
-    <div class="card accent-pink">
-      <h3 class="acc-pink">Financial Quantification</h3>
-      <p style="margin-bottom:10px;color:#c0a0b8;font-size:0.84rem;">Recoverable amounts calculated based on entitled leave encashment and late arrival treatment:</p>
-      <table class="ev-table">
-        <thead><tr><th>Head</th><th>Basis</th><th>Amount</th></tr></thead>
-        <tbody>
-          <tr>
-            <td><strong style="color:#f07ec8;">Leave Encashment</strong></td>
-            <td>Recoverable amount based on entitled leave encashment</td>
-            <td><strong style="color:#f07ec8;">Rs. 70,000</strong></td>
-          </tr>
-          <tr>
-            <td><strong style="color:#f07ec8;">Late Arrival Deduction</strong></td>
-            <td>Excessive late arrivals treated as Leave Without Pay (LWP)</td>
-            <td><strong style="color:#f07ec8;">Approx. Rs. 150,000</strong></td>
-          </tr>
-          <tr style="background:rgba(240,126,200,0.10);">
-            <td colspan="2"><strong style="color:#f07ec8;">Total Estimated Recovery</strong></td>
-            <td><strong style="color:#f07ec8;">Approx. Rs. 220,000</strong></td>
-          </tr>
-        </tbody>
-      </table>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="card ab ab-pink">
+        <h3 class="tc-pink">Financial Quantification</h3>
+        <table class="tbl">
+          <thead><tr><th>Head</th><th>Basis</th><th>Amount</th></tr></thead>
+          <tbody>
+            <tr><td>Leave Encashment</td><td>Entitled leave encashment recovery</td><td><strong class="tc-pink">Rs. 70,000</strong></td></tr>
+            <tr><td>Late Arrival Deduction</td><td>Excessive late arrivals treated as LWP</td><td><strong class="tc-pink">Approx. Rs. 150,000</strong></td></tr>
+            <tr style="background:rgba(200,80,160,0.10);"><td colspan="2"><strong class="tc-pink">Total Estimated Recovery</strong></td><td><strong class="tc-pink">Approx. Rs. 220,000</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card ab ab-pink">
+        <h3 class="tc-pink">Pattern Significance</h3>
+        <p>96 entries within a 2-minute window over 17 months cannot occur naturally — confirming deliberate back-dating to target the exact 09:00 reporting threshold.</p>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- SLIDE 7 -->
-<div class="slide slide-7">
-  <div class="section-bar">
-    <div class="section-num num-7">7</div>
-    <div>
-      <div class="step-badge acc-cyan">Step 7 of 7</div>
-      <h2 class="acc-cyan">Case File, Expert Output &amp; Recovery Support</h2>
-    </div>
+<!-- ══ SLIDE 7 ─ CASE FILE, EXPERT OUTPUT & RECOVERY ════════════════════ -->
+<div class="slide s7">
+  <div class="step-hdr">
+    <div class="step-num sn7">7</div>
+    <div><div class="badge tc-cyan">Step 7 of 7</div><h2 class="tc-cyan">Case File, Expert Output &amp; Recovery Support</h2></div>
   </div>
 
-  <div class="card-grid card-grid-3" style="margin-bottom:14px;">
-    <div class="card accent-cyan">
-      <h3 class="acc-cyan">Case File Contents</h3>
+  <div class="g3" style="margin-bottom:12px;">
+    <div class="card ab ab-cyan">
+      <h3 class="tc-cyan">Case File</h3>
       <ul>
         <li>Fact Finding Report — C&amp;R Division, Jan 2026</li>
-        <li>Annexures A–G: Actual vs. altered attendance reports (Oct–Nov 2025)</li>
-        <li>Annexure H: 96-instance historical pattern data (Jul 2024–Nov 2025)</li>
-        <li>CCTV footage for 5 verified dates</li>
-        <li>Staff interview notes and verbal confirmations</li>
-        <li>ATLAS screenshots — original vs. modified entries</li>
-        <li>Inquiry Committee (IC-1) recommended decisions</li>
+        <li>Annexures A–G: Actual vs. altered records Oct–Nov 2025</li>
+        <li>Annexure H: 96-instance historical pattern Jul 2024–Nov 2025</li>
+        <li>CCTV footage — 5 verified dates</li>
+        <li>Interview notes and verbal confirmations</li>
+        <li>IC-1 recommended decisions</li>
       </ul>
     </div>
-    <div class="card accent-cyan">
-      <h3 class="acc-cyan">Expert Output Required</h3>
+    <div class="card ab ab-cyan">
+      <h3 class="tc-cyan">Expert Output Required</h3>
       <ul>
-        <li><strong style="color:#7ec8f0;">IT Forensic Expert:</strong> Validate audit trail integrity; confirm logs untampered; assess scope of manipulation</li>
-        <li><strong style="color:#7ec8f0;">Payroll/HR Analyst:</strong> Quantify financial benefit across 17-month period</li>
-        <li><strong style="color:#7ec8f0;">Legal Counsel:</strong> Criminal referral viability under PECA 2016 / PPC; draft disciplinary charges</li>
-        <li><strong style="color:#7ec8f0;">ATLAS Vendor:</strong> Confirm back-dating capability and log completeness</li>
+        <li><strong>IT Forensic Expert:</strong> Audit trail integrity; scope of manipulation</li>
+        <li><strong>Payroll/HR Analyst:</strong> Quantify benefit across 17-month period</li>
+        <li><strong>Legal Counsel:</strong> Draft disciplinary charges; recovery advice</li>
+        <li><strong>ATLAS Vendor:</strong> Confirm back-dating capability and log completeness</li>
       </ul>
     </div>
-    <div class="card accent-cyan">
-      <h3 class="acc-cyan">Recovery Support</h3>
+    <div class="card ab ab-cyan">
+      <h3 class="tc-cyan">Action Plan</h3>
       <ul>
-        <li><strong style="color:#7ec8f0;">Financial:</strong> Salary/benefit recovery via employment contract; civil suit for unjust enrichment</li>
-        <li><strong style="color:#7ec8f0;">Disciplinary:</strong> IC-1 recommendations implemented through HR processes</li>
-        <li><strong style="color:#7ec8f0;">System:</strong> Segregation of duties; dual-approval for admin edits; automated audit alerts</li>
-        <li><strong style="color:#7ec8f0;">Policy:</strong> Restrict self-modification of attendance; mandatory supervisor sign-off</li>
+        <li><strong>Immediate:</strong> Forensic image ATLAS; secure CCTV archives</li>
+        <li><strong>Wks 2–4:</strong> CCTV review (96 dates); IT forensic report; payroll data</li>
+        <li><strong>Mo 2–3:</strong> Disciplinary hearing; quantify loss; issue charges</li>
+        <li><strong>Parallel:</strong> Review other staff records; IT control remediation</li>
+        <li><strong>Close-Out:</strong> Policy update; recovery action; system controls deployed</li>
       </ul>
     </div>
   </div>
 
-  <div class="card accent-cyan">
-    <h3 class="acc-cyan">Prioritized Action Plan</h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 30px;margin-top:10px;">
-      <div>
-        <div class="tl-item"><div class="tl-date">Immediate (Week 1)</div><div class="tl-text">Forensic image ATLAS server · Secure all CCTV archives · Preserve all digital evidence</div></div>
-        <div class="tl-item"><div class="tl-date">Short-Term (Weeks 2–4)</div><div class="tl-text">CCTV review for all 96 dates · Independent IT forensic report · Obtain full payroll data · Brief legal counsel</div></div>
-        <div class="tl-item"><div class="tl-date">Medium-Term (Months 2–3)</div><div class="tl-text">Formal disciplinary hearing · Quantify total financial loss · Issue charges per IC-1 recommendations</div></div>
-      </div>
-      <div>
-        <div class="tl-item"><div class="tl-date">Parallel Track</div><div class="tl-text">Review all staff records for manipulation by subject · Implement IT control remediation</div></div>
-        <div class="tl-item"><div class="tl-date">Decision Gate</div><div class="tl-text">Assess criminal referral threshold based on full quantification and legal advice</div></div>
-        <div class="tl-item"><div class="tl-date">Close-Out</div><div class="tl-text">System-wide control improvements deployed · Attendance policy updated · Recovery action initiated</div></div>
-      </div>
+  <div class="g2">
+    <div class="card ab ab-cyan">
+      <h3 class="tc-cyan">Recovery Support</h3>
+      <ul>
+        <li><strong>Financial:</strong> Salary recovery via employment contract — approx. Rs. 220,000</li>
+        <li><strong>Disciplinary:</strong> IC-1 recommendations implemented through HR</li>
+        <li><strong>System:</strong> Segregation of duties; dual-approval for admin edits; audit alerts</li>
+        <li><strong>Policy:</strong> Self-modification restriction; mandatory supervisor sign-off</li>
+      </ul>
+    </div>
+    <div class="card ab ab-red">
+      <h3 class="tc-red">Risk Rating &amp; Classification</h3>
+      <p style="font-size:1.5rem;font-weight:700;color:#f08080;margin:6px 0;">HIGH</p>
+      <p style="font-size:0.8rem;margin-bottom:8px;">Clear evidence · Long-term pattern · Deliberate method · Privileged access</p>
+      <span class="pill pr">Disciplinary Misconduct</span>
+      <span class="pill py">Breach of Trust</span>
+      <span class="pill pb">Unauthorized System Use</span>
+      <span class="pill pb">Attendance Policy Violation</span>
     </div>
   </div>
 </div>
 
-<!-- CLOSING -->
-<div class="slide slide-close" style="padding:28px 52px;">
-  <div class="org-tag">Preliminary Fraud Assessment · Conclusion</div>
-  <h1 style="font-size:1.7rem;margin-bottom:8px;">Overall Assessment &amp; Recommendation</h1>
-  <div class="cover-line" style="margin:10px 0;"></div>
+<!-- ══ CLOSING ─ OVERALL ASSESSMENT & RECOMMENDATIONS ═══════════════════ -->
+<div class="slide close" style="padding:32px 56px;">
+  <div class="tag">Conclusion</div>
+  <h1 style="font-size:1.8rem;margin-bottom:6px;">Overall Assessment &amp; Recommendations</h1>
+  <div class="cline"></div>
 
-  <div class="card-grid card-grid-2" style="margin-top:10px;">
-    <div class="card" style="border-left:4px solid #f08080;background:rgba(220,50,50,0.08);padding:14px 16px;">
-      <h3 style="color:#f08080;font-size:0.88rem;">Is Further Investigation Justified?</h3>
-      <p style="font-size:0.92rem;color:#f0c0c0;margin-top:5px;"><strong>YES — Strongly Recommended</strong></p>
-      <p style="margin-top:5px;font-size:0.8rem;">10 confirmed manipulated entries, 5 CCTV-corroborated dates, a 17-month pattern of 96 suspect entries, and the subject's unique privileged access meet the threshold for full formal investigation and disciplinary proceedings.</p>
+  <div class="g2" style="margin-top:10px;margin-bottom:12px;">
+    <div class="card" style="background:rgba(200,40,40,0.08);border:1px solid rgba(200,40,40,0.20);padding:14px 16px;">
+      <h3 class="tc-red" style="font-size:0.88rem;">Assessment</h3>
+      <p style="font-size:0.9rem;color:#f0a0a0;margin:5px 0;"><strong>Further Investigation — Strongly Recommended</strong></p>
+      <ul style="font-size:0.8rem;color:#d09090;margin-top:6px;">
+        <li>Preliminary findings indicate a sustained pattern of attendance record manipulation through misuse of administrative access rights.</li>
+        <li style="margin-top:4px;">A show-cause notice was issued to Mr. Shakeel. His submitted response <strong style="color:#f08080;">reflected acceptance of the identified irregularities.</strong></li>
+        <li style="margin-top:4px;">A detailed forensic audit is recommended to substantiate findings, identify full extent of manipulation, evaluate possible involvement of other parties, and quantify complete financial impact.</li>
+      </ul>
     </div>
-    <div class="card" style="border-left:4px solid #f0c07e;background:rgba(200,140,0,0.08);padding:14px 16px;">
-      <h3 style="color:#f0c07e;font-size:0.88rem;">What Remains Unclear</h3>
-      <ul style="margin-top:5px;">
-        <li>Subject's formal explanation or defence</li>
-        <li>Whether manipulation extends to other employees' records</li>
-        <li>Full integrity of system audit logs</li>
+    <div class="card" style="background:rgba(180,130,0,0.08);border:1px solid rgba(180,130,0,0.20);padding:14px 16px;">
+      <h3 class="tc-yellow" style="font-size:0.88rem;">What Remains Unclear</h3>
+      <ul style="font-size:0.8rem;color:#c8a860;margin-top:6px;">
+        <li>Full extent of manipulation across 17-month dataset</li>
+        <li>Possible involvement of other parties</li>
+        <li>Complete financial impact beyond the estimated Rs. 220,000</li>
+        <li>Integrity of all system audit logs (forensic review pending)</li>
         <li>Authorization history for subject's admin access</li>
-        <li>Status of IC-1 disciplinary recommendations</li>
       </ul>
     </div>
   </div>
 
-  <div class="card-grid card-grid-3" style="margin-top:10px;">
-    <div class="card" style="border-top:3px solid #f08080;padding:12px 14px;">
-      <h3 style="color:#f08080;font-size:0.88rem;">Fraud Risk Rating</h3>
-      <p style="font-size:1.3rem;font-weight:700;color:#f08080;margin:5px 0;">HIGH</p>
-      <p style="font-size:0.8rem;color:#c0a0a0;">Clear evidence, long-term pattern, deliberate method, unique privileged access.</p>
-    </div>
-    <div class="card" style="border-top:3px solid #f0c07e;padding:12px 14px;">
-      <h3 style="color:#f0c07e;font-size:0.88rem;">Classification</h3>
-      <p style="font-size:0.82rem;color:#c0b080;margin-top:5px;">
-        <span class="pill pill-red">Disciplinary Misconduct</span><br>
-        <span class="pill pill-yellow">Breach of Trust</span><br>
-        <span class="pill pill-blue">Unauthorized System Use</span><br>
-        <span class="pill pill-blue">Attendance Policy Violation</span>
-      </p>
-    </div>
-    <div class="card" style="border-top:3px solid #7eb8f0;padding:12px 14px;">
-      <h3 style="color:#7eb8f0;font-size:0.88rem;">Immediate Actions</h3>
-      <ul style="margin-top:5px;">
-        <li>Forensic image ATLAS server</li>
-        <li>Secure all CCTV archives</li>
-        <li>Issue show-cause notice to subject</li>
-        <li>Engage legal counsel</li>
-        <li>Proceed to disciplinary hearing</li>
-      </ul>
+  <div class="card ab ab-cyan">
+    <h3 class="tc-cyan" style="margin-bottom:10px;">Future Control &amp; Governance Recommendations</h3>
+    <div class="g3" style="gap:8px;">
+      <div>
+        <ul style="font-size:0.8rem;color:#b0c4d8;">
+          <li>Implement a complete approval workflow for attendance adjustments with documented justification and digital approval trail.</li>
+          <li style="margin-top:5px;">Strengthen approval hierarchy by restricting back-date access and enforcing multi-level authorization for attendance amendments.</li>
+        </ul>
+      </div>
+      <div>
+        <ul style="font-size:0.8rem;color:#b0c4d8;">
+          <li>Maintain detailed audit trails for all attendance edits — including user ID, date, time, and change history.</li>
+          <li style="margin-top:5px;">Introduce automated exception reports for unusual attendance patterns and repeated manual overrides.</li>
+        </ul>
+      </div>
+      <div>
+        <ul style="font-size:0.8rem;color:#b0c4d8;">
+          <li>Segregate system administration rights from attendance approval authority to minimize misuse of power.</li>
+          <li style="margin-top:5px;">Conduct periodic compliance reviews and independent audits of attendance system activities.</li>
+        </ul>
+      </div>
     </div>
   </div>
 
-  <div class="divider" style="margin-top:16px;"></div>
-  <p style="font-size:0.78rem;color:#405060;text-align:center;margin-top:8px;">
-    Knowledge &amp; Skill (KS) School System · Compliance &amp; Risk Division · Northern Operations Hub ·
-    Preliminary Fraud Assessment · January 2026 · Confidential &amp; Proprietary
+  <div class="div" style="margin-top:14px;"></div>
+  <p style="font-size:0.75rem;color:#405060;text-align:center;">
+    Knowledge &amp; Skill (KS) School System · Compliance &amp; Risk Division · Northern Operations Hub · January 2026 · Confidential &amp; Proprietary
   </p>
 </div>
 
