@@ -13272,38 +13272,6 @@ function generateIssuedReport(){
   var brDisp=(H.brcode?H.brcode+' ':'')+(H.brname||'Branch');
   var fname='IssuedReport'+(H.brcode?'_'+H.brcode:'')+(H.brname?'_'+H.brname.replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_'):'')+'_'+new Date().toISOString().slice(0,10)+'.html';
 
-  // ── Pre-issue materiality scan ──────────────────────────────────────────
-  if(!generateIssuedReport._skipMatScan){
-    var _missingMat=getMissingMateriality(all,labMap,function(o){return obsText(o);});
-    if(_missingMat.length){
-      var _missList=_missingMat.map(function(m){
-        return '<li style="padding:.3rem 0;border-bottom:1px solid #eee;font-size:.84rem"><strong>'+e(m.lbl)+'</strong> &mdash; '+e(m.title)+'</li>';
-      }).join('');
-      var _ov=document.createElement('div');
-      _ov.style.cssText='position:fixed;inset:0;background:rgba(10,20,40,.6);z-index:99999;display:flex;align-items:center;justify-content:center';
-      _ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:560px;width:93%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.35);padding:1.4rem 1.6rem">'
-        +'<div style="font-size:1rem;font-weight:800;color:#c0392b;margin-bottom:.7rem">&#9888; Framework Materiality Not Defined</div>'
-        +'<p style="font-size:.85rem;color:#444;margin-bottom:.8rem">The following <strong>'+_missingMat.length+' observation'+(+_missingMat.length>1?'s':'')+' </strong>have no instance count or financial impact entered, and no inline table was detected in their text.</p>'
-        +'<ul style="list-style:none;margin-bottom:1rem;max-height:220px;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:.4rem .8rem">'+_missList+'</ul>'
-        +'<div style="display:flex;gap:.7rem;flex-wrap:wrap">'
-        +'<button id="mat-back-btn" style="flex:1;padding:.55rem 1rem;background:#eef1f5;color:#1a3557;border:1px solid #c0ccd8;border-radius:6px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#9664; Go Back &amp; Fill</button>'
-        +'<button id="mat-proceed-btn" style="flex:1;padding:.55rem 1rem;background:#1a3557;color:#fff;border:none;border-radius:6px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Proceed — Mark as Not Quantified</button>'
-        +'</div>'
-        +'</div>';
-      document.body.appendChild(_ov);
-      document.getElementById('mat-back-btn').onclick=function(){_ov.remove();};
-      document.getElementById('mat-proceed-btn').onclick=function(){
-        _ov.remove();
-        generateIssuedReport._skipMatScan=true;
-        generateIssuedReport();
-        generateIssuedReport._skipMatScan=false;
-      };
-      return; // abort current run — user must choose
-    }
-  }
-  generateIssuedReport._skipMatScan=false;
-  // ── End pre-issue scan ──────────────────────────────────────────────────
-
   // COSO analysis strip (simple, reusing sensitivityMap data)
   var cosoHtml='<div id="analysis" style="margin-bottom:1.2rem">'
     +'<div class="section-title" style="font-size:1.1rem">E. Analysis of Observations &amp; Controls (COSO Framework)</div>'
@@ -13777,6 +13745,47 @@ function generateIssuedReport(){
 }
 
 function showSaveDialog(){
+  // Materiality scan — must pass before finalize proceeds
+  if(!showSaveDialog._skipMatScan){
+    var _dbObs2=[]; for(var j2=0;j2<DB.observations.length;j2++){if(selIds[DB.observations[j2].id])_dbObs2.push(DB.observations[j2]);}
+    var _cu2=[]; for(var k2=0;k2<customs.length;k2++){if(selIds[customs[k2].id])_cu2.push(customs[k2]);}
+    var _all2=_dbObs2.concat(_cu2);
+    if(!_all2.length){alert('No observations selected.');return;}
+    // Build a quick labMap for scan display
+    var _lm2={},_rep2=[],_new2=[];
+    for(var a2=0;a2<_all2.length;a2++){var _t2=(obsTypeMap[_all2[a2].id]||_all2[a2].type||'New').toLowerCase();if(_t2==='repeated')_rep2.push(_all2[a2]);else _new2.push(_all2[a2]);}
+    var _n2=0;
+    function _asgn2(list,sec){var n=0;var g=buildCatGroupsFor(list);for(var ci=0;ci<g.catOrder.length;ci++){var ob=g.cats[g.catOrder[ci]];for(var oi=0;oi<ob.length;oi++){n++;_lm2[ob[oi].id]=sec+'.'+n;}}}
+    _asgn2(_rep2,1);_asgn2(_new2,2);
+    function _ot2(o){return (obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:(o.observation||'');}
+    var _miss2=getMissingMateriality(_all2,_lm2,_ot2);
+    if(_miss2.length){
+      var _ml2=_miss2.map(function(m){return '<li style="padding:.3rem 0;border-bottom:1px solid #eee;font-size:.84rem"><strong>'+esc(m.lbl)+'</strong> &mdash; '+esc(m.title)+'</li>';}).join('');
+      var _ov2=document.createElement('div');
+      _ov2.style.cssText='position:fixed;inset:0;background:rgba(10,20,40,.6);z-index:99999;display:flex;align-items:center;justify-content:center';
+      _ov2.innerHTML='<div style="background:#fff;border-radius:12px;max-width:560px;width:93%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.35);padding:1.4rem 1.6rem">'
+        +'<div style="font-size:1rem;font-weight:800;color:#c0392b;margin-bottom:.7rem">&#9888; Framework Materiality Not Defined</div>'
+        +'<p style="font-size:.85rem;color:#444;margin-bottom:.8rem">The following <strong>'+_miss2.length+' observation'+(+_miss2.length>1?'s':'')+' </strong>have no instance count or financial impact entered, and no inline table was detected in their text.</p>'
+        +'<ul style="list-style:none;margin-bottom:1rem;max-height:220px;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:.4rem .8rem">'+_ml2+'</ul>'
+        +'<div style="display:flex;gap:.7rem;flex-wrap:wrap">'
+        +'<button id="mat2-back" style="flex:1;padding:.55rem 1rem;background:#eef1f5;color:#1a3557;border:1px solid #c0ccd8;border-radius:6px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#9664; Go Back &amp; Fill</button>'
+        +'<button id="mat2-proceed" style="flex:1;padding:.55rem 1rem;background:#1a3557;color:#fff;border:none;border-radius:6px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Proceed — Mark as Not Quantified</button>'
+        +'</div>'
+        +'</div>';
+      document.body.appendChild(_ov2);
+      document.getElementById('mat2-back').onclick=function(){_ov2.remove();};
+      document.getElementById('mat2-proceed').onclick=function(){
+        _ov2.remove();
+        showSaveDialog._skipMatScan=true;
+        showSaveDialog();
+        showSaveDialog._skipMatScan=false;
+      };
+      return;
+    }
+  }
+  showSaveDialog._skipMatScan=false;
+  // ── End materiality scan ─────────────────────────────────────────────────
+
   // Build the final content first
   finalizeReport();
   if(!window._pendingFinal){ alert('Please generate the report first.'); return; }
