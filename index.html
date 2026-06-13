@@ -8377,6 +8377,8 @@ var respROMap= {};   // {obsId: RO/HO response}
 var assessMap= {};   // {obsId: 'agreed'|'resolved'|'partial'|'notresolved'}
 var refMap   = {};   // {obsId: referral note text, '' means no referral}
 var obsEdits = {};   // {obsId: {observation, recommendation}} — auditor edits to obs text
+var instCountMap  = {}; // {obsId: number} — manual instance count for framework materiality
+var instAmountMap = {}; // {obsId: number} — manual financial impact Rs. for framework materiality
 var responseLoaded = false;
 var customs  = [];
 var annexures= [];   // [{id,label,title,open,files:[{name,type,dataUrl}]}]
@@ -9194,6 +9196,8 @@ function captureSession() {
     cosoMap  : cosoMap,
     obsEdits : obsEdits,
     refMap   : refMap,
+    instCountMap : instCountMap,
+    instAmountMap: instAmountMap,
     customs  : customs,
     responseLoaded: responseLoaded,
     introSections: getIntroSectionVals(),
@@ -9231,6 +9235,8 @@ function restoreSession(sess) {
   cosoMap        = sess.cosoMap        || {};
   obsEdits       = sess.obsEdits       || {};
   refMap         = sess.refMap         || {};
+  instCountMap   = sess.instCountMap   || {};
+  instAmountMap  = sess.instAmountMap  || {};
   // Restore responseLoaded — also infer it if assessMap or respMap has entries
   responseLoaded = sess.responseLoaded || Object.keys(assessMap).length>0 || Object.keys(sess.respMap||{}).length>0;
   customs   = sess.customs   || [];
@@ -10114,7 +10120,23 @@ function renderRpt(){
       var recText=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
       h+='<div class="osl">Recommendation</div>';
       h+='<textarea class="oedit" id="re-'+o.id+'" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].recommendation=this.value">'+esc(recText)+'</textarea>';
-      // 3. Annexure Data (if set)
+      // 3. Risk Framework — Instances & Financial Impact fields
+      var curInstCount=instCountMap[o.id]||'';
+      var curInstAmt=instAmountMap[o.id]||'';
+      h+='<div style="display:flex;gap:8px;align-items:flex-end;margin:4px 0;padding:5px 8px;background:#f0f7e8;border:1px solid #b8d8a0;border-radius:6px">'
+        +'<div style="font-size:10px;font-weight:700;color:#1a6020;white-space:nowrap;margin-bottom:2px">&#128203; Framework Materiality</div>'
+        +'<div style="display:flex;gap:8px;flex:1">'
+        +'<div style="flex:1">'
+          +'<div style="font-size:10px;color:#555;margin-bottom:2px">Instances (if no inline table)</div>'
+          +'<input type="number" min="0" id="fw-inst-'+o.id+'" placeholder="e.g. 14" value="'+esc(curInstCount+'')+'" style="width:100%;padding:3px 7px;border:1px solid #b0c8a0;border-radius:4px;font-size:12px;font-family:inherit" oninput="instCountMap[\''+o.id+'\']=this.value?parseInt(this.value):0">'
+        +'</div>'
+        +'<div style="flex:1">'
+          +'<div style="font-size:10px;color:#555;margin-bottom:2px">Financial Impact (Rs.)</div>'
+          +'<input type="number" min="0" id="fw-amt-'+o.id+'" placeholder="e.g. 250000" value="'+esc(curInstAmt+'')+'" style="width:100%;padding:3px 7px;border:1px solid #b0c8a0;border-radius:4px;font-size:12px;font-family:inherit" oninput="instAmountMap[\''+o.id+'\']=this.value?parseFloat(this.value):0">'
+        +'</div>'
+        +'</div>'
+        +'</div>';
+      // 4. Annexure Data (if set)
       if(ax) h+='<div class="oax"><strong>Annexure Data:</strong> '+esc(ax)+'</div>';
       // 4. Auditee Response — only show after response is loaded/uploaded; split by BH / RO/HO
       if(responseLoaded){
@@ -10398,7 +10420,7 @@ function doCopy(){
 
 function doClear(){
   if(!confirm('Clear all selections?'))return;
-  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; customs=[]; annexures=[];
   for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
   responseLoaded=false;
   _brInfoHasData=false;
@@ -10421,7 +10443,7 @@ function doClear(){
 
 function doNewReport(){
   if(!confirm('Start a new blank report? All current data will be cleared.'))return;
-  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; customs=[]; annexures=[];
   responseLoaded=false;
   _brInfoHasData=false;
   _brInfoUnlocked=false; // force unlock path to run
@@ -12796,49 +12818,47 @@ function generateIssuedReport(){
   }
 
   // ── Instance & amount parser for materiality uplift ──────────────────────
+  // Sources: (1) inline pipe-table rows in obs text, (2) manual fields only.
+  // No free-text parsing — avoids false positives from policy/info figures.
   var FW_RISK_TIERS=['Low','Low-Medium','Medium','Medium-High','High'];
   function upliftRisk(base, steps){
     var idx=FW_RISK_TIERS.indexOf(base); if(idx===-1)idx=2;
     return FW_RISK_TIERS[Math.min(idx+steps,FW_RISK_TIERS.length-1)];
   }
-  function parseObsInstances(text){
-    if(!text)return{count:0,amount:0,uplift:0,label:'',sources:[]};
+  function parseObsInstances(obsId, text){
     var sources=[], instanceCount=0, totalAmount=0;
 
-    // 1. Table rows — lines containing | pipe characters
-    var lines=text.split('\n');
-    var tblRows=0;
-    for(var li=0;li<lines.length;li++){
-      var ln=lines[li].trim();
-      if(ln.indexOf('|')===-1)continue;
-      if(/^\|[\s\-:|]+\|?\s*$/.test(ln))continue; // skip separator lines |---|
-      tblRows++;
-    }
-    if(tblRows>1){
-      var dataRows=tblRows-1; // subtract 1 header row
-      if(dataRows>instanceCount)instanceCount=dataRows;
-      sources.push(dataRows+' row'+(dataRows!==1?'s':'')+' in inline table');
-    }
-
-    // 2. Directly stated instance counts
-    // matches: "12 instances", "5 cases", "8 payments", "14 vouchers" etc.
-    var countRx=/(\d+)\s*(instances?|cases?|payments?|vouchers?|items?|employees?|students?|transactions?|discrepancies?|entries|records?|files?|bills?|invoices?|irregularities|deficiencies|observations?)/gi;
-    var cm;
-    while((cm=countRx.exec(text))!==null){
-      var n=parseInt(cm[1]);
-      if(n>1&&n>instanceCount){instanceCount=n;sources.push(n+' stated '+cm[2].toLowerCase());}
+    // Source 1: Inline pipe-table rows in observation text
+    if(text){
+      var lines=text.split('\n'), tblRows=0;
+      for(var li=0;li<lines.length;li++){
+        var ln=lines[li].trim();
+        if(ln.indexOf('|')===-1)continue;
+        if(/^\|[\s\-:|]+\|?\s*$/.test(ln))continue; // skip |---|--- separator rows
+        tblRows++;
+      }
+      if(tblRows>1){
+        var dataRows=tblRows-1; // subtract 1 header row
+        instanceCount=Math.max(instanceCount,dataRows);
+        sources.push(dataRows+' row'+(dataRows!==1?'s':'')+' in inline table');
+      }
     }
 
-    // 3. Amounts — Rs., PKR, Pkr followed by number
-    var amtRx=/(?:Rs\.?|PKR|Pkr)\.?\s*([\d,]+(?:\.\d+)?)/g;
-    var am;
-    while((am=amtRx.exec(text))!==null){
-      var val=parseFloat(am[1].replace(/,/g,''));
-      if(val>totalAmount)totalAmount=val;
+    // Source 2: Manual instance count field (overrides table if higher)
+    var manualCount=instCountMap[obsId]||0;
+    if(manualCount>0){
+      if(manualCount>instanceCount) instanceCount=manualCount;
+      sources.push(manualCount+' (manually entered)');
     }
-    if(totalAmount>0)sources.push('Amount: Rs. '+totalAmount.toLocaleString());
 
-    // 4. Determine uplift tiers
+    // Source 3: Manual financial impact field only
+    var manualAmt=instAmountMap[obsId]||0;
+    if(manualAmt>0){
+      totalAmount=manualAmt;
+      sources.push('Rs. '+manualAmt.toLocaleString()+' (manually entered)');
+    }
+
+    // Materiality classification
     var uplift=0, label='';
     var amtFactor= totalAmount>=1000000?2 : totalAmount>=100000?1 : 0;
     var cntFactor= instanceCount>=15?2 : instanceCount>=5?1 : 0;
@@ -12965,7 +12985,7 @@ function generateIssuedReport(){
       +'</div>';
     // Framework panel (hidden by default; shown when toggleFramework() is active)
     var fw=getFw(o);
-    var inst=parseObsInstances(ot); // ot = obsText(o) already in scope
+    var inst=parseObsInstances(o.id, ot); // ot = obsText(o) already in scope
     var adjInherent=inst.uplift>0?upliftRisk(fw.mx.inherent,inst.uplift):fw.mx.inherent;
     var adjResidual=inst.uplift>0?upliftRisk(fw.mx.residual,inst.uplift):fw.mx.residual;
     var wasUplifted=(adjInherent!==fw.mx.inherent);
@@ -13372,7 +13392,7 @@ function generateIssuedReport(){
       for(var fi=0;fi<all.length;fi++){
         var fo=all[fi]; var flbl=labMap[fo.id]||'?';
         var ffw=getFw(fo);
-        var finst=parseObsInstances(obsText(fo));
+        var finst=parseObsInstances(fo.id, obsText(fo));
         var fadjIR=finst.uplift>0?upliftRisk(ffw.mx.inherent,finst.uplift):ffw.mx.inherent;
         var irBgMap={High:'#fdecea','Medium-High':'#fef3e2',Medium:'#eaf4fb','Low-Medium':'#e8f4ff',Low:'#e9f7ef'};
         var irBg=irBgMap[fadjIR]||'#f7f9fc';
@@ -14350,7 +14370,7 @@ function loadDemoData(){
   var hasData = Object.keys(selIds).length > 0;
 
   // --- Clear existing (inline, no confirm prompt) ---
-  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; customs=[]; annexures=[];
   responseLoaded=false; _brInfoHasData=false; _brInfoUnlocked=true;
   _reportEverGenerated=false; clearReportDirty();
   window.pendingSel={};
