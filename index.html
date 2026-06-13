@@ -13058,6 +13058,108 @@ function finalizeReport(){
   finalHtml+=misHtml;
   finalHtml+=buildIntroHtml(getIntroSectionVals(), true);
   finalHtml+='<p style="font-size:12px;color:#6a7888;margin-bottom:16px">Total Observations: <strong>'+num+'</strong></p>';
+
+  // ── Section E: COSO Framework Analysis ──────────────────────────────────
+  var fCOSO_DEFS=[
+    {key:'CE',label:'Control Environment',        col:'#1a3a5c',desc:'Tone at the top, ethics, governance structure, HR policies and board oversight.'},
+    {key:'RA',label:'Risk Assessment',             col:'#8e44ad',desc:'Identification, analysis and management response to risks at branch level.'},
+    {key:'CA',label:'Control Activities',          col:'#16a085',desc:'Policies and procedures ensuring management directives are carried out effectively.'},
+    {key:'IC',label:'Information & Communication', col:'#2980b9',desc:'Relevant information identified, captured and communicated in a timely manner.'},
+    {key:'M', label:'Monitoring',                  col:'#c0392b',desc:'Ongoing assessment of control quality; corrective actions identified and taken.'},
+    {key:'',  label:'Not Mapped',                  col:'#95a5a6',desc:'COSO component not assigned to this observation.'}
+  ];
+  var fCosoCnt={}, fCosoRef={};
+  for(var fci=0;fci<fCOSO_DEFS.length;fci++){fCosoCnt[fCOSO_DEFS[fci].key]=0;fCosoRef[fCOSO_DEFS[fci].key]=[];}
+  var fSensCnt={'High':0,'M to H':0,'L to M':0,'Low':0,'':0};
+  var fSensRef={'High':[],'M to H':[],'L to M':[],'Low':[],'':[]};
+  var fSensLabels={'High':'High Risk','M to H':'Medium-High','L to M':'Low-Medium','Low':'Low Risk','':'Not Rated'};
+  var fSensCols={'High':'#c0392b','M to H':'#e67e22','L to M':'#f1c40f','Low':'#27ae60','':'#95a5a6'};
+  var fLblMap={};var fnum=0;
+  (function(){
+    var dbO2=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbO2.push(DB.observations[j]);}
+    var cu2=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cu2.push(customs[k]);}
+    var allF=dbO2.concat(cu2);
+    // Re-build labMap for finalize context
+    var rep2=[],nw2=[];
+    for(var a2=0;a2<allF.length;a2++){var t2=(obsTypeMap[allF[a2].id]||allF[a2].type||'New').toLowerCase();if(t2==='repeated')rep2.push(allF[a2]);else nw2.push(allF[a2]);}
+    var sn=0,idx=0;
+    function assignLabels(list,sn){var cats2={};for(var i=0;i<list.length;i++){var c2=list[i].category||'Others';if(!cats2[c2])cats2[c2]=[];cats2[c2].push(list[i]);}var catOrd=catOrderByDef(cats2);var ci2=0;for(var cc2=0;cc2<catOrd.length;cc2++){var oo=cats2[catOrd[cc2]];for(var oi2=0;oi2<oo.length;oi2++){ci2++;fLblMap[oo[oi2].id]=sn+'.'+ci2;}}}
+    assignLabels(rep2,1); assignLabels(nw2,2);
+  }());
+  for(var fe=0;fe<all.length;fe++){
+    var feo=all[fe]; var felbl=fLblMap[feo.id]||labMap[feo.id]||'?';
+    var fck=cosoMap[feo.id]||''; if(!(fck in fCosoCnt))fck='';
+    fCosoCnt[fck]++; fCosoRef[fck].push(felbl);
+    var fsk=sensitivityMap[feo.id]||''; if(!(fsk in fSensCnt))fsk='';
+    fSensCnt[fsk]++; fSensRef[fsk].push(felbl);
+  }
+  var fTotal=all.length;
+  var finSecStyle='font-family:Merriweather,serif;font-size:13px;font-weight:700;color:#fff;background:#1a3a5c;padding:8px 14px;margin:20px 0 0;border-radius:4px 4px 0 0;letter-spacing:.3px';
+  var finCardStyle='border:1px solid #dde2ea;border-top:none;border-radius:0 0 5px 5px;overflow:hidden;margin-bottom:20px';
+  var finThStyle='background:#edf2f8;color:#1a3a5c;padding:6px 10px;text-align:left;font-size:11px;font-weight:700;border-bottom:2px solid #c8d8ec';
+  var finTdStyle='padding:6px 10px;border-bottom:1px solid #e8eef6;font-size:12px;vertical-align:middle';
+  // Colour bar
+  var fCosoBar='<div style="display:flex;height:9px;overflow:hidden;margin:10px 12px 10px">';
+  for(var fbi=0;fbi<fCOSO_DEFS.length;fbi++){var fbd=fCOSO_DEFS[fbi];if(!fCosoCnt[fbd.key])continue;fCosoBar+='<div style="flex:'+fCosoCnt[fbd.key]+';background:'+fbd.col+';opacity:.85" title="'+esc(fbd.label)+': '+fCosoCnt[fbd.key]+'"></div>';}
+  fCosoBar+='</div>';
+  var fCosoTable='<table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<thead><tr>'
+    +'<th style="'+finThStyle+';width:52px;text-align:center">Code</th>'
+    +'<th style="'+finThStyle+';width:150px">Component</th>'
+    +'<th style="'+finThStyle+'">Description</th>'
+    +'<th style="'+finThStyle+';width:48px;text-align:center">Count</th>'
+    +'<th style="'+finThStyle+';width:64px;text-align:center">Share</th>'
+    +'<th style="'+finThStyle+'">Observations</th>'
+    +'</tr></thead><tbody>';
+  for(var fri=0;fri<fCOSO_DEFS.length;fri++){
+    var frd=fCOSO_DEFS[fri]; var fcnt=fCosoCnt[frd.key]; var frefs=fCosoRef[frd.key];
+    var fpct=fTotal?Math.round(fcnt/fTotal*100):0;
+    fCosoTable+='<tr style="background:'+(fri%2?'#f8fafd':'#fff')+'">'
+      +'<td style="'+finTdStyle+';text-align:center">'+(frd.key?'<span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:800;background:'+frd.col+';color:#fff">'+frd.key+'</span>':'<span style="color:#aaa">—</span>')+'</td>'
+      +'<td style="'+finTdStyle+';font-weight:700;color:'+frd.col+'">'+esc(frd.label)+'</td>'
+      +'<td style="'+finTdStyle+';color:#555">'+esc(frd.desc)+'</td>'
+      +'<td style="'+finTdStyle+';text-align:center;font-weight:800;color:'+(fcnt?frd.col:'#aaa')+'">'+fcnt+'</td>'
+      +'<td style="'+finTdStyle+';text-align:center">'+(fcnt?'<div style="background:#e8edf4;border-radius:20px;height:5px;margin-bottom:2px;overflow:hidden"><div style="height:100%;width:'+fpct+'%;background:'+frd.col+';border-radius:20px"></div></div><span style="font-size:10px;color:#666">'+fpct+'%</span>':'<span style="color:#ccc">—</span>')+'</td>'
+      +'<td style="'+finTdStyle+'">'+(frefs.length?frefs.map(function(r){return'<span style="display:inline-block;background:'+frd.col+'1a;color:'+frd.col+';border:1px solid '+frd.col+'55;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;margin:1px 2px">'+esc(r)+'</span>';}).join(''):'<span style="color:#ccc">—</span>')+'</td>'
+      +'</tr>';
+  }
+  fCosoTable+='<tr style="background:#edf2f8;font-weight:700"><td colspan="3" style="'+finTdStyle+'">Total</td><td style="'+finTdStyle+';text-align:center;color:#1a3a5c">'+fTotal+'</td><td style="'+finTdStyle+';text-align:center;color:#1a3a5c">100%</td><td style="'+finTdStyle+';color:#888;font-size:11px;font-weight:400">All selected observations</td></tr>';
+  fCosoTable+='</tbody></table>';
+  finalHtml+='<div style="'+finSecStyle+'">E. Analysis of Observations &amp; Controls (COSO Framework)</div>';
+  finalHtml+='<div style="'+finCardStyle+'">'+fCosoBar+fCosoTable+'</div>';
+
+  // ── Section F: Sensitivity Matrix ────────────────────────────────────────
+  var FMHIGH=[],FMMH=[],FMLM=[],FMLOW=[];
+  for(var fsi=0;fsi<all.length;fsi++){
+    var fso=all[fsi]; var fslbl=fLblMap[fso.id]||labMap[fso.id]||'?';
+    var fsk2=sensitivityMap[fso.id]||'';
+    if(fsk2==='High')FMHIGH.push(fslbl); else if(fsk2==='M to H')FMMH.push(fslbl); else if(fsk2==='L to M')FMLM.push(fslbl); else if(fsk2==='Low')FMLOW.push(fslbl);
+  }
+  var fCellStyle='font-size:11px;padding:8px 10px;font-weight:700;vertical-align:top';
+  var fAxisStyle='background:#edf2f8;color:#1a3a5c;font-size:10px;font-weight:700;padding:6px 8px;text-align:center;border:1px solid #c8d8ec';
+  finalHtml+='<div style="'+finSecStyle+'">F. Sensitivity Matrix</div>';
+  finalHtml+='<div style="'+finCardStyle+';padding:12px">'
+    +'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:480px;width:100%">'
+    +'<tr><td style="'+fAxisStyle+'" colspan="2" rowspan="2"></td><td style="'+fAxisStyle+'" colspan="3">LIKELIHOOD / NON-COMPLIANCE</td></tr>'
+    +'<tr><td style="'+fAxisStyle+'">HIGH</td><td style="'+fAxisStyle+'">MEDIUM</td><td style="'+fAxisStyle+'">LOW</td></tr>'
+    +'<tr><td style="'+fAxisStyle+';writing-mode:vertical-rl;transform:rotate(180deg);width:28px" rowspan="3">IMPACT</td>'
+    +'<td style="'+fAxisStyle+'">HIGH</td>'
+    +'<td style="'+fCellStyle+';background:#fdecea;color:#c0392b;border:1px solid #f5b7b1">&#128308; HIGH RISK'+(FMHIGH.length?'<br><span style="font-weight:400;font-size:10px">'+FMHIGH.join(', ')+'</span>':'')+'</td>'
+    +'<td style="'+fCellStyle+';background:#fef3e2;color:#d35400;border:1px solid #fad7a0">&#128992; MED-HIGH'+(FMMH.length?'<br><span style="font-weight:400;font-size:10px">'+FMMH.join(', ')+'</span>':'')+'</td>'
+    +'<td style="'+fCellStyle+';background:#fef9e7;color:#7d6608;border:1px solid #f9e79f">&#128994; LOW-MED'+(FMLM.length?'<br><span style="font-weight:400;font-size:10px">'+FMLM.join(', ')+'</span>':'')+'</td>'
+    +'</tr>'
+    +'<tr><td style="'+fAxisStyle+'">MEDIUM</td>'
+    +'<td style="'+fCellStyle+';background:#fef3e2;color:#d35400;border:1px solid #fad7a0">&#128992;</td>'
+    +'<td style="'+fCellStyle+';background:#fef9e7;color:#7d6608;border:1px solid #f9e79f">&#128994;</td>'
+    +'<td style="'+fCellStyle+';background:#eafaf1;color:#1e8449;border:1px solid #a9dfbf">&#128995; LOW</td>'
+    +'</tr>'
+    +'<tr><td style="'+fAxisStyle+'">LOW</td>'
+    +'<td style="'+fCellStyle+';background:#fef9e7;color:#7d6608;border:1px solid #f9e79f">&#128994;</td>'
+    +'<td style="'+fCellStyle+';background:#eafaf1;color:#1e8449;border:1px solid #a9dfbf">&#128995;</td>'
+    +'<td style="'+fCellStyle+';background:#eafaf1;color:#1e8449;border:1px solid #a9dfbf">&#128995; LOW'+(FMLOW.length?'<br><span style="font-weight:400;font-size:10px">'+FMLOW.join(', ')+'</span>':'')+'</td>'
+    +'</tr>'
+    +'</table></div></div>';
+
   finalHtml+=obsSection;
   finalHtml+=finalAnnexParts.body;
   // Embed full session so this HTML can be re-loaded into the app
