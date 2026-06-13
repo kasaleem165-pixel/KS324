@@ -15642,14 +15642,17 @@ function ra_runAnalysis(){
   }
   scores.sort(function(a,b){return b.score-a.score;});
   var overall=Math.round((scores[0].score*0.5)+(scores[1].score*0.3)+(scores[2].score*0.2));
-  ra_renderResults(branchName,scores,overall,d1,d2,autype,pb,rpt2!=null);
+  var nextDate=(document.getElementById('ra-next_date')||{}).value||'';
+  var nextDays=parseInt((document.getElementById('ra-next_days')||{}).value||'3',10)||3;
+  var nextTeam=parseInt((document.getElementById('ra-next_team')||{}).value||'2',10)||2;
+  ra_renderResults(branchName,scores,overall,d1,d2,autype,pb,rpt2!=null,nextDate,nextDays,nextTeam);
   document.getElementById('ra-results-empty').style.display='none';
   document.getElementById('ra-results-content').style.display='block';
   document.getElementById('ra-RP').scrollTop=0;
   ra_toast('Risk assessment complete -- '+allSources.length+' report'+(allSources.length>1?'s':'')+' analysed.');
 }
 
-function ra_renderResults(branch,scores,overall,d1,d2,autype,pb,hasTrend){
+function ra_renderResults(branch,scores,overall,d1,d2,autype,pb,hasTrend,nextDate,nextDays,nextTeam){
   var ol=ra_scoreToLevel(overall);
   var region=ra_currentBranch?ra_currentBranch.region+' Region, ':'';
   var city=ra_currentBranch?ra_currentBranch.city:'';
@@ -15669,7 +15672,8 @@ function ra_renderResults(branch,scores,overall,d1,d2,autype,pb,hasTrend){
   document.getElementById('ra-gauge-label').style.color=ra_levelColor(ol);
   document.getElementById('ra-gauge-needle').style.left=overall+'%';
   document.getElementById('ra-gauge-summary').innerHTML=ra_gaugeSummary(branch,scores,ol,d1);
-  ra_renderMatrix(scores); ra_renderBarChart(scores); ra_renderHeatmap(scores); ra_renderRiskRegister(scores); ra_renderFocus(scores,branch,autype);
+  ra_renderAuditPlan(scores,branch,autype,pb,nextDate,nextDays||3,nextTeam||2,overall,d1);
+  ra_renderMatrix(scores); ra_renderBarChart(scores); ra_renderHeatmap(scores); ra_renderRiskRegister(scores); ra_renderFocus(scores,branch,autype,nextDays||3,nextTeam||2);
   document.getElementById('ra-trend-card').style.display=hasTrend?'block':'none';
   if(hasTrend) ra_renderTrend(scores);
   var hasRep=false;
@@ -15838,7 +15842,198 @@ function ra_renderRecs(scores){
   document.getElementById('ra-res-recs').innerHTML=h;
 }
 
-// ── ERM helpers ──────────────────────────────────────────────────────────────
+// ── Risk-Based Audit Plan ─────────────────────────────────────────────────────
+function ra_renderAuditPlan(scores,branch,autype,pb,nextDate,days,team,overall,prevReportDate){
+  var ol=ra_scoreToLevel(overall);
+  var approach={
+    critical:'Comprehensive Audit — full-scope examination of all high-risk areas with detailed substantive testing',
+    high:'Focused Risk-Based Audit — priority on high and critical risk areas with targeted sampling',
+    medium:'Standard Risk-Based Audit — balanced coverage with increased scrutiny on risk-flagged areas',
+    low:'Routine Audit — standard procedures with monitoring emphasis on preventive controls'
+  }[ol]||'Standard Audit';
+  var approachColor={critical:'#c03030',high:'#d07020',medium:'#1a5c8a',low:'#1a7040'}[ol]||'#333';
+
+  // Effort allocation — weight by risk level (report-present cats first, then background)
+  var wt={critical:4,high:3,medium:2,low:1};
+  var reportCats=scores.filter(function(s){return s.fromReport;});
+  var bgCats=scores.filter(function(s){return !s.fromReport;});
+  // Allocate 85% of effort to report-present, 15% to background/generic
+  var repTotal=reportCats.reduce(function(sum,s){return sum+(wt[s.level]||1);},0)||1;
+  var totalHours=days*team*7; // 7 productive hours per auditor per day
+  var fieldHours=Math.round(totalHours*0.70); // 70% fieldwork
+  var adminHours=totalHours-fieldHours;
+
+  // Build effort table
+  var allocRows='';
+  var usedHours=0;
+  for(var i=0;i<reportCats.length;i++){
+    var s=reportCats[i];
+    var pct=Math.round((wt[s.level]||1)/repTotal*85);
+    var hrs=Math.round(fieldHours*pct/100);
+    usedHours+=hrs;
+    var sampleGuide={critical:'Full population / 100% sample',high:'≥50% or min 25 items',medium:'30% or min 15 items',low:'15% or min 8 items'}[s.level];
+    var lc={critical:'#c03030',high:'#d07020',medium:'#806000',low:'#1a6020'}[s.level]||'#333';
+    var lb={critical:'#fde8e8',high:'#fff0e0',medium:'#fffbe0',low:'#e8f8e8'}[s.level]||'#eee';
+    var lbd={critical:'#f0a0a0',high:'#f0b070',medium:'#e0c030',low:'#80c880'}[s.level]||'#ccc';
+    allocRows+='<tr style="background:'+(i%2===0?'#f0f8f0':'#e8f4e8')+';border-left:3px solid '+lc+'">';
+    allocRows+='<td style="padding:8px 10px;border-bottom:1px solid #d0e8d0;font-weight:700;color:#1a3a5c">'+ra_esc(s.cat)+'</td>';
+    allocRows+='<td style="padding:8px 10px;border-bottom:1px solid #d0e8d0;text-align:center"><span style="background:'+lb+';color:'+lc+';border:1px solid '+lbd+';border-radius:8px;padding:2px 8px;font-size:10px;font-weight:800">'+ra_levelLabel(s.level).toUpperCase()+'</span></td>';
+    allocRows+='<td style="padding:8px 10px;border-bottom:1px solid #d0e8d0;text-align:center;font-weight:700;color:'+lc+'">'+pct+'%</td>';
+    allocRows+='<td style="padding:8px 10px;border-bottom:1px solid #d0e8d0;text-align:center;font-weight:700;color:#1a3a5c">~'+hrs+' hrs</td>';
+    allocRows+='<td style="padding:8px 10px;border-bottom:1px solid #d0e8d0;font-size:10.5px;color:#4a5a70">'+ra_esc(sampleGuide)+'</td>';
+    var rep1=s.d1?s.d1.repeated:0;
+    allocRows+='<td style="padding:8px 10px;border-bottom:1px solid #d0e8d0;text-align:center">'+(rep1>0?'<span style="background:#fde8e8;color:#c03030;border:1px solid #f0a0a0;border-radius:6px;padding:2px 7px;font-size:10px;font-weight:700">'+rep1+' Repeated</span>':'<span style="color:#aaa;font-size:10px">None</span>')+'</td>';
+    allocRows+='</tr>';
+  }
+  // Background/admin row
+  var bgHrs=totalHours-usedHours;
+  allocRows+='<tr style="background:#f5f5f5;border-left:3px solid #ccc">';
+  allocRows+='<td style="padding:8px 10px;border-bottom:1px solid #eee;color:#888;font-style:italic" colspan="3">Opening meeting, documentation review, exit meeting &amp; reporting</td>';
+  allocRows+='<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center;font-weight:700;color:#888">~'+Math.max(bgHrs,0)+' hrs</td>';
+  allocRows+='<td style="padding:8px 10px;border-bottom:1px solid #eee;color:#aaa;font-size:10.5px">Standard audit procedures</td>';
+  allocRows+='<td style="padding:8px 10px;border-bottom:1px solid #eee"></td></tr>';
+
+  // KRIs
+  var kris=[];
+  var repCats=scores.filter(function(s){return s.fromReport&&s.d1&&s.d1.repeated>0;});
+  if(repCats.length>0) kris.push('<strong>Repeated Observations:</strong> '+repCats.length+' category(ies) have unresolved repeat findings — highest risk indicator');
+  var highPlus=scores.filter(function(s){return s.fromReport&&(s.level==='critical'||s.level==='high');});
+  if(highPlus.length>0) kris.push('<strong>High-Risk Categories:</strong> '+highPlus.map(function(s){return s.cat;}).join(', '));
+  var topObs=0; scores.forEach(function(s){if(s.d1&&s.d1.obs>topObs)topObs=s.d1.obs;});
+  if(topObs>0) kris.push('<strong>Maximum Observations in Any Category:</strong> '+topObs+' — indicates systemic control weakness');
+
+  var h='';
+  // Banner
+  h+='<div style="background:linear-gradient(135deg,#1a3a5c,#2a5c8a);color:#fff;border-radius:6px;padding:14px 18px;margin-bottom:16px">';
+  h+='<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:flex-start">';
+  h+='<div><div style="font-size:16px;font-weight:800">'+ra_esc(branch)+'</div>';
+  h+='<div style="font-size:11px;color:#a8d0f0;margin-top:3px">'+ra_esc(autype)+(pb?' &nbsp;|&nbsp; Lead: '+ra_esc(pb):'')+'</div></div>';
+  h+='<div style="text-align:right"><div style="font-size:11px;color:#a8d0f0">'+(nextDate?'Planned: <strong style="color:#fff">'+ra_fmtDate(nextDate)+'</strong>':'Audit date not specified')+'</div>';
+  h+='<div style="font-size:11px;color:#a8d0f0;margin-top:2px">Duration: <strong style="color:#fff">'+days+' day'+(days>1?'s':'')+'</strong> &nbsp;|&nbsp; Team: <strong style="color:#fff">'+team+' auditor'+(team>1?'s':'')+'</strong> &nbsp;|&nbsp; Total: <strong style="color:#fff">~'+totalHours+' hrs</strong></div>';
+  if(prevReportDate) h+='<div style="font-size:10px;color:#7ab0d0;margin-top:2px">Previous report: '+ra_fmtDate(prevReportDate)+'</div>';
+  h+='</div></div>';
+  h+='</div>';
+
+  // Audit Approach
+  h+='<div style="background:'+{critical:'#fff5f5',high:'#fff8f0',medium:'#f0f6ff',low:'#f0fff4'}[ol]||'#f8f8f8'+';border:1px solid '+{critical:'#f0a0a0',high:'#f0b070',medium:'#a8c8e8',low:'#80c880'}[ol]||'#ccc'+';border-radius:6px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px">';
+  h+='<div style="font-size:20px">'+{critical:'🚨',high:'⚠️',medium:'🔍',low:'✅'}[ol]+'</div>';
+  h+='<div><div style="font-size:12px;font-weight:800;color:'+approachColor+';text-transform:uppercase;letter-spacing:.4px">Recommended Approach</div>';
+  h+='<div style="font-size:12px;color:#2a3a50;margin-top:3px;line-height:1.6">'+ra_esc(approach)+'</div></div></div>';
+
+  // KRIs
+  if(kris.length){
+    h+='<div style="background:#fffbe0;border:1px solid #e0c030;border-radius:6px;padding:10px 14px;margin-bottom:16px">';
+    h+='<div style="font-size:11px;font-weight:800;color:#806000;margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">&#128680; Key Risk Indicators (KRIs)</div>';
+    h+='<ul style="margin:0;padding-left:18px;font-size:11px;color:#4a5a70;line-height:1.8">';
+    kris.forEach(function(k){h+='<li>'+k+'</li>';});
+    h+='</ul></div>';
+  }
+
+  // Effort Allocation Table
+  h+='<div style="font-size:11px;font-weight:800;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Audit Scope &amp; Effort Allocation</div>';
+  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">';
+  h+='<thead><tr>';
+  ['Audit Area','Risk Level','Effort %','Hours (~)','Sample Approach','Prior Repeated'].forEach(function(c){
+    h+='<th style="background:#1a3a5c;color:#fff;padding:7px 10px;text-align:left;font-size:10px;font-weight:700;white-space:nowrap">'+c+'</th>';
+  });
+  h+='</tr></thead><tbody>'+allocRows+'</tbody></table></div>';
+
+  if(!reportCats.length){
+    h+='<div style="margin-top:12px;background:#fde8e8;border:1px solid #f0a0a0;border-radius:6px;padding:10px 14px;font-size:11px;color:#9b1a1a;font-weight:600">&#9888; No categories were identified in the loaded report. Paste or load the full report text for meaningful effort allocation.</div>';
+  }
+  document.getElementById('ra-res-auditplan').innerHTML=h;
+}
+
+// ── Audit Program (replaces Focus Areas) ─────────────────────────────────────
+var RA_PROCEDURES={
+  'Financial Management':['Verify all bank payment vouchers against supporting documents and obtain authorization evidence','Check budget vs actual expenditure — identify variances and assess approval for overruns','Review procurement files for comparative quotes, Purchase Committee approvals, and split-transaction red flags','Confirm withholding tax deductions and verify timely deposit with FBR','Examine petty cash / imprest fund — count, reconcile, and check supporting vouchers','Trace all journal vouchers and confirm they were not used to replace bank payments'],
+  'HR & Payroll':['Review employee files for completeness — contracts, NIC, references, security checks, and joining reports','Verify attendance records against payroll disbursements for selected month(s)','Confirm EOBI/PESSI/SESSI numbers are updated in BEAMS for all applicable staff','Check confirmation status of employees past probation period','Review final settlements for departed staff — timeliness and accuracy','Verify short-office-hours incidents are documented and actioned'],
+  'Safety & Security':['Confirm approved guards strength copy is available and matches deployment','Review CCTV recording continuity — check for gaps in recording over 30-day period','Examine weapon/ammunition register against physical stock and verify signatures','Confirm annual firing practice records are maintained and signed off','Check security contractor documentation — contract, guard lists, relief records','Verify WTMD/metal detector and UPS functional status'],
+  'Fixed Assets & Inventory':['Conduct spot physical verification of assets — cross-check against Fixed Asset Register','Confirm all assets are numbered/tagged; identify untagged or duplicate-coded items','Check Asset Disposal/AIDN status for assets pending disposal','Review Physical Verification Report — date, signatures, and reconciliation','Examine assets marked "Out of Order" — assess write-off or repair status','Verify fixed asset register has all mandatory columns (AIDN, location, custodian, value)'],
+  'Library & Records':['Verify item-per-child ratio against approved threshold','Confirm all books/resources are entered in KOHA Library Module with correct data','Check barcode labelling completeness on library resources','Examine condition of books — identify poor condition items and maintenance records','Review transfer and disposal entries — verify proper processing and approvals','Assess overdue book return records and follow-up actions'],
+  'Student Records & Fee':['Verify registration fee collection records — confirm deposit timeliness and proper challan documentation','Cross-check student data in BEAMS against physical student files for accuracy','Review fee concession files — confirm approvals are obtained and properly filed','Check unclaimed student security deposits — identify and verify follow-up actions','Review files for transfer-in students — confirm receipt and completeness','Verify security refund processing timeliness against policy'],
+  'General Administration':['Inspect Memorandum Register(s) — verify accuracy, completeness, and maintenance','Confirm Document Tracking Sheet is in practice and up to date','Check Generator Log Book — fuel consumption, maintenance, and running hours','Verify Inward Gate Pass is being used for all incoming items','Check renewal status of School Business Registration and utility contracts','Confirm Demolition and Printed Stationery Registers are maintained']
+};
+
+function ra_renderFocus(scores,branch,autype,days,team){
+  days=days||3; team=team||2;
+  var wt={critical:4,high:3,medium:2,low:1};
+  var reportCats=scores.filter(function(s){return s.fromReport;});
+  var repTotal=reportCats.reduce(function(sum,s){return sum+(wt[s.level]||1);},0)||1;
+  var fieldHours=Math.round(days*team*7*0.70);
+
+  var h='<div style="font-size:11px;color:#4a5a70;margin-bottom:14px;line-height:1.6">Detailed audit procedures for each area identified in the previous report, prioritized by risk level. Estimated hours are proportional to risk weight within total available fieldwork time of <strong>~'+fieldHours+' hours</strong>.</div>';
+
+  if(!reportCats.length){
+    h+='<div style="color:#c03030;font-size:12px;font-weight:600;padding:10px 0">&#9888; No categories identified in loaded report — load or paste the previous audit report text to generate the audit program.</div>';
+    document.getElementById('ra-res-focus').innerHTML=h; return;
+  }
+
+  for(var i=0;i<reportCats.length;i++){
+    var s=reportCats[i];
+    var bc={critical:'#c03030',high:'#d07020',medium:'#1a5c8a',low:'#1a7040'}[s.level]||'#555';
+    var bg={critical:'#fffafa',high:'#fffdf8',medium:'#f5f8ff',low:'#f5fff8'}[s.level]||'#fff';
+    var bBg={critical:'#fde8e8',high:'#fff0e0',medium:'#e8f0ff',low:'#e8f8e8'}[s.level]||'#eee';
+    var bFg={critical:'#9b1a1a',high:'#b04400',medium:'#1a3a8c',low:'#1a6020'}[s.level]||'#333';
+    var bBd={critical:'#f0a0a0',high:'#f0b070',medium:'#a8c8e8',low:'#80c880'}[s.level]||'#ccc';
+    var pct=Math.round((wt[s.level]||1)/repTotal*85);
+    var hrs=Math.round(fieldHours*pct/100);
+    var sampleGuide={critical:'Full population (100%) — examine all instances',high:'Minimum 50% sample or 25 items, whichever is larger',medium:'30% sample or minimum 15 items',low:'15% sample or minimum 8 items'}[s.level];
+    var obs1=s.d1?s.d1.obs:0; var rep1=s.d1?s.d1.repeated:0;
+    var fwKey=RA_CAT_TO_FW[s.cat]||'gen';
+    var rr=FW_RR[fwKey]||FW_RR.gen;
+    var procs=RA_PROCEDURES[s.cat]||[];
+
+    h+='<div style="border:1px solid #dde4ee;border-left:5px solid '+bc+';border-radius:0 8px 8px 0;margin-bottom:16px;background:'+bg+';overflow:hidden">';
+    // Section header
+    h+='<div style="background:'+bc+';color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">';
+    h+='<div style="font-size:12px;font-weight:800;letter-spacing:.3px">'+ra_esc(s.cat)+'</div>';
+    h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+    h+='<span style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700">'+ra_levelLabel(s.level).toUpperCase()+' RISK</span>';
+    h+='<span style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700">~'+hrs+' hrs ('+pct+'%)</span>';
+    if(rep1>0) h+='<span style="background:#fff;color:'+bc+';border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800">&#9888; '+rep1+' Repeated</span>';
+    h+='</div></div>';
+    // Body
+    h+='<div style="padding:12px 14px">';
+    // Meta chips
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">';
+    h+='<span style="font-size:10px;background:#edf2f8;border:1px solid #c8d8ec;border-radius:6px;padding:2px 8px;color:#1a3a5c;font-weight:600">'+obs1+' obs in previous report</span>';
+    h+='<span style="font-size:10px;background:#edf2f8;border:1px solid #c8d8ec;border-radius:6px;padding:2px 8px;color:#1a3a5c;font-weight:600">S&amp;A Databank: '+RA_DB_CATS[s.cat].count+' findings</span>';
+    h+='<span style="font-size:10px;background:#edf2f8;border:1px solid #c8d8ec;border-radius:6px;padding:2px 8px;color:#1a3a5c;font-weight:600">Score: '+s.score+'/100</span>';
+    h+='</div>';
+    // Audit objective
+    h+='<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">Audit Objective</div>';
+    h+='<div style="font-size:11px;color:#4a5a70;margin-bottom:10px;line-height:1.5;background:#f5f8fd;border-left:3px solid '+bc+';padding:6px 10px;border-radius:0 4px 4px 0">'+ra_esc(rr.obj)+'</div>';
+    // Sample guidance
+    h+='<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">Sample Approach</div>';
+    h+='<div style="font-size:11px;color:#4a5a70;margin-bottom:10px;background:#fffbe0;border-left:3px solid #c0a000;padding:6px 10px;border-radius:0 4px 4px 0">'+ra_esc(sampleGuide)+'</div>';
+    // Procedures
+    h+='<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:6px">Audit Procedures</div>';
+    h+='<ol style="margin:0;padding-left:20px;font-size:11px;color:#2a3a50;line-height:1.75">';
+    for(var pi=0;pi<procs.length;pi++) h+='<li style="margin-bottom:3px">'+ra_esc(procs[pi])+'</li>';
+    // Also add top databank observations as additional checks
+    if(i<3){
+      var dbTitles=RA_DB_CATS[s.cat].titles.slice(0,3);
+      h+='<li style="color:#6a7888;font-style:italic">Additionally verify: '+ra_esc(dbTitles.join('; '))+' (top S&amp;A databank findings)</li>';
+    }
+    h+='</ol>';
+    h+='</div></div>';
+  }
+
+  // Background categories note
+  var bgCats=scores.filter(function(s){return !s.fromReport;});
+  if(bgCats.length){
+    h+='<div style="background:#f5f8fd;border:1px solid #c8d8ec;border-radius:6px;padding:12px 14px;margin-top:4px">';
+    h+='<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:6px">&#9432; Background Risk Areas — Not Observed in Previous Report</div>';
+    h+='<div style="font-size:11px;color:#4a5a70;margin-bottom:8px;line-height:1.6">The following categories had no observations in the previous report but carry inherent risk based on S&amp;A historical data. Include brief checks as part of routine procedures:</div>';
+    h+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
+    bgCats.forEach(function(s){
+      h+='<span style="font-size:10.5px;background:#edf2f8;border:1px solid #c8d8ec;border-radius:6px;padding:3px 10px;color:#2a4060;font-weight:600">'+ra_esc(s.cat)+' <span style="color:#9a9a9a">('+RA_DB_CATS[s.cat].count+' in databank)</span></span>';
+    });
+    h+='</div></div>';
+  }
+  document.getElementById('ra-res-focus').innerHTML=h;
+}
 var RA_CAT_TO_FW={
   'Financial Management':'fin',
   'HR & Payroll':'hr',
@@ -16061,8 +16256,12 @@ function ra_renderRiskRegister(scores){
   <div class="ra-wrap">
     <!-- LEFT PANEL -->
     <div id="ra-LP">
+      <div style="background:linear-gradient(135deg,#1a3a5c,#2a5c8a);color:#fff;padding:14px 16px">
+        <div style="font-size:13px;font-weight:800;letter-spacing:.4px;margin-bottom:4px">&#128202; Risk-Based Audit Planner</div>
+        <div style="font-size:10.5px;color:#a8d0f0;line-height:1.6">Load previous audit report(s) for a branch to profile its risk exposure, identify high-risk areas, and generate a risk-prioritized audit plan for the upcoming visit.</div>
+      </div>
       <div class="ra-sec" style="background:#f5f8fd">
-        <div class="ra-sh">&#128205; Branch Selection</div>
+        <div class="ra-sh">&#128205; Branch Being Audited</div>
         <div class="ra-fr">
           <label>Branch</label>
           <input type="text" id="ra-sel_branch" list="ra-dl-branch" placeholder="Type branch name or code..." autocomplete="off" oninput="ra_onBranchInput(this.value)">
@@ -16074,7 +16273,7 @@ function ra_renderRiskRegister(scores){
         </div>
       </div>
       <div class="ra-sec">
-        <div class="ra-sh">&#128196; Previous Audit Report(s)</div>
+        <div class="ra-sh">&#128196; Previous Audit Report(s) — Source Data</div>
         <div class="ra-fr">
           <label>Load file(s) — Word (.docx), JSON session, Excel or plain text</label>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
@@ -16094,28 +16293,54 @@ function ra_renderRiskRegister(scores){
         <button style="padding:4px 10px;font-size:11px;border-radius:4px;border:1px solid #c8d8ec;background:#f5f8fd;color:#1a3a5c;cursor:pointer;font-weight:600" onclick="document.getElementById('ra-paste_text').value=''">&#10005; Clear Pasted Text</button>
       </div>
       <div class="ra-sec">
-        <div class="ra-sh">&#9881; Analysis Options</div>
+        <div class="ra-sh">&#128203; Upcoming Audit Details</div>
         <div class="ra-fr">
-          <label>Audit Type for upcoming audit</label>
+          <label>Audit Type</label>
           <input type="text" id="ra-next_autype" value="Routine Audit Visit" placeholder="e.g. Routine Audit Visit">
         </div>
-        <div class="ra-fr">
-          <label>Auditor / Prepared By</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="ra-fr" style="margin-bottom:0">
+            <label>Planned Audit Date</label>
+            <input type="date" id="ra-next_date">
+          </div>
+          <div class="ra-fr" style="margin-bottom:0">
+            <label>Audit Duration (days)</label>
+            <input type="number" id="ra-next_days" value="3" min="1" max="30" placeholder="3">
+          </div>
+        </div>
+        <div class="ra-fr" style="margin-top:10px">
+          <label>Lead Auditor / Prepared By</label>
           <input type="text" id="ra-next_pb" placeholder="Auditor name">
+        </div>
+        <div class="ra-fr">
+          <label>Audit Team Size</label>
+          <select id="ra-next_team" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:12px;background:#fff;color:#1e2d40">
+            <option value="1">1 — Solo Auditor</option>
+            <option value="2" selected>2 — Small Team</option>
+            <option value="3">3 — Standard Team</option>
+            <option value="4">4+ — Large Team</option>
+          </select>
         </div>
       </div>
       <div style="padding:14px 16px">
-        <button class="ra-btn-gold" onclick="ra_runAnalysis()">&#128202; Run Risk Assessment</button>
-        <div class="ra-hint" style="text-align:center;margin-top:8px">Risk is calculated from databank frequency, observation history, and repeated findings</div>
+        <button class="ra-btn-gold" onclick="ra_runAnalysis()" style="background:linear-gradient(135deg,#1a7a4a,#23a060);color:#fff">&#128203; Generate Risk-Based Audit Plan</button>
+        <div class="ra-hint" style="text-align:center;margin-top:8px">Analyses previous report data to build a risk-prioritized audit program for the upcoming visit</div>
       </div>
     </div><!-- end ra-LP -->
 
     <!-- RIGHT PANEL -->
     <div id="ra-RP">
       <div id="ra-results-empty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#7a8a9a;text-align:center;gap:12px">
-        <div style="font-size:48px">&#128202;</div>
-        <div style="font-size:15px;font-weight:700;color:#2a3a50">Systems &amp; Audit — Risk Assessment</div>
-        <div style="max-width:380px;line-height:1.7">Select a branch, load or paste one or more previous audit reports, then click <strong>Run Risk Assessment</strong> to generate a prioritized risk profile and audit focus recommendations.</div>
+        <div style="font-size:48px">&#128203;</div>
+        <div style="font-size:16px;font-weight:800;color:#1a3a5c">Risk-Based Audit Planner</div>
+        <div style="max-width:400px;line-height:1.8;font-size:12px">
+          <strong>How to use:</strong><br>
+          1. Select the <strong>branch</strong> you plan to audit<br>
+          2. Load or paste its <strong>previous audit report(s)</strong><br>
+          3. Fill in upcoming audit details<br>
+          4. Click <strong>Generate Risk-Based Audit Plan</strong><br><br>
+          The system will analyse historical observations, identify high-risk areas, and produce a <strong>risk-prioritized audit program</strong> with effort allocation and specific procedures for each area.
+        </div>
       </div>
       <div id="ra-results-content" style="display:none">
         <!-- Header -->
@@ -16142,6 +16367,11 @@ function ra_renderRiskRegister(scores){
           <div class="ra-gauge-ticks"><span>Low</span><span>Medium</span><span>High</span><span>Critical</span></div>
           <div id="ra-gauge-summary" style="font-size:12px;color:#4a5a70;margin-top:12px;line-height:1.6"></div>
         </div>
+        <!-- Risk-Based Audit Plan -->
+        <div class="ra-card" id="ra-auditplan-card">
+          <div class="ra-card-title">&#128203; Risk-Based Audit Plan</div>
+          <div id="ra-res-auditplan"></div>
+        </div>
         <!-- Category Risk Matrix -->
         <div class="ra-card">
           <div class="ra-card-title">Category Risk Matrix</div>
@@ -16162,9 +16392,9 @@ function ra_renderRiskRegister(scores){
           <div class="ra-card-title">&#128203; Enterprise Risk Register (ERM)</div>
           <div id="ra-res-register"></div>
         </div>
-        <!-- Focus Areas -->
+        <!-- Audit Program -->
         <div class="ra-card">
-          <div class="ra-card-title">&#128680; Priority Focus Areas for Upcoming Audit</div>
+          <div class="ra-card-title">&#128221; Risk-Based Audit Program</div>
           <div id="ra-res-focus"></div>
         </div>
         <!-- Trend -->
@@ -16179,12 +16409,12 @@ function ra_renderRiskRegister(scores){
         </div>
         <!-- Recommendations -->
         <div class="ra-card">
-          <div class="ra-card-title">&#9989; Audit Recommendations</div>
+          <div class="ra-card-title">&#9989; Audit Planning Recommendations</div>
           <div id="ra-res-recs"></div>
         </div>
         <!-- Print -->
         <div style="text-align:center;margin-top:8px;margin-bottom:30px">
-          <button style="padding:10px 28px;border:none;border-radius:5px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;background:#1a3a5c;color:#fff" onclick="window.print()">&#128462; Print / Save as PDF</button>
+          <button style="padding:10px 28px;border:none;border-radius:5px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;background:linear-gradient(135deg,#1a3a5c,#2a5c8a);color:#fff;box-shadow:0 2px 8px rgba(26,58,92,.3)" onclick="window.print()">&#128462; Export Audit Plan — Print / Save as PDF</button>
         </div>
       </div><!-- end ra-results-content -->
     </div><!-- end ra-RP -->
