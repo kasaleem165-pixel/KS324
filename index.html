@@ -15289,10 +15289,22 @@ function toggleRAPanel(){
 
 function ra_initBranches(){
   if(RA_BRANCHES.length) return;
-  var el=document.getElementById('ra-branch-data');
-  if(!el) return;
-  try{ RA_BRANCHES=JSON.parse(el.textContent); }catch(e){ RA_BRANCHES=[]; }
+  // Share the same branch list as the Report Interface (BHS_BRANCHES from #branch-data)
+  if(typeof BHS_BRANCHES !== 'undefined' && BHS_BRANCHES.length){
+    RA_BRANCHES = BHS_BRANCHES;
+  } else {
+    var el=document.getElementById('ra-branch-data');
+    if(el && el.textContent.trim()){ try{ RA_BRANCHES=JSON.parse(el.textContent); }catch(e){ RA_BRANCHES=[]; } }
+  }
   ra_buildBranchDatalist();
+}
+
+// Called whenever BHS_BRANCHES changes so the RA branch select stays in sync
+function ra_syncBranchList(){
+  if(typeof BHS_BRANCHES !== 'undefined'){
+    RA_BRANCHES = BHS_BRANCHES;
+    ra_buildBranchSelect();
+  }
 }
 
 function ra_buildBranchDatalist(){ // kept for backwards compat — delegates to select builder
@@ -16497,8 +16509,8 @@ function ra_methodologyHtml(){
 </script>
 
 <!-- ===== RISK ASSESSMENT PANEL ===== -->
+<!-- ra-branch-data is intentionally empty; RA panel uses BHS_BRANCHES from #branch-data (same source as Report Interface) -->
 <script type="application/json" id="ra-branch-data">
-[{"code":"239","name":"Newlands, Lahore","region":"Center","city":"Lahore"},{"code":"249","name":"TNS Beaconhouse Defence","region":"Center","city":"Lahore"},{"code":"212","name":"Defence Campus, Lahore","region":"Center","city":"Lahore"},{"code":"214","name":"Walton Campus, Lahore","region":"Center","city":"Lahore"},{"code":"278","name":"Ring Road Campus, Lahore","region":"Center","city":"Lahore"},{"code":"232","name":"Main Campus Canal, Faisalabad","region":"Center","city":"Faisalabad"},{"code":"221","name":"Bosan Road Campus, Multan","region":"Center","city":"Multan"},{"code":"243","name":"Satellite Town Campus, Gujranwala","region":"Center","city":"Gujranwala"},{"code":"271","name":"Sialkot Campus","region":"Center","city":"Sialkot"},{"code":"302","name":"BCP Margalla Campus, Islamabad","region":"North","city":"Islamabad"},{"code":"305","name":"F-8/2 Campus, Islamabad","region":"North","city":"Islamabad"},{"code":"311","name":"Margalla Campus, Islamabad","region":"North","city":"Islamabad"},{"code":"321","name":"Tipu Sultan Campus, Rawalpindi","region":"North","city":"Rawalpindi"},{"code":"332","name":"KG Campus Satellite Town, Rawalpindi","region":"North","city":"Rawalpindi"},{"code":"345","name":"Frontier Campus, Peshawar","region":"North","city":"Peshawar"},{"code":"351","name":"Main Campus, Abbottabad","region":"North","city":"Abbottabad"},{"code":"364","name":"Gujrat Campus","region":"North","city":"Gujrat"},{"code":"431","name":"Clifton Campus, Karachi","region":"South","city":"Karachi"},{"code":"433","name":"Defence Campus, Karachi","region":"South","city":"Karachi"},{"code":"464","name":"Gulshan Campus, Karachi","region":"South","city":"Karachi"},{"code":"451","name":"Qasimabad Campus, Hyderabad","region":"South","city":"Hyderabad"},{"code":"471","name":"Juniper Campus, Quetta","region":"South","city":"Quetta"},{"code":"495","name":"Sukkur Campus","region":"South","city":"Sukkar"}]
 </script>
 <div id="ra-panel" style="display:none;max-width:100%;background:#f0f3f8;min-height:calc(100vh - 50px)">
   <style>
