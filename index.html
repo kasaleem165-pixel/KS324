@@ -12794,6 +12794,64 @@ function generateIssuedReport(){
     else if(val==='Low')c='#27ae60';
     return '<span style="font-size:.67rem;color:#999;text-transform:uppercase;letter-spacing:.4px">'+label+'</span> <span style="display:inline-block;background:'+c+';color:#fff;border-radius:20px;padding:.1rem .6rem;font-size:.7rem;font-weight:700;margin:.1rem .2rem .1rem 0">'+val+'</span> ';
   }
+
+  // ── Instance & amount parser for materiality uplift ──────────────────────
+  var FW_RISK_TIERS=['Low','Low-Medium','Medium','Medium-High','High'];
+  function upliftRisk(base, steps){
+    var idx=FW_RISK_TIERS.indexOf(base); if(idx===-1)idx=2;
+    return FW_RISK_TIERS[Math.min(idx+steps,FW_RISK_TIERS.length-1)];
+  }
+  function parseObsInstances(text){
+    if(!text)return{count:0,amount:0,uplift:0,label:'',sources:[]};
+    var sources=[], instanceCount=0, totalAmount=0;
+
+    // 1. Table rows — lines containing | pipe characters
+    var lines=text.split('\n');
+    var tblRows=0;
+    for(var li=0;li<lines.length;li++){
+      var ln=lines[li].trim();
+      if(ln.indexOf('|')===-1)continue;
+      if(/^\|[\s\-:|]+\|?\s*$/.test(ln))continue; // skip separator lines |---|
+      tblRows++;
+    }
+    if(tblRows>1){
+      var dataRows=tblRows-1; // subtract 1 header row
+      if(dataRows>instanceCount)instanceCount=dataRows;
+      sources.push(dataRows+' row'+(dataRows!==1?'s':'')+' in inline table');
+    }
+
+    // 2. Directly stated instance counts
+    // matches: "12 instances", "5 cases", "8 payments", "14 vouchers" etc.
+    var countRx=/(\d+)\s*(instances?|cases?|payments?|vouchers?|items?|employees?|students?|transactions?|discrepancies?|entries|records?|files?|bills?|invoices?|irregularities|deficiencies|observations?)/gi;
+    var cm;
+    while((cm=countRx.exec(text))!==null){
+      var n=parseInt(cm[1]);
+      if(n>1&&n>instanceCount){instanceCount=n;sources.push(n+' stated '+cm[2].toLowerCase());}
+    }
+
+    // 3. Amounts — Rs., PKR, Pkr followed by number
+    var amtRx=/(?:Rs\.?|PKR|Pkr)\.?\s*([\d,]+(?:\.\d+)?)/g;
+    var am;
+    while((am=amtRx.exec(text))!==null){
+      var val=parseFloat(am[1].replace(/,/g,''));
+      if(val>totalAmount)totalAmount=val;
+    }
+    if(totalAmount>0)sources.push('Amount: Rs. '+totalAmount.toLocaleString());
+
+    // 4. Determine uplift tiers
+    var uplift=0, label='';
+    var amtFactor= totalAmount>=1000000?2 : totalAmount>=100000?1 : 0;
+    var cntFactor= instanceCount>=15?2 : instanceCount>=5?1 : 0;
+    uplift=Math.max(amtFactor,cntFactor);
+    if(uplift===2) label='Systemic / Pervasive';
+    else if(uplift===1) label='Significant';
+    else if(instanceCount>=2||totalAmount>0) label='Isolated / Limited';
+    else label='Not Quantified';
+
+    return{count:instanceCount,amount:totalAmount,uplift:uplift,label:label,sources:sources};
+  }
+  // ── End instance parser ──────────────────────────────────────────────────
+
   // ── End framework data ───────────────────────────────────────────────────
 
   // Separate Repeated / New
@@ -12907,6 +12965,20 @@ function generateIssuedReport(){
       +'</div>';
     // Framework panel (hidden by default; shown when toggleFramework() is active)
     var fw=getFw(o);
+    var inst=parseObsInstances(ot); // ot = obsText(o) already in scope
+    var adjInherent=inst.uplift>0?upliftRisk(fw.mx.inherent,inst.uplift):fw.mx.inherent;
+    var adjResidual=inst.uplift>0?upliftRisk(fw.mx.residual,inst.uplift):fw.mx.residual;
+    var wasUplifted=(adjInherent!==fw.mx.inherent);
+    var instBadgeColor=inst.label==='Systemic / Pervasive'?'#c0392b':inst.label==='Significant'?'#e67e22':inst.label==='Isolated / Limited'?'#2980b9':'#95a5a6';
+    var instBox='<div style="background:#f7f9fc;border:1px solid #dde2ea;border-radius:6px;padding:.55rem .75rem;margin-top:.55rem;font-size:.77rem">'
+      +'<div style="font-size:.63rem;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#555;margin-bottom:.3rem">&#128202; Materiality Analysis (from Observation Text)</div>'
+      +(inst.count>0?'<div>Instances detected: <strong>'+inst.count+'</strong></div>':'')
+      +(inst.amount>0?'<div>Max amount mentioned: <strong>Rs. '+inst.amount.toLocaleString()+'</strong></div>':'')
+      +(inst.sources.length?'<div style="color:#777;font-size:.72rem;margin-top:.2rem">Sources: '+inst.sources.join(' &bull; ')+'</div>':'')
+      +'<div style="margin-top:.3rem">Materiality level: <span style="display:inline-block;background:'+instBadgeColor+';color:#fff;border-radius:20px;padding:.1rem .6rem;font-size:.7rem;font-weight:700">'+inst.label+'</span>'
+      +(wasUplifted?' <span style="color:#c0392b;font-size:.7rem;font-weight:700">&uarr; Inherent Risk uplifted by '+inst.uplift+' tier'+(inst.uplift>1?'s':'')+'</span>':'')
+      +'</div>'
+      +'</div>';
     h+='<div class="fw-panel" style="display:none;margin-top:.9rem;border:1px solid #b8d4ec;border-radius:8px;overflow:hidden">'
       +'<div style="background:#1a3557;color:#fff;padding:.45rem .9rem;font-size:.76rem;font-weight:700;letter-spacing:.5px">&#128203; Risk-Based Audit Framework &mdash; '+lbl+'</div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;font-size:.82rem">'
@@ -12918,9 +12990,11 @@ function generateIssuedReport(){
         +fwChip('Likelihood',fw.mx.likelihood)
         +fwChip('Impact',fw.mx.impact)
         +'<br>'
-        +fwChip('Inherent Risk',fw.mx.inherent)
-        +fwChip('Residual Risk',fw.mx.residual)
+        +fwChip('Inherent Risk',adjInherent)
+        +(wasUplifted?'<span style="font-size:.67rem;color:#c0392b;font-weight:700">&uarr; uplifted</span> ':'')
+        +fwChip('Residual Risk',adjResidual)
         +fwChip('Risk Appetite',fw.mx.appetite)
+        +instBox
         +'<div style="margin-top:.5rem;font-size:.74rem;color:#666;border-top:1px solid #dde8f0;padding-top:.4rem"><em>Control Objective:</em> '+e(fw.rr.obj)+'</div>'
       +'</div>'
       +'<div style="padding:.8rem 1rem;background:#f9fcff">'
@@ -12928,7 +13002,9 @@ function generateIssuedReport(){
         +'<div style="display:inline-block;background:#1a7a4a;color:#fff;border-radius:5px;padding:.15rem .55rem;font-size:.72rem;font-weight:700;margin-bottom:.4rem">'+e(fw.ca.id)+'</div>'
         +'<div style="font-weight:700;color:#1a7a4a;font-size:.87rem;margin-bottom:.35rem">'+e(fw.ca.name)+'</div>'
         +'<div style="color:#555;font-size:.79rem;margin-bottom:.5rem">'+e(fw.ca.desc)+'</div>'
-        +'<div style="margin-top:.4rem;font-size:.74rem;color:#444;border-top:1px solid #d0e8d8;padding-top:.4rem"><strong>Audit Conclusion:</strong> Based on the application of <em>'+e(fw.ca.name)+'</em>, the audit team identified control gaps related to observation '+lbl+'. Specific findings and recommendations are documented above in the observation detail.</div>'
+        +'<div style="margin-top:.4rem;font-size:.74rem;color:#444;border-top:1px solid #d0e8d8;padding-top:.4rem"><strong>Audit Conclusion:</strong> Based on the application of <em>'+e(fw.ca.name)+'</em>, the audit team identified control gaps related to observation '+lbl+'. '
+        +(inst.count>0?'A total of <strong>'+inst.count+' instance'+(inst.count!==1?'s':'')+' were identified</strong>, indicating a '+inst.label.toLowerCase()+' control failure. ':' ')
+        +'Specific findings and recommendations are documented above in the observation detail.</div>'
       +'</div>'
       +'</div>'
       +'</div>';
@@ -13296,14 +13372,17 @@ function generateIssuedReport(){
       for(var fi=0;fi<all.length;fi++){
         var fo=all[fi]; var flbl=labMap[fo.id]||'?';
         var ffw=getFw(fo);
-        var rc_=riskClass(sensitivityMap[fo.id]||'');
-        var irBg={High:'#fdecea','Medium-High':'#fef3e2',Medium:'#eaf4fb','Low-Medium':'#e8f4ff',Low:'#e9f7ef'}[ffw.mx.inherent]||'#f7f9fc';
+        var finst=parseObsInstances(obsText(fo));
+        var fadjIR=finst.uplift>0?upliftRisk(ffw.mx.inherent,finst.uplift):ffw.mx.inherent;
+        var irBgMap={High:'#fdecea','Medium-High':'#fef3e2',Medium:'#eaf4fb','Low-Medium':'#e8f4ff',Low:'#e9f7ef'};
+        var irBg=irBgMap[fadjIR]||'#f7f9fc';
+        var wasUp=(fadjIR!==ffw.mx.inherent);
         ft+='<tr style="border-bottom:1px solid #dde2ea">'
           +'<td style="padding:.4rem .6rem;font-size:.75rem;font-weight:700;white-space:nowrap"><a href="#obs-'+e(flbl.replace('.','-'))+'" style="color:var(--primary);text-decoration:none;font-weight:700">'+e(flbl)+'</a></td>'
           +'<td style="padding:.4rem .6rem;font-size:.8rem">'+e(fo.title)+'</td>'
           +'<td style="padding:.4rem .6rem;white-space:nowrap"><span style="background:#1a3557;color:#fff;border-radius:4px;padding:.1rem .45rem;font-size:.7rem;font-weight:700">'+e(ffw.rr.id)+'</span></td>'
           +'<td style="padding:.4rem .6rem;font-size:.79rem;color:#c0392b;font-weight:600">'+e(ffw.rr.name)+'</td>'
-          +'<td style="padding:.4rem .6rem;background:'+irBg+';font-size:.75rem;font-weight:700;white-space:nowrap">'+e(ffw.mx.inherent)+'</td>'
+          +'<td style="padding:.4rem .6rem;background:'+irBg+';font-size:.75rem;font-weight:700;white-space:nowrap">'+e(fadjIR)+(wasUp?' <span style="color:#c0392b;font-size:.65rem">&uarr;</span>':'')+(finst.count>0?' <span style="font-size:.65rem;color:#666">('+finst.count+' inst.)</span>':'')+'</td>'
           +'<td style="padding:.4rem .6rem;white-space:nowrap"><span style="background:#1a7a4a;color:#fff;border-radius:4px;padding:.1rem .45rem;font-size:.7rem;font-weight:700">'+e(ffw.ca.id)+'</span></td>'
           +'<td style="padding:.4rem .6rem;font-size:.79rem;color:#1a7a4a;font-weight:600">'+e(ffw.ca.name)+'</td>'
           +'</tr>';
