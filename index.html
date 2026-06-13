@@ -16119,29 +16119,91 @@ function _w2rBuildHtml(d){
     if(o.type==='rep')cntRep++;else cntNew++;
   });
   var total=obs.length;
-  // category groups
   var catMap={},catOrder=[];
   obs.forEach(function(o){var c=o.cat||'General';if(!catMap[c]){catMap[c]=[];catOrder.push(c);}catMap[c].push(o);});
+
+  // Risk framework helpers
+  var RISK_TO_FW={'High':'High','MH':'M to H','LM':'L to M','Low':'Low'};
+  var RESID_MAP={'High':'M to H','M to H':'L to M','L to M':'Low','Low':'Low'};
+  var CHIP_STYLE={'High':'background:#fde8e8;color:#c0392b;border:1px solid #f5c6c6',
+    'M to H':'background:#fef3e2;color:#b7660a;border:1px solid #fad9a0',
+    'L to M':'background:#e3f2fd;color:#1565c0;border:1px solid #bbdefb',
+    'Low':'background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9'};
+  var CHIP_ICON={'High':'🔴','M to H':'🟠','L to M':'🔵','Low':'🟢'};
+  function rChip(rk){var s=CHIP_STYLE[rk]||CHIP_STYLE['L to M'];return'<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;'+s+'">'+(CHIP_ICON[rk]||'⚪')+' '+rk+'</span>';}
+  function getWFw(o){
+    var key=getFwKey(o.cat||'');
+    var fwKey=RISK_TO_FW[o.risk]||'L to M';
+    var mx=(typeof FW_MX!=='undefined'&&FW_MX[fwKey])||{inherent:fwKey,residual:RESID_MAP[fwKey]||fwKey};
+    var rr=(typeof FW_RR!=='undefined'&&FW_RR[key])||{name:'General Risk',desc:'Risk associated with audit area'};
+    var ca=(typeof FW_CA!=='undefined'&&FW_CA[key])||{name:'General Control',desc:'Internal controls and procedures'};
+    return{rr:rr,ca:ca,mx:mx,fwKey:fwKey};
+  }
+
+  // Label map W.1, W.2 ...
+  var lMap={};obs.forEach(function(o,i){lMap[o.id]='W.'+(i+1);});
+
   // obs data for embedded JS
   var obsDataJs='var OD={};';
   obs.forEach(function(o){var dt=detail[o.id]||{};obsDataJs+='OD['+JSON.stringify(o.id)+']='+JSON.stringify({id:o.id,title:o.title,risk:o.risk,type:o.type,refTo:o.refTo,observation:(dt.observation||'').replace(/\s+/g,' ').trim(),recommendation:(dt.recommendation||'').replace(/\s+/g,' ').trim(),response:(dt.response||'').replace(/\s+/g,' ').trim(),roResponse:(dt.roResponse||'').replace(/\s+/g,' ').trim(),auditView:(dt.auditView||'').replace(/\s+/g,' ').trim()})+';\n';});
+
   var RLBL={High:'&#128308; High',MH:'&#128992; M to H',LM:'&#128994; L to M',Low:'&#128995; Low'};
-  function rb(r){return '<span class="rb r-'+r+'">'+RLBL[r]+'</span>';}
-  function tb(t){return '<span class="st '+(t==='rep'?'sr':'sn')+'">'+(t==='rep'?'Repeated':'New')+'</span>';}
-  // synopsis rows
+  function rb(r){return'<span class="rb r-'+r+'">'+RLBL[r]+'</span>';}
+  function tb(t){return'<span class="st '+(t==='rep'?'sr_':'sn')+'">'+(t==='rep'?'Repeated':'New')+'</span>';}
+
+  // RCM data for embedded JS
+  var rcmArr=[];
+  obs.forEach(function(o){
+    var fw=getWFw(o);
+    rcmArr.push({id:o.id,title:o.title,cat:o.cat||'General',type:o.type,
+      risk:fw.fwKey,residual:fw.mx.residual||RESID_MAP[fw.fwKey]||fw.fwKey,
+      rr:(fw.rr&&fw.rr.name)||'—',ca:(fw.ca&&fw.ca.name)||'—'});
+  });
+  var rcmJson=JSON.stringify(rcmArr);
+
+  // Synopsis rows
   var synHtml='';
   obs.forEach(function(o){
+    var fw=getWFw(o);
+    var fwKey=fw.fwKey;
+    var residual=fw.mx.residual||RESID_MAP[fwKey]||fwKey;
     var dt=detail[o.id]||{};
-    synHtml+='<div class="sr" data-id="'+esc(o.id)+'" data-risk="'+o.risk+'" data-type="'+o.type+'" onclick="tgSyn(this)">'+
-    '<div class="srm"><div class="srf">'+esc(o.id)+'</div><div class="srt">'+esc(o.title)+'</div><div>'+tb(o.type)+'</div><div>'+rb(o.risk)+'</div><div style="font-size:11px;color:#6a7888">'+esc(o.refTo)+'</div></div>'+
-    '<div class="sre"><div class="tagr">'+rb(o.risk)+tb(o.type)+'<span style="font-size:11px;color:#6a7888">Ref: <strong>'+esc(o.refTo)+'</strong></span></div>'+
-    '<div class="seg"><div class="eb"><h4>Observation</h4><p>'+esc((dt.observation||'See Detailed Observations tab.').substring(0,500))+'</p></div>'+
-    '<div class="eb"><h4>Recommendation</h4><p>'+esc((dt.recommendation||'').substring(0,500))+'</p></div></div>'+
-    (dt.response?'<div class="eb" style="margin-top:8px"><h4>Auditee Response</h4><p>'+esc(dt.response.substring(0,500))+'</p></div>':'')+
-    '<button class="bvo" onclick="event.stopPropagation();openM(\''+esc(o.id)+'\')">&#128196; View Full Detail</button>'+
-    '</div></div>';
+    var lbl=lMap[o.id];
+    var idSlug=lbl.replace('.','-');
+    var rrObj=fw.rr||{};var caObj=fw.ca||{};var mx=fw.mx||{};
+    var fwPanel='<div style="margin-top:.8rem;border:1px solid #b8d4ec;border-radius:6px;overflow:hidden">'
+      +'<div style="background:#1a3a5c;color:#fff;padding:6px 12px;font-size:11px;font-weight:700;letter-spacing:.5px">RISK-BASED AUDIT FRAMEWORK</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#b8d4ec">'
+      +'<div style="background:#f0f5fb;padding:8px 12px"><div style="font-size:10px;font-weight:700;color:#5a7a9a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Risk Register</div>'
+      +'<div style="font-size:12px;font-weight:700;color:#1a3a5c">'+esc(rrObj.name||'General Risk')+'</div>'
+      +'<div style="font-size:11px;color:#5a7a9a;margin-top:2px">'+esc(rrObj.desc||'')+'</div></div>'
+      +'<div style="background:#f0f5fb;padding:8px 12px"><div style="font-size:10px;font-weight:700;color:#5a7a9a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Control Activity</div>'
+      +'<div style="font-size:12px;font-weight:700;color:#1a3a5c">'+esc(caObj.name||'General Control')+'</div>'
+      +'<div style="font-size:11px;color:#5a7a9a;margin-top:2px">'+esc(caObj.desc||'')+'</div></div>'
+      +'</div>'
+      +'<div style="background:#f8fafd;padding:8px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+      +'<span style="font-size:10px;color:#6a7888;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Risk Assessment:</span>'
+      +rChip(mx.inherent||fwKey)+'<span style="color:#bbb;font-size:11px">&#8594;</span>'+rChip(residual)
+      +'<span style="font-size:10px;color:#6a7888;margin-left:6px">Auditor Sensitivity: </span>'+rChip(fwKey)
+      +'</div></div>';
+    synHtml+='<div class="sr" id="sr-'+idSlug+'" data-id="'+esc(o.id)+'" data-risk="'+o.risk+'" data-type="'+o.type+'" onclick="tgSyn(this)">'
+      +'<div class="srm"><div class="srf">'+esc(lbl)+'</div><div class="srt">'+esc(o.title)+'</div><div>'+tb(o.type)+'</div>'
+      +'<div>'+rChip(fwKey)+'</div><div>'+rChip(residual)+'</div>'
+      +'<div style="font-size:11px;color:#888;text-align:center">&#8212;</div>'
+      +'<div style="font-size:11px;color:var(--nv);font-weight:700;text-align:center">&#9660; Detail</div></div>'
+      +'<div class="sre"><div class="tagr">'+rb(o.risk)+tb(o.type)+'<span style="font-size:11px;color:#6a7888">Ref To: <strong>'+esc(o.refTo)+'</strong></span></div>'
+      +'<div class="seg"><div class="eb"><h4>Observation</h4><p>'+esc((dt.observation||'See Detailed Observations.').substring(0,600))+'</p></div>'
+      +'<div class="eb"><h4>Recommendation</h4><p>'+esc((dt.recommendation||'').substring(0,600))+'</p></div></div>'
+      +(dt.response?'<div class="eb" style="margin-top:8px"><h4>Auditee Response</h4><p>'+esc(dt.response.substring(0,500))+'</p></div>':'')
+      +(dt.roResponse?'<div class="eb" style="margin-top:8px"><h4>RO Response</h4><p>'+esc(dt.roResponse.substring(0,500))+'</p></div>':'')
+      +(dt.auditView?'<div class="eb" style="margin-top:8px"><h4>Audit View</h4><p>'+esc(dt.auditView.substring(0,500))+'</p></div>':'')
+      +'<div style="margin-top:.7rem;display:flex;gap:.6rem;flex-wrap:wrap">'
+      +'<button class="bvo" onclick="event.stopPropagation();openM(\''+esc(o.id)+'\')">&#128196; View Full Detail</button>'
+      +'<button class="bvo" style="background:#2a4a6a" onclick="event.stopPropagation();hlSyn(\'sr-'+idSlug+'\')">&#8593; Back to Synopsis</button>'
+      +'</div>'+fwPanel+'</div></div>';
   });
-  // obs cards
+
+  // obs cards (Detailed Observations tab)
   var cardsHtml='';var shR=false,shN=false;
   catOrder.forEach(function(cat){
     var grp=catMap[cat];var isR=grp[0]&&grp[0].type==='rep';
@@ -16150,17 +16212,30 @@ function _w2rBuildHtml(d){
     cardsHtml+='<div class="os"><div class="osh">'+esc(cat)+'<span class="cnt">'+grp.length+'</span></div>';
     grp.forEach(function(o){
       var dt=detail[o.id]||{};
-      cardsHtml+='<div class="oc"><div class="och" onclick="this.parentElement.classList.toggle(\'open\')"><span class="on">'+esc(o.id)+'</span><span style="flex:1;font-weight:600;font-size:13px">'+esc(o.title)+'</span>'+rb(o.risk)+tb(o.type)+'<span class="chv">&#9660;</span></div>'+
-      '<div class="ob"><div class="tagr">'+rb(o.risk)+tb(o.type)+'<span style="font-size:11px;color:#6a7888">Referred To: <strong>'+esc(o.refTo)+'</strong></span></div>'+
-      (dt.observation?'<div class="sl">Observation</div><div class="ot">'+esc(dt.observation)+'</div>':'')+
-      (dt.recommendation?'<div class="sl">Recommendation</div><div class="oq">'+esc(dt.recommendation)+'</div>':'')+
-      (dt.response?'<div class="sl">Auditee Response</div><div class="oq">'+esc(dt.response)+'</div>':'')+
-      (dt.roResponse?'<div class="sl">RO Response</div><div class="oq">'+esc(dt.roResponse)+'</div>':'')+
-      (dt.auditView?'<div class="sl">Audit View</div><div class="oq" style="border-left-color:#1a3a5c">'+esc(dt.auditView)+'</div>':'')+
-      '</div></div>';
+      cardsHtml+='<div class="oc"><div class="och" onclick="this.parentElement.classList.toggle(\'open\')"><span class="on">'+esc(o.id)+'</span><span style="flex:1;font-weight:600;font-size:13px">'+esc(o.title)+'</span>'+rb(o.risk)+tb(o.type)+'<span class="chv">&#9660;</span></div>'
+        +'<div class="ob"><div class="tagr">'+rb(o.risk)+tb(o.type)+'<span style="font-size:11px;color:#6a7888">Referred To: <strong>'+esc(o.refTo)+'</strong></span></div>'
+        +(dt.observation?'<div class="sl">Observation</div><div class="ot">'+esc(dt.observation)+'</div>':'')+
+        (dt.recommendation?'<div class="sl">Recommendation</div><div class="oq">'+esc(dt.recommendation)+'</div>':'')+
+        (dt.response?'<div class="sl">Auditee Response</div><div class="oq">'+esc(dt.response)+'</div>':'')+
+        (dt.roResponse?'<div class="sl">RO Response</div><div class="oq">'+esc(dt.roResponse)+'</div>':'')+
+        (dt.auditView?'<div class="sl">Audit View</div><div class="oq" style="border-left-color:#1a3a5c">'+esc(dt.auditView)+'</div>':'')
+        +'</div></div>';
     });
     cardsHtml+='</div>';
   });
+
+  // Section F: Sensitivity Matrix with refs
+  var sdRefs={High:[],MH:[],LM:[],Low:[]};
+  obs.forEach(function(o){var k=o.risk;if(sdRefs[k])sdRefs[k].push(o.id);});
+  function smrRef(arr){return arr.length?arr.map(function(id){return'<span style="display:inline-block;background:rgba(0,0,0,.08);border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700;margin:1px">'+esc(id)+'</span>';}).join(' '):'<span style="color:#aaa">—</span>';}
+  var sensMatrix='<div class="mhr"><div class="mhc">HIGH Likelihood</div><div class="mhc">LOW Likelihood</div></div>'
+    +'<div class="mg"><div class="mav">I&nbsp;M&nbsp;P&nbsp;A&nbsp;C&nbsp;T</div>'
+    +'<div class="mq mq1"><div class="ql">&#128308; High Risk</div><div class="qr">'+smrRef(sdRefs.High)+'<br><strong>Count: '+(sdRefs.High.length)+'</strong></div></div>'
+    +'<div class="mq mq2"><div class="ql">&#128992; Med to High</div><div class="qr">'+smrRef(sdRefs.MH)+'<br><strong>Count: '+(sdRefs.MH.length)+'</strong></div></div>'
+    +'<div class="mq mq3"><div class="ql">&#128994; Low to Med</div><div class="qr">'+smrRef(sdRefs.LM)+'<br><strong>Count: '+(sdRefs.LM.length)+'</strong></div></div>'
+    +'<div class="mq mq4"><div class="ql">&#128995; Low Risk</div><div class="qr">'+smrRef(sdRefs.Low)+'<br><strong>Count: '+(sdRefs.Low.length)+'</strong></div></div>'
+    +'<div class="mah">L I K E L I H O O D &nbsp;/&nbsp; N O N &ndash; C O M P L I A N C E</div></div>';
+
   // analysis table
   var aTbl='';
   if(aRows.length>1){
@@ -16168,174 +16243,275 @@ function _w2rBuildHtml(d){
     for(var i=1;i<aRows.length;i++) aTbl+='<tr>'+aRows[i].map(function(c){return'<td class="num">'+esc(c)+'</td>';}).join('')+'</tr>';
     aTbl+='</tbody></table></div>';
   }
-  function smr(arr){return(arr&&arr.length)?arr.join(', '):'—';}
   var auth=meta.authors.length?meta.authors.join(' &mdash; '):'Systems &amp; Audit Department';
 
+  // Methodology section HTML
+  var stepData=[
+    {num:1,icon:'&#128270;',title:'Risk Identification',color:'#1a3a5c',
+     detail:'Identify and prioritize risk areas based on the nature, size, and complexity of the audited unit. This includes reviewing prior audit reports, management representations, and environmental risk factors to build the Risk Register. Key deliverable: Risk Register with categorized risk areas assigned sensitivity ratings.'},
+    {num:2,icon:'&#9881;',title:'Control Assessment',color:'#c9962a',
+     detail:'Evaluate the design and operating effectiveness of internal controls relevant to each identified risk. Control assessments determine whether controls are sufficient to mitigate inherent risks to an acceptable residual level. Key deliverable: Control Activity Matrix mapping controls to risks.'},
+    {num:3,icon:'&#128196;',title:'Evidence Gathering',color:'#2e7d32',
+     detail:'Collect and analyze audit evidence through inspections, observations, inquiries, confirmations, and analytical procedures. Evidence must be sufficient, appropriate, and directly linked to identified risk areas and control gaps. Key deliverable: Working papers with documented evidence per observation.'},
+    {num:4,icon:'&#128221;',title:'Observation Development',color:'#b7660a',
+     detail:'Develop observations based on evidence gathered. Each observation includes the condition (what was found), criteria (what should be), cause (why it occurred), and effect (the risk/impact). Observations are rated by auditor sensitivity to reflect materiality and likelihood. Key deliverable: Draft Audit Observations with Risk Ratings.'},
+    {num:5,icon:'&#128202;',title:'Reporting & Follow-up',color:'#6b21a8',
+     detail:'Communicate findings to management through a structured audit report. Include management responses, action plans, and deadlines. Track repeat observations to assess systemic control weaknesses and ensure corrective actions are implemented. Key deliverable: Final Audit Report with Management Action Plan.'}
+  ];
+  var stepsHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:20px">';
+  stepData.forEach(function(s){
+    stepsHtml+='<div class="step-card" onclick="tgStep(this)" style="background:#fff;border:1px solid #dde2ea;border-radius:8px;overflow:hidden;cursor:pointer;transition:box-shadow .2s">'
+      +'<div style="background:'+s.color+';color:#fff;padding:10px 14px;display:flex;align-items:center;gap:8px">'
+      +'<span style="font-size:20px">'+s.icon+'</span>'
+      +'<div><div style="font-size:10px;opacity:.7;letter-spacing:.5px">STEP '+s.num+'</div>'
+      +'<div style="font-size:13px;font-weight:700">'+s.title+'</div></div>'
+      +'<span style="margin-left:auto;font-size:14px;transition:transform .2s" class="step-chv">&#9660;</span>'
+      +'</div>'
+      +'<div class="step-body" style="display:none;padding:12px 14px;font-size:12.5px;line-height:1.65;color:#3a4a60">'+s.detail+'</div>'
+      +'</div>';
+  });
+  stepsHtml+='</div>';
+
+  var rcmHtml='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'
+    +'<label style="font-size:12px;font-weight:700;color:#5a7a9a">Group By:</label>'
+    +'<select id="w-rcm-group" onchange="wRcmRender()" style="padding:4px 10px;border:1px solid #dde2ea;border-radius:6px;font-size:12px;font-family:Inter,sans-serif">'
+    +'<option value="cat">Category</option><option value="type">Type</option><option value="risk">Auditor Risk</option><option value="none">No Grouping</option>'
+    +'</select>'
+    +'<button onclick="wRcmExpand(true)" style="padding:4px 10px;border:1px solid #dde2ea;border-radius:6px;font-size:12px;background:#fff;cursor:pointer;font-family:Inter,sans-serif">&#9660; Expand All</button>'
+    +'<button onclick="wRcmExpand(false)" style="padding:4px 10px;border:1px solid #dde2ea;border-radius:6px;font-size:12px;background:#fff;cursor:pointer;font-family:Inter,sans-serif">&#9658; Collapse All</button>'
+    +'</div>'
+    +'<div class="tw"><table class="rt" id="w-rcm-tbl"><thead><tr id="w-rcm-head"></tr></thead><tbody id="w-rcm-body"></tbody></table></div>';
+
+  var ermStmt='<div style="background:linear-gradient(135deg,#0d1f35,#1a3a5c);color:#fff;border-radius:8px;padding:20px 24px;margin-top:16px">'
+    +'<div style="font-size:13px;font-weight:700;color:#f0c040;margin-bottom:10px;letter-spacing:.5px">&#128200; ERM Assurance Statement</div>'
+    +'<div style="font-size:12.5px;line-height:1.75;color:#c8d8f0">'
+    +'Based on our risk-based audit methodology and the procedures performed, this audit was conducted in accordance with the Enterprise Risk Management (ERM) framework principles. '
+    +'Our approach ensured that:<br><br>'
+    +'&#10003;&nbsp; <strong>Risk Identification</strong> — All material risk areas were identified and documented in the Risk Register prior to fieldwork.<br>'
+    +'&#10003;&nbsp; <strong>Control Assessment</strong> — Internal controls were evaluated for design adequacy and operating effectiveness against each risk.<br>'
+    +'&#10003;&nbsp; <strong>Evidence-Based Conclusions</strong> — All observations are supported by documented audit evidence and are directly traceable to identified risks.<br>'
+    +'&#10003;&nbsp; <strong>Risk-Rated Reporting</strong> — Observations are rated using a consistent risk sensitivity matrix reflecting inherent and residual risk levels.<br>'
+    +'&#10003;&nbsp; <strong>Management Accountability</strong> — Findings include management responses and agreed action plans with defined responsibility and timelines.'
+    +'</div></div>';
+
+  var methSection='<div class="pb"><h2>&#128221; Risk-Based Audit Methodology</h2>'
+    +'<div style="background:#f0f5fb;border-left:4px solid #1a3a5c;padding:12px 16px;border-radius:0 6px 6px 0;margin-bottom:16px;font-size:12.5px;line-height:1.7;color:#3a4a60">'
+    +'This audit was conducted using a <strong>Risk-Based Audit Methodology</strong> aligned with Enterprise Risk Management (ERM) principles and the COSO Internal Control Framework. '
+    +'The following five-step process was applied systematically to ensure that audit effort is directed towards areas of highest risk and that controls are evaluated in context of their risk mitigation effectiveness.'
+    +'</div>'+stepsHtml
+    +'<h2 style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid #dde2ea">&#128203; Risk &amp; Control Matrix — All Observations</h2>'
+    +rcmHtml+ermStmt+'</div>';
+
   // ── CSS ──
-  var css='*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}'+
-  ':root{--nv:#1a3a5c;--nd:#0f2540;--go:#c9962a;--bg:#f3f5f8;--br:#dde2ea}'+
-  'body{font-family:Inter,sans-serif;font-size:13.5px;color:#1e2d40;background:var(--bg)}'+
-  '#cov{background:linear-gradient(135deg,#0d1f35,#1a3a5c 60%,#2a5080);color:#fff;padding:52px 36px 44px;text-align:center;border-bottom:4px solid var(--go)}'+
-  '.co{font-size:12px;letter-spacing:3px;color:#f0c040;text-transform:uppercase;margin-bottom:8px}'+
-  '.ct{font-family:Merriweather,serif;font-size:24px;font-weight:700;margin-bottom:6px}'+
-  '.cs{font-size:14px;color:#c8d8f0;margin-bottom:20px}'+
-  '.cc{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:20px}'+
-  '.ck{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:20px;padding:4px 14px;font-size:12px;color:#dde8f8}'+
-  '.ck span{color:#f0c040;font-weight:600}'+
-  '.cf{font-size:11px;color:rgba(255,255,255,.4);letter-spacing:1px;text-transform:uppercase}'+
-  '#kb{background:var(--nd);padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;border-bottom:2px solid var(--go)}'+
-  '.kt{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px 16px;text-align:center;cursor:pointer;transition:background .2s,transform .15s;min-width:80px}'+
-  '.kt:hover{background:rgba(255,255,255,.14);transform:translateY(-2px)}'+
-  '.kn{font-size:24px;font-weight:700;line-height:1}.kl{font-size:10px;color:#a0b4c8;margin-top:3px;text-transform:uppercase;letter-spacing:.5px}'+
-  '#tb{background:#fff;border-bottom:2px solid var(--br);display:flex;padding:0 18px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow-x:auto}'+
-  '.tbn{padding:10px 16px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:600;color:#6a7888;border-bottom:3px solid transparent;transition:color .2s,border-color .2s;font-family:Inter,sans-serif;white-space:nowrap}'+
-  '.tbn.active{color:var(--nv);border-bottom-color:var(--go)}'+
-  '.sc{display:none;padding:18px}.sc.active{display:block}'+
-  '.ig{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:18px}'+
-  '.ic{background:#fff;border-radius:8px;border:1px solid var(--br);padding:12px 16px}'+
-  '.ic h3{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#8899aa;margin-bottom:7px}'+
-  '.ir{display:flex;gap:7px;margin-bottom:4px;font-size:12.5px}.il{color:#6a7888;min-width:100px;flex-shrink:0}.iv{font-weight:600}'+
-  '.pb{background:#fff;border-radius:8px;border:1px solid var(--br);padding:16px 20px;margin-bottom:12px}'+
-  '.pb h2{font-size:13px;font-weight:700;color:var(--nv);margin-bottom:7px;padding-bottom:5px;border-bottom:1px solid var(--br)}'+
-  '.mw{background:#fff;border-radius:8px;border:1px solid var(--br);padding:16px 20px;margin-bottom:12px}'+
-  '.mw h2{font-size:13px;font-weight:700;color:var(--nv);margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid var(--br)}'+
-  '.mhr{display:flex;justify-content:space-between;max-width:660px;margin:0 auto 4px;padding-left:38px}'+
-  '.mhc{flex:1;text-align:center;font-size:10px;font-weight:700;color:#888;letter-spacing:1px}'+
-  '.mg{display:grid;grid-template-columns:34px 1fr 1fr;grid-template-rows:1fr 1fr 34px;gap:4px;max-width:660px;margin:0 auto}'+
-  '.mq{padding:12px;border-radius:5px}.mq1{background:#fde8e8;border:1px solid #f5c6c6}.mq2{background:#fef3e2;border:1px solid #fad9a0}.mq3{background:#fff9e6;border:1px solid #f5e6a0}.mq4{background:#e8f5e9;border:1px solid #a5d6a7}'+
-  '.mq .ql{font-weight:700;font-size:12px;color:#333;margin-bottom:4px}.mq .qr{font-size:11px;color:#555;line-height:1.6}'+
-  '.mav{writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;font-size:10px;font-weight:700;color:#555;letter-spacing:2px;background:#f0f4f8;border-radius:4px;display:flex;align-items:center;justify-content:center}'+
-  '.mah{grid-column:2/4;grid-row:3;text-align:center;font-size:10px;font-weight:700;color:#555;letter-spacing:2px;background:#f0f4f8;border-radius:4px;display:flex;align-items:center;justify-content:center;padding:5px}'+
-  '.tw{overflow-x:auto;margin-bottom:12px}'+
-  'table.rt{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;border:1px solid var(--br)}'+
-  'table.rt th{background:var(--nv);color:#fff;padding:8px 11px;font-size:11.5px;text-align:left;font-weight:600}'+
-  'table.rt td{padding:7px 11px;border-bottom:1px solid var(--br);font-size:12px;vertical-align:top}'+
-  'table.rt td.num{text-align:center;font-weight:700}table.rt tr:last-child td{border-bottom:none}'+
-  '.sf{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}'+
-  '.sfb{padding:4px 12px;border:1px solid var(--br);border-radius:20px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#6a7888;transition:all .2s;font-family:Inter,sans-serif}'+
-  '.sfb.active,.sfb:hover{background:var(--nv);color:#fff;border-color:var(--nv)}'+
-  '.st_{background:#fff;border-radius:8px;border:1px solid var(--br);overflow:hidden}'+
-  '.shdr{display:grid;grid-template-columns:62px 1fr 78px 88px 68px;background:var(--nv);color:#fff;padding:8px 12px;font-size:11px;font-weight:700;letter-spacing:.3px}'+
-  '.sr{border-bottom:1px solid var(--br);cursor:pointer}.sr:last-child{border-bottom:none}'+
-  '.srm{display:grid;grid-template-columns:62px 1fr 78px 88px 68px;padding:9px 12px;align-items:center;transition:background .15s}'+
-  '.srm:hover{background:#f5f8fc}.sr.expanded .srm{background:#eef3fa}'+
-  '.srf{font-weight:700;color:var(--nv);font-size:12.5px}.srt{font-size:12.5px}'+
-  '.st{font-size:11px;padding:2px 7px;border-radius:10px;font-weight:700;text-align:center;display:inline-block}'+
-  '.sr_{background:#f3e8ff;color:#6b21a8}.sn{background:#e0f2fe;color:#0369a1}'+
-  '.rb{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}'+
-  '.r-High{background:#fde8e8;color:#c0392b;border:1px solid #f5c6c6}'+
-  '.r-MH{background:#fef3e2;color:#b7660a;border:1px solid #fad9a0}'+
-  '.r-LM{background:#e3f2fd;color:#1565c0;border:1px solid #bbdefb}'+
-  '.r-Low{background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9}'+
-  '.sre{padding:14px 18px;background:#f9fbfe;border-top:1px solid var(--br);display:none}'+
-  '.sr.expanded .sre{display:block}'+
-  '.seg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}'+
-  '.eb{background:#fff;border-radius:5px;border:1px solid var(--br);padding:10px 12px}'+
-  '.eb h4{font-size:11px;font-weight:700;color:#6a7888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}'+
-  '.eb p,.eb div{font-size:12.5px;line-height:1.6;color:#2a3a50}'+
-  '.bvo{display:inline-block;margin-top:7px;padding:5px 11px;background:var(--nv);color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif}'+
-  '.tagr{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:7px}'+
-  '.os{margin-bottom:20px}'+
-  '.osh{background:var(--nv);color:#fff;padding:9px 14px;border-radius:6px 6px 0 0;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}'+
-  '.osh .cnt{background:rgba(255,255,255,.2);padding:1px 7px;border-radius:10px;font-size:11px}'+
-  '.oc{background:#fff;border:1px solid var(--br);border-top:none;padding:0}.oc:last-child{border-radius:0 0 6px 6px}'+
-  '.och{padding:10px 14px;display:flex;align-items:center;gap:8px;cursor:pointer;transition:background .15s;border-bottom:1px solid var(--br)}'+
-  '.och:hover{background:#f5f8fc}.oc.open .och{background:#eef3fa}'+
-  '.on{font-weight:700;color:var(--nv);font-size:12.5px;min-width:44px}'+
-  '.chv{transition:transform .2s;color:#aaa;font-size:13px;margin-left:auto}.oc.open .chv{transform:rotate(180deg)}'+
-  '.ob{display:none;padding:14px 18px;background:#fafcff}.oc.open .ob{display:block}'+
-  '.sl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#8899aa;margin-bottom:4px;margin-top:9px}.sl:first-child{margin-top:0}'+
-  '.ot{font-size:13px;line-height:1.7;color:#2a3a50}'+
-  '.oq{background:#f0f4fa;border-left:3px solid var(--go);padding:9px 12px;margin:5px 0;font-size:12.5px;line-height:1.65;color:#3a4a60;border-radius:0 4px 4px 0}'+
-  '.ph{padding:8px 14px;border-radius:4px;margin-bottom:9px;font-weight:700;font-size:13px}'+
-  '.rph{background:#f3e8ff;border-left:4px solid #7c3aed;color:#6b21a8}'+
-  '.nph{background:#e0f2fe;border-left:4px solid #0369a1;color:#0369a1}'+
-  '#om{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:none;align-items:center;justify-content:center}'+
-  '#om.open{display:flex}'+
-  '.mb{background:#fff;border-radius:10px;width:740px;max-width:96vw;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.35)}'+
-  '.mhd{background:var(--nd);color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between}'+
-  '.mhd h2{font-size:13px;font-weight:700}.mc{background:rgba(255,255,255,.15);border:none;color:#fff;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1}'+
-  '.mbdy{padding:18px 22px;overflow-y:auto;flex:1}'+
-  '#ft{background:var(--nd);color:#a0b4c8;text-align:center;padding:16px;font-size:11px;border-top:2px solid var(--go)}'+
-  '@media(max-width:580px){.shdr,.srm{grid-template-columns:50px 1fr 68px 68px}.seg{grid-template-columns:1fr}}';
+  var css='*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}'
+  +':root{--nv:#1a3a5c;--nd:#0f2540;--go:#c9962a;--bg:#f3f5f8;--br:#dde2ea}'
+  +'body{font-family:Inter,sans-serif;font-size:13.5px;color:#1e2d40;background:var(--bg)}'
+  +'#cov{background:linear-gradient(135deg,#0d1f35,#1a3a5c 60%,#2a5080);color:#fff;padding:52px 36px 44px;text-align:center;border-bottom:4px solid var(--go)}'
+  +'.co{font-size:12px;letter-spacing:3px;color:#f0c040;text-transform:uppercase;margin-bottom:8px}'
+  +'.ct{font-family:Merriweather,serif;font-size:24px;font-weight:700;margin-bottom:6px}'
+  +'.cs{font-size:14px;color:#c8d8f0;margin-bottom:20px}'
+  +'.cc{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:20px}'
+  +'.ck{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:20px;padding:4px 14px;font-size:12px;color:#dde8f8}'
+  +'.ck span{color:#f0c040;font-weight:600}'
+  +'.cf{font-size:11px;color:rgba(255,255,255,.4);letter-spacing:1px;text-transform:uppercase}'
+  +'#kb{background:var(--nd);padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;border-bottom:2px solid var(--go)}'
+  +'.kt{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px 16px;text-align:center;cursor:pointer;transition:background .2s,transform .15s;min-width:80px}'
+  +'.kt:hover{background:rgba(255,255,255,.14);transform:translateY(-2px)}'
+  +'.kn{font-size:24px;font-weight:700;line-height:1}.kl{font-size:10px;color:#a0b4c8;margin-top:3px;text-transform:uppercase;letter-spacing:.5px}'
+  +'#tb{background:#fff;border-bottom:2px solid var(--br);display:flex;padding:0 18px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow-x:auto}'
+  +'.tbn{padding:10px 16px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:600;color:#6a7888;border-bottom:3px solid transparent;transition:color .2s,border-color .2s;font-family:Inter,sans-serif;white-space:nowrap}'
+  +'.tbn.active{color:var(--nv);border-bottom-color:var(--go)}'
+  +'.sc{display:none;padding:18px}.sc.active{display:block}'
+  +'.ig{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:18px}'
+  +'.ic{background:#fff;border-radius:8px;border:1px solid var(--br);padding:12px 16px}'
+  +'.ic h3{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#8899aa;margin-bottom:7px}'
+  +'.ir{display:flex;gap:7px;margin-bottom:4px;font-size:12.5px}.il{color:#6a7888;min-width:100px;flex-shrink:0}.iv{font-weight:600}'
+  +'.pb{background:#fff;border-radius:8px;border:1px solid var(--br);padding:16px 20px;margin-bottom:12px}'
+  +'.pb h2{font-size:13px;font-weight:700;color:var(--nv);margin-bottom:7px;padding-bottom:5px;border-bottom:1px solid var(--br)}'
+  +'.mw{background:#fff;border-radius:8px;border:1px solid var(--br);padding:16px 20px;margin-bottom:12px}'
+  +'.mw h2{font-size:13px;font-weight:700;color:var(--nv);margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid var(--br)}'
+  +'.mhr{display:flex;justify-content:space-between;max-width:660px;margin:0 auto 4px;padding-left:38px}'
+  +'.mhc{flex:1;text-align:center;font-size:10px;font-weight:700;color:#888;letter-spacing:1px}'
+  +'.mg{display:grid;grid-template-columns:34px 1fr 1fr;grid-template-rows:1fr 1fr 34px;gap:4px;max-width:660px;margin:0 auto}'
+  +'.mq{padding:12px;border-radius:5px}.mq1{background:#fde8e8;border:1px solid #f5c6c6}.mq2{background:#fef3e2;border:1px solid #fad9a0}.mq3{background:#fff9e6;border:1px solid #f5e6a0}.mq4{background:#e8f5e9;border:1px solid #a5d6a7}'
+  +'.mq .ql{font-weight:700;font-size:12px;color:#333;margin-bottom:4px}.mq .qr{font-size:11px;color:#555;line-height:1.6}'
+  +'.mav{writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;font-size:10px;font-weight:700;color:#555;letter-spacing:2px;background:#f0f4f8;border-radius:4px;display:flex;align-items:center;justify-content:center}'
+  +'.mah{grid-column:2/4;grid-row:3;text-align:center;font-size:10px;font-weight:700;color:#555;letter-spacing:2px;background:#f0f4f8;border-radius:4px;display:flex;align-items:center;justify-content:center;padding:5px}'
+  +'.tw{overflow-x:auto;margin-bottom:12px}'
+  +'table.rt{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;border:1px solid var(--br)}'
+  +'table.rt th{background:var(--nv);color:#fff;padding:8px 11px;font-size:11.5px;text-align:left;font-weight:600;cursor:pointer;white-space:nowrap}'
+  +'table.rt th:hover{background:#2a5080}'
+  +'table.rt td{padding:7px 11px;border-bottom:1px solid var(--br);font-size:12px;vertical-align:top}'
+  +'table.rt td.num{text-align:center;font-weight:700}table.rt tr:last-child td{border-bottom:none}'
+  +'.sf{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}'
+  +'.sfb{padding:4px 12px;border:1px solid var(--br);border-radius:20px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#6a7888;transition:all .2s;font-family:Inter,sans-serif}'
+  +'.sfb.active,.sfb:hover{background:var(--nv);color:#fff;border-color:var(--nv)}'
+  +'.st_{background:#fff;border-radius:8px;border:1px solid var(--br);overflow:hidden}'
+  +'.shdr{display:grid;grid-template-columns:52px 1fr 70px 100px 100px 70px 70px;background:var(--nv);color:#fff;padding:8px 12px;font-size:11px;font-weight:700;letter-spacing:.3px}'
+  +'.sr{border-bottom:1px solid var(--br);cursor:pointer}.sr:last-child{border-bottom:none}'
+  +'.srm{display:grid;grid-template-columns:52px 1fr 70px 100px 100px 70px 70px;padding:9px 12px;align-items:center;transition:background .15s}'
+  +'.srm:hover{background:#f5f8fc}.sr.expanded .srm{background:#eef3fa}'
+  +'.srf{font-weight:700;color:var(--nv);font-size:12.5px}.srt{font-size:12.5px}'
+  +'.st{font-size:11px;padding:2px 7px;border-radius:10px;font-weight:700;text-align:center;display:inline-block}'
+  +'.sr_{background:#f3e8ff;color:#6b21a8}.sn{background:#e0f2fe;color:#0369a1}'
+  +'.rb{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}'
+  +'.r-High{background:#fde8e8;color:#c0392b;border:1px solid #f5c6c6}'
+  +'.r-MH{background:#fef3e2;color:#b7660a;border:1px solid #fad9a0}'
+  +'.r-LM{background:#e3f2fd;color:#1565c0;border:1px solid #bbdefb}'
+  +'.r-Low{background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9}'
+  +'.sre{padding:14px 18px;background:#f9fbfe;border-top:1px solid var(--br);display:none}'
+  +'.sr.expanded .sre{display:block}'
+  +'.seg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}'
+  +'.eb{background:#fff;border-radius:5px;border:1px solid var(--br);padding:10px 12px}'
+  +'.eb h4{font-size:11px;font-weight:700;color:#6a7888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}'
+  +'.eb p,.eb div{font-size:12.5px;line-height:1.6;color:#2a3a50}'
+  +'.bvo{display:inline-block;margin-top:4px;padding:5px 11px;background:var(--nv);color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif}'
+  +'.tagr{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:7px}'
+  +'.os{margin-bottom:20px}'
+  +'.osh{background:var(--nv);color:#fff;padding:9px 14px;border-radius:6px 6px 0 0;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}'
+  +'.osh .cnt{background:rgba(255,255,255,.2);padding:1px 7px;border-radius:10px;font-size:11px}'
+  +'.oc{background:#fff;border:1px solid var(--br);border-top:none;padding:0}.oc:last-child{border-radius:0 0 6px 6px}'
+  +'.och{padding:10px 14px;display:flex;align-items:center;gap:8px;cursor:pointer;transition:background .15s;border-bottom:1px solid var(--br)}'
+  +'.och:hover{background:#f5f8fc}.oc.open .och{background:#eef3fa}'
+  +'.on{font-weight:700;color:var(--nv);font-size:12.5px;min-width:44px}'
+  +'.chv{transition:transform .2s;color:#aaa;font-size:13px;margin-left:auto}.oc.open .chv{transform:rotate(180deg)}'
+  +'.ob{display:none;padding:14px 18px;background:#fafcff}.oc.open .ob{display:block}'
+  +'.sl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#8899aa;margin-bottom:4px;margin-top:9px}.sl:first-child{margin-top:0}'
+  +'.ot{font-size:13px;line-height:1.7;color:#2a3a50}'
+  +'.oq{background:#f0f4fa;border-left:3px solid var(--go);padding:9px 12px;margin:5px 0;font-size:12.5px;line-height:1.65;color:#3a4a60;border-radius:0 4px 4px 0}'
+  +'.ph{padding:8px 14px;border-radius:4px;margin-bottom:9px;font-weight:700;font-size:13px}'
+  +'.rph{background:#f3e8ff;border-left:4px solid #7c3aed;color:#6b21a8}'
+  +'.nph{background:#e0f2fe;border-left:4px solid #0369a1;color:#0369a1}'
+  +'#om{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:none;align-items:center;justify-content:center}'
+  +'#om.open{display:flex}'
+  +'.mb{background:#fff;border-radius:10px;width:740px;max-width:96vw;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.35)}'
+  +'.mhd{background:var(--nd);color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between}'
+  +'.mhd h2{font-size:13px;font-weight:700}.mc{background:rgba(255,255,255,.15);border:none;color:#fff;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1}'
+  +'.mbdy{padding:18px 22px;overflow-y:auto;flex:1}'
+  +'#ft{background:var(--nd);color:#a0b4c8;text-align:center;padding:16px;font-size:11px;border-top:2px solid var(--go)}'
+  +'.step-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.12)}'
+  +'.rcm-grp-hdr{background:#eef3fa;padding:7px 11px;font-size:11.5px;font-weight:700;color:#1a3a5c;cursor:pointer;border-top:1px solid #dde2ea;display:flex;align-items:center;gap:6px}'
+  +'.rcm-grp-hdr:hover{background:#dde8f5}'
+  +'@media(max-width:768px){.shdr,.srm{grid-template-columns:44px 1fr 60px 80px 80px}.seg{grid-template-columns:1fr}}';
 
   // ── JS ──
-  var js=obsDataJs+
-  'function showTab(n,btn){document.querySelectorAll(".tbn").forEach(function(b){b.classList.remove("active")});document.querySelectorAll(".sc").forEach(function(s){s.classList.remove("active")});document.getElementById("t"+n).classList.add("active");btn.classList.add("active");}\n'+
-  'function tgSyn(el){el.classList.toggle("expanded");}\n'+
-  'function filterSyn(f,btn){\n'+
-  '  if(btn){document.querySelectorAll(".sfb").forEach(function(b){b.classList.remove("active")});btn.classList.add("active");}\n'+
-  '  document.querySelectorAll(".sr").forEach(function(r){var k=r.dataset.risk,t=r.dataset.type;r.style.display=(f==="all"||f===k||(f==="rep"&&t==="rep")||(f==="new"&&t==="new"))?"":"none";});\n'+
-  '  if(!btn){document.querySelectorAll(".tbn").forEach(function(b){b.classList.remove("active")});document.querySelectorAll(".sc").forEach(function(s){s.classList.remove("active")});document.getElementById("tsynopsis").classList.add("active");document.querySelectorAll(".tbn")[1].classList.add("active");var bs=document.querySelectorAll(".sfb");var idx={all:0,High:1,MH:2,LM:3,Low:4,rep:5,new:6}[f];if(bs[idx]){bs.forEach(function(b){b.classList.remove("active")});bs[idx].classList.add("active");}}\n'+
-  '}\n'+
-  'function openM(id){var o=OD[id];if(!o)return;document.getElementById("mttl").textContent=id+" — "+o.title;var b="<div class=\'tagr\'>"+rb(o.risk)+tb(o.type)+"<span style=\'font-size:11px;color:#6a7888\'>Ref: <strong>"+o.refTo+"</strong></span></div>";if(o.observation)b+="<div class=\'sl\'>Observation</div><div class=\'ot\' style=\'margin-bottom:10px\'>"+o.observation+"</div>";if(o.recommendation)b+="<div class=\'sl\'>Recommendation</div><div class=\'oq\' style=\'margin-bottom:10px\'>"+o.recommendation+"</div>";if(o.response)b+="<div class=\'sl\'>Auditee Response</div><div class=\'oq\'>"+o.response+"</div>";if(o.roResponse)b+="<div class=\'sl\'>RO Response</div><div class=\'oq\'>"+o.roResponse+"</div>";if(o.auditView)b+="<div class=\'sl\'>Audit View</div><div class=\'oq\' style=\'border-left-color:#1a3a5c\'>"+o.auditView+"</div>";document.getElementById("mbdy").innerHTML=b;document.getElementById("om").classList.add("open");}\n'+
-  'function closeM(){document.getElementById("om").classList.remove("open");}\n'+
-  'document.getElementById("om").addEventListener("click",function(e){if(e.target===this)closeM();});\n'+
-  'var RLBL={High:"&#128308; High",MH:"&#128992; M to H",LM:"&#128994; L to M",Low:"&#128995; Low"};\n'+
-  'function rb(r){return "<span class=\'rb r-"+r+"\'>"+RLBL[r]+"</span>";}\n'+
-  'function tb(t){return "<span class=\'st "+(t==="rep"?"sr_":"sn")+"\'"+">"+(t==="rep"?"Repeated":"New")+"</span>";}\n';
+  var js=obsDataJs
+  +'var _wRcmData='+rcmJson+';\n'
+  +'var _wRcmSort={col:null,asc:true};\n'
+  +'var _wRcmGroups={};\n'
+  +'var RLBL={High:"&#128308; High",MH:"&#128992; M to H",LM:"&#128994; L to M",Low:"&#128995; Low"};\n'
+  +'function rb(r){return "<span class=\'rb r-"+r+"\'>"+RLBL[r]+"</span>";}\n'
+  +'function tb(t){return "<span class=\'st "+(t==="rep"?"sr_":"sn")+"\'>"+(t==="rep"?"Repeated":"New")+"</span>";}\n'
+  +'function showTab(n,btn){document.querySelectorAll(".tbn").forEach(function(b){b.classList.remove("active")});document.querySelectorAll(".sc").forEach(function(s){s.classList.remove("active")});document.getElementById("t"+n).classList.add("active");btn.classList.add("active");}\n'
+  +'function tgSyn(el){el.classList.toggle("expanded");}\n'
+  +'function filterSyn(f,btn){\n'
+  +'  if(btn){document.querySelectorAll(".sfb").forEach(function(b){b.classList.remove("active")});btn.classList.add("active");}\n'
+  +'  document.querySelectorAll(".sr").forEach(function(r){var k=r.dataset.risk,t=r.dataset.type;r.style.display=(f==="all"||f===k||(f==="rep"&&t==="rep")||(f==="new"&&t==="new"))?"":"none";});\n'
+  +'}\n'
+  +'function hlSyn(id){\n'
+  +'  var el=document.getElementById(id);if(!el)return;\n'
+  +'  el.classList.remove("expanded");\n'
+  +'  document.querySelectorAll(".tbn").forEach(function(b){b.classList.remove("active")});document.querySelectorAll(".sc").forEach(function(s){s.classList.remove("active")});\n'
+  +'  document.getElementById("tsynopsis").classList.add("active");document.querySelectorAll(".tbn")[1].classList.add("active");\n'
+  +'  el.scrollIntoView({behavior:"smooth",block:"center"});\n'
+  +'  el.style.transition="background .3s";el.style.background="#fffde7";\n'
+  +'  setTimeout(function(){el.style.background="";},2000);\n'
+  +'}\n'
+  +'function openM(id){var o=OD[id];if(!o)return;document.getElementById("mttl").textContent=id+" — "+o.title;var b="<div class=\'tagr\'>"+rb(o.risk)+tb(o.type)+"<span style=\'font-size:11px;color:#6a7888\'>Ref: <strong>"+o.refTo+"</strong></span></div>";if(o.observation)b+="<div class=\'sl\'>Observation</div><div class=\'ot\' style=\'margin-bottom:10px\'>"+o.observation+"</div>";if(o.recommendation)b+="<div class=\'sl\'>Recommendation</div><div class=\'oq\' style=\'margin-bottom:10px\'>"+o.recommendation+"</div>";if(o.response)b+="<div class=\'sl\'>Auditee Response</div><div class=\'oq\'>"+o.response+"</div>";if(o.roResponse)b+="<div class=\'sl\'>RO Response</div><div class=\'oq\'>"+o.roResponse+"</div>";if(o.auditView)b+="<div class=\'sl\'>Audit View</div><div class=\'oq\' style=\'border-left-color:#1a3a5c\'>"+o.auditView+"</div>";document.getElementById("mbdy").innerHTML=b;document.getElementById("om").classList.add("open");}\n'
+  +'function closeM(){document.getElementById("om").classList.remove("open");}\n'
+  +'document.getElementById("om").addEventListener("click",function(e){if(e.target===this)closeM();});\n'
+  +'function tgStep(card){var body=card.querySelector(".step-body");var chv=card.querySelector(".step-chv");var open=body.style.display!=="none"&&body.style.display!=="";body.style.display=open?"none":"block";chv.style.transform=open?"":"rotate(180deg)";}\n'
+  +'function wRcmRender(){\n'
+  +'  var grp=document.getElementById("w-rcm-group").value;\n'
+  +'  var data=_wRcmData.slice();\n'
+  +'  if(_wRcmSort.col!==null){var col=_wRcmSort.col;var asc=_wRcmSort.asc;data.sort(function(a,b){var av=a[col]||"",bv=b[col]||"";return asc?(av<bv?-1:av>bv?1:0):(av<bv?1:av>bv?-1:0);});}\n'
+  +'  var cols=["#","ID","Title","Category","Type","Auditor Risk","Residual Risk","Risk Register","Control Activity"];\n'
+  +'  var keys=[null,"id","title","cat","type","risk","residual","rr","ca"];\n'
+  +'  var head=document.getElementById("w-rcm-head");\n'
+  +'  head.innerHTML=cols.map(function(c,i){return"<th onclick=\'"+(i>0?"wRcmSort(\'"+keys[i]+"\')":'')+"\'>"+(i>0?"&#8597; ":"")+c+"</th>";}).join("");\n'
+  +'  var body=document.getElementById("w-rcm-body");\n'
+  +'  body.innerHTML="";\n'
+  +'  _wRcmGroups={};\n'
+  +'  if(grp==="none"){\n'
+  +'    data.forEach(function(r,i){body.innerHTML+=wRcmRow(r,i+1);});\n'
+  +'  } else {\n'
+  +'    var groups={}; var gOrder=[];\n'
+  +'    data.forEach(function(r){var gk=r[grp]||"—";if(!groups[gk]){groups[gk]=[];gOrder.push(gk);}groups[gk].push(r);});\n'
+  +'    gOrder.forEach(function(gk){\n'
+  +'      var gid="wrcmg-"+gk.replace(/[^a-z0-9]/gi,"_");\n'
+  +'      _wRcmGroups[gid]=true;\n'
+  +'      body.innerHTML+="<tr class=\'rcm-grp-hdr\' onclick=\'wRcmToggleGrp(\\""+gid+"\\")\' id=\'"+gid+"-hdr\'><td colspan=\'9\'>&#9660; "+gk+" ("+groups[gk].length+")</td></tr>";\n'
+  +'      groups[gk].forEach(function(r,i){body.innerHTML+="<tr class=\'"+gid+"\'>"+wRcmRow(r,i+1).replace(/^<tr>/,"").replace(/<\\/tr>$/,"")+"</tr>";});\n'
+  +'    });\n'
+  +'  }\n'
+  +'}\n'
+  +'function wRcmRow(r,i){var RCH={"High":"background:#fde8e8;color:#c0392b","M to H":"background:#fef3e2;color:#b7660a","L to M":"background:#e3f2fd;color:#1565c0","Low":"background:#e8f5e9;color:#2e7d32"};function rc(v){var s=RCH[v]||"";return s?"<span style=\'display:inline-block;padding:2px 7px;border-radius:8px;font-size:11px;font-weight:700;"+s+"\'>"+(v==="High"?"🔴":v==="M to H"?"🟠":v==="L to M"?"🔵":"🟢")+" "+v+"</span>":v;}return"<tr><td class=\'num\'>"+i+"</td><td style=\'font-weight:700;color:#1a3a5c\'>"+r.id+"</td><td>"+r.title+"</td><td>"+r.cat+"</td><td>"+(r.type==="rep"?"<span style=\'background:#f3e8ff;color:#6b21a8;padding:2px 6px;border-radius:8px;font-size:11px;font-weight:700\'>Repeated</span>":"<span style=\'background:#e0f2fe;color:#0369a1;padding:2px 6px;border-radius:8px;font-size:11px;font-weight:700\'>New</span>")+"</td><td>"+rc(r.risk)+"</td><td>"+rc(r.residual)+"</td><td style=\'font-size:11.5px\'>"+r.rr+"</td><td style=\'font-size:11.5px\'>"+r.ca+"</td></tr>";}\n'
+  +'function wRcmSort(col){if(_wRcmSort.col===col)_wRcmSort.asc=!_wRcmSort.asc;else{_wRcmSort.col=col;_wRcmSort.asc=true;}wRcmRender();}\n'
+  +'function wRcmToggleGrp(gid){var rows=document.querySelectorAll("."+gid);var hdr=document.getElementById(gid+"-hdr");var open=_wRcmGroups[gid];rows.forEach(function(r){r.style.display=open?"none":"";});_wRcmGroups[gid]=!open;if(hdr){var td=hdr.querySelector("td");var t=td.textContent;td.textContent=open?t.replace("▼","▶"):t.replace("▶","▼");}}\n'
+  +'function wRcmExpand(open){Object.keys(_wRcmGroups).forEach(function(gid){if(_wRcmGroups[gid]!==open)wRcmToggleGrp(gid);});}\n'
+  +'document.addEventListener("DOMContentLoaded",function(){wRcmRender();});\n';
 
-  return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n'+
-  '<title>'+esc(meta.title)+' — '+esc(meta.branch||'Audit Report')+'</title>\n'+
-  '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">\n'+
-  '<style>'+css+'</style>\n</head>\n<body>\n'+
-  '<div id="cov"><div class="co">Beaconhouse Group &mdash; Systems &amp; Audit Department</div>'+
-  '<div class="ct">'+esc(meta.title)+'</div><div class="cs">'+esc(meta.branch||'')+'</div>'+
-  '<div class="cc">'+
-  (meta.visitPeriod?'<div class="ck">Period of Visit: <span>'+esc(meta.visitPeriod)+'</span></div>':'')+
-  (meta.coveredPeriod?'<div class="ck">Period Covered: <span>'+esc(meta.coveredPeriod)+'</span></div>':'')+
-  (meta.region?'<div class="ck">Region: <span>'+esc(meta.region)+'</span></div>':'')+
-  '<div class="ck">Status: <span>'+esc(meta.status)+'</span></div>'+
-  (auth?'<div class="ck">Prepared by: <span>'+auth+'</span></div>':'')+
-  '</div><div class="cf">Confidential &amp; Proprietary &mdash; S&amp;A Internal Use Only</div></div>\n'+
-  '<div id="kb">'+
-  '<div class="kt" onclick="filterSyn(\'High\')"><div class="kn" style="color:#e74c3c">'+cntH+'</div><div class="kl" style="color:#e74c3c">High</div></div>'+
-  '<div class="kt" onclick="filterSyn(\'MH\')"><div class="kn" style="color:#f39c12">'+cntMH+'</div><div class="kl" style="color:#f39c12">Med-High</div></div>'+
-  '<div class="kt" onclick="filterSyn(\'LM\')"><div class="kn" style="color:#3498db">'+cntLM+'</div><div class="kl" style="color:#3498db">Low-Med</div></div>'+
-  '<div class="kt" onclick="filterSyn(\'Low\')"><div class="kn" style="color:#2ecc71">'+cntLow+'</div><div class="kl" style="color:#2ecc71">Low</div></div>'+
-  '<div class="kt" onclick="filterSyn(\'all\')"><div class="kn" style="color:#f0c040">'+total+'</div><div class="kl">Total</div></div>'+
-  '<div class="kt" onclick="filterSyn(\'rep\')"><div class="kn" style="color:#9b59b6">'+cntRep+'</div><div class="kl" style="color:#9b59b6">Repeated</div></div>'+
-  '<div class="kt" onclick="filterSyn(\'new\')"><div class="kn" style="color:#1abc9c">'+cntNew+'</div><div class="kl" style="color:#1abc9c">New</div></div>'+
-  '</div>\n'+
-  '<div id="tb"><button class="tbn active" onclick="showTab(\'overview\',this)">&#128196; Overview</button><button class="tbn" onclick="showTab(\'synopsis\',this)">&#128202; Management Synopsis</button><button class="tbn" onclick="showTab(\'observations\',this)">&#128270; Detailed Observations</button></div>\n'+
-  '<div id="toverview" class="sc active"><div class="ig">'+
-  '<div class="ic"><h3>Document Information</h3>'+
-  '<div class="ir"><span class="il">Report</span><span class="iv">'+esc(meta.title)+'</span></div>'+
-  (meta.branch?'<div class="ir"><span class="il">Branch</span><span class="iv">'+esc(meta.branch)+'</span></div>':'')+
-  (meta.region?'<div class="ir"><span class="il">Region</span><span class="iv">'+esc(meta.region)+'</span></div>':'')+
-  (meta.visitPeriod?'<div class="ir"><span class="il">Period of Visit</span><span class="iv">'+esc(meta.visitPeriod)+'</span></div>':'')+
-  (meta.coveredPeriod?'<div class="ir"><span class="il">Period Covered</span><span class="iv">'+esc(meta.coveredPeriod)+'</span></div>':'')+
-  '<div class="ir"><span class="il">Status</span><span class="iv">'+esc(meta.status)+'</span></div></div>'+
-  (meta.authors.length?'<div class="ic"><h3>Audit Team</h3>'+meta.authors.map(function(a){return'<div class="ir"><span class="iv">'+esc(a)+'</span></div>';}).join('')+'</div>':'')+
-  '<div class="ic"><h3>Observation Summary</h3>'+
-  '<div class="ir"><span class="il">High</span><span class="iv" style="color:#c0392b">'+cntH+'</span></div>'+
-  '<div class="ir"><span class="il">Med-High</span><span class="iv" style="color:#b7660a">'+cntMH+'</span></div>'+
-  '<div class="ir"><span class="il">Low-Med</span><span class="iv" style="color:#1565c0">'+cntLM+'</span></div>'+
-  '<div class="ir"><span class="il">Low</span><span class="iv" style="color:#2e7d32">'+cntLow+'</span></div>'+
-  '<div class="ir"><span class="il">Total</span><span class="iv" style="color:#c9962a;font-size:15px">'+total+'</span></div></div></div>'+
-  (aTbl?'<div class="mw"><h2>Analysis of Audit Observations</h2>'+aTbl+'</div>':'')+
-  '<div class="mw"><h2>Sensitivity Matrix</h2>'+
-  '<div class="mhr"><div class="mhc">HIGH Impact</div><div class="mhc">LOW Impact</div></div>'+
-  '<div class="mg"><div class="mav">I&nbsp;M&nbsp;P&nbsp;A&nbsp;C&nbsp;T</div>'+
-  '<div class="mq mq1"><div class="ql">&#128308; High Risk</div><div class="qr">'+esc(smr(sd.High))+'<br>Count: <strong>'+(sd.High||[]).length+'</strong></div></div>'+
-  '<div class="mq mq2"><div class="ql">&#128992; Med to High</div><div class="qr">'+esc(smr(sd.MH))+'<br>Count: <strong>'+(sd.MH||[]).length+'</strong></div></div>'+
-  '<div class="mq mq3"><div class="ql">&#128994; Low to Med</div><div class="qr">'+esc(smr(sd.LM))+'<br>Count: <strong>'+(sd.LM||[]).length+'</strong></div></div>'+
-  '<div class="mq mq4"><div class="ql">&#128995; Low Risk</div><div class="qr">'+esc(smr(sd.Low))+'<br>Count: <strong>'+(sd.Low||[]).length+'</strong></div></div>'+
-  '<div class="mah">L I K E L I H O O D &nbsp;/&nbsp; N O N &ndash; C O M P L I A N C E</div></div></div>'+
-  '</div>\n'+
-  '<div id="tsynopsis" class="sc"><div class="sf">'+
-  '<button class="sfb active" onclick="filterSyn(\'all\',this)">All ('+total+')</button>'+
-  '<button class="sfb" onclick="filterSyn(\'High\',this)">&#128308; High ('+cntH+')</button>'+
-  '<button class="sfb" onclick="filterSyn(\'MH\',this)">&#128992; M-High ('+cntMH+')</button>'+
-  '<button class="sfb" onclick="filterSyn(\'LM\',this)">&#128994; L-Med ('+cntLM+')</button>'+
-  '<button class="sfb" onclick="filterSyn(\'Low\',this)">&#128995; Low ('+cntLow+')</button>'+
-  '<button class="sfb" onclick="filterSyn(\'rep\',this)">Repeated ('+cntRep+')</button>'+
-  '<button class="sfb" onclick="filterSyn(\'new\',this)">New ('+cntNew+')</button>'+
-  '</div><div class="st_"><div class="shdr"><div>Ref</div><div>Observation</div><div>Type</div><div>Risk</div><div>Ref.To</div></div><div id="synr">'+synHtml+'</div></div></div>\n'+
-  '<div id="tobservations" class="sc">'+cardsHtml+'</div>\n'+
-  '<div id="om"><div class="mb"><div class="mhd"><h2 id="mttl">Detail</h2><button class="mc" onclick="closeM()">&#10005;</button></div><div class="mbdy" id="mbdy"></div></div></div>\n'+
-  '<div id="ft"><strong>Beaconhouse Group &mdash; Systems &amp; Audit Department</strong><br>'+esc(meta.title)+' &mdash; '+esc(meta.branch||'')+'</div>\n'+
-  '<script>\n'+js+'\n<\/script>\n</body>\n</html>';
+  return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n'
+  +'<title>'+esc(meta.title)+' — '+esc(meta.branch||'Audit Report')+'</title>\n'
+  +'<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">\n'
+  +'<style>'+css+'</style>\n</head>\n<body>\n'
+  +'<div id="cov"><div class="co">Beaconhouse Group &mdash; Systems &amp; Audit Department</div>'
+  +'<div class="ct">'+esc(meta.title)+'</div><div class="cs">'+esc(meta.branch||'')+'</div>'
+  +'<div class="cc">'
+  +(meta.visitPeriod?'<div class="ck">Period of Visit: <span>'+esc(meta.visitPeriod)+'</span></div>':'')
+  +(meta.coveredPeriod?'<div class="ck">Period Covered: <span>'+esc(meta.coveredPeriod)+'</span></div>':'')
+  +(meta.region?'<div class="ck">Region: <span>'+esc(meta.region)+'</span></div>':'')
+  +'<div class="ck">Status: <span>'+esc(meta.status)+'</span></div>'
+  +(auth?'<div class="ck">Prepared by: <span>'+auth+'</span></div>':'')
+  +'</div><div class="cf">Confidential &amp; Proprietary &mdash; S&amp;A Internal Use Only</div></div>\n'
+  +'<div id="kb">'
+  +'<div class="kt" onclick="filterSyn(\'High\')"><div class="kn" style="color:#e74c3c">'+cntH+'</div><div class="kl" style="color:#e74c3c">High</div></div>'
+  +'<div class="kt" onclick="filterSyn(\'MH\')"><div class="kn" style="color:#f39c12">'+cntMH+'</div><div class="kl" style="color:#f39c12">Med-High</div></div>'
+  +'<div class="kt" onclick="filterSyn(\'LM\')"><div class="kn" style="color:#3498db">'+cntLM+'</div><div class="kl" style="color:#3498db">Low-Med</div></div>'
+  +'<div class="kt" onclick="filterSyn(\'Low\')"><div class="kn" style="color:#2ecc71">'+cntLow+'</div><div class="kl" style="color:#2ecc71">Low</div></div>'
+  +'<div class="kt" onclick="filterSyn(\'all\')"><div class="kn" style="color:#f0c040">'+total+'</div><div class="kl">Total</div></div>'
+  +'<div class="kt" onclick="filterSyn(\'rep\')"><div class="kn" style="color:#9b59b6">'+cntRep+'</div><div class="kl" style="color:#9b59b6">Repeated</div></div>'
+  +'<div class="kt" onclick="filterSyn(\'new\')"><div class="kn" style="color:#1abc9c">'+cntNew+'</div><div class="kl" style="color:#1abc9c">New</div></div>'
+  +'</div>\n'
+  +'<div id="tb">'
+  +'<button class="tbn active" onclick="showTab(\'overview\',this)">&#128196; Overview</button>'
+  +'<button class="tbn" onclick="showTab(\'synopsis\',this)">&#128202; Management Synopsis</button>'
+  +'<button class="tbn" onclick="showTab(\'observations\',this)">&#128270; Detailed Observations</button>'
+  +'<button class="tbn" onclick="showTab(\'methodology\',this)">&#128221; Methodology</button>'
+  +'</div>\n'
+  +'<div id="toverview" class="sc active"><div class="ig">'
+  +'<div class="ic"><h3>Document Information</h3>'
+  +'<div class="ir"><span class="il">Report</span><span class="iv">'+esc(meta.title)+'</span></div>'
+  +(meta.branch?'<div class="ir"><span class="il">Branch</span><span class="iv">'+esc(meta.branch)+'</span></div>':'')
+  +(meta.region?'<div class="ir"><span class="il">Region</span><span class="iv">'+esc(meta.region)+'</span></div>':'')
+  +(meta.visitPeriod?'<div class="ir"><span class="il">Period of Visit</span><span class="iv">'+esc(meta.visitPeriod)+'</span></div>':'')
+  +(meta.coveredPeriod?'<div class="ir"><span class="il">Period Covered</span><span class="iv">'+esc(meta.coveredPeriod)+'</span></div>':'')
+  +'<div class="ir"><span class="il">Status</span><span class="iv">'+esc(meta.status)+'</span></div></div>'
+  +(meta.authors.length?'<div class="ic"><h3>Audit Team</h3>'+meta.authors.map(function(a){return'<div class="ir"><span class="iv">'+esc(a)+'</span></div>';}).join('')+'</div>':'')
+  +'<div class="ic"><h3>Observation Summary</h3>'
+  +'<div class="ir"><span class="il">High</span><span class="iv" style="color:#c0392b">'+cntH+'</span></div>'
+  +'<div class="ir"><span class="il">Med-High</span><span class="iv" style="color:#b7660a">'+cntMH+'</span></div>'
+  +'<div class="ir"><span class="il">Low-Med</span><span class="iv" style="color:#1565c0">'+cntLM+'</span></div>'
+  +'<div class="ir"><span class="il">Low</span><span class="iv" style="color:#2e7d32">'+cntLow+'</span></div>'
+  +'<div class="ir"><span class="il">Total</span><span class="iv" style="color:#c9962a;font-size:15px">'+total+'</span></div></div></div>'
+  +(aTbl?'<div class="mw"><h2>Analysis of Audit Observations</h2>'+aTbl+'</div>':'')
+  +'<div class="mw"><h2>F. Sensitivity Matrix — Observations by Risk Level</h2>'
+  +sensMatrix+'</div>'
+  +'</div>\n'
+  +'<div id="tsynopsis" class="sc"><div class="sf">'
+  +'<button class="sfb active" onclick="filterSyn(\'all\',this)">All ('+total+')</button>'
+  +'<button class="sfb" onclick="filterSyn(\'High\',this)">&#128308; High ('+cntH+')</button>'
+  +'<button class="sfb" onclick="filterSyn(\'MH\',this)">&#128992; M-High ('+cntMH+')</button>'
+  +'<button class="sfb" onclick="filterSyn(\'LM\',this)">&#128994; L-Med ('+cntLM+')</button>'
+  +'<button class="sfb" onclick="filterSyn(\'Low\',this)">&#128995; Low ('+cntLow+')</button>'
+  +'<button class="sfb" onclick="filterSyn(\'rep\',this)">Repeated ('+cntRep+')</button>'
+  +'<button class="sfb" onclick="filterSyn(\'new\',this)">New ('+cntNew+')</button>'
+  +'</div><div class="st_"><div class="shdr"><div>Ref</div><div>Observation</div><div>Type</div><div>Auditor Risk</div><div>Residual Risk</div><div>Materiality</div><div>Detail</div></div><div id="synr">'+synHtml+'</div></div></div>\n'
+  +'<div id="tobservations" class="sc">'+cardsHtml+'</div>\n'
+  +'<div id="tmethodology" class="sc">'+methSection+'</div>\n'
+  +'<div id="om"><div class="mb"><div class="mhd"><h2 id="mttl">Detail</h2><button class="mc" onclick="closeM()">&#10005;</button></div><div class="mbdy" id="mbdy"></div></div></div>\n'
+  +'<div id="ft"><strong>Beaconhouse Group &mdash; Systems &amp; Audit Department</strong><br>'+esc(meta.title)+' &mdash; '+esc(meta.branch||'')+'</div>\n'
+  +'<script>\n'+js+'\n<\/script>\n</body>\n</html>';
 }
 </script>
 </body>
