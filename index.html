@@ -8969,6 +8969,52 @@ function setSensitivity(id, sel){
   var val = sel.value;
   if(val) sensitivityMap[id]=val; else delete sensitivityMap[id];
   sel.className = 'sens-sel'+(val==='High'?' s-high':val==='M to H'?' s-mh':val==='L to M'?' s-lm':val==='Low'?' s-low':'');
+  updateFwSuggestion(id); // refresh suggestion badge after manual change
+}
+
+function getSuggestedSens(obsId){
+  var count=instCountMap[obsId]||0;
+  var amount=instAmountMap[obsId]||0;
+  // Also auto-count table rows from the live observation textarea
+  var obsEl=document.getElementById('oe-'+obsId);
+  if(obsEl&&obsEl.value){
+    var lines=obsEl.value.split('\n'),tblRows=0;
+    for(var i=0;i<lines.length;i++){
+      var ln=lines[i].trim();
+      if(ln.indexOf('|')===-1)continue;
+      if(/^\|[\s\-:|]+\|?\s*$/.test(ln))continue;
+      tblRows++;
+    }
+    if(tblRows>1){var dr=tblRows-1;if(dr>count)count=dr;}
+  }
+  if(count>=15||amount>=1000000) return'High';
+  if(count>=5 ||amount>=100000)  return'M to H';
+  if(count>=2 ||amount>=10000)   return'L to M';
+  if(count>=1 ||amount>0)        return'Low';
+  return null;
+}
+
+function updateFwSuggestion(obsId){
+  var el=document.getElementById('fw-sug-'+obsId);
+  if(!el)return;
+  var sug=getSuggestedSens(obsId);
+  if(!sug){el.innerHTML='';return;}
+  var cur=sensitivityMap[obsId]||'';
+  var bgMap={High:'#c0392b','M to H':'#e67e22','L to M':'#2980b9',Low:'#27ae60'};
+  var c=bgMap[sug]||'#555';
+  var already=(cur===sug);
+  el.innerHTML='<span style="font-size:10px;background:'+c+';color:#fff;border-radius:3px;padding:1px 6px;font-weight:700;margin-left:4px">Suggested: '+sug+'</span>'
+    +(already
+      ?'<span style="font-size:10px;color:'+c+';margin-left:4px;font-weight:700">&#10003; Applied</span>'
+      :'<button onclick="applySuggestedSens(\''+obsId+'\',\''+sug+'\')" style="font-size:10px;padding:1px 7px;background:#1a3557;color:#fff;border:none;border-radius:3px;cursor:pointer;margin-left:3px;font-family:inherit">Apply</button>');
+}
+
+function applySuggestedSens(obsId, sug){
+  sensitivityMap[obsId]=sug;
+  var sel=document.getElementById('sens-sel-'+obsId);
+  if(sel){sel.value=sug;setSensitivity(obsId,sel);}
+  updateFwSuggestion(obsId);
+  renderRpt(); // refresh preview
 }
 
 function setCoso(id, sel){
@@ -10090,13 +10136,14 @@ function renderRpt(){
       h+='<div class="oc '+tc+'" id="oc-'+o.id+'">';
       h+='<div class="och"><span class="onum">Obs. '+num+'</span>';
       h+='<span class="otl">'+esc(o.title)+' <span class="badge '+tc+'">'+esc(effType)+'</span></span>';
-      h+='<select class="sens-sel '+sensClass+'" title="Sensitivity Level" onchange="setSensitivity(\''+o.id+'\',this)">';
+      h+='<select id="sens-sel-'+o.id+'" class="sens-sel '+sensClass+'" title="Sensitivity Level" onchange="setSensitivity(\''+o.id+'\',this)">';
       h+='<option value="">Sensitivity</option>';
       h+='<option value="High"'+(curSens==='High'?' selected':'')+'>High</option>';
       h+='<option value="M to H"'+(curSens==='M to H'?' selected':'')+'>M to H</option>';
       h+='<option value="L to M"'+(curSens==='L to M'?' selected':'')+'>L to M</option>';
       h+='<option value="Low"'+(curSens==='Low'?' selected':'')+'>Low</option>';
       h+='</select>';
+      h+='<span id="fw-sug-'+o.id+'"></span>';
       h+='<select class="coso-sel '+cosoClass+'" title="COSO Component" onchange="setCoso(\''+o.id+'\',this)">';
       h+='<option value="">COSO</option>';
       h+='<option value="CE"'+(curCoso==='CE'?' selected':'')+'>CE</option>';
@@ -10124,11 +10171,11 @@ function renderRpt(){
         +'<div style="display:flex;gap:8px;flex:1">'
         +'<div style="flex:1">'
           +'<div style="font-size:10px;color:#555;margin-bottom:2px">Instances (if no inline table)</div>'
-          +'<input type="number" min="0" id="fw-inst-'+o.id+'" placeholder="e.g. 14" value="'+esc(curInstCount+'')+'" style="width:100%;padding:3px 7px;border:1px solid #b0c8a0;border-radius:4px;font-size:12px;font-family:inherit" oninput="instCountMap[\''+o.id+'\']=this.value?parseInt(this.value):0">'
+          +'<input type="number" min="0" id="fw-inst-'+o.id+'" placeholder="e.g. 14" value="'+esc(curInstCount+'')+'" style="width:100%;padding:3px 7px;border:1px solid #b0c8a0;border-radius:4px;font-size:12px;font-family:inherit" oninput="instCountMap[\''+o.id+'\']=this.value?parseInt(this.value):0;updateFwSuggestion(\''+o.id+'\')">'
         +'</div>'
         +'<div style="flex:1">'
           +'<div style="font-size:10px;color:#555;margin-bottom:2px">Financial Impact (Rs.)</div>'
-          +'<input type="number" min="0" id="fw-amt-'+o.id+'" placeholder="e.g. 250000" value="'+esc(curInstAmt+'')+'" style="width:100%;padding:3px 7px;border:1px solid #b0c8a0;border-radius:4px;font-size:12px;font-family:inherit" oninput="instAmountMap[\''+o.id+'\']=this.value?parseFloat(this.value):0">'
+          +'<input type="number" min="0" id="fw-amt-'+o.id+'" placeholder="e.g. 250000" value="'+esc(curInstAmt+'')+'" style="width:100%;padding:3px 7px;border:1px solid #b0c8a0;border-radius:4px;font-size:12px;font-family:inherit" oninput="instAmountMap[\''+o.id+'\']=this.value?parseFloat(this.value):0;updateFwSuggestion(\''+o.id+'\')">'
         +'</div>'
         +'</div>'
         +'</div>';
@@ -10219,6 +10266,11 @@ function renderRpt(){
   h+=buildAnnexHtml(false,obsNumMap);
   cont.innerHTML=h;
   captureLpBaseline();
+  // Initialize framework suggestion badges for all observations with saved values
+  setTimeout(function(){
+    var ids=Object.keys(instCountMap).concat(Object.keys(instAmountMap));
+    for(var i=0;i<ids.length;i++) updateFwSuggestion(ids[i]);
+  },0);
   // analysis-inline is already embedded in h above; no separate refresh needed
 }
 
