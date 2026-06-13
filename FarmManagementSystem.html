@@ -25,6 +25,7 @@
   .btn-sm { padding:5px 12px;font-size:12px;border-radius:6px;border:none;cursor:pointer; }
   .btn-edit { background:#3b82f6;color:#fff; }
   .btn-del { background:#ef4444;color:#fff; }
+  .btn-dispose { background:#d97706;color:#fff; }
   .btn-info { background:#06b6d4;color:#fff; }
   .badge { display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600; }
   .badge-green { background:#dcfce7;color:#166534; }
@@ -174,6 +175,30 @@
         <th>Actions</th>
       </tr></thead>
       <tbody id="animalTbody"></tbody>
+    </table></div>
+  </div>
+
+  <!-- DISPOSAL RECORDS SECTION -->
+  <div class="card" style="margin-top:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-size:15px;font-weight:700;"><i class="fas fa-sign-out-alt" style="color:#d97706;margin-right:8px;"></i>Animal Exit / Disposal Records</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select class="form-control" style="width:160px;" id="filterDisposalType" onchange="renderDisposals()">
+          <option value="">All Exit Types</option>
+          <option>Sale</option><option>Death / Mortality</option><option>Gift</option>
+          <option>Replacement</option><option>Slaughter</option><option>Lost</option><option>Other</option>
+        </select>
+        <input type="date" class="form-control" style="width:150px;" id="filterDisposalFrom" onchange="renderDisposals()" title="From Date">
+        <span style="color:#9ca3af;font-weight:700;">→</span>
+        <input type="date" class="form-control" style="width:150px;" id="filterDisposalTo" onchange="renderDisposals()" title="To Date">
+      </div>
+    </div>
+    <div style="overflow-x:auto;"><table>
+      <thead><tr>
+        <th>Date</th><th>Tag No</th><th>Type</th><th>Gender</th><th>Exit Reason</th>
+        <th>Party / Buyer</th><th>Amount (Rs)</th><th>Remarks</th><th>Actions</th>
+      </tr></thead>
+      <tbody id="disposalTbody"></tbody>
     </table></div>
   </div>
 </div>
@@ -391,6 +416,11 @@
       <i class="fas fa-rupee-sign" style="font-size:32px;color:#d97706;margin-bottom:10px;display:block;"></i>
       <div style="font-weight:700;margin-bottom:4px;">Expense Report</div>
       <div style="font-size:12px;color:#6b7280;">All farm expenses</div>
+    </div>
+    <div class="card" style="text-align:center;cursor:pointer;" onclick="printReport('disposals')">
+      <i class="fas fa-sign-out-alt" style="font-size:32px;color:#d97706;margin-bottom:10px;display:block;"></i>
+      <div style="font-weight:700;margin-bottom:4px;">Animal Exit Log</div>
+      <div style="font-size:12px;color:#6b7280;">Sales, deaths, gifts &amp; disposals</div>
     </div>
   </div>
   <div id="reportOutput"></div>
@@ -894,6 +924,65 @@
 </div>
 </div>
 
+<!-- ANIMAL DISPOSAL MODAL -->
+<div class="modal-overlay" id="disposalModal" style="display:none;">
+<div class="modal-box" style="max-width:520px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div style="font-size:16px;font-weight:700;color:#92400e;"><i class="fas fa-sign-out-alt" style="color:#d97706;margin-right:8px;"></i>Record Animal Exit</div>
+    <button onclick="closeModal('disposalModal')" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">✕</button>
+  </div>
+  <input type="hidden" id="disposalAnimalId">
+  <!-- Animal info banner -->
+  <div id="disposalAnimalInfo" style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#92400e;"></div>
+  <div class="grid-2">
+    <div class="form-group">
+      <label>Exit / Disposal Reason *</label>
+      <select class="form-control" id="disposalType" onchange="toggleDisposalFields()">
+        <option value="">Select reason...</option>
+        <option>Sale</option>
+        <option>Death / Mortality</option>
+        <option>Gift</option>
+        <option>Replacement</option>
+        <option>Slaughter</option>
+        <option>Lost</option>
+        <option>Other</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Exit Date *</label>
+      <input type="date" class="form-control" id="disposalDate">
+    </div>
+    <div class="form-group" id="dspFieldAmount">
+      <label>Sale / Value Amount (Rs)</label>
+      <input type="number" class="form-control" id="disposalAmount" min="0" placeholder="0">
+    </div>
+    <div class="form-group" id="dspFieldParty">
+      <label id="disposalPartyLabel">Buyer / Recipient Name</label>
+      <input class="form-control" id="disposalParty" placeholder="Name...">
+    </div>
+    <div class="form-group" id="dspFieldCause" style="display:none;">
+      <label>Cause of Death</label>
+      <input class="form-control" id="disposalCause" placeholder="e.g. Disease, Accident...">
+    </div>
+    <div class="form-group" id="dspFieldCertNo">
+      <label>Certificate / Reference No</label>
+      <input class="form-control" id="disposalCertNo" placeholder="Optional">
+    </div>
+  </div>
+  <div class="form-group">
+    <label>Remarks</label>
+    <textarea class="form-control" id="disposalRemarks" rows="2" placeholder="Additional details..."></textarea>
+  </div>
+  <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:12px;color:#78350f;margin-bottom:14px;">
+    <i class="fas fa-info-circle"></i> The animal's status will be updated automatically. The record stays in the system for history. Use <b>Delete</b> only to remove data entry errors.
+  </div>
+  <div style="display:flex;gap:10px;justify-content:flex-end;">
+    <button class="btn-danger" onclick="closeModal('disposalModal')">Cancel</button>
+    <button class="btn-warning" onclick="saveDisposal()"><i class="fas fa-save"></i> Save Exit Record</button>
+  </div>
+</div>
+</div>
+
 <!-- ANIMAL REGISTER FILTER MODAL -->
 <div class="modal-overlay" id="animalReportFilterModal" style="display:none;">
 <div class="modal-box" style="max-width:480px;">
@@ -1009,7 +1098,7 @@ const LOOKUP_DEFAULTS = {
   stagesFemale:   ['Calf','Heifer','Cow'],
   stagesMale:     ['Calf','Bull Calf','Ox','Bull'],
   animalSources:  ['Purchased','Born on Farm','Gifted','Transferred In'],
-  animalStatuses: ['Active','Sold','Dead','Transferred'],
+  animalStatuses: ['Active','Sold','Dead','Gifted','Slaughtered','Replaced','Transferred','Lost'],
   feedCategories: ['Feed','Fertilizer','Medicine','Supplements','Other'],
   feedUnits:      ['kg','bags','liters','pieces','tons','quintal','Man','Kanal'],
   voucherTypes:   ['Purchase Bill','Cash Payment','Journal Voucher','Sales Invoice','Expense Voucher'],
@@ -1510,7 +1599,7 @@ function showTab(name) {
     if(t.getAttribute('onclick') && t.getAttribute('onclick').includes("'"+name+"'")) t.classList.add('active');
   });
   if(name==='dashboard') refreshDashboard();
-  if(name==='animals') renderAnimals();
+  if(name==='animals') { renderAnimals(); renderDisposals(); }
   if(name==='inventory') renderFeed();
   if(name==='transactions') renderTransactions();
   if(name==='milk') { populateAllDropdowns(); populateMilkAnimalFilter(); renderMilk(); renderMilkSummary(); }
@@ -1904,8 +1993,9 @@ function renderAnimals() {
       <td><span class="badge badge-blue">${a.stage||'—'}</span></td><td>${ageStr}</td>
       <td><span class="badge ${sb}">${a.status||'—'}</span></td>
       <td style="white-space:nowrap;">
-        <button class="btn-sm btn-edit" onclick="openAnimalModal('${a.id}')"><i class="fas fa-edit"></i></button>
-        <button class="btn-sm btn-del" style="margin-left:4px;" onclick="deleteAnimal('${a.id}')"><i class="fas fa-trash"></i></button>
+        <button class="btn-sm btn-edit" onclick="openAnimalModal('${a.id}')" title="Edit"><i class="fas fa-edit"></i></button>
+        ${a.status==='Active'?`<button class="btn-sm btn-dispose" style="margin-left:4px;" onclick="openDisposalModal('${a.id}')" title="Record exit (sale/death/gift...)"><i class="fas fa-sign-out-alt"></i></button>`:'<span style="display:inline-block;width:32px;"></span>'}
+        <button class="btn-sm btn-del" style="margin-left:4px;" onclick="deleteAnimal('${a.id}')" title="Delete record permanently"><i class="fas fa-trash"></i></button>
       </td></tr>
     <tr id="ae_${a.id}" class="expand-row" style="display:none;"><td colspan="10">
       <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;">
@@ -1925,7 +2015,127 @@ function renderAnimals() {
 function toggleExpand(rowId){const r=document.getElementById(rowId);r.style.display=r.style.display==='none'?'table-row':'none';}
 
 function deleteAnimal(id){
-  confirm2('Delete Animal','This will permanently delete the animal record.',()=>{dbDelete('animals',id);renderAnimals();toast('Animal deleted','warn');});
+  confirm2('Delete Animal','This will permanently delete the animal record. Use "Exit" button to record a sale/death instead.',()=>{dbDelete('animals',id);renderAnimals();renderDisposals();toast('Animal deleted','warn');});
+}
+
+// ============================================================
+// ANIMAL DISPOSAL / EXIT MODULE
+// ============================================================
+function openDisposalModal(animalId) {
+  const a = dbFind('animals', animalId);
+  if (!a) return;
+  document.getElementById('disposalAnimalId').value = animalId;
+  document.getElementById('disposalDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('disposalType').value = '';
+  document.getElementById('disposalAmount').value = '';
+  document.getElementById('disposalParty').value = '';
+  document.getElementById('disposalCause').value = '';
+  document.getElementById('disposalCertNo').value = '';
+  document.getElementById('disposalRemarks').value = '';
+  document.getElementById('disposalAnimalInfo').innerHTML =
+    `<b>Tag #${a.tagNo}</b> &nbsp;|&nbsp; ${a.animalType||''} &nbsp;|&nbsp; ${a.breed||''} &nbsp;|&nbsp; ${a.gender||''} &nbsp;|&nbsp; Stage: ${a.stage||'—'}`;
+  toggleDisposalFields();
+  openModal('disposalModal');
+}
+
+function toggleDisposalFields() {
+  const type = document.getElementById('disposalType').value;
+  const amountEl  = document.getElementById('dspFieldAmount');
+  const partyEl   = document.getElementById('dspFieldParty');
+  const causeEl   = document.getElementById('dspFieldCause');
+  const certEl    = document.getElementById('dspFieldCertNo');
+  const partyLbl  = document.getElementById('disposalPartyLabel');
+
+  // Amount: show for Sale, Replacement, Slaughter
+  amountEl.style.display  = ['Sale','Replacement','Slaughter'].includes(type) ? '' : 'none';
+  // Cause: show for Death/Mortality
+  causeEl.style.display   = (type === 'Death / Mortality') ? '' : 'none';
+  // Party: show for Sale, Gift, Replacement, Transferred
+  partyEl.style.display   = ['Sale','Gift','Replacement','Other'].includes(type) ? '' : 'none';
+  if (type === 'Sale')        partyLbl.textContent = 'Buyer Name';
+  else if (type === 'Gift')   partyLbl.textContent = 'Recipient Name';
+  else                        partyLbl.textContent = 'Party / Person Name';
+  // Cert: always show
+  certEl.style.display = '';
+}
+
+function saveDisposal() {
+  const animalId   = document.getElementById('disposalAnimalId').value;
+  const type       = document.getElementById('disposalType').value;
+  const date       = document.getElementById('disposalDate').value;
+  if (!type || !date) { toast('Please select Exit Reason and Date', 'error'); return; }
+
+  const a = dbFind('animals', animalId);
+  if (!a) return;
+
+  const record = {
+    animalId,
+    tagNo:       a.tagNo,
+    animalType:  a.animalType || '',
+    breed:       a.breed || '',
+    gender:      a.gender || '',
+    stage:       a.stage || '',
+    disposalType: type,
+    date,
+    amount:      Number(document.getElementById('disposalAmount').value) || 0,
+    party:       document.getElementById('disposalParty').value.trim(),
+    cause:       document.getElementById('disposalCause').value.trim(),
+    certNo:      document.getElementById('disposalCertNo').value.trim(),
+    remarks:     document.getElementById('disposalRemarks').value.trim()
+  };
+  dbAdd('disposals', record);
+
+  // Update animal status to reflect disposal
+  const statusMap = {
+    'Sale': 'Sold', 'Death / Mortality': 'Dead', 'Gift': 'Gifted',
+    'Replacement': 'Replaced', 'Slaughter': 'Slaughtered', 'Lost': 'Lost', 'Other': 'Transferred'
+  };
+  dbUpdate('animals', animalId, { status: statusMap[type] || type });
+
+  closeModal('disposalModal');
+  renderAnimals();
+  renderDisposals();
+  toast(`Exit recorded: ${a.tagNo} — ${type}`);
+}
+
+function renderDisposals() {
+  let list = dbGet('disposals');
+  const fType = (document.getElementById('filterDisposalType')||{}).value || '';
+  const fFrom = (document.getElementById('filterDisposalFrom')||{}).value || '';
+  const fTo   = (document.getElementById('filterDisposalTo')||{}).value || '';
+  if (fType) list = list.filter(r => r.disposalType === fType);
+  if (fFrom) list = list.filter(r => r.date >= fFrom);
+  if (fTo)   list = list.filter(r => r.date <= fTo);
+  list = list.slice().sort((a,b) => b.date.localeCompare(a.date));
+  const tbody = document.getElementById('disposalTbody');
+  if (!tbody) return;
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:30px;">No exit records found.</td></tr>';
+    return;
+  }
+  const typeColors = {
+    'Sale':'badge-green','Death / Mortality':'badge-red','Gift':'badge-purple',
+    'Replacement':'badge-yellow','Slaughter':'badge-red','Lost':'badge-yellow','Other':'badge-blue'
+  };
+  tbody.innerHTML = list.map(r => `<tr>
+    <td>${r.date}</td>
+    <td><b>${r.tagNo}</b></td>
+    <td>${r.animalType||'—'} ${r.breed?'/ '+r.breed:''}</td>
+    <td>${r.gender||'—'}</td>
+    <td><span class="badge ${typeColors[r.disposalType]||'badge-blue'}">${r.disposalType}</span></td>
+    <td>${r.party||r.cause||'—'}</td>
+    <td>${r.amount?'Rs '+Number(r.amount).toLocaleString():'—'}</td>
+    <td>${r.remarks||'—'}</td>
+    <td><button class="btn-sm btn-del" onclick="deleteDisposal('${r.id}')"><i class="fas fa-trash"></i></button></td>
+  </tr>`).join('');
+}
+
+function deleteDisposal(id) {
+  confirm2('Delete Exit Record', 'This removes the exit record only. The animal record is unchanged.', () => {
+    dbDelete('disposals', id);
+    renderDisposals();
+    toast('Exit record deleted', 'warn');
+  });
 }
 
 function viewAnimalPhoto(id) {
@@ -2337,6 +2547,7 @@ function printReport(type, customAnimals, filterDesc){
   else if(type==='milk'){const milk=dbGet('milkRecords').sort((a,b)=>b.date.localeCompare(a.date));html=head('Milk Production Records')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Tag No</th><th>Shift</th><th>Qty</th><th>Unit</th><th>Remarks</th></tr></thead><tbody>`+milk.map(r=>`<tr><td>${r.date}</td><td>${r.tagNo}</td><td>${r.shift||''}</td><td>${r.qty}</td><td>${r.unit||'Liters'}</td><td>${r.remarks||''}</td></tr>`).join('')+`</tbody></table>`+foot;}
   else if(type==='health'){const hr=dbGet('healthRecords').sort((a,b)=>b.date.localeCompare(a.date));html=head('Health Records')+`<table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Tag No</th><th>Type</th><th>Details</th><th>Doctor</th><th>Cost (Rs)</th><th>Next Due</th></tr></thead><tbody>`+hr.map(r=>`<tr><td>${r.date}</td><td>${r.tagNo}</td><td>${r.recordType||r.eventType||'Treatment'}</td><td>${getHealthDetail(r)}</td><td>${r.doctor||''}</td><td>Rs ${Number(r.cost||0).toLocaleString()}</td><td>${r.nextDue||''}</td></tr>`).join('')+`</tbody></table>`+foot;}
   else if(type==='expenses'){const exp=dbGet('expenses').sort((a,b)=>b.date.localeCompare(a.date));const total=exp.reduce((s,r)=>s+Number(r.amount||0),0);html=head('Expense Report')+`<p style="font-weight:700;">Total: Rs ${total.toLocaleString()}</p><table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount (Rs)</th><th>Payment Mode</th><th>Reference</th></tr></thead><tbody>`+exp.map(r=>`<tr><td>${r.date}</td><td>${r.category}</td><td>${r.description||''}</td><td>Rs ${Number(r.amount||0).toLocaleString()}</td><td>${r.paymentMode||''}</td><td>${r.refNo||''}</td></tr>`).join('')+`</tbody></table>`+foot;}
+  else if(type==='disposals'){const disp=dbGet('disposals').sort((a,b)=>b.date.localeCompare(a.date));const saleTotal=disp.filter(r=>r.disposalType==='Sale'||r.disposalType==='Slaughter').reduce((s,r)=>s+Number(r.amount||0),0);html=head('Animal Exit / Disposal Log')+`<p style="font-weight:700;">Total Sale / Slaughter Proceeds: Rs ${saleTotal.toLocaleString()}</p><table border="1" style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#2d5c3e;color:#fff;"><tr><th>Date</th><th>Tag No</th><th>Type</th><th>Breed</th><th>Gender</th><th>Stage</th><th>Exit Reason</th><th>Party/Cause</th><th>Amount (Rs)</th><th>Cert/Ref No</th><th>Remarks</th></tr></thead><tbody>`+disp.map(r=>`<tr><td>${r.date}</td><td>${r.tagNo}</td><td>${r.animalType||''}</td><td>${r.breed||''}</td><td>${r.gender||''}</td><td>${r.stage||''}</td><td>${r.disposalType}</td><td>${r.party||r.cause||''}</td><td>${r.amount?'Rs '+Number(r.amount).toLocaleString():''}</td><td>${r.certNo||''}</td><td>${r.remarks||''}</td></tr>`).join('')+`</tbody></table>`+foot;}
   const win=window.open('','_blank');
   win.document.write(`<!DOCTYPE html><html><head><title>Report</title></head><body onload="window.print()">${html}</body></html>`);
   win.document.close();
@@ -2348,7 +2559,7 @@ function printReport(type, customAnimals, filterDesc){
 function exportData(){
   const data={animals:dbGet('animals'),feed:dbGet('feed'),transactions:dbGet('transactions'),
     weights:dbGet('weights'),transitionRules:dbGet('transitionRules'),transitionLog:dbGet('transitionLog'),
-    milkRecords:dbGet('milkRecords'),healthRecords:dbGet('healthRecords'),expenses:dbGet('expenses'),
+    milkRecords:dbGet('milkRecords'),healthRecords:dbGet('healthRecords'),expenses:dbGet('expenses'),disposals:dbGet('disposals'),
     lookups:getLookups(),setup:DB.getObj('setup',{})};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
@@ -2370,6 +2581,7 @@ function importData(input){
       if(data.milkRecords) DB.set('milkRecords',data.milkRecords);
       if(data.healthRecords) DB.set('healthRecords',data.healthRecords);
       if(data.expenses) DB.set('expenses',data.expenses);
+      if(data.disposals) DB.set('disposals',data.disposals);
       if(data.lookups) DB.setObj('lookups',data.lookups);
       if(data.setup) DB.setObj('setup',data.setup);
       toast('Data imported'); refreshDashboard();
@@ -2379,7 +2591,7 @@ function importData(input){
 }
 function confirmClearData(){
   confirm2('Clear All Data','This will permanently delete ALL animals, transactions, and records. Cannot be undone!',()=>{
-    ['animals','feed','transactions','weights','transitionRules','transitionLog','milkRecords','healthRecords','expenses'].forEach(k=>DB.set(k,[]));
+    ['animals','feed','transactions','weights','transitionRules','transitionLog','milkRecords','healthRecords','expenses','disposals'].forEach(k=>DB.set(k,[]));
     toast('All data cleared','warn'); refreshDashboard();
   });
 }
