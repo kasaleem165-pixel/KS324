@@ -15668,7 +15668,7 @@ function ra_renderResults(branch,scores,overall,d1,d2,autype,pb,hasTrend){
   document.getElementById('ra-gauge-label').style.color=ra_levelColor(ol);
   document.getElementById('ra-gauge-needle').style.left=overall+'%';
   document.getElementById('ra-gauge-summary').innerHTML=ra_gaugeSummary(branch,scores,ol,d1);
-  ra_renderMatrix(scores); ra_renderBarChart(scores); ra_renderFocus(scores,branch,autype);
+  ra_renderMatrix(scores); ra_renderBarChart(scores); ra_renderHeatmap(scores); ra_renderRiskRegister(scores); ra_renderFocus(scores,branch,autype);
   document.getElementById('ra-trend-card').style.display=hasTrend?'block':'none';
   if(hasTrend) ra_renderTrend(scores);
   var hasRep=false;
@@ -15702,7 +15702,7 @@ function ra_fmtDate(iso){
 
 function ra_renderMatrix(scores){
   var h='<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
-  var ths=['Category','Risk Level','Risk Score','Obs (Latest)','Repeated','DB Count'];
+  var ths=['Category','Risk Level','Risk Score','Inherent Risk','Residual Risk','Obs (Latest)','Repeated','DB Count'];
   for(var t=0;t<ths.length;t++) h+='<th style="background:#1a3a5c;color:#fff;padding:7px 10px;text-align:left;font-size:11px;font-weight:700">'+ths[t]+'</th>';
   h+='</tr></thead><tbody>';
   for(var i=0;i<scores.length;i++){
@@ -15714,6 +15714,9 @@ function ra_renderMatrix(scores){
     h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6;font-weight:700;color:#1a3a5c">'+ra_esc(s.cat)+'</td>';
     h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6"><span style="display:inline-block;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:800;text-transform:uppercase;background:'+bBg+';color:'+bFg+';border:1px solid '+bBd+'">'+ra_levelLabel(s.level)+'</span></td>';
     h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6"><div style="display:flex;align-items:center;gap:6px"><div style="width:'+s.score+'px;max-width:80px;height:8px;background:'+ra_levelBarColor(s.level)+';border-radius:4px"></div><strong style="color:'+ra_levelColor(s.level)+'">'+s.score+'</strong></div></td>';
+    var _mx2=FW_MX[ra_levelToSensKey(s.level)]||FW_MX['L to M'];
+    h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6;text-align:center">'+ra_lvlBadge(_mx2.inherent)+'</td>';
+    h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6;text-align:center">'+ra_lvlBadge(_mx2.residual)+'</td>';
     h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6">'+obs1+'</td>';
     h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6">'+(rep1>0?'<span style="color:#c03030;font-weight:700">'+rep1+'</span>':'0')+'</td>';
     h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6;color:#6a7888">'+RA_DB_CATS[s.cat].count+'</td>';
@@ -15829,6 +15832,171 @@ function ra_renderRecs(scores){
   }
   if(!h) h='<div style="color:#6a7888;font-size:12px;padding:10px 0">Load audit report data to generate recommendations.</div>';
   document.getElementById('ra-res-recs').innerHTML=h;
+}
+
+// ── ERM helpers ──────────────────────────────────────────────────────────────
+var RA_CAT_TO_FW={
+  'Financial Management':'fin',
+  'HR & Payroll':'hr',
+  'Safety & Security':'sec',
+  'Fixed Assets & Inventory':'fa',
+  'Library & Records':'lib',
+  'Student Records & Fee':'stu',
+  'General Administration':'gen'
+};
+var RA_RISK_TYPES={
+  fin:'Financial Risk',hr:'Compliance / HR Risk',sec:'Security & Safety Risk',
+  fa:'Operational Risk',lib:'Operational Risk',stu:'Compliance Risk',
+  lab:'Operational Risk',gen:'Operational Risk'
+};
+var RA_CTRL_TYPES={
+  fin:'Preventive & Detective',hr:'Preventive',sec:'Preventive & Corrective',
+  fa:'Detective',lib:'Detective',stu:'Preventive & Detective',
+  lab:'Detective',gen:'Preventive'
+};
+
+function ra_levelToSensKey(level){
+  return {critical:'High',high:'M to H',medium:'L to M',low:'Low'}[level]||'L to M';
+}
+function ra_ctrlEffectiveness(score){
+  if(score>=70) return {label:'Inadequate',color:'#c03030',bg:'#fde8e8'};
+  if(score>=50) return {label:'Partially Adequate',color:'#b04400',bg:'#fff0e0'};
+  if(score>=25) return {label:'Adequate',color:'#1a7040',bg:'#e8f8e8'};
+  return {label:'Strong',color:'#1a5c2a',bg:'#d4f0d8'};
+}
+function ra_actionRequired(level){
+  if(level==='critical') return 'Immediate comprehensive audit & escalation to senior management';
+  if(level==='high')     return 'Priority focused audit — control enhancement plan required';
+  if(level==='medium')   return 'Strengthen controls & schedule targeted review';
+  return 'Routine monitoring — maintain current control environment';
+}
+function ra_lvlBadge(val){
+  var c={
+    'High':         {bg:'#fde8e8',fg:'#9b1a1a',bd:'#f0a0a0'},
+    'Medium-High':  {bg:'#fff0e0',fg:'#b04400',bd:'#f0b070'},
+    'Medium':       {bg:'#fffbe0',fg:'#806000',bd:'#e0c030'},
+    'Low-Medium':   {bg:'#e8f0f8',fg:'#1a3a5c',bd:'#a8c8e8'},
+    'Low':          {bg:'#e8f8e8',fg:'#1a6020',bd:'#80c880'},
+    'Low-High':     {bg:'#f5e8f8',fg:'#5a0070',bd:'#d090e0'}
+  }[val]||{bg:'#eee',fg:'#333',bd:'#ccc'};
+  return '<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;white-space:nowrap;background:'+c.bg+';color:'+c.fg+';border:1px solid '+c.bd+'">'+val+'</span>';
+}
+
+// ── Risk Heatmap ─────────────────────────────────────────────────────────────
+function ra_renderHeatmap(scores){
+  function coord(s){
+    var fwKey=RA_CAT_TO_FW[s.cat]||'gen';
+    var mx=FW_MX[ra_levelToSensKey(s.level)]||FW_MX['L to M'];
+    var lMap={'High':4,'Medium':3,'Low':2}; var iMap={'High':5,'Medium':3,'Low':2};
+    var l=lMap[mx.likelihood]||2; var im=iMap[mx.impact]||2;
+    // weight-based nudge: safety (w=5) almost certain; financial/hr (w=4) +1 impact
+    var w=(RA_DB_CATS[s.cat]||{}).weight||2;
+    if(w>=5) l=Math.min(l+1,5);
+    if(w>=4) im=Math.min(im+1,5);
+    if(s.d1&&s.d1.repeated>0) l=Math.min(l+1,5); // repeated obs → higher likelihood
+    return {l:l,i:im};
+  }
+  var grid={};
+  for(var k=0;k<scores.length;k++){
+    var cd=coord(scores[k]); var key=cd.l+'-'+cd.i;
+    if(!grid[key]) grid[key]=[];
+    grid[key].push(scores[k]);
+  }
+  var likeLabels=['Rare','Unlikely','Possible','Likely','Almost Certain'];
+  var impLabels=['Minor','Moderate','Significant','Major','Catastrophic'];
+  function cellBg(l,i){
+    var v=l*i;
+    if(v>=16) return {bg:'#fde8e8',bd:'#e88080'};
+    if(v>=9)  return {bg:'#fff0e0',bd:'#f0b070'};
+    if(v>=4)  return {bg:'#fffbe0',bd:'#d8c040'};
+    return {bg:'#e8f8e8',bd:'#80c880'};
+  }
+  var dotColor={critical:'#c03030',high:'#d07020',medium:'#c0a000',low:'#40a040'};
+  var h='<div style="font-size:11px;color:#5a6a7a;margin-bottom:10px;line-height:1.6">Categories are plotted by Likelihood × Impact. Cells are color-coded: <span style="color:#9b1a1a;font-weight:700">Red</span>=Critical, <span style="color:#b04400;font-weight:700">Orange</span>=High, <span style="color:#806000;font-weight:700">Yellow</span>=Medium, <span style="color:#1a6020;font-weight:700">Green</span>=Low. Repeated observations and higher databank weight push categories toward higher likelihood.</div>';
+  h+='<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;min-width:460px">';
+  // Column header
+  h+='<thead><tr><th style="background:#1a3a5c;color:#fff;padding:7px 8px;font-size:10px;font-weight:700;text-align:center;border-right:1px solid #2a4a6c;width:90px">L &darr; &nbsp; I &rarr;</th>';
+  for(var ii=1;ii<=5;ii++) h+='<th style="background:#1a3a5c;color:#fff;padding:7px 6px;font-size:10px;font-weight:700;text-align:center;border-right:1px solid #2a4a6c">'+impLabels[ii-1]+'<br><span style="color:#a0c0e0;font-weight:400">('+ii+')</span></th>';
+  h+='</tr></thead><tbody>';
+  for(var li=5;li>=1;li--){
+    h+='<tr><td style="background:#1a3a5c;color:#fff;padding:7px 8px;font-size:10px;font-weight:700;text-align:center;border-bottom:1px solid #2a4a6c;border-right:1px solid #2a4a6c">'+likeLabels[li-1]+'<br><span style="color:#a0c0e0;font-weight:400">('+li+')</span></td>';
+    for(var im2=1;im2<=5;im2++){
+      var cb=cellBg(li,im2); var cats=grid[li+'-'+im2]||[];
+      var inner=cats.map(function(sc){
+        return '<div style="font-size:9px;font-weight:700;color:'+dotColor[sc.level]+';line-height:1.3;white-space:nowrap" title="'+ra_esc(sc.cat)+' — Score: '+sc.score+'">&#9679; '+ra_esc(sc.cat.split(' & ')[0].split(' ').slice(0,2).join(' '))+'</div>';
+      }).join('');
+      h+='<td style="background:'+cb.bg+';border:1px solid '+cb.bd+';padding:6px 5px;text-align:center;min-width:80px;vertical-align:middle">'+inner+'</td>';
+    }
+    h+='</tr>';
+  }
+  h+='</tbody></table></div>';
+  h+='<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:10px;color:#4a5a70">';
+  [{bg:'#fde8e8',bd:'#e88080',t:'Critical (L×I ≥ 16)'},{bg:'#fff0e0',bd:'#f0b070',t:'High (L×I 9–15)'},{bg:'#fffbe0',bd:'#d8c040',t:'Medium (L×I 4–8)'},{bg:'#e8f8e8',bd:'#80c880',t:'Low (L×I ≤ 3)'}]
+    .forEach(function(lv){ h+='<span style="display:flex;align-items:center;gap:5px"><span style="width:13px;height:13px;background:'+lv.bg+';border:1px solid '+lv.bd+';border-radius:2px;display:inline-block"></span>'+lv.t+'</span>'; });
+  h+='</div>';
+  document.getElementById('ra-res-heatmap').innerHTML=h;
+}
+
+// ── ERM Risk Register ─────────────────────────────────────────────────────────
+function ra_renderRiskRegister(scores){
+  var h='<div style="font-size:11px;color:#4a5a70;margin-bottom:14px;line-height:1.7">Enterprise Risk Management Register — synthesized from observation history, control framework (FW_RR / FW_CA), and databank frequency. <strong>Inherent Risk</strong> = exposure before controls; <strong>Residual Risk</strong> = remaining exposure after controls. Control Effectiveness is derived from observation frequency and recurrence.</div>';
+  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:980px">';
+  var cols=['Risk ID','Risk Name &amp; Type','Likelihood','Impact','Inherent Risk','Key Control','Ctrl Type','Control Effectiveness','Residual Risk','Risk Appetite','Action Required'];
+  h+='<thead><tr>';
+  cols.forEach(function(c){ h+='<th style="background:#1a3a5c;color:#fff;padding:8px 9px;text-align:left;font-size:10px;font-weight:700;white-space:nowrap;border-right:1px solid #2a4a6c;vertical-align:top">'+c+'</th>'; });
+  h+='</tr></thead><tbody>';
+  for(var i=0;i<scores.length;i++){
+    var s=scores[i];
+    var fwKey=RA_CAT_TO_FW[s.cat]||'gen';
+    var rr=FW_RR[fwKey]||FW_RR.gen;
+    var ca=FW_CA[fwKey]||FW_CA.gen;
+    var mx=FW_MX[ra_levelToSensKey(s.level)]||FW_MX['L to M'];
+    var ce=ra_ctrlEffectiveness(s.score);
+    var rtype=RA_RISK_TYPES[fwKey]||'Operational Risk';
+    var ctype=RA_CTRL_TYPES[fwKey]||'Preventive';
+    var action=ra_actionRequired(s.level);
+    var rowBg=i%2===0?'#fff':'#f7faff';
+    h+='<tr style="background:'+rowBg+'">';
+    h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;vertical-align:top"><div style="font-weight:800;color:#1a3a5c;font-size:10px;white-space:nowrap">'+ra_esc(rr.id)+'</div></td>';
+    h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;vertical-align:top;min-width:155px"><div style="font-weight:700;color:#1a3a5c;margin-bottom:3px">'+ra_esc(rr.name)+'</div><span style="font-size:9.5px;background:#edf2f8;border:1px solid #c8d8ec;border-radius:6px;padding:1px 6px;color:#2a4060;font-weight:600">'+ra_esc(rtype)+'</span></td>';
+    h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;text-align:center;vertical-align:top">'+ra_lvlBadge(mx.likelihood)+'</td>';
+    h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;text-align:center;vertical-align:top">'+ra_lvlBadge(mx.impact)+'</td>';
+    h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;text-align:center;vertical-align:top">'+ra_lvlBadge(mx.inherent)+'</td>';
+    h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;vertical-align:top;min-width:170px"><div style="font-size:9.5px;font-weight:700;color:#1a3a5c">'+ra_esc(ca.id)+'</div><div style="margin-top:2px;color:#2a3a50;line-height:1.4">'+ra_esc(ca.name)+'</div></td>';
+    h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;vertical-align:top;white-space:nowrap"><span style="font-size:9.5px;background:#f0f4f8;border:1px solid #c8d8ec;border-radius:6px;padding:2px 6px;color:#2a4060;font-weight:600">'+ra_esc(ctype)+'</span></td>';
+    h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;text-align:center;vertical-align:top"><span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;background:'+ce.bg+';color:'+ce.color+';border:1px solid '+ce.color+'55">'+ce.label+'</span></td>';
+    h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;text-align:center;vertical-align:top">'+ra_lvlBadge(mx.residual)+'</td>';
+    h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;text-align:center;vertical-align:top">'+ra_lvlBadge(mx.appetite)+'</td>';
+    h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;vertical-align:top;min-width:160px;font-size:10.5px;color:#4a5a70;line-height:1.4">'+ra_esc(action)+'</td>';
+    h+='</tr>';
+    // Detail sub-row
+    h+='<tr style="background:'+rowBg+'"><td colspan="11" style="padding:0 10px 12px;border-bottom:2px solid #d8e4f0">';
+    h+='<div style="background:#f5f9ff;border:1px solid #c8d8ec;border-radius:6px;padding:10px 14px;display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:11px;color:#4a5a70;line-height:1.6">';
+    h+='<div><div style="font-size:10px;font-weight:800;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Risk Description &amp; Audit Objective</div><div>'+ra_esc(rr.desc)+'</div><div style="margin-top:5px"><strong>Audit Objective:</strong> '+ra_esc(rr.obj)+'</div></div>';
+    h+='<div><div style="font-size:10px;font-weight:800;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Control Activity Description</div><div>'+ra_esc(ca.desc)+'</div>';
+    var obs1=s.d1?s.d1.obs:0; var rep1=s.d1?s.d1.repeated:0;
+    if(obs1>0||rep1>0){
+      h+='<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">';
+      if(obs1>0) h+='<span style="background:#edf2f8;border:1px solid #c8d8ec;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:600;color:#1a3a5c">'+obs1+' obs in report</span>';
+      if(rep1>0) h+='<span style="background:#fde8e8;border:1px solid #f0a0a0;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:600;color:#9b1a1a">'+rep1+' repeated (escalated)</span>';
+      h+='<span style="background:#edf2f8;border:1px solid #c8d8ec;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:600;color:#1a3a5c">'+RA_DB_CATS[s.cat].count+' in S&amp;A databank</span>';
+      h+='</div>';
+    }
+    h+='</div></div></td></tr>';
+  }
+  h+='</tbody></table></div>';
+  // ERM Legend
+  h+='<div style="margin-top:16px;background:#f5f8fd;border:1px solid #c8d8ec;border-radius:7px;padding:14px 16px">';
+  h+='<div style="font-size:11px;font-weight:800;color:#1a3a5c;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">&#128203; ERM Definitions</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;font-size:11px;color:#4a5a70;line-height:1.6">';
+  h+='<div><strong>Inherent Risk:</strong> Exposure to risk before any controls are applied. Reflects the raw risk in the process.</div>';
+  h+='<div><strong>Residual Risk:</strong> Remaining risk after applying key controls. Should fall within risk appetite.</div>';
+  h+='<div><strong>Control Effectiveness:</strong> How well the control mitigates risk — derived from observation frequency and repeat rate. High frequency = Inadequate controls.</div>';
+  h+='<div><strong>Risk Appetite:</strong> The level of risk the organization is willing to accept in pursuit of its objectives. Drives action thresholds.</div>';
+  h+='<div><strong>Preventive Control:</strong> Stops the risk event from occurring (e.g., approval workflows, access restrictions).</div>';
+  h+='<div><strong>Detective Control:</strong> Identifies the risk event after it occurs (e.g., reconciliations, physical verification, audits).</div>';
+  h+='</div></div>';
+  document.getElementById('ra-res-register').innerHTML=h;
 }
 </script>
 
@@ -15955,6 +16123,16 @@ function ra_renderRecs(scores){
         <div class="ra-card">
           <div class="ra-card-title">Observation Frequency by Category</div>
           <div id="ra-res-barchart"></div>
+        </div>
+        <!-- Risk Heatmap -->
+        <div class="ra-card">
+          <div class="ra-card-title">&#127922; Risk Heatmap — Likelihood vs Impact Matrix</div>
+          <div id="ra-res-heatmap"></div>
+        </div>
+        <!-- ERM Risk Register -->
+        <div class="ra-card">
+          <div class="ra-card-title">&#128203; Enterprise Risk Register (ERM)</div>
+          <div id="ra-res-register"></div>
         </div>
         <!-- Focus Areas -->
         <div class="ra-card">
