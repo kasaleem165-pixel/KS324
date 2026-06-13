@@ -13469,16 +13469,83 @@ function generateIssuedReport(){
   var brDisp=(H.brcode?H.brcode+' ':'')+(H.brname||'Branch');
   var fname='IssuedReport'+(H.brcode?'_'+H.brcode:'')+(H.brname?'_'+H.brname.replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_'):'')+'_'+new Date().toISOString().slice(0,10)+'.html';
 
-  // COSO analysis strip (simple, reusing sensitivityMap data)
+  // COSO analysis — full data with counts and observation reference numbers
+  var COSO_DEFS=[
+    {key:'CE',label:'Control Environment',        col:'#1a3a5c',desc:'Tone at the top, ethics, governance structure, HR policies and board oversight.'},
+    {key:'RA',label:'Risk Assessment',             col:'#8e44ad',desc:'Identification, analysis and management response to risks at branch level.'},
+    {key:'CA',label:'Control Activities',          col:'#16a085',desc:'Policies and procedures ensuring management directives are carried out effectively.'},
+    {key:'IC',label:'Information & Communication', col:'#2980b9',desc:'Relevant information identified, captured and communicated in a timely manner.'},
+    {key:'M', label:'Monitoring',                  col:'#c0392b',desc:'Ongoing assessment of control quality; corrective actions identified and taken.'},
+    {key:'',  label:'Not Mapped',                  col:'#95a5a6',desc:'COSO component not assigned to this observation.'}
+  ];
+  var cosoCnt={}, cosoRef={};
+  for(var cdi=0;cdi<COSO_DEFS.length;cdi++){cosoCnt[COSO_DEFS[cdi].key]=0;cosoRef[COSO_DEFS[cdi].key]=[];}
+  for(var cai=0;cai<all.length;cai++){
+    var cao=all[cai]; var calbl=labMap[cao.id]||'?';
+    var cak=cosoMap[cao.id]||'';
+    if(!(cak in cosoCnt))cak='';
+    cosoCnt[cak]++; cosoRef[cak].push(calbl);
+  }
+  var cosoTotal=all.length;
   var cosoHtml='<div id="analysis" style="margin-bottom:1.2rem">'
     +'<div class="section-title" style="font-size:1.1rem">E. Analysis of Observations &amp; Controls (COSO Framework)</div>'
-    +'<div class="card" style="font-size:.9rem"><p>Observations are analysed per the COSO Internal Control — Integrated Framework across three components: <strong>Control Environment (CE)</strong>, <strong>Control Activities (CA)</strong>, and <strong>Monitoring</strong>. Risk tiers:</p>'
-    +'<div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.8rem">'
-    +'<span class="risk high">High — Immediate action required</span>'
-    +'<span class="risk mh">Medium-High — Priority attention</span>'
-    +'<span class="risk lm">Low-Medium — Planned action</span>'
-    +'<span class="risk low">Low — Monitor &amp; review</span>'
-    +'</div></div></div>';
+    +'<div class="card">'
+    // Proportional colour bar
+    +'<div style="display:flex;height:10px;border-radius:6px;overflow:hidden;margin-bottom:1rem">';
+  for(var cbi=0;cbi<COSO_DEFS.length;cbi++){
+    var cbd=COSO_DEFS[cbi];
+    if(!cosoCnt[cbd.key])continue;
+    cosoHtml+='<div style="flex:'+cosoCnt[cbd.key]+';background:'+cbd.col+';opacity:.88" title="'+e(cbd.label)+': '+cosoCnt[cbd.key]+'"></div>';
+  }
+  cosoHtml+='</div>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:.82rem">'
+    +'<thead><tr>'
+    +'<th style="background:var(--primary);color:#fff;padding:.45rem .7rem;text-align:center;font-size:.72rem;width:58px">Code</th>'
+    +'<th style="background:var(--primary);color:#fff;padding:.45rem .7rem;text-align:left;font-size:.72rem;width:160px">Component</th>'
+    +'<th style="background:var(--primary);color:#fff;padding:.45rem .7rem;text-align:left;font-size:.72rem">Description</th>'
+    +'<th style="background:var(--primary);color:#fff;padding:.45rem .7rem;text-align:center;font-size:.72rem;width:52px">Count</th>'
+    +'<th style="background:var(--primary);color:#fff;padding:.45rem .7rem;text-align:center;font-size:.72rem;width:72px">Share</th>'
+    +'<th style="background:var(--primary);color:#fff;padding:.45rem .7rem;text-align:left;font-size:.72rem">Observations</th>'
+    +'</tr></thead><tbody>';
+  for(var cri=0;cri<COSO_DEFS.length;cri++){
+    var crd=COSO_DEFS[cri];
+    var cnt=cosoCnt[crd.key]; var refs=cosoRef[crd.key];
+    var pct=cosoTotal?Math.round(cnt/cosoTotal*100):0;
+    var rowBg=cri%2===0?'#fff':'#f8fafd';
+    cosoHtml+='<tr style="background:'+rowBg+';border-bottom:1px solid #e8eef6">';
+    cosoHtml+='<td style="padding:.42rem .6rem;text-align:center">';
+    if(crd.key){
+      cosoHtml+='<span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:.72rem;font-weight:800;background:'+crd.col+';color:#fff">'+crd.key+'</span>';
+    } else {
+      cosoHtml+='<span style="font-size:.72rem;color:#aaa">—</span>';
+    }
+    cosoHtml+='</td>';
+    cosoHtml+='<td style="padding:.42rem .6rem;font-weight:700;color:'+crd.col+';font-size:.81rem">'+e(crd.label)+'</td>';
+    cosoHtml+='<td style="padding:.42rem .6rem;color:#555;font-size:.79rem">'+e(crd.desc)+'</td>';
+    cosoHtml+='<td style="padding:.42rem .6rem;text-align:center;font-weight:800;color:'+(cnt?crd.col:'#aaa')+'">'+cnt+'</td>';
+    cosoHtml+='<td style="padding:.42rem .6rem;text-align:center">';
+    if(cnt){
+      cosoHtml+='<div style="background:#e8edf4;border-radius:20px;height:6px;margin-bottom:2px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+crd.col+';border-radius:20px"></div></div>';
+      cosoHtml+='<span style="font-size:.68rem;color:#666">'+pct+'%</span>';
+    } else {
+      cosoHtml+='<span style="font-size:.72rem;color:#ccc">—</span>';
+    }
+    cosoHtml+='</td>';
+    cosoHtml+='<td style="padding:.42rem .6rem;font-size:.78rem;color:#3a5070">';
+    if(refs.length){
+      cosoHtml+=refs.map(function(r){return'<span style="display:inline-block;background:'+crd.col+'1a;color:'+crd.col+';border:1px solid '+crd.col+'55;border-radius:4px;padding:.05rem .4rem;font-size:.7rem;font-weight:700;margin:.1rem .15rem .1rem 0">'+e(r)+'</span>';}).join('');
+    } else {
+      cosoHtml+='<span style="color:#ccc;font-size:.75rem">—</span>';
+    }
+    cosoHtml+='</td></tr>';
+  }
+  cosoHtml+='<tr style="background:#edf2f8;font-weight:700">'
+    +'<td colspan="3" style="padding:.45rem .7rem;color:var(--primary);font-size:.8rem">Total</td>'
+    +'<td style="padding:.45rem .7rem;text-align:center;color:var(--primary);font-size:.85rem">'+cosoTotal+'</td>'
+    +'<td style="padding:.45rem .7rem;text-align:center;color:var(--primary);font-size:.8rem">100%</td>'
+    +'<td style="padding:.45rem .7rem;color:#888;font-size:.75rem;font-weight:400">All selected observations</td>'
+    +'</tr>';
+  cosoHtml+='</tbody></table></div></div>';
 
   var matrixHtml='<div id="matrix" style="margin-bottom:1.2rem">'
     +'<div class="section-title" style="font-size:1.1rem">F. Sensitivity Matrix</div>'
