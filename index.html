@@ -13201,10 +13201,53 @@ function generateIssuedReport(){
     if(resp.bh===null&&resp.ro===null&&resp.gen) iboxes+='<div class="ibox iresp"><span class="ibox-lbl">&#128172; Auditee Response</span>'+e(resp.gen)+'</div>';
     if(av) iboxes+='<div class="ibox iview"><span class="ibox-lbl">&#128065; Audit View</span>'+e(av)+'</div>';
     if(at) iboxes+='<div class="ibox iaction"><span class="ibox-lbl">&#10004; Action Taken</span>'+e(at)+'</div>';
+    // Risk-Based Framework panel inside detail expansion
+    var wasUplifted=(adjInherent!==fw.mx.inherent);
+    var instBadgeColor=inst.label==='Systemic / Pervasive'?'#c0392b':inst.label==='Significant'?'#e67e22':inst.label==='Isolated / Limited'?'#2980b9':'#95a5a6';
+    var instBox='<div style="background:#f7f9fc;border:1px solid #dde2ea;border-radius:6px;padding:.45rem .65rem;margin-top:.45rem;font-size:.76rem">'
+      +'<div style="font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#555;margin-bottom:.25rem">&#128202; Materiality Analysis</div>'
+      +(inst.count>0?'<div>Instances: <strong>'+inst.count+'</strong></div>':'')
+      +(inst.amount>0?'<div>Financial Impact: <strong>Rs. '+inst.amount.toLocaleString()+'</strong></div>':'')
+      +(inst.sources.length?'<div style="color:#777;font-size:.7rem;margin-top:.15rem">Sources: '+inst.sources.join(' &bull; ')+'</div>':'')
+      +'<div style="margin-top:.25rem">Materiality: <span style="display:inline-block;background:'+instBadgeColor+';color:#fff;border-radius:20px;padding:.08rem .55rem;font-size:.68rem;font-weight:700">'+inst.label+'</span>'
+      +(wasUplifted?' <span style="color:#c0392b;font-size:.68rem;font-weight:700">&uarr; Risk uplifted</span>':'')+'</div></div>';
+    function fwC(lbl2,val){var c='#7f8c8d';if(val==='High')c='#c0392b';else if(val==='Medium-High')c='#e67e22';else if(val==='Medium')c='#2980b9';else if(val==='Low-Medium')c='#2e86ab';else if(val==='Low')c='#27ae60';return'<span style="font-size:.62rem;color:#999;text-transform:uppercase;letter-spacing:.4px">'+lbl2+'</span> <span style="display:inline-block;background:'+c+';color:#fff;border-radius:20px;padding:.08rem .55rem;font-size:.68rem;font-weight:700;margin:.08rem .15rem .08rem 0">'+val+'</span> ';}
+    iboxes+='<div style="margin-top:.8rem;border:1px solid #b8d4ec;border-radius:8px;overflow:hidden">'
+      +'<div style="background:#1a3557;color:#fff;padding:.38rem .8rem;font-size:.74rem;font-weight:700;letter-spacing:.5px">&#128203; Risk-Based Audit Framework</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;font-size:.81rem">'
+      +'<div style="padding:.7rem .9rem;border-right:1px solid #d0e4f0">'
+        +'<div style="font-size:.61rem;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#1a3557;margin-bottom:.3rem">Risk Register Reference</div>'
+        +'<span style="background:#1a3557;color:#fff;border-radius:4px;padding:.1rem .45rem;font-size:.68rem;font-weight:700;margin-bottom:.35rem;display:inline-block">'+e(fw.rr.id)+'</span>'
+        +'<div style="font-weight:700;color:#c0392b;font-size:.84rem;margin-bottom:.3rem">'+e(fw.rr.name)+'</div>'
+        +'<div style="color:#555;font-size:.77rem;margin-bottom:.45rem">'+e(fw.rr.desc)+'</div>'
+        +fwC('Auditor Risk',sk||'—')+fwC('Residual Risk',adjResidual)+'<br>'
+        +fwC('Risk Appetite',fw.mx.appetite)
+        +instBox
+        +'<div style="margin-top:.45rem;font-size:.72rem;color:#666;border-top:1px solid #dde8f0;padding-top:.35rem"><em>Control Objective:</em> '+e(fw.rr.obj)+'</div>'
+      +'</div>'
+      +'<div style="padding:.7rem .9rem;background:#f9fcff">'
+        +'<div style="font-size:.61rem;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#1a7a4a;margin-bottom:.3rem">Control Activity Applied</div>'
+        +'<span style="background:#1a7a4a;color:#fff;border-radius:4px;padding:.1rem .45rem;font-size:.68rem;font-weight:700;margin-bottom:.35rem;display:inline-block">'+e(fw.ca.id)+'</span>'
+        +'<div style="font-weight:700;color:#1a7a4a;font-size:.84rem;margin-bottom:.3rem">'+e(fw.ca.name)+'</div>'
+        +'<div style="color:#555;font-size:.77rem;margin-bottom:.45rem">'+e(fw.ca.desc)+'</div>'
+        +'<div style="font-size:.72rem;color:#444;border-top:1px solid #d0e8d8;padding-top:.35rem"><strong>Audit Conclusion:</strong> Based on <em>'+e(fw.ca.name)+'</em>, the audit team identified control gaps. '
+        +(inst.count>0?'<strong>'+inst.count+' instance'+(inst.count!==1?'s':'')+' identified</strong>, indicating a '+inst.label.toLowerCase()+' control failure. ':' ')
+        +'Findings and recommendations are above.</div>'
+      +'</div></div></div>';
     iboxes+='<div style="margin-top:.7rem"><button class="rep-btn" onclick="openReportModal(\''+id+'\')">&#128196; View as Written in Report</button></div>';
+    // Populate verbatim modal data
+    var mBody='';
+    if(ot) mBody+='<div class="modal-badge mb-find">Finding</div><div class="modal-section ms-find">'+e(ot)+'</div>';
+    if(rt) mBody+='<div class="modal-badge mb-rec">Recommendation</div><div class="modal-section ms-rec">'+e(rt)+'</div>';
+    if(resp.bh!==null&&resp.bh!=='') mBody+='<div class="modal-badge mb-resp">Auditee Response (BH)</div><div class="modal-section ms-resp">'+e(resp.bh)+'</div>';
+    if(resp.ro!==null&&resp.ro!=='') mBody+='<div class="modal-badge mb-roresp">RO Response</div><div class="modal-section ms-resp">'+e(resp.ro)+'</div>';
+    if(resp.bh===null&&resp.ro===null&&resp.gen) mBody+='<div class="modal-badge mb-resp">Auditee Response</div><div class="modal-section ms-resp">'+e(resp.gen)+'</div>';
+    if(av) mBody+='<div class="modal-badge mb-view">Audit View</div><div class="modal-section ms-view">'+e(av)+'</div>';
+    if(at) mBody+='<div class="modal-badge mb-action">Action Taken</div><div class="modal-section ms-action">'+e(at)+'</div>';
+    vbData[id]={title:lbl+' — '+e(o.title),body:mBody};
     return '<tr id="syn-row-'+id+'">'
-      +'<td style="white-space:nowrap"><a href="#obs-'+id+'" class="full-obs-link" data-syn="syn-row-'+id+'">'+lbl+'</a></td>'
-      +'<td><a href="#obs-'+id+'" class="full-obs-link" data-syn="syn-row-'+id+'">'+e(o.title)+'</a>'+(o.category?'<br><span class="cat">'+e(o.category)+'</span>':'')+'</td>'
+      +'<td style="white-space:nowrap">'+lbl+'</td>'
+      +'<td>'+e(o.title)+(o.category?'<br><span class="cat">'+e(o.category)+'</span>':'')+'</td>'
       +'<td>'+rk+'</td>'
       +'<td>'+resChip(adjResidual)+'</td>'
       +'<td>'+matChip+'</td>'
@@ -13575,7 +13618,7 @@ function generateIssuedReport(){
     // Top nav
     +'<nav class="topnav">'
     +'<div class="brand">Beaconhouse &nbsp;<span>Systems &amp; Audit</span></div>'
-    +'<div style="display:flex;align-items:center;gap:.5rem"><a href="#synopsis">Synopsis</a><a href="#repeated-obs">Repeated</a><a href="#new-obs">New Findings</a>'+(annexures.length?'<a href="#annexures">Annexures</a>':'')
+    +'<div style="display:flex;align-items:center;gap:.5rem"><a href="#synopsis">Synopsis</a><a href="#repeated-syn">Repeated</a><a href="#new-syn">New Findings</a>'+(annexures.length?'<a href="#annexures">Annexures</a>':'')
     +'</div>'
     +'</nav>\n'
 
@@ -13638,11 +13681,7 @@ function generateIssuedReport(){
     +'</div>'
     +'</div>\n'
 
-    // (fw-summary table removed — Residual Risk & Materiality now in synopsis tables)
-
-    // Full observation cards
-    +cardSection(repeated, '&#128308; Section 1 — Repeated (Unresolved) Observations', 'repeated-obs')
-    +cardSection(newObs,   '&#128310; Section 2 — New Observations', 'new-obs')
+    // (Standalone card sections removed — all detail available via synopsis Detail expansion)
 
     +annexHtml
     +kpiModals
