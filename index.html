@@ -10318,7 +10318,8 @@ function renderRpt(){
       var cosoClass=curCoso==='CE'?'c-ce':curCoso==='RA'?'c-ra':curCoso==='CA'?'c-ca':curCoso==='IC'?'c-ic':curCoso==='M'?'c-m':'';
       h+='<div class="oc '+tc+'" id="oc-'+o.id+'">';
       h+='<div class="och"><span class="onum">Obs. '+num+'</span>';
-      h+='<span class="otl">'+esc(o.title)+' <span class="badge '+tc+'">'+esc(effType)+'</span>'+(tc==='repeated'&&lastRefMap[o.id]?'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fff8f0;color:#8a3000;border:1px solid #f0b080;margin-left:3px">Prior: '+esc(lastRefMap[o.id])+'</span>':'')+'</span>';
+      var priorRefDraft=lastRefMap[o.id]||'';
+      h+='<span class="otl">'+esc(o.title)+' <span class="badge '+tc+'">'+esc(effType)+'</span>'+(tc==='repeated'?(priorRefDraft?'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fff8f0;color:#8a3000;border:1px solid #f0b080;margin-left:3px">Prior: '+esc(priorRefDraft)+'</span>':'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fde8e8;color:#9b1a1a;border:1px solid #f0a0a0;margin-left:3px" title="Prior Audit Reference required">&#9888; Prior Ref required</span>'):'')+'</span>';
       h+='<select id="sens-sel-'+o.id+'" class="sens-sel '+sensClass+'" title="Sensitivity Level" onchange="setSensitivity(\''+o.id+'\',this)">';
       h+='<option value="">Sensitivity</option>';
       h+='<option value="High"'+(curSens==='High'?' selected':'')+'>High</option>';
@@ -12898,12 +12899,28 @@ function parseObsInstances(obsId, text){
 // ============================================================
 // FINALIZE & SAVE FINAL REPORT
 // ============================================================
+function _checkPriorRefs(all){
+  var missing=[];
+  for(var i=0;i<all.length;i++){
+    var o=all[i];
+    var t=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
+    if(t==='repeated'&&!lastRefMap[o.id]){missing.push(o);}
+  }
+  return missing;
+}
+
 function finalizeReport(){
   var H=getHdrVals();
   var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
   var all=dbObs.concat(cuObs);
   if(!all.length){toast('No observations selected.');return;}
+  var missingRef=_checkPriorRefs(all);
+  if(missingRef.length){
+    var names=missingRef.map(function(o,i){return (i+1)+'. '+o.title;}).join('\n');
+    alert('Cannot finalize — Prior Audit Reference is missing for '+missingRef.length+' repeated observation'+(missingRef.length>1?'s':'')+':\n\n'+names+'\n\nPlease enter the prior audit report reference number for each repeated observation in the selection list.');
+    return;
+  }
 
   var avMode=document.querySelector('input[name="avmode"]:checked');
   var avVal=avMode?avMode.value:'auto';
@@ -13221,6 +13238,12 @@ function generateIssuedReport(){
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
   var all=dbObs.concat(cuObs);
   if(!all.length){toast('No observations selected. Please select observations first.');return;}
+  var missingRef=_checkPriorRefs(all);
+  if(missingRef.length){
+    var names=missingRef.map(function(o,i){return (i+1)+'. '+o.title;}).join('\n');
+    alert('Cannot generate Issued Report — Prior Audit Reference is missing for '+missingRef.length+' repeated observation'+(missingRef.length>1?'s':'')+':\n\n'+names+'\n\nPlease enter the prior audit report reference number for each repeated observation in the selection list.');
+    return;
+  }
 
   syncAnnexTextFromDom();
   var H=getHdrVals();
