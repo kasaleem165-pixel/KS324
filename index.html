@@ -12741,6 +12741,61 @@ function generateIssuedReport(){
     if(!s)return''; if(s==='High')return'high'; if(s==='M to H')return'mh'; if(s==='L to M')return'lm'; if(s==='Low')return'low'; return'';
   }
 
+  // ── Risk-Based Framework data ────────────────────────────────────────────
+  var FW_RR={
+    fin:{id:'RR-FIN-01',name:'Financial Mismanagement Risk',desc:'Risk of financial irregularities, policy non-compliance in expenditure and procurement.',obj:'Ensure expenditures are authorised, properly documented, and within policy limits.'},
+    cash:{id:'RR-FIN-02',name:'Cash & Bank Management Risk',desc:'Risk of cash misappropriation, reconciliation failures, and unauthorised transactions.',obj:'Maintain accurate cash/bank records with proper authorisation and reconciliation.'},
+    hr:{id:'RR-HR-01',name:'Human Resource Compliance Risk',desc:'Risk of non-compliance in recruitment, payroll, attendance, and employee record management.',obj:'Ensure HR processes comply with policy; records are complete and accurate.'},
+    fa:{id:'RR-OPS-01',name:'Fixed Asset Management Risk',desc:'Risk of asset misappropriation, untracked disposals, or inaccurate fixed asset register.',obj:'Maintain complete, accurate fixed asset records with regular physical verification.'},
+    lib:{id:'RR-OPS-02',name:'Library Resource Management Risk',desc:'Risk of loss, mis-cataloguing, or under-utilisation of library resources.',obj:'Ensure library resources are accurately catalogued, tracked and properly maintained.'},
+    stu:{id:'RR-OPS-03',name:'Student Record & Fee Management Risk',desc:'Risk of data inaccuracies, fee irregularities, and non-compliance in student management.',obj:'Ensure complete and accurate student records with proper fee collection procedures.'},
+    lab:{id:'RR-OPS-04',name:'Laboratory Resource Risk',desc:'Risk of loss, misuse, or improper maintenance of laboratory equipment and consumables.',obj:'Ensure lab resources are inventoried, maintained, and used in accordance with policy.'},
+    sec:{id:'RR-SEC-01',name:'Safety & Security Compliance Risk',desc:'Risk of security breaches due to non-compliance with security protocols and contracts.',obj:'Ensure branch security meets contractual obligations and safety standards.'},
+    gen:{id:'RR-OPS-05',name:'Operational Compliance Risk',desc:'Risk of non-compliance in general branch operations, records, and administrative procedures.',obj:'Ensure branch operations comply with SOPs and administrative requirements.'}
+  };
+  var FW_CA={
+    fin:{id:'CA-FIN-01',name:'Budget Variance Monitoring Control',desc:'Periodic review of actual vs budgeted expenditures with variance analysis and authorisation for deviations.'},
+    cash:{id:'CA-FIN-02',name:'Cash & Bank Reconciliation Control',desc:'Daily cash counts and monthly bank reconciliation reviewed and approved by the Branch Head.'},
+    hr:{id:'CA-HR-01',name:'HR Records Completeness Control',desc:'Systematic review of employee files, payroll reconciliation, and attendance monitoring by management.'},
+    fa:{id:'CA-OPS-01',name:'Fixed Asset Verification Control',desc:'Annual physical verification of fixed assets against the register, with tagging and reconciliation.'},
+    lib:{id:'CA-OPS-02',name:'Library Resource Audit Control',desc:'Regular stock-taking, KOHA module entries, and item-per-child ratio review by the Branch Librarian.'},
+    stu:{id:'CA-OPS-03',name:'Student Record Review Control',desc:'Periodic audit of student files, BEAMS data, and fee collection records for completeness and accuracy.'},
+    lab:{id:'CA-OPS-04',name:'Lab Resource Inventory Control',desc:'Regular inventory checks of laboratory equipment and consumables against register entries.'},
+    sec:{id:'CA-SEC-01',name:'Security Contract Compliance Control',desc:'Monthly review of security contractor performance against SLA, CCTV checks, and drill records.'},
+    gen:{id:'CA-OPS-05',name:'General Operations Compliance Control',desc:'Routine review of branch administrative records, registers, and SOPs by the Branch Head and Accounts staff.'}
+  };
+  var FW_MX={
+    'High':  {likelihood:'High',  impact:'High',  inherent:'High',        residual:'Medium-High',appetite:'Low'},
+    'M to H':{likelihood:'Medium',impact:'High',  inherent:'Medium-High', residual:'Medium',     appetite:'Low-Medium'},
+    'L to M':{likelihood:'Low',   impact:'Medium',inherent:'Medium',      residual:'Low-Medium', appetite:'Medium'},
+    'Low':   {likelihood:'Low',   impact:'Low',   inherent:'Low',         residual:'Low',        appetite:'Medium-High'}
+  };
+  function getFwKey(cat){
+    if(!cat)return'gen'; var c=cat.toLowerCase();
+    if(c.indexOf('imprest')!==-1||c.indexOf('payment')!==-1||c.indexOf('account')!==-1||c.indexOf('procurement')!==-1||c.indexOf('vendor')!==-1||c.indexOf('tax')!==-1)return'fin';
+    if(c.indexOf('cash')!==-1||c.indexOf('bank')!==-1)return'cash';
+    if(c.indexOf('recruit')!==-1||c.indexOf('payroll')!==-1||c.indexOf('employee')!==-1)return'hr';
+    if(c.indexOf('fixed asset')!==-1||c.indexOf('asset')!==-1)return'fa';
+    if(c.indexOf('library')!==-1||c.indexOf('lib ')!==-1)return'lib';
+    if(c.indexOf('student')!==-1)return'stu';
+    if(c.indexOf('lab')!==-1||c.indexOf('science')!==-1)return'lab';
+    if(c.indexOf('security')!==-1||c.indexOf('safety')!==-1)return'sec';
+    return'gen';
+  }
+  function getFw(o){
+    var key=getFwKey(o.category||'');
+    var mx=FW_MX[sensitivityMap[o.id]||'L to M']||FW_MX['L to M'];
+    return{rr:FW_RR[key],ca:FW_CA[key],mx:mx};
+  }
+  function fwChip(label,val){
+    var c='#7f8c8d';
+    if(val==='High')c='#c0392b'; else if(val==='Medium-High')c='#e67e22';
+    else if(val==='Medium')c='#2980b9'; else if(val==='Low-Medium')c='#2e86ab';
+    else if(val==='Low')c='#27ae60';
+    return '<span style="font-size:.67rem;color:#999;text-transform:uppercase;letter-spacing:.4px">'+label+'</span> <span style="display:inline-block;background:'+c+';color:#fff;border-radius:20px;padding:.1rem .6rem;font-size:.7rem;font-weight:700;margin:.1rem .2rem .1rem 0">'+val+'</span> ';
+  }
+  // ── End framework data ───────────────────────────────────────────────────
+
   // Separate Repeated / New
   var repeated=[], newObs=[];
   for(var a=0;a<all.length;a++){
@@ -12849,6 +12904,33 @@ function generateIssuedReport(){
     h+='<div style="margin-top:.7rem;display:flex;gap:.6rem;flex-wrap:wrap">'
       +'<button class="rep-btn" onclick="openReportModal(\''+id+'\')">&#128196; View as Written in Report</button>'
       +'<a href="#syn-row-'+id+'" class="back-link" onclick="event.preventDefault();highlightSynRow(\'syn-row-'+id+'\')">&#8593; Back to Synopsis</a>'
+      +'</div>';
+    // Framework panel (hidden by default; shown when toggleFramework() is active)
+    var fw=getFw(o);
+    h+='<div class="fw-panel" style="display:none;margin-top:.9rem;border:1px solid #b8d4ec;border-radius:8px;overflow:hidden">'
+      +'<div style="background:#1a3557;color:#fff;padding:.45rem .9rem;font-size:.76rem;font-weight:700;letter-spacing:.5px">&#128203; Risk-Based Audit Framework &mdash; '+lbl+'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;font-size:.82rem">'
+      +'<div style="padding:.8rem 1rem;border-right:1px solid #d0e4f0">'
+        +'<div style="font-size:.63rem;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#1a3557;margin-bottom:.35rem">Risk Register Reference</div>'
+        +'<div style="display:inline-block;background:#1a3557;color:#fff;border-radius:5px;padding:.15rem .55rem;font-size:.72rem;font-weight:700;margin-bottom:.4rem">'+e(fw.rr.id)+'</div>'
+        +'<div style="font-weight:700;color:#c0392b;font-size:.87rem;margin-bottom:.35rem">'+e(fw.rr.name)+'</div>'
+        +'<div style="color:#555;font-size:.79rem;margin-bottom:.5rem">'+e(fw.rr.desc)+'</div>'
+        +fwChip('Likelihood',fw.mx.likelihood)
+        +fwChip('Impact',fw.mx.impact)
+        +'<br>'
+        +fwChip('Inherent Risk',fw.mx.inherent)
+        +fwChip('Residual Risk',fw.mx.residual)
+        +fwChip('Risk Appetite',fw.mx.appetite)
+        +'<div style="margin-top:.5rem;font-size:.74rem;color:#666;border-top:1px solid #dde8f0;padding-top:.4rem"><em>Control Objective:</em> '+e(fw.rr.obj)+'</div>'
+      +'</div>'
+      +'<div style="padding:.8rem 1rem;background:#f9fcff">'
+        +'<div style="font-size:.63rem;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#1a7a4a;margin-bottom:.35rem">Control Activity Applied</div>'
+        +'<div style="display:inline-block;background:#1a7a4a;color:#fff;border-radius:5px;padding:.15rem .55rem;font-size:.72rem;font-weight:700;margin-bottom:.4rem">'+e(fw.ca.id)+'</div>'
+        +'<div style="font-weight:700;color:#1a7a4a;font-size:.87rem;margin-bottom:.35rem">'+e(fw.ca.name)+'</div>'
+        +'<div style="color:#555;font-size:.79rem;margin-bottom:.5rem">'+e(fw.ca.desc)+'</div>'
+        +'<div style="margin-top:.4rem;font-size:.74rem;color:#444;border-top:1px solid #d0e8d8;padding-top:.4rem"><strong>Audit Conclusion:</strong> Based on the application of <em>'+e(fw.ca.name)+'</em>, the audit team identified control gaps related to observation '+lbl+'. Specific findings and recommendations are documented above in the observation detail.</div>'
+      +'</div>'
+      +'</div>'
       +'</div>';
     h+='</div>';
     // Store verbatim data for shared modal
@@ -13133,7 +13215,9 @@ function generateIssuedReport(){
     // Top nav
     +'<nav class="topnav">'
     +'<div class="brand">Beaconhouse &nbsp;<span>Systems &amp; Audit</span></div>'
-    +'<div><a href="#synopsis">Synopsis</a><a href="#repeated-obs">Repeated</a><a href="#new-obs">New Findings</a>'+(annexures.length?'<a href="#annexures">Annexures</a>':'')+'</div>'
+    +'<div style="display:flex;align-items:center;gap:.5rem"><a href="#synopsis">Synopsis</a><a href="#repeated-obs">Repeated</a><a href="#new-obs">New Findings</a>'+(annexures.length?'<a href="#annexures">Annexures</a>':'')
+    +'<button id="fw-toggle-btn" onclick="toggleFramework()" style="background:#1e6e3e;color:#fff;border:none;border-radius:20px;padding:.28rem .85rem;font-size:.78rem;font-weight:700;cursor:pointer;letter-spacing:.3px;margin-left:.8rem;transition:background .2s" title="Show or hide the Risk-Based Audit Framework for each observation">&#128203; Show Risk Framework</button>'
+    +'</div>'
     +'</nav>\n'
 
     // Cover
@@ -13177,6 +13261,56 @@ function generateIssuedReport(){
     +synTable(repeated, 'Section 1 — Repeated (Unresolved) Observations', 'repeated-syn')
     +synTable(newObs,   'Section 2 — New Observations', 'new-syn')
     +'</div>\n'
+
+    // Framework intro banner (hidden by default)
+    +'<div id="fw-intro" style="display:none;background:linear-gradient(135deg,#e8f4f8,#f0f7e8);border:1px solid #b0d4e8;border-radius:10px;padding:1.2rem 1.5rem;max-width:1100px;margin:1rem auto;box-sizing:border-box">'
+    +'<div style="font-weight:800;color:#1a3557;font-size:.98rem;margin-bottom:.6rem">&#128203; Risk-Based Audit Methodology</div>'
+    +'<p style="font-size:.86rem;color:#444;line-height:1.65">This audit was conducted following a <strong>Risk-Based Audit Approach</strong> aligned with the <strong>COSO Internal Control &mdash; Integrated Framework</strong>. For each audit area, the team identified relevant risks from the Branch Risk Register, assessed the adequacy and effectiveness of existing control activities, and formulated audit observations based on identified control gaps.</p>'
+    +'<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.8rem;font-size:.76rem;align-items:center">'
+    +'<span style="background:#1a3557;color:#fff;border-radius:20px;padding:.2rem .8rem;font-weight:700">Step 1: Risk Identification</span>'
+    +'<span style="color:#555">&rarr;</span>'
+    +'<span style="background:#2980b9;color:#fff;border-radius:20px;padding:.2rem .8rem;font-weight:700">Step 2: Control Mapping</span>'
+    +'<span style="color:#555">&rarr;</span>'
+    +'<span style="background:#e67e22;color:#fff;border-radius:20px;padding:.2rem .8rem;font-weight:700">Step 3: Control Testing</span>'
+    +'<span style="color:#555">&rarr;</span>'
+    +'<span style="background:#c0392b;color:#fff;border-radius:20px;padding:.2rem .8rem;font-weight:700">Step 4: Gap Analysis</span>'
+    +'<span style="color:#555">&rarr;</span>'
+    +'<span style="background:#27ae60;color:#fff;border-radius:20px;padding:.2rem .8rem;font-weight:700">Step 5: Observation &amp; Recommendation</span>'
+    +'</div>'
+    +'</div>\n'
+
+    // Framework summary table (hidden by default)
+    +(function(){
+      var ft='<div id="fw-summary" style="display:none;max-width:1100px;margin:0 auto 1.2rem;padding:0 1.5rem;box-sizing:border-box">';
+      ft+='<div class="section-title">&#128203; Risk-Based Audit Framework &mdash; Observation Summary</div>';
+      ft+='<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem">';
+      ft+='<thead><tr>'
+        +'<th style="background:#1a3557;color:#fff;padding:.5rem .7rem;text-align:left;font-size:.73rem;white-space:nowrap">#</th>'
+        +'<th style="background:#1a3557;color:#fff;padding:.5rem .7rem;text-align:left;font-size:.73rem">Observation</th>'
+        +'<th style="background:#1a3557;color:#fff;padding:.5rem .7rem;text-align:left;font-size:.73rem;white-space:nowrap">Risk Register ID</th>'
+        +'<th style="background:#1a3557;color:#fff;padding:.5rem .7rem;text-align:left;font-size:.73rem">Risk Name</th>'
+        +'<th style="background:#1a3557;color:#fff;padding:.5rem .7rem;text-align:left;font-size:.73rem;white-space:nowrap">Inherent Risk</th>'
+        +'<th style="background:#1a3557;color:#fff;padding:.5rem .7rem;text-align:left;font-size:.73rem;white-space:nowrap">Control Activity ID</th>'
+        +'<th style="background:#1a3557;color:#fff;padding:.5rem .7rem;text-align:left;font-size:.73rem">Control Activity</th>'
+        +'</tr></thead><tbody>';
+      for(var fi=0;fi<all.length;fi++){
+        var fo=all[fi]; var flbl=labMap[fo.id]||'?';
+        var ffw=getFw(fo);
+        var rc_=riskClass(sensitivityMap[fo.id]||'');
+        var irBg={High:'#fdecea','Medium-High':'#fef3e2',Medium:'#eaf4fb','Low-Medium':'#e8f4ff',Low:'#e9f7ef'}[ffw.mx.inherent]||'#f7f9fc';
+        ft+='<tr style="border-bottom:1px solid #dde2ea">'
+          +'<td style="padding:.4rem .6rem;font-size:.75rem;font-weight:700;white-space:nowrap"><a href="#obs-'+e(flbl.replace('.','-'))+'" style="color:var(--primary);text-decoration:none;font-weight:700">'+e(flbl)+'</a></td>'
+          +'<td style="padding:.4rem .6rem;font-size:.8rem">'+e(fo.title)+'</td>'
+          +'<td style="padding:.4rem .6rem;white-space:nowrap"><span style="background:#1a3557;color:#fff;border-radius:4px;padding:.1rem .45rem;font-size:.7rem;font-weight:700">'+e(ffw.rr.id)+'</span></td>'
+          +'<td style="padding:.4rem .6rem;font-size:.79rem;color:#c0392b;font-weight:600">'+e(ffw.rr.name)+'</td>'
+          +'<td style="padding:.4rem .6rem;background:'+irBg+';font-size:.75rem;font-weight:700;white-space:nowrap">'+e(ffw.mx.inherent)+'</td>'
+          +'<td style="padding:.4rem .6rem;white-space:nowrap"><span style="background:#1a7a4a;color:#fff;border-radius:4px;padding:.1rem .45rem;font-size:.7rem;font-weight:700">'+e(ffw.ca.id)+'</span></td>'
+          +'<td style="padding:.4rem .6rem;font-size:.79rem;color:#1a7a4a;font-weight:600">'+e(ffw.ca.name)+'</td>'
+          +'</tr>';
+      }
+      ft+='</tbody></table></div></div>';
+      return ft;
+    }())
 
     // Full observation cards
     +cardSection(repeated, '&#128308; Section 1 — Repeated (Unresolved) Observations', 'repeated-obs')
@@ -13370,6 +13504,27 @@ function generateIssuedReport(){
     +'  _hlRow.classList.remove("syn-highlight");\n'
     +'  _hlRow=null;\n'
     +'});\n'
+
+    // toggleFramework
+    +'var _fwVisible=false;\n'
+    +'function toggleFramework(){\n'
+    +'  _fwVisible=!_fwVisible;\n'
+    +'  var btn=document.getElementById("fw-toggle-btn");\n'
+    +'  var intro=document.getElementById("fw-intro");\n'
+    +'  var summ=document.getElementById("fw-summary");\n'
+    +'  var panels=document.querySelectorAll(".fw-panel");\n'
+    +'  if(_fwVisible){\n'
+    +'    if(btn){btn.textContent="\\u274C Hide Risk Framework";btn.style.background="#c0392b";}\n'
+    +'    if(intro)intro.style.display="block";\n'
+    +'    if(summ)summ.style.display="block";\n'
+    +'    panels.forEach(function(p){p.style.display="block";});\n'
+    +'  } else {\n'
+    +'    if(btn){btn.textContent="\\u{1F4CB} Show Risk Framework";btn.style.background="#1e6e3e";}\n'
+    +'    if(intro)intro.style.display="none";\n'
+    +'    if(summ)summ.style.display="none";\n'
+    +'    panels.forEach(function(p){p.style.display="none";});\n'
+    +'  }\n'
+    +'}\n'
     +'<\/script>\n'
     +'</body>\n</html>';
 
