@@ -14323,6 +14323,18 @@ function generateIssuedReport(){
 }
 
 function showSaveDialog(){
+  // Prior Ref check — repeated observations must have a prior audit reference
+  {
+    var _prDbObs=[]; for(var _pj=0;_pj<DB.observations.length;_pj++){if(selIds[DB.observations[_pj].id])_prDbObs.push(DB.observations[_pj]);}
+    var _prCu=[]; for(var _pk=0;_pk<customs.length;_pk++){if(selIds[customs[_pk].id])_prCu.push(customs[_pk]);}
+    var _prAll=_prDbObs.concat(_prCu);
+    var _prMiss=_checkPriorRefs(_prAll);
+    if(_prMiss.length){
+      var _prNames=_prMiss.map(function(o,i){return (i+1)+'. '+o.title;}).join('\n');
+      alert('Cannot finalize — Prior Audit Reference is missing for '+_prMiss.length+' repeated observation'+(_prMiss.length>1?'s':'')+':\n\n'+_prNames+'\n\nPlease enter the prior audit report reference number for each repeated observation in the selection list before finalizing.');
+      return;
+    }
+  }
   // Materiality scan — must pass before finalize proceeds
   if(!showSaveDialog._skipMatScan){
     var _dbObs2=[]; for(var j2=0;j2<DB.observations.length;j2++){if(selIds[DB.observations[j2].id])_dbObs2.push(DB.observations[j2]);}
