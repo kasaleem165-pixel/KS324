@@ -8377,8 +8377,9 @@ var respROMap= {};   // {obsId: RO/HO response}
 var assessMap= {};   // {obsId: 'agreed'|'resolved'|'partial'|'notresolved'}
 var refMap   = {};   // {obsId: referral note text, '' means no referral}
 var obsEdits = {};   // {obsId: {observation, recommendation}} — auditor edits to obs text
-var instCountMap  = {}; // {obsId: number} — manual instance count for framework materiality
-var instAmountMap = {}; // {obsId: number} — manual financial impact Rs. for framework materiality
+var instCountMap  = {}; // {obsId: number} — instance count for framework materiality
+var instAmountMap = {}; // {obsId: number} — financial impact Rs. for framework materiality
+var instSourceMap = {}; // {obsId: string} — how it was filled: 'auto: inline table' | 'auto: Annexure X' | 'manual'
 var responseLoaded = false;
 var customs  = [];
 var annexures= [];   // [{id,label,title,open,files:[{name,type,dataUrl}]}]
@@ -9017,6 +9018,60 @@ function applySuggestedSens(obsId, sug){
   renderRpt(); // refresh preview
 }
 
+// ── Auto-detect materiality from inline table or annexure text ────────────
+function autoDetectMateriality(obsId, obsText, linkedAnx){
+  if(instCountMap[obsId]>0) return null; // don't overwrite auditor's value
+
+  // 1. Inline pipe-table in observation text
+  if(obsText){
+    var lines=obsText.split('\n'),tblRows=0;
+    for(var i=0;i<lines.length;i++){
+      var ln=lines[i].trim();
+      if(ln.indexOf('|')===-1)continue;
+      if(/^\|[\s\-:|]+\|?\s*$/.test(ln))continue;
+      tblRows++;
+    }
+    if(tblRows>1){
+      var dr=tblRows-1;
+      instCountMap[obsId]=dr;
+      instSourceMap[obsId]='auto: inline table';
+      return{count:dr,source:'inline table'};
+    }
+  }
+
+  // 2. Linked annexure text — count non-empty lines (subtract 1 for header)
+  if(linkedAnx&&linkedAnx.length){
+    for(var ai=0;ai<linkedAnx.length;ai++){
+      var ax=linkedAnx[ai];
+      if(!ax.text||!ax.text.trim())continue;
+      var axLines=ax.text.split('\n').filter(function(l){return l.trim().length>0;});
+      if(axLines.length>1){
+        var axRows=axLines.length-1;
+        instCountMap[obsId]=axRows;
+        instSourceMap[obsId]='auto: Annexure '+(ax.label||'');
+        return{count:axRows,source:'Annexure '+(ax.label||'')};
+      }
+    }
+  }
+  return null;
+}
+
+// ── Pre-issue scan: observations with no materiality data at all ──────────
+function getMissingMateriality(allObs, labMapObj, obsTextFn){
+  var missing=[];
+  for(var i=0;i<allObs.length;i++){
+    var o=allObs[i];
+    if(instCountMap[o.id]>0||instAmountMap[o.id]>0)continue;
+    // Also pass if inline table exists in obs text
+    var ot=obsTextFn(o),hasTable=false;
+    if(ot){var ls=ot.split('\n');for(var li=0;li<ls.length;li++){var ln=ls[li].trim();if(ln.indexOf('|')!==-1&&!/^\|[\s\-:|]+\|?\s*$/.test(ln)){hasTable=true;break;}}}
+    if(hasTable)continue;
+    missing.push({id:o.id,lbl:labMapObj[o.id]||'?',title:o.title||''});
+  }
+  return missing;
+}
+// ── End auto-detect ───────────────────────────────────────────────────────
+
 function setCoso(id, sel){
   var val = sel.value;
   if(val) cosoMap[id]=val; else delete cosoMap[id];
@@ -9244,6 +9299,7 @@ function captureSession() {
     refMap   : refMap,
     instCountMap : instCountMap,
     instAmountMap: instAmountMap,
+    instSourceMap: instSourceMap,
     customs  : customs,
     responseLoaded: responseLoaded,
     introSections: getIntroSectionVals(),
@@ -9283,6 +9339,7 @@ function restoreSession(sess) {
   refMap         = sess.refMap         || {};
   instCountMap   = sess.instCountMap   || {};
   instAmountMap  = sess.instAmountMap  || {};
+  instSourceMap  = sess.instSourceMap  || {};
   // Restore responseLoaded — also infer it if assessMap or respMap has entries
   responseLoaded = sess.responseLoaded || Object.keys(assessMap).length>0 || Object.keys(sess.respMap||{}).length>0;
   customs   = sess.customs   || [];
@@ -10163,15 +10220,19 @@ function renderRpt(){
       var obsText=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:o.observation||'';
       h+='<div class="osl">Observation</div>';
       h+='<textarea class="oedit" id="oe-'+o.id+'" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].observation=this.value">'+esc(obsText)+'</textarea>';
+      // Auto-detect materiality from inline table or linked annexure
+      autoDetectMateriality(o.id, obsText, getLinkedAnnexures(o.id));
       // 2b. Risk Framework — Instances & Financial Impact fields (after Observation, before Recommendation)
       var curInstCount=instCountMap[o.id]||'';
       var curInstAmt=instAmountMap[o.id]||'';
+      var instSrc=instSourceMap[o.id]||'';
+      var instLabel=instSrc?'<span style="font-size:9px;color:#1a6020;font-weight:700;margin-left:4px">('+esc(instSrc)+')</span>':'';
       h+='<div style="display:flex;gap:8px;align-items:flex-end;margin:4px 0;padding:5px 8px;background:#f0f7e8;border:1px solid #b8d8a0;border-radius:6px">'
         +'<div style="font-size:10px;font-weight:700;color:#1a6020;white-space:nowrap;margin-bottom:2px">&#128203; Framework Materiality</div>'
         +'<div style="display:flex;gap:8px;flex:1">'
         +'<div style="flex:1">'
-          +'<div style="font-size:10px;color:#555;margin-bottom:2px">Instances (if no inline table)</div>'
-          +'<input type="number" min="0" id="fw-inst-'+o.id+'" placeholder="e.g. 14" value="'+esc(curInstCount+'')+'" style="width:100%;padding:3px 7px;border:1px solid #b0c8a0;border-radius:4px;font-size:12px;font-family:inherit" oninput="instCountMap[\''+o.id+'\']=this.value?parseInt(this.value):0;updateFwSuggestion(\''+o.id+'\')">'
+          +'<div style="font-size:10px;color:#555;margin-bottom:2px">Instances'+instLabel+'</div>'
+          +'<input type="number" min="0" id="fw-inst-'+o.id+'" placeholder="e.g. 14" value="'+esc(curInstCount+'')+'" style="width:100%;padding:3px 7px;border:1px solid '+(instSrc?'#1a6020':'#b0c8a0')+';border-radius:4px;font-size:12px;font-family:inherit" oninput="instCountMap[\''+o.id+'\']=this.value?parseInt(this.value):0;instSourceMap[\''+o.id+'\']=\'manual\';updateFwSuggestion(\''+o.id+'\')">'
         +'</div>'
         +'<div style="flex:1">'
           +'<div style="font-size:10px;color:#555;margin-bottom:2px">Financial Impact (Rs.)</div>'
@@ -10472,7 +10533,7 @@ function doCopy(){
 
 function doClear(){
   if(!confirm('Clear all selections?'))return;
-  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[];
   for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
   responseLoaded=false;
   _brInfoHasData=false;
@@ -10495,7 +10556,7 @@ function doClear(){
 
 function doNewReport(){
   if(!confirm('Start a new blank report? All current data will be cleared.'))return;
-  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[];
   responseLoaded=false;
   _brInfoHasData=false;
   _brInfoUnlocked=false; // force unlock path to run
@@ -13211,6 +13272,38 @@ function generateIssuedReport(){
   var brDisp=(H.brcode?H.brcode+' ':'')+(H.brname||'Branch');
   var fname='IssuedReport'+(H.brcode?'_'+H.brcode:'')+(H.brname?'_'+H.brname.replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_'):'')+'_'+new Date().toISOString().slice(0,10)+'.html';
 
+  // ── Pre-issue materiality scan ──────────────────────────────────────────
+  if(!generateIssuedReport._skipMatScan){
+    var _missingMat=getMissingMateriality(all,labMap,function(o){return obsText(o);});
+    if(_missingMat.length){
+      var _missList=_missingMat.map(function(m){
+        return '<li style="padding:.3rem 0;border-bottom:1px solid #eee;font-size:.84rem"><strong>'+e(m.lbl)+'</strong> &mdash; '+e(m.title)+'</li>';
+      }).join('');
+      var _ov=document.createElement('div');
+      _ov.style.cssText='position:fixed;inset:0;background:rgba(10,20,40,.6);z-index:99999;display:flex;align-items:center;justify-content:center';
+      _ov.innerHTML='<div style="background:#fff;border-radius:12px;max-width:560px;width:93%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.35);padding:1.4rem 1.6rem">'
+        +'<div style="font-size:1rem;font-weight:800;color:#c0392b;margin-bottom:.7rem">&#9888; Framework Materiality Not Defined</div>'
+        +'<p style="font-size:.85rem;color:#444;margin-bottom:.8rem">The following <strong>'+_missingMat.length+' observation'+(+_missingMat.length>1?'s':'')+' </strong>have no instance count or financial impact entered, and no inline table was detected in their text.</p>'
+        +'<ul style="list-style:none;margin-bottom:1rem;max-height:220px;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:.4rem .8rem">'+_missList+'</ul>'
+        +'<div style="display:flex;gap:.7rem;flex-wrap:wrap">'
+        +'<button id="mat-back-btn" style="flex:1;padding:.55rem 1rem;background:#eef1f5;color:#1a3557;border:1px solid #c0ccd8;border-radius:6px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#9664; Go Back &amp; Fill</button>'
+        +'<button id="mat-proceed-btn" style="flex:1;padding:.55rem 1rem;background:#1a3557;color:#fff;border:none;border-radius:6px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Proceed — Mark as Not Quantified</button>'
+        +'</div>'
+        +'</div>';
+      document.body.appendChild(_ov);
+      document.getElementById('mat-back-btn').onclick=function(){_ov.remove();};
+      document.getElementById('mat-proceed-btn').onclick=function(){
+        _ov.remove();
+        generateIssuedReport._skipMatScan=true;
+        generateIssuedReport();
+        generateIssuedReport._skipMatScan=false;
+      };
+      return; // abort current run — user must choose
+    }
+  }
+  generateIssuedReport._skipMatScan=false;
+  // ── End pre-issue scan ──────────────────────────────────────────────────
+
   // COSO analysis strip (simple, reusing sensitivityMap data)
   var cosoHtml='<div id="analysis" style="margin-bottom:1.2rem">'
     +'<div class="section-title" style="font-size:1.1rem">E. Analysis of Observations &amp; Controls (COSO Framework)</div>'
@@ -14422,7 +14515,7 @@ function loadDemoData(){
   var hasData = Object.keys(selIds).length > 0;
 
   // --- Clear existing (inline, no confirm prompt) ---
-  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[];
   responseLoaded=false; _brInfoHasData=false; _brInfoUnlocked=true;
   _reportEverGenerated=false; clearReportDirty();
   window.pendingSel={};
