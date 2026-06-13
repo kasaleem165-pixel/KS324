@@ -8377,6 +8377,7 @@ var CATS     = sg('bhs_ca', DEF_CA);
 var selIds   = {};   // {obsId: true}
 var annexMap = {};   // {obsId: "text"}
 var obsTypeMap = {}; // {obsId: 'New'|'Repeated'} — per-report type override
+var lastRefMap = {}; // {obsId: 'string'} — prior audit report reference for Repeated obs
 var sensitivityMap = {}; // {obsId: 'High'|'M to H'|'L to M'|'Low'}
 var cosoMap        = {}; // {obsId: 'CE'|'RA'|'CA'|'IC'|'M'}
 var avMap    = {};   // {obsId: manual audit view text}
@@ -8725,6 +8726,10 @@ function renderList(obs, toks, showScore) {
         inner += '<label style="display:flex;align-items:center;gap:3px;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;border:1.5px solid #d06020;background:'+(curType==='Repeated'?'#d06020':'#fff')+';color:'+(curType==='Repeated'?'#fff':'#d06020')+'" onclick="event.stopPropagation()">';
         inner += '<input type="radio" name="otyp-'+o.id+'" value="Repeated" style="display:none" '+(curType==='Repeated'?'checked':'')+' onchange="setObsType(\''+o.id+'\',\'Repeated\')">Repeated</label>';
         inner += '</div>';
+        inner += '<div id="lrx-'+o.id+'" style="margin-top:4px;display:'+(curType==='Repeated'?'flex':'none')+';align-items:center;gap:5px" onclick="event.stopPropagation()">';
+        inner += '<span style="font-size:11px;font-weight:700;color:#d06020;white-space:nowrap">Prior Ref:</span>';
+        inner += '<input type="text" id="lr-'+o.id+'" placeholder="e.g. OBS-2024-07" value="'+(lastRefMap[o.id]||'')+'" style="flex:1;font-size:11.5px;padding:3px 8px;border:1px solid #f0b080;border-radius:6px;font-family:inherit;color:#5a2000;background:#fff8f2" onclick="event.stopPropagation()" oninput="setLastRef(\''+o.id+'\',this.value)">';
+        inner += '</div>';
       }
 
       div.innerHTML = inner;
@@ -8796,6 +8801,14 @@ function injectTypePill(id, div){
     '<label style="display:flex;align-items:center;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;border:1.5px solid #d06020;background:'+(curType==='Repeated'?'#d06020':'#fff')+';color:'+(curType==='Repeated'?'#fff':'#d06020')+'" onclick="event.stopPropagation()">'+
     '<input type="radio" name="otyp-'+id+'" value="Repeated" style="display:none" '+(curType==='Repeated'?'checked':'')+' onchange="setObsType(\''+id+'\',\'Repeated\')">Repeated</label>';
   div.appendChild(row);
+  // Prior-ref input row (separate element, shown only when Repeated)
+  var lrRow=document.createElement('div');
+  lrRow.id='lrx-'+id;
+  lrRow.style.cssText='margin-top:4px;display:'+(curType==='Repeated'?'flex':'none')+';align-items:center;gap:5px';
+  lrRow.onclick=function(e){e.stopPropagation();};
+  lrRow.innerHTML='<span style="font-size:11px;font-weight:700;color:#d06020;white-space:nowrap">Prior Ref:</span>'+
+    '<input type="text" id="lr-'+id+'" placeholder="e.g. OBS-2024-07" value="'+(lastRefMap[id]||'')+'" style="flex:1;font-size:11.5px;padding:3px 8px;border:1px solid #f0b080;border-radius:6px;font-family:inherit;color:#5a2000;background:#fff8f2" onclick="event.stopPropagation()" oninput="setLastRef(\''+id+'\',this.value)">';
+  div.appendChild(lrRow);
 }
 
 function handleSel(id, checked, div) {
@@ -8900,7 +8913,15 @@ function setObsType(id, val) {
       labels[i].style.color = active ? '#fff' : (isNew?'#2070b8':'#d06020');
     }
   }
+  // Show/hide prior-ref input
+  var lrx = document.getElementById('lrx-'+id);
+  if(lrx) lrx.style.display = (val==='Repeated') ? 'flex' : 'none';
+  if(val==='New') { delete lastRefMap[id]; var lri=document.getElementById('lr-'+id); if(lri) lri.value=''; }
   renderRpt();
+}
+
+function setLastRef(id, val) {
+  if(val) lastRefMap[id]=val; else delete lastRefMap[id];
 }
 
 // ============================================================
@@ -9388,6 +9409,7 @@ function captureSession() {
     formData : formData,
     selIds   : selIds,
     obsTypeMap: obsTypeMap,
+    lastRefMap: lastRefMap,
     annexMap : annexMap,
     avMap    : avMap,
     actMap   : actMap,
@@ -9428,6 +9450,7 @@ function restoreSession(sess) {
   // Restore state maps
   selIds    = sess.selIds    || {};
   obsTypeMap= sess.obsTypeMap|| {};
+  lastRefMap= sess.lastRefMap|| {};
   annexMap  = sess.annexMap  || {};
   avMap     = sess.avMap     || {};
   actMap    = sess.actMap    || {};
@@ -10637,7 +10660,7 @@ function doCopy(){
 
 function doClear(){
   if(!confirm('Clear all selections?'))return;
-  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[];
   for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
   responseLoaded=false;
   _brInfoHasData=false;
@@ -10660,7 +10683,7 @@ function doClear(){
 
 function doNewReport(){
   if(!confirm('Start a new blank report? All current data will be cleared.'))return;
-  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[];
   responseLoaded=false;
   _brInfoHasData=false;
   _brInfoUnlocked=false; // force unlock path to run
@@ -12925,6 +12948,8 @@ function finalizeReport(){
     h+='<span style="font-size:11px;font-weight:700;color:#6a7888">Obs. '+num+'</span>';
     h+='<span style="flex:1;font-size:13px;font-weight:700;color:#1e2d40">'+esc(o.title)+'</span>';
     h+='<span style="padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;'+(tc==='repeated'?'background:#fff0e6;color:#b04800;border:1px solid #f0b080':'background:#e6f0ff;color:#1050a0;border:1px solid #90b8e8')+'">'+esc(effType)+'</span>';
+    var priorRefFin=lastRefMap[o.id]||'';
+    if(tc==='repeated'&&priorRefFin) h+='<span style="padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;background:#fff8f0;color:#8a3000;border:1px solid #f0b080;margin-left:3px">Prior: '+esc(priorRefFin)+'</span>';
     var finSens=sensitivityMap[o.id]||'';
     if(finSens){var sc=finSens==='High'?'background:#fde8e8;color:#9b1a1a;border-color:#f0a0a0':finSens==='M to H'?'background:#fff0e0;color:#b04400;border-color:#f0b070':finSens==='L to M'?'background:#fffbe0;color:#806000;border-color:#e0c030':'background:#e8f8e8;color:#1a6020;border-color:#80c880';h+='<span style="padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;border:1px solid;'+sc+'">'+esc(finSens)+'</span>';}
     var finCoso=cosoMap[o.id]||'';
@@ -13348,9 +13373,10 @@ function generateIssuedReport(){
     if(av) mBody+='<div class="modal-badge mb-view">Audit View</div><div class="modal-section ms-view">'+e(av)+'</div>';
     if(at) mBody+='<div class="modal-badge mb-action">Action Taken</div><div class="modal-section ms-action">'+e(at)+'</div>';
     vbData[id]={title:lbl+' — '+e(o.title),body:mBody};
+    var priorRef=lastRefMap[o.id]||'';
     return '<tr id="syn-row-'+id+'">'
       +'<td style="white-space:nowrap">'+lbl+'</td>'
-      +'<td>'+e(o.title)+(o.category?'<br><span class="cat">'+e(o.category)+'</span>':'')+'</td>'
+      +'<td>'+e(o.title)+(o.category?'<br><span class="cat">'+e(o.category)+'</span>':'')+(priorRef?'<br><span style="display:inline-block;margin-top:2px;font-size:.67rem;font-weight:700;background:#fff0e6;color:#b04800;border:1px solid #f0b080;border-radius:4px;padding:0 5px">Prior Ref: '+e(priorRef)+'</span>':'')+'</td>'
       +'<td>'+rk+'</td>'
       +'<td>'+resChip(adjResidual)+'</td>'
       +'<td>'+matChip+'</td>'
@@ -15054,7 +15080,7 @@ function loadDemoData(){
   var hasData = Object.keys(selIds).length > 0;
 
   // --- Clear existing (inline, no confirm prompt) ---
-  selIds={}; annexMap={}; obsTypeMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[];
   responseLoaded=false; _brInfoHasData=false; _brInfoUnlocked=true;
   _reportEverGenerated=false; clearReportDirty();
   window.pendingSel={};
