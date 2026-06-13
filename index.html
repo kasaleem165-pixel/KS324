@@ -10060,6 +10060,12 @@ function flushObsEditsToDb(){
 var INTRO_SECTION_IDS = ['rpt_intro','rpt_scope','rpt_methodology','rpt_terms'];
 var INTRO_SECTION_LABELS = ['Introduction & Background','Objectives & Scope','Audit Methodology','Explanation of Terms & Abbreviations'];
 
+function syncIntroFromDraft(sid, val){
+  var src = document.getElementById(sid);
+  if(src){ src.value = val; checkIntroPlaceholders(sid); }
+  updateIntroStatus();
+}
+
 function toggleIntroSection(forceOpen){
   var body=document.getElementById('intro-body');
   var arrow=document.getElementById('intro-arrow');
@@ -10212,9 +10218,10 @@ function buildIntroHtml(vals, forPrint){
       h += '<div style="font-size:12.5px;line-height:1.75;color:#2a3a50;white-space:pre-wrap">'+esc(text)+'</div>';
       h += '</div>';
     } else {
+      var sid = INTRO_SECTION_IDS[i];
       h += '<div style="margin-bottom:12px">';
       h += '<div style="font-size:12px;font-weight:700;color:var(--navy);border-bottom:2px solid var(--navy);padding-bottom:3px;margin-bottom:6px">'+esc(label)+'</div>';
-      h += '<div style="font-size:12px;line-height:1.65;color:#2a3a50;white-space:pre-wrap">'+esc(text)+'</div>';
+      h += '<textarea id="rp-'+sid+'" rows="4" oninput="syncIntroFromDraft(\''+sid+'\',this.value)" style="width:100%;box-sizing:border-box;font-size:12px;line-height:1.65;color:#2a3a50;border:1px dashed #c8d8ec;border-radius:4px;padding:6px 8px;resize:vertical;font-family:inherit;background:#fff;outline:none">'+esc(text)+'</textarea>';
       h += '</div>';
     }
   }
