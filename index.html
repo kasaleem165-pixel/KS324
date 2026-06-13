@@ -13185,6 +13185,14 @@ function generateIssuedReport(){
     var resp=respText(o);
     var av=avText(o); var at=atText(o);
     var rt=recText(o); var ot=obsText(o);
+    // Residual Risk & Materiality for synopsis columns
+    var fw=getFw(o);
+    var inst=parseObsInstances(o.id, ot);
+    var adjInherent=inst.uplift>0?upliftRisk(fw.mx.inherent,inst.uplift):fw.mx.inherent;
+    var adjResidual=inst.uplift>0?upliftRisk(fw.mx.residual,inst.uplift):fw.mx.residual;
+    function resChip(val){var c='#7f8c8d';if(val==='High')c='#c0392b';else if(val==='Medium-High')c='#e67e22';else if(val==='Medium')c='#2980b9';else if(val==='Low-Medium')c='#2e86ab';else if(val==='Low')c='#27ae60';return'<span style="display:inline-block;background:'+c+';color:#fff;border-radius:20px;padding:.1rem .6rem;font-size:.7rem;font-weight:700;white-space:nowrap">'+val+'</span>';}
+    var matBg=inst.label==='Systemic / Pervasive'?'#c0392b':inst.label==='Significant'?'#e67e22':inst.label==='Isolated / Limited'?'#2980b9':'#95a5a6';
+    var matChip='<span style="display:inline-block;background:'+matBg+';color:#fff;border-radius:20px;padding:.1rem .6rem;font-size:.68rem;font-weight:700;white-space:nowrap">'+inst.label+'</span>';
     var iboxes='';
     if(ot) iboxes+='<div class="ibox ifind"><span class="ibox-lbl">&#128269; Finding</span>'+e(ot)+'</div>';
     if(rt) iboxes+='<div class="ibox irec"><span class="ibox-lbl">&#9989; Recommendation</span>'+e(rt)+'</div>';
@@ -13198,10 +13206,12 @@ function generateIssuedReport(){
       +'<td style="white-space:nowrap"><a href="#obs-'+id+'" class="full-obs-link" data-syn="syn-row-'+id+'">'+lbl+'</a></td>'
       +'<td><a href="#obs-'+id+'" class="full-obs-link" data-syn="syn-row-'+id+'">'+e(o.title)+'</a>'+(o.category?'<br><span class="cat">'+e(o.category)+'</span>':'')+'</td>'
       +'<td>'+rk+'</td>'
+      +'<td>'+resChip(adjResidual)+'</td>'
+      +'<td>'+matChip+'</td>'
       +'<td>'+e(ref)+'</td>'
       +'<td style="white-space:nowrap"><button class="det-btn" id="btn-'+id+'" onclick="toggleDetail(\'dt-'+id+'\',this)" title="Expand inline detail">&#9660; Detail</button></td>'
       +'</tr>'
-      +'<tr id="dt-'+id+'" class="detail-row" style="display:none"><td colspan="5" style="padding:0"><div class="detail-panel">'+iboxes+'</div></td></tr>';
+      +'<tr id="dt-'+id+'" class="detail-row" style="display:none"><td colspan="7" style="padding:0"><div class="detail-panel">'+iboxes+'</div></td></tr>';
   }
 
   // Verbatim data store — keyed by obs id string e.g. "1-2"
@@ -13252,7 +13262,7 @@ function generateIssuedReport(){
       +(wasUplifted?' <span style="color:#c0392b;font-size:.7rem;font-weight:700">&uarr; Inherent Risk uplifted by '+inst.uplift+' tier'+(inst.uplift>1?'s':'')+'</span>':'')
       +'</div>'
       +'</div>';
-    h+='<div class="fw-panel" style="display:none;margin-top:.9rem;border:1px solid #b8d4ec;border-radius:8px;overflow:hidden">'
+    h+='<div class="fw-panel" style="display:block;margin-top:.9rem;border:1px solid #b8d4ec;border-radius:8px;overflow:hidden">'
       +'<div style="background:#1a3557;color:#fff;padding:.45rem .9rem;font-size:.76rem;font-weight:700;letter-spacing:.5px">&#128203; Risk-Based Audit Framework &mdash; '+lbl+'</div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;font-size:.82rem">'
       +'<div style="padding:.8rem 1rem;border-right:1px solid #d0e4f0">'
@@ -13301,7 +13311,8 @@ function generateIssuedReport(){
     var h='<div class="card" id="'+secId+'">';
     h+='<div style="font-weight:700;color:var(--primary);margin-bottom:.8rem">'+secLabel+' <span style="font-weight:400;font-size:.8rem;color:var(--muted)">('+list.length+' observations)</span></div>';
     h+='<table class="syn-table"><thead><tr>'
-      +'<th style="width:48px">#</th><th>Observation</th><th style="width:88px">Risk</th>'
+      +'<th style="width:48px">#</th><th>Observation</th><th style="width:88px">Auditor Risk</th>'
+      +'<th style="width:100px">Residual Risk</th><th style="width:110px">Materiality</th>'
       +'<th style="width:60px">Ref.</th><th style="width:90px">Detail</th></tr></thead><tbody>';
     var grp=buildCatGroupsFor(list);
     for(var ci=0;ci<grp.catOrder.length;ci++){
@@ -13565,7 +13576,6 @@ function generateIssuedReport(){
     +'<nav class="topnav">'
     +'<div class="brand">Beaconhouse &nbsp;<span>Systems &amp; Audit</span></div>'
     +'<div style="display:flex;align-items:center;gap:.5rem"><a href="#synopsis">Synopsis</a><a href="#repeated-obs">Repeated</a><a href="#new-obs">New Findings</a>'+(annexures.length?'<a href="#annexures">Annexures</a>':'')
-    +'<button id="fw-toggle-btn" onclick="toggleFramework()" style="background:#1e6e3e;color:#fff;border:none;border-radius:20px;padding:.28rem .85rem;font-size:.78rem;font-weight:700;cursor:pointer;letter-spacing:.3px;margin-left:.8rem;transition:background .2s" title="Show or hide the Risk-Based Audit Framework for each observation">&#128203; Show Risk Framework</button>'
     +'</div>'
     +'</nav>\n'
 
@@ -13611,8 +13621,8 @@ function generateIssuedReport(){
     +synTable(newObs,   'Section 2 — New Observations', 'new-syn')
     +'</div>\n'
 
-    // Framework intro banner (hidden by default)
-    +'<div id="fw-intro" style="display:none;background:linear-gradient(135deg,#e8f4f8,#f0f7e8);border:1px solid #b0d4e8;border-radius:10px;padding:1.2rem 1.5rem;max-width:1100px;margin:1rem auto;box-sizing:border-box">'
+    // Framework intro banner (always visible)
+    +'<div id="fw-intro" style="display:block;background:linear-gradient(135deg,#e8f4f8,#f0f7e8);border:1px solid #b0d4e8;border-radius:10px;padding:1.2rem 1.5rem;max-width:1100px;margin:1rem auto;box-sizing:border-box">'
     +'<div style="font-weight:800;color:#1a3557;font-size:.98rem;margin-bottom:.6rem">&#128203; Risk-Based Audit Methodology</div>'
     +'<p style="font-size:.86rem;color:#444;line-height:1.65">This audit was conducted following a <strong>Risk-Based Audit Approach</strong> aligned with the <strong>COSO Internal Control &mdash; Integrated Framework</strong>. For each audit area, the team identified relevant risks from the Branch Risk Register, assessed the adequacy and effectiveness of existing control activities, and formulated audit observations based on identified control gaps.</p>'
     +'<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.8rem;font-size:.76rem;align-items:center">'
@@ -13628,41 +13638,7 @@ function generateIssuedReport(){
     +'</div>'
     +'</div>\n'
 
-    // Framework summary table (hidden by default)
-    +(function(){
-      var ft='<div id="fw-summary" style="display:none;max-width:1100px;margin:0 auto 1.2rem;padding:0 1.5rem;box-sizing:border-box">';
-      ft+='<div class="section-title">&#128203; Risk-Based Audit Framework &mdash; Observation Summary</div>';
-      ft+='<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem">';
-      ft+='<thead><tr>'
-        +'<th style="background:#1a3557;color:#fff;padding:.5rem .7rem;text-align:left;font-size:.73rem;white-space:nowrap">#</th>'
-        +'<th style="background:#1a3557;color:#fff;padding:.5rem .7rem;text-align:left;font-size:.73rem">Observation</th>'
-        +'<th style="background:#1a3557;color:#fff;padding:.5rem .7rem;text-align:left;font-size:.73rem;white-space:nowrap">Risk Register ID</th>'
-        +'<th style="background:#1a3557;color:#fff;padding:.5rem .7rem;text-align:left;font-size:.73rem">Risk Name</th>'
-        +'<th style="background:#1a3557;color:#fff;padding:.5rem .7rem;text-align:left;font-size:.73rem;white-space:nowrap">Inherent Risk</th>'
-        +'<th style="background:#1a3557;color:#fff;padding:.5rem .7rem;text-align:left;font-size:.73rem;white-space:nowrap">Control Activity ID</th>'
-        +'<th style="background:#1a3557;color:#fff;padding:.5rem .7rem;text-align:left;font-size:.73rem">Control Activity</th>'
-        +'</tr></thead><tbody>';
-      for(var fi=0;fi<all.length;fi++){
-        var fo=all[fi]; var flbl=labMap[fo.id]||'?';
-        var ffw=getFw(fo);
-        var finst=parseObsInstances(fo.id, obsText(fo));
-        var fadjIR=finst.uplift>0?upliftRisk(ffw.mx.inherent,finst.uplift):ffw.mx.inherent;
-        var irBgMap={High:'#fdecea','Medium-High':'#fef3e2',Medium:'#eaf4fb','Low-Medium':'#e8f4ff',Low:'#e9f7ef'};
-        var irBg=irBgMap[fadjIR]||'#f7f9fc';
-        var wasUp=(fadjIR!==ffw.mx.inherent);
-        ft+='<tr style="border-bottom:1px solid #dde2ea">'
-          +'<td style="padding:.4rem .6rem;font-size:.75rem;font-weight:700;white-space:nowrap"><a href="#obs-'+e(flbl.replace('.','-'))+'" style="color:var(--primary);text-decoration:none;font-weight:700">'+e(flbl)+'</a></td>'
-          +'<td style="padding:.4rem .6rem;font-size:.8rem">'+e(fo.title)+'</td>'
-          +'<td style="padding:.4rem .6rem;white-space:nowrap"><span style="background:#1a3557;color:#fff;border-radius:4px;padding:.1rem .45rem;font-size:.7rem;font-weight:700">'+e(ffw.rr.id)+'</span></td>'
-          +'<td style="padding:.4rem .6rem;font-size:.79rem;color:#c0392b;font-weight:600">'+e(ffw.rr.name)+'</td>'
-          +'<td style="padding:.4rem .6rem;background:'+irBg+';font-size:.75rem;font-weight:700;white-space:nowrap">'+e(fadjIR)+(wasUp?' <span style="color:#c0392b;font-size:.65rem">&uarr;</span>':'')+(finst.count>0?' <span style="font-size:.65rem;color:#666">('+finst.count+' inst.)</span>':'')+'</td>'
-          +'<td style="padding:.4rem .6rem;white-space:nowrap"><span style="background:#1a7a4a;color:#fff;border-radius:4px;padding:.1rem .45rem;font-size:.7rem;font-weight:700">'+e(ffw.ca.id)+'</span></td>'
-          +'<td style="padding:.4rem .6rem;font-size:.79rem;color:#1a7a4a;font-weight:600">'+e(ffw.ca.name)+'</td>'
-          +'</tr>';
-      }
-      ft+='</tbody></table></div></div>';
-      return ft;
-    }())
+    // (fw-summary table removed — Residual Risk & Materiality now in synopsis tables)
 
     // Full observation cards
     +cardSection(repeated, '&#128308; Section 1 — Repeated (Unresolved) Observations', 'repeated-obs')
@@ -13857,26 +13833,6 @@ function generateIssuedReport(){
     +'  _hlRow=null;\n'
     +'});\n'
 
-    // toggleFramework
-    +'var _fwVisible=false;\n'
-    +'function toggleFramework(){\n'
-    +'  _fwVisible=!_fwVisible;\n'
-    +'  var btn=document.getElementById("fw-toggle-btn");\n'
-    +'  var intro=document.getElementById("fw-intro");\n'
-    +'  var summ=document.getElementById("fw-summary");\n'
-    +'  var panels=document.querySelectorAll(".fw-panel");\n'
-    +'  if(_fwVisible){\n'
-    +'    if(btn){btn.textContent="\\u274C Hide Risk Framework";btn.style.background="#c0392b";}\n'
-    +'    if(intro)intro.style.display="block";\n'
-    +'    if(summ)summ.style.display="block";\n'
-    +'    panels.forEach(function(p){p.style.display="block";});\n'
-    +'  } else {\n'
-    +'    if(btn){btn.textContent="\\u{1F4CB} Show Risk Framework";btn.style.background="#1e6e3e";}\n'
-    +'    if(intro)intro.style.display="none";\n'
-    +'    if(summ)summ.style.display="none";\n'
-    +'    panels.forEach(function(p){p.style.display="none";});\n'
-    +'  }\n'
-    +'}\n'
     +'<\/script>\n'
     +'</body>\n</html>';
 
