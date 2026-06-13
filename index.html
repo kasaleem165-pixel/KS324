@@ -12786,6 +12786,93 @@ function applyRespLoad(){
 }
 
 // ============================================================
+// RISK-BASED FRAMEWORK DATA (shared by Finalized & Issued reports)
+// ============================================================
+var FW_RR={
+  fin:{id:'RR-FIN-01',name:'Financial Mismanagement Risk',desc:'Risk of financial irregularities, policy non-compliance in expenditure and procurement.',obj:'Ensure expenditures are authorised, properly documented, and within policy limits.'},
+  cash:{id:'RR-FIN-02',name:'Cash & Bank Management Risk',desc:'Risk of cash misappropriation, reconciliation failures, and unauthorised transactions.',obj:'Maintain accurate cash/bank records with proper authorisation and reconciliation.'},
+  hr:{id:'RR-HR-01',name:'Human Resource Compliance Risk',desc:'Risk of non-compliance in recruitment, payroll, attendance, and employee record management.',obj:'Ensure HR processes comply with policy; records are complete and accurate.'},
+  fa:{id:'RR-OPS-01',name:'Fixed Asset Management Risk',desc:'Risk of asset misappropriation, untracked disposals, or inaccurate fixed asset register.',obj:'Maintain complete, accurate fixed asset records with regular physical verification.'},
+  lib:{id:'RR-OPS-02',name:'Library Resource Management Risk',desc:'Risk of loss, mis-cataloguing, or under-utilisation of library resources.',obj:'Ensure library resources are accurately catalogued, tracked and properly maintained.'},
+  stu:{id:'RR-OPS-03',name:'Student Record & Fee Management Risk',desc:'Risk of data inaccuracies, fee irregularities, and non-compliance in student management.',obj:'Ensure complete and accurate student records with proper fee collection procedures.'},
+  lab:{id:'RR-OPS-04',name:'Laboratory Resource Risk',desc:'Risk of loss, misuse, or improper maintenance of laboratory equipment and consumables.',obj:'Ensure lab resources are inventoried, maintained, and used in accordance with policy.'},
+  sec:{id:'RR-SEC-01',name:'Safety & Security Compliance Risk',desc:'Risk of security breaches due to non-compliance with security protocols and contracts.',obj:'Ensure branch security meets contractual obligations and safety standards.'},
+  gen:{id:'RR-OPS-05',name:'Operational Compliance Risk',desc:'Risk of non-compliance in general branch operations, records, and administrative procedures.',obj:'Ensure branch operations comply with SOPs and administrative requirements.'}
+};
+var FW_CA={
+  fin:{id:'CA-FIN-01',name:'Budget Variance Monitoring Control',desc:'Periodic review of actual vs budgeted expenditures with variance analysis and authorisation for deviations.'},
+  cash:{id:'CA-FIN-02',name:'Cash & Bank Reconciliation Control',desc:'Daily cash counts and monthly bank reconciliation reviewed and approved by the Branch Head.'},
+  hr:{id:'CA-HR-01',name:'HR Records Completeness Control',desc:'Systematic review of employee files, payroll reconciliation, and attendance monitoring by management.'},
+  fa:{id:'CA-OPS-01',name:'Fixed Asset Verification Control',desc:'Annual physical verification of fixed assets against the register, with tagging and reconciliation.'},
+  lib:{id:'CA-OPS-02',name:'Library Resource Audit Control',desc:'Regular stock-taking, KOHA module entries, and item-per-child ratio review by the Branch Librarian.'},
+  stu:{id:'CA-OPS-03',name:'Student Record Review Control',desc:'Periodic audit of student files, BEAMS data, and fee collection records for completeness and accuracy.'},
+  lab:{id:'CA-OPS-04',name:'Lab Resource Inventory Control',desc:'Regular inventory checks of laboratory equipment and consumables against register entries.'},
+  sec:{id:'CA-SEC-01',name:'Security Contract Compliance Control',desc:'Monthly review of security contractor performance against SLA, CCTV checks, and drill records.'},
+  gen:{id:'CA-OPS-05',name:'General Operations Compliance Control',desc:'Routine review of branch administrative records, registers, and SOPs by the Branch Head and Accounts staff.'}
+};
+var FW_MX={
+  'High':  {likelihood:'High',  impact:'High',  inherent:'High',        residual:'Medium-High',appetite:'Low'},
+  'M to H':{likelihood:'Medium',impact:'High',  inherent:'Medium-High', residual:'Medium',     appetite:'Low-Medium'},
+  'L to M':{likelihood:'Low',   impact:'Medium',inherent:'Medium',      residual:'Low-Medium', appetite:'Medium'},
+  'Low':   {likelihood:'Low',   impact:'Low',   inherent:'Low',         residual:'Low',        appetite:'Medium-High'}
+};
+var FW_RISK_TIERS=['Low','Low-Medium','Medium','Medium-High','High'];
+function getFwKey(cat){
+  if(!cat)return'gen'; var c=cat.toLowerCase();
+  if(c.indexOf('imprest')!==-1||c.indexOf('payment')!==-1||c.indexOf('account')!==-1||c.indexOf('procurement')!==-1||c.indexOf('vendor')!==-1||c.indexOf('tax')!==-1)return'fin';
+  if(c.indexOf('cash')!==-1||c.indexOf('bank')!==-1)return'cash';
+  if(c.indexOf('recruit')!==-1||c.indexOf('payroll')!==-1||c.indexOf('employee')!==-1)return'hr';
+  if(c.indexOf('fixed asset')!==-1||c.indexOf('asset')!==-1)return'fa';
+  if(c.indexOf('library')!==-1||c.indexOf('lib ')!==-1)return'lib';
+  if(c.indexOf('student')!==-1)return'stu';
+  if(c.indexOf('lab')!==-1||c.indexOf('science')!==-1)return'lab';
+  if(c.indexOf('security')!==-1||c.indexOf('safety')!==-1)return'sec';
+  return'gen';
+}
+function getFw(o){
+  var key=getFwKey(o.category||'');
+  var mx=FW_MX[sensitivityMap[o.id]||'L to M']||FW_MX['L to M'];
+  return{rr:FW_RR[key],ca:FW_CA[key],mx:mx};
+}
+function fwChip(label,val){
+  var c='#7f8c8d';
+  if(val==='High')c='#c0392b'; else if(val==='Medium-High')c='#e67e22';
+  else if(val==='Medium')c='#2980b9'; else if(val==='Low-Medium')c='#2e86ab';
+  else if(val==='Low')c='#27ae60';
+  return '<span style="font-size:.67rem;color:#999;text-transform:uppercase;letter-spacing:.4px">'+label+'</span> <span style="display:inline-block;background:'+c+';color:#fff;border-radius:20px;padding:.1rem .6rem;font-size:.7rem;font-weight:700;margin:.1rem .2rem .1rem 0">'+val+'</span> ';
+}
+function upliftRisk(base, steps){
+  var idx=FW_RISK_TIERS.indexOf(base); if(idx===-1)idx=2;
+  return FW_RISK_TIERS[Math.min(idx+steps,FW_RISK_TIERS.length-1)];
+}
+function parseObsInstances(obsId, text){
+  var sources=[], instanceCount=0, totalAmount=0;
+  if(text){
+    var lines=text.split('\n'), tblRows=0;
+    for(var li=0;li<lines.length;li++){
+      var ln=lines[li].trim();
+      if(ln.indexOf('|')===-1)continue;
+      if(/^\|[\s\-:|]+\|?\s*$/.test(ln))continue;
+      tblRows++;
+    }
+    if(tblRows>1){var dataRows=tblRows-1;instanceCount=Math.max(instanceCount,dataRows);sources.push(dataRows+' row'+(dataRows!==1?'s':'')+' in inline table');}
+  }
+  var manualCount=instCountMap[obsId]||0;
+  if(manualCount>0){if(manualCount>instanceCount)instanceCount=manualCount;sources.push(manualCount+' (manually entered)');}
+  var manualAmt=instAmountMap[obsId]||0;
+  if(manualAmt>0){totalAmount=manualAmt;sources.push('Rs. '+manualAmt.toLocaleString()+' (manually entered)');}
+  var uplift=0,label='';
+  var amtFactor=totalAmount>=1000000?2:totalAmount>=100000?1:0;
+  var cntFactor=instanceCount>=15?2:instanceCount>=5?1:0;
+  uplift=Math.max(amtFactor,cntFactor);
+  if(uplift===2)label='Systemic / Pervasive';
+  else if(uplift===1)label='Significant';
+  else if(instanceCount>=2||totalAmount>0)label='Isolated / Limited';
+  else label='Not Quantified';
+  return{count:instanceCount,amount:totalAmount,uplift:uplift,label:label,sources:sources};
+}
+
+// ============================================================
 // FINALIZE & SAVE FINAL REPORT
 // ============================================================
 function finalizeReport(){
@@ -12866,6 +12953,44 @@ function finalizeReport(){
     if(refTxt){
       h+='<div style="margin-top:10px;padding:7px 12px;background:#fff8f0;border:1px solid #c07030;border-left:4px solid #b84000;border-radius:0 4px 4px 0;font-size:12px;font-style:italic;color:#6a2000;font-weight:600">'+esc(refTxt)+'</div>';
     }
+    // Risk-Based Framework panel (hidden by default; shown by toggleFramework())
+    var fw=getFw(o);
+    var inst=parseObsInstances(o.id, obsText);
+    var adjInherent=inst.uplift>0?upliftRisk(fw.mx.inherent,inst.uplift):fw.mx.inherent;
+    var adjResidual=inst.uplift>0?upliftRisk(fw.mx.residual,inst.uplift):fw.mx.residual;
+    var wasUplifted=(adjInherent!==fw.mx.inherent);
+    var instBadgeColor=inst.label==='Systemic / Pervasive'?'#c0392b':inst.label==='Significant'?'#e67e22':inst.label==='Isolated / Limited'?'#2980b9':'#95a5a6';
+    var instBox='<div style="background:#f7f9fc;border:1px solid #dde2ea;border-radius:6px;padding:.55rem .75rem;margin-top:.55rem;font-size:.77rem">'
+      +'<div style="font-size:.63rem;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#555;margin-bottom:.3rem">&#128202; Materiality Analysis</div>'
+      +(inst.count>0?'<div>Instances: <strong>'+inst.count+'</strong></div>':'')
+      +(inst.amount>0?'<div>Financial Impact: <strong>Rs. '+inst.amount.toLocaleString()+'</strong></div>':'')
+      +(inst.sources.length?'<div style="color:#777;font-size:.72rem;margin-top:.2rem">Sources: '+inst.sources.join(' &bull; ')+'</div>':'')
+      +'<div style="margin-top:.3rem">Materiality: <span style="display:inline-block;background:'+instBadgeColor+';color:#fff;border-radius:20px;padding:.1rem .6rem;font-size:.7rem;font-weight:700">'+inst.label+'</span>'
+      +(wasUplifted?' <span style="color:#c0392b;font-size:.7rem;font-weight:700">&uarr; Inherent Risk uplifted</span>':'')
+      +'</div></div>';
+    function fwChipF(lbl,val){var c='#7f8c8d';if(val==='High')c='#c0392b';else if(val==='Medium-High')c='#e67e22';else if(val==='Medium')c='#2980b9';else if(val==='Low-Medium')c='#2e86ab';else if(val==='Low')c='#27ae60';return'<span style="font-size:.63rem;color:#999;text-transform:uppercase;letter-spacing:.4px">'+lbl+'</span> <span style="display:inline-block;background:'+c+';color:#fff;border-radius:20px;padding:.1rem .6rem;font-size:.7rem;font-weight:700;margin:.1rem .2rem .1rem 0">'+val+'</span> ';}
+    h+='<div class="fw-panel" style="display:none;margin-top:10px;border:1px solid #b8d4ec;border-radius:6px;overflow:hidden">'
+      +'<div style="background:#1a3557;color:#fff;padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:.5px">&#128203; Risk-Based Audit Framework &mdash; '+esc(o.title)+'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;font-size:11.5px">'
+      +'<div style="padding:10px 12px;border-right:1px solid #d0e4f0">'
+        +'<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#1a3557;margin-bottom:4px">Risk Register Reference</div>'
+        +'<div style="display:inline-block;background:#1a3557;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;margin-bottom:5px">'+esc(fw.rr.id)+'</div>'
+        +'<div style="font-weight:700;color:#c0392b;font-size:12px;margin-bottom:4px">'+esc(fw.rr.name)+'</div>'
+        +'<div style="color:#555;font-size:11px;margin-bottom:6px">'+esc(fw.rr.desc)+'</div>'
+        +fwChipF('Likelihood',fw.mx.likelihood)+fwChipF('Impact',fw.mx.impact)+'<br>'
+        +fwChipF('Inherent Risk',adjInherent)+(wasUplifted?'<span style="color:#c0392b;font-size:10px;font-weight:700">&uarr; uplifted</span> ':'')+fwChipF('Residual Risk',adjResidual)+fwChipF('Risk Appetite',fw.mx.appetite)
+        +instBox
+        +'<div style="margin-top:6px;font-size:10.5px;color:#666;border-top:1px solid #dde8f0;padding-top:5px"><em>Control Objective:</em> '+esc(fw.rr.obj)+'</div>'
+      +'</div>'
+      +'<div style="padding:10px 12px;background:#f9fcff">'
+        +'<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#1a7a4a;margin-bottom:4px">Control Activity Applied</div>'
+        +'<div style="display:inline-block;background:#1a7a4a;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;margin-bottom:5px">'+esc(fw.ca.id)+'</div>'
+        +'<div style="font-weight:700;color:#1a7a4a;font-size:12px;margin-bottom:4px">'+esc(fw.ca.name)+'</div>'
+        +'<div style="color:#555;font-size:11px;margin-bottom:6px">'+esc(fw.ca.desc)+'</div>'
+        +'<div style="font-size:10.5px;color:#444;border-top:1px solid #d0e8d8;padding-top:5px"><strong>Audit Conclusion:</strong> Based on the application of <em>'+esc(fw.ca.name)+'</em>, the audit team identified control gaps. '
+        +(inst.count>0?'A total of <strong>'+inst.count+' instance'+(inst.count!==1?'s':'')+' were identified</strong>, indicating a '+inst.label.toLowerCase()+' control failure. ':' ')
+        +'Findings and recommendations are documented above.</div>'
+      +'</div></div></div>';
     h+='</div></div>';
     return h;
   }
@@ -12911,11 +13036,14 @@ function finalizeReport(){
   var finalHtml='<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n';
   finalHtml+='<title>FINAL – Audit Report'+(H.brcode?' '+H.brcode:'')+(H.brname?' '+H.brname:'')+'</title>\n';
   finalHtml+='<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">\n';
-  finalHtml+='<style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{font-family:Inter,sans-serif;font-size:13.5px;color:#1e2d40;background:#f3f5f8;padding:20px}#wrap{max-width:860px;margin:0 auto}#rp{background:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(26,58,92,.1);padding:30px 34px}#finalbanner{background:#e6f4ea;border:1px solid #5a9a6a;border-radius:6px;padding:10px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:#2a6040}#prtbtn{margin-bottom:16px;padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-family:Inter,sans-serif;font-size:13px;font-weight:600;cursor:pointer}#prtbtn:hover{background:#2a5080}@media print{#finalbanner,#prtbtn{display:none!important}body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}div{page-break-inside:avoid}}</style>\n';
+  finalHtml+='<style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{font-family:Inter,sans-serif;font-size:13.5px;color:#1e2d40;background:#f3f5f8;padding:20px}#wrap{max-width:860px;margin:0 auto}#rp{background:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(26,58,92,.1);padding:30px 34px}#finalbanner{background:#e6f4ea;border:1px solid #5a9a6a;border-radius:6px;padding:10px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:#2a6040}#prtbtn{margin-bottom:16px;padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-family:Inter,sans-serif;font-size:13px;font-weight:600;cursor:pointer}#prtbtn:hover{background:#2a5080}@media print{#finalbanner,#prtbtn,#fw-toggle-btn,.fw-panel{display:none!important}body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}div{page-break-inside:avoid}}</style>\n';
   finalHtml+=finalAnnexParts.head+'\n';
   finalHtml+='</head>\n<body>\n<div id="wrap">\n';
   finalHtml+='<div id="finalbanner">&#9989; FINAL AUDIT REPORT &nbsp;|&nbsp; Finalized: '+today+'&nbsp;&nbsp;<span style="margin-left:auto;font-weight:400;font-size:11px;color:#3a7050">This is the finalized version. All fields are locked.</span></div>\n';
-  finalHtml+='<button id="prtbtn" onclick="window.print()">&#128462; Print / Save as PDF</button>\n';
+  finalHtml+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
+    +'<button id="prtbtn" onclick="window.print()" style="padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-family:Inter,sans-serif;font-size:13px;font-weight:600;cursor:pointer">&#128462; Print / Save as PDF</button>'
+    +'<button id="fw-toggle-btn" onclick="toggleFramework()" style="padding:10px 18px;background:#1e6e3e;color:#fff;border:none;border-radius:20px;font-family:Inter,sans-serif;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:background .2s" title="Show or hide the Risk-Based Audit Framework for each observation">&#128203; Show Risk Framework</button>'
+    +'</div>\n';
   finalHtml+='<div id="rp">\n';
   finalHtml+='<div style="text-align:center;border-bottom:3px solid #1a3a5c;padding-bottom:16px;margin-bottom:20px">';
   finalHtml+='<div style="font-size:10px;font-weight:700;letter-spacing:2px;color:#c9962a;text-transform:uppercase;margin-bottom:6px">Beaconhouse Group &nbsp;|&nbsp; Systems &amp; Audit</div>';
@@ -12938,6 +13066,21 @@ function finalizeReport(){
   embeddedSess.ver=0; // marker: came from exported HTML
   finalHtml+='<script id="bhs-session-data" type="application/json">'+JSON.stringify(embeddedSess)+'<\/script>';
   finalHtml+=finalAnnexParts.data+'\n';
+  finalHtml+='<script>\n'
+    +'var _fwVisible=false;\n'
+    +'function toggleFramework(){\n'
+    +'  _fwVisible=!_fwVisible;\n'
+    +'  var btn=document.getElementById("fw-toggle-btn");\n'
+    +'  var panels=document.querySelectorAll(".fw-panel");\n'
+    +'  if(_fwVisible){\n'
+    +'    if(btn){btn.textContent="\\u274C Hide Risk Framework";btn.style.background="#c0392b";}\n'
+    +'    panels.forEach(function(p){p.style.display="block";});\n'
+    +'  } else {\n'
+    +'    if(btn){btn.textContent="\\u{1F4CB} Show Risk Framework";btn.style.background="#1e6e3e";}\n'
+    +'    panels.forEach(function(p){p.style.display="none";});\n'
+    +'  }\n'
+    +'}\n'
+    +'<\/script>\n';
   finalHtml+='</div>\n</div>\n</body>\n</html>';
 
   // Store built report for save dialog to use
@@ -12982,116 +13125,7 @@ function generateIssuedReport(){
     if(!s)return''; if(s==='High')return'high'; if(s==='M to H')return'mh'; if(s==='L to M')return'lm'; if(s==='Low')return'low'; return'';
   }
 
-  // ── Risk-Based Framework data ────────────────────────────────────────────
-  var FW_RR={
-    fin:{id:'RR-FIN-01',name:'Financial Mismanagement Risk',desc:'Risk of financial irregularities, policy non-compliance in expenditure and procurement.',obj:'Ensure expenditures are authorised, properly documented, and within policy limits.'},
-    cash:{id:'RR-FIN-02',name:'Cash & Bank Management Risk',desc:'Risk of cash misappropriation, reconciliation failures, and unauthorised transactions.',obj:'Maintain accurate cash/bank records with proper authorisation and reconciliation.'},
-    hr:{id:'RR-HR-01',name:'Human Resource Compliance Risk',desc:'Risk of non-compliance in recruitment, payroll, attendance, and employee record management.',obj:'Ensure HR processes comply with policy; records are complete and accurate.'},
-    fa:{id:'RR-OPS-01',name:'Fixed Asset Management Risk',desc:'Risk of asset misappropriation, untracked disposals, or inaccurate fixed asset register.',obj:'Maintain complete, accurate fixed asset records with regular physical verification.'},
-    lib:{id:'RR-OPS-02',name:'Library Resource Management Risk',desc:'Risk of loss, mis-cataloguing, or under-utilisation of library resources.',obj:'Ensure library resources are accurately catalogued, tracked and properly maintained.'},
-    stu:{id:'RR-OPS-03',name:'Student Record & Fee Management Risk',desc:'Risk of data inaccuracies, fee irregularities, and non-compliance in student management.',obj:'Ensure complete and accurate student records with proper fee collection procedures.'},
-    lab:{id:'RR-OPS-04',name:'Laboratory Resource Risk',desc:'Risk of loss, misuse, or improper maintenance of laboratory equipment and consumables.',obj:'Ensure lab resources are inventoried, maintained, and used in accordance with policy.'},
-    sec:{id:'RR-SEC-01',name:'Safety & Security Compliance Risk',desc:'Risk of security breaches due to non-compliance with security protocols and contracts.',obj:'Ensure branch security meets contractual obligations and safety standards.'},
-    gen:{id:'RR-OPS-05',name:'Operational Compliance Risk',desc:'Risk of non-compliance in general branch operations, records, and administrative procedures.',obj:'Ensure branch operations comply with SOPs and administrative requirements.'}
-  };
-  var FW_CA={
-    fin:{id:'CA-FIN-01',name:'Budget Variance Monitoring Control',desc:'Periodic review of actual vs budgeted expenditures with variance analysis and authorisation for deviations.'},
-    cash:{id:'CA-FIN-02',name:'Cash & Bank Reconciliation Control',desc:'Daily cash counts and monthly bank reconciliation reviewed and approved by the Branch Head.'},
-    hr:{id:'CA-HR-01',name:'HR Records Completeness Control',desc:'Systematic review of employee files, payroll reconciliation, and attendance monitoring by management.'},
-    fa:{id:'CA-OPS-01',name:'Fixed Asset Verification Control',desc:'Annual physical verification of fixed assets against the register, with tagging and reconciliation.'},
-    lib:{id:'CA-OPS-02',name:'Library Resource Audit Control',desc:'Regular stock-taking, KOHA module entries, and item-per-child ratio review by the Branch Librarian.'},
-    stu:{id:'CA-OPS-03',name:'Student Record Review Control',desc:'Periodic audit of student files, BEAMS data, and fee collection records for completeness and accuracy.'},
-    lab:{id:'CA-OPS-04',name:'Lab Resource Inventory Control',desc:'Regular inventory checks of laboratory equipment and consumables against register entries.'},
-    sec:{id:'CA-SEC-01',name:'Security Contract Compliance Control',desc:'Monthly review of security contractor performance against SLA, CCTV checks, and drill records.'},
-    gen:{id:'CA-OPS-05',name:'General Operations Compliance Control',desc:'Routine review of branch administrative records, registers, and SOPs by the Branch Head and Accounts staff.'}
-  };
-  var FW_MX={
-    'High':  {likelihood:'High',  impact:'High',  inherent:'High',        residual:'Medium-High',appetite:'Low'},
-    'M to H':{likelihood:'Medium',impact:'High',  inherent:'Medium-High', residual:'Medium',     appetite:'Low-Medium'},
-    'L to M':{likelihood:'Low',   impact:'Medium',inherent:'Medium',      residual:'Low-Medium', appetite:'Medium'},
-    'Low':   {likelihood:'Low',   impact:'Low',   inherent:'Low',         residual:'Low',        appetite:'Medium-High'}
-  };
-  function getFwKey(cat){
-    if(!cat)return'gen'; var c=cat.toLowerCase();
-    if(c.indexOf('imprest')!==-1||c.indexOf('payment')!==-1||c.indexOf('account')!==-1||c.indexOf('procurement')!==-1||c.indexOf('vendor')!==-1||c.indexOf('tax')!==-1)return'fin';
-    if(c.indexOf('cash')!==-1||c.indexOf('bank')!==-1)return'cash';
-    if(c.indexOf('recruit')!==-1||c.indexOf('payroll')!==-1||c.indexOf('employee')!==-1)return'hr';
-    if(c.indexOf('fixed asset')!==-1||c.indexOf('asset')!==-1)return'fa';
-    if(c.indexOf('library')!==-1||c.indexOf('lib ')!==-1)return'lib';
-    if(c.indexOf('student')!==-1)return'stu';
-    if(c.indexOf('lab')!==-1||c.indexOf('science')!==-1)return'lab';
-    if(c.indexOf('security')!==-1||c.indexOf('safety')!==-1)return'sec';
-    return'gen';
-  }
-  function getFw(o){
-    var key=getFwKey(o.category||'');
-    var mx=FW_MX[sensitivityMap[o.id]||'L to M']||FW_MX['L to M'];
-    return{rr:FW_RR[key],ca:FW_CA[key],mx:mx};
-  }
-  function fwChip(label,val){
-    var c='#7f8c8d';
-    if(val==='High')c='#c0392b'; else if(val==='Medium-High')c='#e67e22';
-    else if(val==='Medium')c='#2980b9'; else if(val==='Low-Medium')c='#2e86ab';
-    else if(val==='Low')c='#27ae60';
-    return '<span style="font-size:.67rem;color:#999;text-transform:uppercase;letter-spacing:.4px">'+label+'</span> <span style="display:inline-block;background:'+c+';color:#fff;border-radius:20px;padding:.1rem .6rem;font-size:.7rem;font-weight:700;margin:.1rem .2rem .1rem 0">'+val+'</span> ';
-  }
 
-  // ── Instance & amount parser for materiality uplift ──────────────────────
-  // Sources: (1) inline pipe-table rows in obs text, (2) manual fields only.
-  // No free-text parsing — avoids false positives from policy/info figures.
-  var FW_RISK_TIERS=['Low','Low-Medium','Medium','Medium-High','High'];
-  function upliftRisk(base, steps){
-    var idx=FW_RISK_TIERS.indexOf(base); if(idx===-1)idx=2;
-    return FW_RISK_TIERS[Math.min(idx+steps,FW_RISK_TIERS.length-1)];
-  }
-  function parseObsInstances(obsId, text){
-    var sources=[], instanceCount=0, totalAmount=0;
-
-    // Source 1: Inline pipe-table rows in observation text
-    if(text){
-      var lines=text.split('\n'), tblRows=0;
-      for(var li=0;li<lines.length;li++){
-        var ln=lines[li].trim();
-        if(ln.indexOf('|')===-1)continue;
-        if(/^\|[\s\-:|]+\|?\s*$/.test(ln))continue; // skip |---|--- separator rows
-        tblRows++;
-      }
-      if(tblRows>1){
-        var dataRows=tblRows-1; // subtract 1 header row
-        instanceCount=Math.max(instanceCount,dataRows);
-        sources.push(dataRows+' row'+(dataRows!==1?'s':'')+' in inline table');
-      }
-    }
-
-    // Source 2: Manual instance count field (overrides table if higher)
-    var manualCount=instCountMap[obsId]||0;
-    if(manualCount>0){
-      if(manualCount>instanceCount) instanceCount=manualCount;
-      sources.push(manualCount+' (manually entered)');
-    }
-
-    // Source 3: Manual financial impact field only
-    var manualAmt=instAmountMap[obsId]||0;
-    if(manualAmt>0){
-      totalAmount=manualAmt;
-      sources.push('Rs. '+manualAmt.toLocaleString()+' (manually entered)');
-    }
-
-    // Materiality classification
-    var uplift=0, label='';
-    var amtFactor= totalAmount>=1000000?2 : totalAmount>=100000?1 : 0;
-    var cntFactor= instanceCount>=15?2 : instanceCount>=5?1 : 0;
-    uplift=Math.max(amtFactor,cntFactor);
-    if(uplift===2) label='Systemic / Pervasive';
-    else if(uplift===1) label='Significant';
-    else if(instanceCount>=2||totalAmount>0) label='Isolated / Limited';
-    else label='Not Quantified';
-
-    return{count:instanceCount,amount:totalAmount,uplift:uplift,label:label,sources:sources};
-  }
-  // ── End instance parser ──────────────────────────────────────────────────
-
-  // ── End framework data ───────────────────────────────────────────────────
 
   // Separate Repeated / New
   var repeated=[], newObs=[];
