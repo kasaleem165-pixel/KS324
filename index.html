@@ -15637,7 +15637,8 @@ function ra_runAnalysis(){
   var catNames=Object.keys(RA_DB_CATS); var scores=[];
   for(var si=0;si<catNames.length;si++){
     var sc=ra_scoreCategory(catNames[si],rpt1,rpt2);
-    scores.push({cat:catNames[si],score:sc,level:ra_scoreToLevel(sc),d1:rpt1[catNames[si]],d2:rpt2?rpt2[catNames[si]]:null});
+    var _d1=rpt1[catNames[si]]||{obs:0,repeated:0};
+    scores.push({cat:catNames[si],score:sc,level:ra_scoreToLevel(sc),d1:_d1,d2:rpt2?rpt2[catNames[si]]:null,fromReport:(_d1.obs>0)});
   }
   scores.sort(function(a,b){return b.score-a.score;});
   var overall=Math.round((scores[0].score*0.5)+(scores[1].score*0.3)+(scores[2].score*0.2));
@@ -15710,8 +15711,10 @@ function ra_renderMatrix(scores){
     var bBg={critical:'#fde8e8',high:'#fff0e0',medium:'#fffbe0',low:'#e8f8e8'}[s.level]||'#eee';
     var bFg={critical:'#9b1a1a',high:'#b04400',medium:'#806000',low:'#1a6020'}[s.level]||'#333';
     var bBd={critical:'#f0a0a0',high:'#f0b070',medium:'#e0c030',low:'#80c880'}[s.level]||'#ccc';
-    h+='<tr>';
-    h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6;font-weight:700;color:#1a3a5c">'+ra_esc(s.cat)+'</td>';
+    var mRowBg=s.fromReport?'#f0f8f0':'#fafafa';
+    var mLBorder=s.fromReport?'border-left:3px solid #1a7a4a':'border-left:3px solid #e0e0e0';
+    h+='<tr style="background:'+mRowBg+';'+mLBorder+'">';
+    h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6;font-weight:700;color:#1a3a5c">'+(s.fromReport?'<span style="color:#1a7a4a;font-size:10px;margin-right:4px">&#10003;</span>':'')+ra_esc(s.cat)+'</td>';
     h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6"><span style="display:inline-block;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:800;text-transform:uppercase;background:'+bBg+';color:'+bFg+';border:1px solid '+bBd+'">'+ra_levelLabel(s.level)+'</span></td>';
     h+='<td style="padding:8px 10px;border-bottom:1px solid #eaeff6"><div style="display:flex;align-items:center;gap:6px"><div style="width:'+s.score+'px;max-width:80px;height:8px;background:'+ra_levelBarColor(s.level)+';border-radius:4px"></div><strong style="color:'+ra_levelColor(s.level)+'">'+s.score+'</strong></div></td>';
     var _mx2=FW_MX[ra_levelToSensKey(s.level)]||FW_MX['L to M'];
@@ -15723,6 +15726,7 @@ function ra_renderMatrix(scores){
     h+='</tr>';
   }
   h+='</tbody></table>';
+  h+='<div style="margin-top:8px;font-size:10px;color:#7a8a9a"><span style="color:#1a7a4a;font-weight:700">&#10003; Green left border</span> = category identified in the loaded report (data-driven risk). &nbsp;|&nbsp; <span style="color:#aaa">Grey left border</span> = not in report — inherent/databank risk only.</div>';
   document.getElementById('ra-res-matrix').innerHTML=h;
 }
 
@@ -15885,22 +15889,23 @@ function ra_lvlBadge(val){
 // ── Risk Heatmap ─────────────────────────────────────────────────────────────
 function ra_renderHeatmap(scores){
   function coord(s){
-    var fwKey=RA_CAT_TO_FW[s.cat]||'gen';
     var mx=FW_MX[ra_levelToSensKey(s.level)]||FW_MX['L to M'];
     var lMap={'High':4,'Medium':3,'Low':2}; var iMap={'High':5,'Medium':3,'Low':2};
     var l=lMap[mx.likelihood]||2; var im=iMap[mx.impact]||2;
-    // weight-based nudge: safety (w=5) almost certain; financial/hr (w=4) +1 impact
     var w=(RA_DB_CATS[s.cat]||{}).weight||2;
     if(w>=5) l=Math.min(l+1,5);
     if(w>=4) im=Math.min(im+1,5);
-    if(s.d1&&s.d1.repeated>0) l=Math.min(l+1,5); // repeated obs → higher likelihood
+    if(s.d1&&s.d1.repeated>0) l=Math.min(l+1,5);
     return {l:l,i:im};
   }
+  // Only plot categories that actually appeared in the loaded report
+  var reportScores=scores.filter(function(s){return s.fromReport;});
+  var noDataScores=scores.filter(function(s){return !s.fromReport;});
   var grid={};
-  for(var k=0;k<scores.length;k++){
-    var cd=coord(scores[k]); var key=cd.l+'-'+cd.i;
+  for(var k=0;k<reportScores.length;k++){
+    var cd=coord(reportScores[k]); var key=cd.l+'-'+cd.i;
     if(!grid[key]) grid[key]=[];
-    grid[key].push(scores[k]);
+    grid[key].push(reportScores[k]);
   }
   var likeLabels=['Rare','Unlikely','Possible','Likely','Almost Certain'];
   var impLabels=['Minor','Moderate','Significant','Major','Catastrophic'];
@@ -15934,19 +15939,32 @@ function ra_renderHeatmap(scores){
   [{bg:'#fde8e8',bd:'#e88080',t:'Critical (L×I ≥ 16)'},{bg:'#fff0e0',bd:'#f0b070',t:'High (L×I 9–15)'},{bg:'#fffbe0',bd:'#d8c040',t:'Medium (L×I 4–8)'},{bg:'#e8f8e8',bd:'#80c880',t:'Low (L×I ≤ 3)'}]
     .forEach(function(lv){ h+='<span style="display:flex;align-items:center;gap:5px"><span style="width:13px;height:13px;background:'+lv.bg+';border:1px solid '+lv.bd+';border-radius:2px;display:inline-block"></span>'+lv.t+'</span>'; });
   h+='</div>';
+  if(!reportScores.length){
+    h='<div style="color:#c03030;font-size:12px;padding:10px 0;font-weight:600">&#9888; No observations were identified in the loaded report. Please ensure the report contains observation titles or keywords that match the audit categories, or paste the report text directly.</div>';
+  }
+  if(noDataScores.length){
+    h+='<div style="margin-top:12px;background:#f5f8fd;border:1px solid #c8d8ec;border-radius:6px;padding:10px 14px;font-size:11px;color:#5a6a7a">';
+    h+='<strong style="color:#1a3a5c">&#9432; Categories not found in the loaded report</strong> (inherent background risk from S&amp;A databank only — not plotted above):<br><span style="color:#7a8a9a">'+noDataScores.map(function(s){return ra_esc(s.cat);}).join(' &nbsp;|&nbsp; ')+'</span></div>';
+  }
   document.getElementById('ra-res-heatmap').innerHTML=h;
 }
 
 // ── ERM Risk Register ─────────────────────────────────────────────────────────
 function ra_renderRiskRegister(scores){
-  var h='<div style="font-size:11px;color:#4a5a70;margin-bottom:14px;line-height:1.7">Enterprise Risk Management Register — synthesized from observation history, control framework (FW_RR / FW_CA), and databank frequency. <strong>Inherent Risk</strong> = exposure before controls; <strong>Residual Risk</strong> = remaining exposure after controls. Control Effectiveness is derived from observation frequency and recurrence.</div>';
-  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:980px">';
-  var cols=['Risk ID','Risk Name &amp; Type','Likelihood','Impact','Inherent Risk','Key Control','Ctrl Type','Control Effectiveness','Residual Risk','Risk Appetite','Action Required'];
+  // Sort: report-present rows first, then by score descending
+  var sorted=scores.slice().sort(function(a,b){
+    if(a.fromReport&&!b.fromReport) return -1;
+    if(!a.fromReport&&b.fromReport) return 1;
+    return b.score-a.score;
+  });
+  var h='<div style="font-size:11px;color:#4a5a70;margin-bottom:14px;line-height:1.7">Enterprise Risk Management Register — categories identified in the loaded report are shown first and highlighted. Risk levels, control effectiveness, likelihood and impact are all derived from actual report observations. Categories not present in the report show inherent background risk from the S&amp;A databank only.</div>';
+  h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:1020px">';
+  var cols=['Risk ID','Risk Name &amp; Type','Report Evidence','Likelihood','Impact','Inherent Risk','Key Control','Ctrl Type','Control Effectiveness','Residual Risk','Risk Appetite','Action Required'];
   h+='<thead><tr>';
   cols.forEach(function(c){ h+='<th style="background:#1a3a5c;color:#fff;padding:8px 9px;text-align:left;font-size:10px;font-weight:700;white-space:nowrap;border-right:1px solid #2a4a6c;vertical-align:top">'+c+'</th>'; });
   h+='</tr></thead><tbody>';
-  for(var i=0;i<scores.length;i++){
-    var s=scores[i];
+  for(var i=0;i<sorted.length;i++){
+    var s=sorted[i];
     var fwKey=RA_CAT_TO_FW[s.cat]||'gen';
     var rr=FW_RR[fwKey]||FW_RR.gen;
     var ca=FW_CA[fwKey]||FW_CA.gen;
@@ -15955,34 +15973,44 @@ function ra_renderRiskRegister(scores){
     var rtype=RA_RISK_TYPES[fwKey]||'Operational Risk';
     var ctype=RA_CTRL_TYPES[fwKey]||'Preventive';
     var action=ra_actionRequired(s.level);
-    var rowBg=i%2===0?'#fff':'#f7faff';
-    h+='<tr style="background:'+rowBg+'">';
+    var obs1=s.d1?s.d1.obs:0; var rep1=s.d1?s.d1.repeated:0;
+    var rowBg=s.fromReport?(i%2===0?'#f0f8ff':'#e8f4ff'):(i%2===0?'#fafafa':'#f5f5f5');
+    var leftBorder=s.fromReport?'border-left:4px solid #1a7a4a':'border-left:4px solid #c8d8ec';
+    h+='<tr style="background:'+rowBg+';'+leftBorder+'">';
     h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;vertical-align:top"><div style="font-weight:800;color:#1a3a5c;font-size:10px;white-space:nowrap">'+ra_esc(rr.id)+'</div></td>';
     h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;vertical-align:top;min-width:155px"><div style="font-weight:700;color:#1a3a5c;margin-bottom:3px">'+ra_esc(rr.name)+'</div><span style="font-size:9.5px;background:#edf2f8;border:1px solid #c8d8ec;border-radius:6px;padding:1px 6px;color:#2a4060;font-weight:600">'+ra_esc(rtype)+'</span></td>';
+    // Report Evidence cell
+    if(s.fromReport){
+      var evid='<div style="font-weight:700;color:#1a6020;font-size:11px">'+obs1+' observation'+(obs1!==1?'s':'')+'</div>';
+      if(rep1>0) evid+='<div style="font-size:10px;color:#c03030;font-weight:700;margin-top:2px">'+rep1+' repeated</div>';
+      evid+='<div style="font-size:9.5px;color:#5a8a7a;margin-top:2px">Risk Score: '+s.score+'/100</div>';
+      h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;vertical-align:top">'+evid+'</td>';
+    } else {
+      h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;vertical-align:top"><span style="font-size:9.5px;background:#f0f0f0;border:1px solid #d0d0d0;border-radius:6px;padding:2px 7px;color:#888;font-weight:600">Not in report</span><div style="font-size:9.5px;color:#9a9a9a;margin-top:3px">Databank risk only</div></td>';
+    }
     h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;text-align:center;vertical-align:top">'+ra_lvlBadge(mx.likelihood)+'</td>';
     h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;text-align:center;vertical-align:top">'+ra_lvlBadge(mx.impact)+'</td>';
     h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;text-align:center;vertical-align:top">'+ra_lvlBadge(mx.inherent)+'</td>';
     h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;vertical-align:top;min-width:170px"><div style="font-size:9.5px;font-weight:700;color:#1a3a5c">'+ra_esc(ca.id)+'</div><div style="margin-top:2px;color:#2a3a50;line-height:1.4">'+ra_esc(ca.name)+'</div></td>';
     h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;vertical-align:top;white-space:nowrap"><span style="font-size:9.5px;background:#f0f4f8;border:1px solid #c8d8ec;border-radius:6px;padding:2px 6px;color:#2a4060;font-weight:600">'+ra_esc(ctype)+'</span></td>';
-    h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;text-align:center;vertical-align:top"><span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;background:'+ce.bg+';color:'+ce.color+';border:1px solid '+ce.color+'55">'+ce.label+'</span></td>';
+    // Control effectiveness only meaningful when report data present
+    var ceCell=s.fromReport?'<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;background:'+ce.bg+';color:'+ce.color+';border:1px solid '+ce.color+'55">'+ce.label+'</span>':'<span style="font-size:9.5px;color:#aaa">N/A</span>';
+    h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;text-align:center;vertical-align:top">'+ceCell+'</td>';
     h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;text-align:center;vertical-align:top">'+ra_lvlBadge(mx.residual)+'</td>';
     h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;text-align:center;vertical-align:top">'+ra_lvlBadge(mx.appetite)+'</td>';
-    h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;vertical-align:top;min-width:160px;font-size:10.5px;color:#4a5a70;line-height:1.4">'+ra_esc(action)+'</td>';
+    h+='<td style="padding:9px 10px;border-bottom:1px solid #eaeff6;vertical-align:top;min-width:160px;font-size:10.5px;color:#4a5a70;line-height:1.4">'+(s.fromReport?ra_esc(action):'<span style="color:#aaa">Monitor — no report data</span>')+'</td>';
     h+='</tr>';
-    // Detail sub-row
-    h+='<tr style="background:'+rowBg+'"><td colspan="11" style="padding:0 10px 12px;border-bottom:2px solid #d8e4f0">';
+    // Detail sub-row — span 12 cols now
+    h+='<tr style="background:'+rowBg+'"><td colspan="12" style="padding:0 10px 12px;border-bottom:2px solid #d8e4f0">';
     h+='<div style="background:#f5f9ff;border:1px solid #c8d8ec;border-radius:6px;padding:10px 14px;display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:11px;color:#4a5a70;line-height:1.6">';
     h+='<div><div style="font-size:10px;font-weight:800;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Risk Description &amp; Audit Objective</div><div>'+ra_esc(rr.desc)+'</div><div style="margin-top:5px"><strong>Audit Objective:</strong> '+ra_esc(rr.obj)+'</div></div>';
     h+='<div><div style="font-size:10px;font-weight:800;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Control Activity Description</div><div>'+ra_esc(ca.desc)+'</div>';
-    var obs1=s.d1?s.d1.obs:0; var rep1=s.d1?s.d1.repeated:0;
-    if(obs1>0||rep1>0){
-      h+='<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">';
-      if(obs1>0) h+='<span style="background:#edf2f8;border:1px solid #c8d8ec;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:600;color:#1a3a5c">'+obs1+' obs in report</span>';
-      if(rep1>0) h+='<span style="background:#fde8e8;border:1px solid #f0a0a0;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:600;color:#9b1a1a">'+rep1+' repeated (escalated)</span>';
-      h+='<span style="background:#edf2f8;border:1px solid #c8d8ec;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:600;color:#1a3a5c">'+RA_DB_CATS[s.cat].count+' in S&amp;A databank</span>';
-      h+='</div>';
-    }
-    h+='</div></div></td></tr>';
+    h+='<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">';
+    if(obs1>0) h+='<span style="background:#d4f0d8;border:1px solid #80c880;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;color:#1a6020">&#10003; '+obs1+' obs from report</span>';
+    if(rep1>0) h+='<span style="background:#fde8e8;border:1px solid #f0a0a0;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;color:#9b1a1a">&#9888; '+rep1+' repeated</span>';
+    if(!s.fromReport) h+='<span style="background:#f0f0f0;border:1px solid #ccc;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:600;color:#888">No data in report</span>';
+    h+='<span style="background:#edf2f8;border:1px solid #c8d8ec;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:600;color:#1a3a5c">'+RA_DB_CATS[s.cat].count+' in S&amp;A databank</span>';
+    h+='</div></div></div></td></tr>';
   }
   h+='</tbody></table></div>';
   // ERM Legend
