@@ -15342,27 +15342,36 @@ function ra_onBranchSelect(val){
   if(mw) mw.style.display='none';
 }
 
-function ra_detectBranchInText(text){
+function ra_detectBranchInText(text, selectedBranch){
   if(!text||!RA_BRANCHES.length) return null;
   var lower=text.toLowerCase().substring(0,8000);
-  // Longer/more-specific names first to avoid partial matches
+  // Step 1: if the selected branch name appears in the text, that is definitive
+  if(selectedBranch && lower.indexOf(selectedBranch.toLowerCase())!==-1) return selectedBranch;
+  // Step 2: scan for any branch name (longest first to prefer more-specific names)
   var sorted=RA_BRANCHES.slice().sort(function(a,b){return b.name.length-a.name.length;});
   for(var i=0;i<sorted.length;i++){
     var b=sorted[i];
     if(lower.indexOf(b.name.toLowerCase())!==-1) return b.name;
   }
-  // Fallback: try code match
+  // Step 3: branch code fallback — require the code to be surrounded by non-digits
   for(var j=0;j<RA_BRANCHES.length;j++){
     var b2=RA_BRANCHES[j];
-    if(b2.code&&lower.indexOf(b2.code.toLowerCase())!==-1) return b2.name;
+    if(b2.code){
+      var re=new RegExp('(?:^|\\D)'+b2.code+'(?:\\D|$)');
+      if(re.test(lower)) return b2.name;
+    }
   }
   return null;
 }
 
 function ra_branchMatch(selected, detected){
-  if(!selected||!detected) return true; // can't determine — allow
+  if(!selected||!detected) return true;
   var sl=selected.toLowerCase(); var dl=detected.toLowerCase();
-  return sl===dl||dl.indexOf(sl)!==-1||sl.indexOf(dl)!==-1;
+  if(sl===dl||dl.indexOf(sl)!==-1||sl.indexOf(dl)!==-1) return true;
+  // Core-name match: strip city suffix (last comma-separated segment) and compare
+  var slCore=sl.split(',')[0].trim(); var dlCore=dl.split(',')[0].trim();
+  if(slCore&&dlCore&&(slCore===dlCore||dlCore.indexOf(slCore)!==-1||slCore.indexOf(dlCore)!==-1)) return true;
+  return false;
 }
 
 function ra_showBranchMismatch(selected, detected){
@@ -15395,8 +15404,10 @@ function ra_handleFilePick(input){
               sb.value=sess.formData.brname;
               ra_onBranchInput(sess.formData.brname);
             }
-            var detBr=sess.formData&&sess.formData.brname?sess.formData.brname:ra_detectBranchInText(text);
-            ra_addLoadedReport(file.name,date,sess,text,detBr);
+            var selectedBr=(document.getElementById('ra-sel_branch')||{}).value||'';
+            var detBr=sess.formData&&sess.formData.brname?sess.formData.brname:ra_detectBranchInText(text,selectedBr);
+            var certain=!!(sess.formData&&sess.formData.brname);
+            ra_addLoadedReport(file.name,date,sess,text,detBr,certain);
           }catch(err){ ra_toast('Could not read JSON: '+file.name); }
         };
         r.readAsText(file);
@@ -15404,7 +15415,8 @@ function ra_handleFilePick(input){
         var r2=new FileReader();
         r2.onload=function(e){
           ra_parseDocxFile(e.target.result,function(text){
-            ra_addLoadedReport(file.name,'',null,text||'',ra_detectBranchInText(text));
+            var sb2=(document.getElementById('ra-sel_branch')||{}).value||'';
+            ra_addLoadedReport(file.name,'',null,text||'',ra_detectBranchInText(text,sb2),false);
             if(!text) ra_toast('Warning: could not extract text from '+file.name);
           });
         };
@@ -15413,14 +15425,15 @@ function ra_handleFilePick(input){
         var r4=new FileReader();
         r4.onload=function(e){
           ra_parseXlsxFile(e.target.result,function(text){
-            ra_addLoadedReport(file.name,'',null,text||'',ra_detectBranchInText(text));
+            var sb3=(document.getElementById('ra-sel_branch')||{}).value||'';
+            ra_addLoadedReport(file.name,'',null,text||'',ra_detectBranchInText(text,sb3),false);
             if(!text) ra_toast('Warning: could not extract text from '+file.name);
           });
         };
         r4.readAsArrayBuffer(file);
       } else {
         var r3=new FileReader();
-        r3.onload=function(e){ ra_addLoadedReport(file.name,'',null,e.target.result||'',ra_detectBranchInText(e.target.result)); };
+        r3.onload=function(e){ var sb4=(document.getElementById('ra-sel_branch')||{}).value||''; ra_addLoadedReport(file.name,'',null,e.target.result||'',ra_detectBranchInText(e.target.result,sb4),false); };
         r3.readAsText(file);
       }
     })(files[fi]);
@@ -15428,15 +15441,22 @@ function ra_handleFilePick(input){
   input.value='';
 }
 
-function ra_addLoadedReport(name,date,sess,text,detectedBranch){
+function ra_addLoadedReport(name,date,sess,text,detectedBranch,isCertain){
   for(var i=0;i<ra_loadedReports.length;i++){
     if(ra_loadedReports[i].name===name){ ra_toast(name+' is already loaded.'); return; }
   }
   var selectedBranch=(document.getElementById('ra-sel_branch')||{}).value||'';
   if(selectedBranch&&detectedBranch&&!ra_branchMatch(selectedBranch,detectedBranch)){
     ra_showBranchMismatch(selectedBranch,detectedBranch);
-    alert('Branch Mismatch!\n\nThe loaded file appears to be for:\n"'+detectedBranch+'"\n\nSelected branch is:\n"'+selectedBranch+'"\n\nThe report has NOT been loaded. Please select the correct branch or load the correct report.');
-    return;
+    if(isCertain){
+      // JSON session — branch name is authoritative; hard block
+      alert('Branch Mismatch!\n\nThis session file belongs to:\n"'+detectedBranch+'"\n\nSelected branch is:\n"'+selectedBranch+'"\n\nThe file has NOT been loaded. Please select the correct branch above or load the correct file.');
+      return;
+    } else {
+      // Text/docx — detection is based on text scan and may be imperfect; let user decide
+      var proceed=confirm('Possible Branch Mismatch\n\nThe system detected a possible reference to:\n"'+detectedBranch+'"\n\nSelected branch is:\n"'+selectedBranch+'"\n\nIf this file IS for '+selectedBranch+', click OK to load it anyway.\nIf it belongs to a different branch, click Cancel.');
+      if(!proceed) return;
+    }
   }
   ra_loadedReports.push({name:name,date:date,sess:sess,text:text,detectedBranch:detectedBranch||''});
   ra_renderLoadedFilesList();
