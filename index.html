@@ -13621,7 +13621,7 @@ function generateIssuedReport(){
     // Top nav
     +'<nav class="topnav">'
     +'<div class="brand">Beaconhouse &nbsp;<span>Systems &amp; Audit</span></div>'
-    +'<div style="display:flex;align-items:center;gap:.5rem"><a href="#synopsis">Synopsis</a><a href="#repeated-syn">Repeated</a><a href="#new-syn">New Findings</a>'+(annexures.length?'<a href="#annexures">Annexures</a>':'')
+    +'<div style="display:flex;align-items:center;gap:.5rem"><a href="#synopsis">Synopsis</a><a href="#repeated-syn">Repeated</a><a href="#new-syn">New Findings</a>'+(annexures.length?'<a href="#annexures">Annexures</a>':'')+'<a href="#methodology">Methodology</a>'
     +'</div>'
     +'</nav>\n'
 
@@ -13667,22 +13667,114 @@ function generateIssuedReport(){
     +synTable(newObs,   'Section 2 — New Observations', 'new-syn')
     +'</div>\n'
 
-    // Framework intro banner (always visible)
-    +'<div id="fw-intro" style="display:block;background:linear-gradient(135deg,#e8f4f8,#f0f7e8);border:1px solid #b0d4e8;border-radius:10px;padding:1.2rem 1.5rem;max-width:1100px;margin:1rem auto;box-sizing:border-box">'
-    +'<div style="font-weight:800;color:#1a3557;font-size:.98rem;margin-bottom:.6rem">&#128203; Risk-Based Audit Methodology</div>'
-    +'<p style="font-size:.86rem;color:#444;line-height:1.65">This audit was conducted following a <strong>Risk-Based Audit Approach</strong> aligned with the <strong>COSO Internal Control &mdash; Integrated Framework</strong>. For each audit area, the team identified relevant risks from the Branch Risk Register, assessed the adequacy and effectiveness of existing control activities, and formulated audit observations based on identified control gaps.</p>'
-    +'<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.8rem;font-size:.76rem;align-items:center">'
-    +'<span style="background:#1a3557;color:#fff;border-radius:20px;padding:.2rem .8rem;font-weight:700">Step 1: Risk Identification</span>'
-    +'<span style="color:#555">&rarr;</span>'
-    +'<span style="background:#2980b9;color:#fff;border-radius:20px;padding:.2rem .8rem;font-weight:700">Step 2: Control Mapping</span>'
-    +'<span style="color:#555">&rarr;</span>'
-    +'<span style="background:#e67e22;color:#fff;border-radius:20px;padding:.2rem .8rem;font-weight:700">Step 3: Control Testing</span>'
-    +'<span style="color:#555">&rarr;</span>'
-    +'<span style="background:#c0392b;color:#fff;border-radius:20px;padding:.2rem .8rem;font-weight:700">Step 4: Gap Analysis</span>'
-    +'<span style="color:#555">&rarr;</span>'
-    +'<span style="background:#27ae60;color:#fff;border-radius:20px;padding:.2rem .8rem;font-weight:700">Step 5: Observation &amp; Recommendation</span>'
-    +'</div>'
-    +'</div>\n'
+    // ── Risk-Based Audit Methodology Section ─────────────────────────────────
+    +(function(){
+      var MSTEPS=[
+        {n:1,color:'#1a3557',icon:'&#128269;',title:'Risk Identification',
+         short:'Branch Risk Register mapped to each audit area.',
+         detail:'The audit team reviewed the Branch Risk Register to identify all applicable risks for this branch. Each audit area (Finance, HR, Fixed Assets, Student Records, Library, Lab, Security, Operations) was mapped to its corresponding risk category. This ensured complete coverage with no audit area left without a formal risk anchor. Risks were classified by likelihood and impact to determine the priority of testing.'},
+        {n:2,color:'#2471a3',icon:'&#128279;',title:'Control Mapping',
+         short:'Relevant control activities identified per risk.',
+         detail:'For each identified risk, the team mapped the applicable Control Activity from the Internal Control framework. Control activities included budget variance monitoring, cash reconciliation, HR record reviews, fixed asset verification, student record audits, library stock-taking, lab inventory checks, and security contract compliance reviews. This mapping confirmed what controls should be in place and formed the basis of our testing programme.'},
+        {n:3,color:'#d68910',icon:'&#9989;',title:'Control Testing',
+         short:'Adequacy and operating effectiveness evaluated.',
+         detail:'Each control activity was tested for two dimensions: (1) Design Adequacy — whether the control, if operating as intended, is capable of preventing or detecting the risk; and (2) Operating Effectiveness — whether the control was actually applied consistently during the audit period. Testing methods included document review, physical verification, reconciliation checks, staff interviews, and system data extraction. Results were graded as Effective, Partially Effective, or Ineffective.'},
+        {n:4,color:'#c0392b',icon:'&#128202;',title:'Gap Analysis',
+         short:'Control failures and deviations documented.',
+         detail:'Where control testing revealed deficiencies — either in design or operation — a control gap was recorded. Each gap was assessed for root cause (policy non-compliance, system failure, staff awareness, or supervision gap) and impact (financial, reputational, or operational). The severity of each gap determined the Materiality level (Isolated / Significant / Systemic) and directly informed the Auditor Risk Rating assigned to the observation.'},
+        {n:5,color:'#1a7a4a',icon:'&#128221;',title:'Observation & Recommendation',
+         short:'Findings reported with corrective action required.',
+         detail:'Each control gap was translated into a formal Audit Observation, comprising: the Finding (what was found), the Risk (what could go wrong), the Recommendation (corrective action required), and the timeline for remediation. Observations were classified as Repeated (unresolved from prior audit) or New. The auditee response and auditor assessment of that response are also recorded, providing a complete audit trail from risk identification to resolution status.'}
+      ];
+      var mhtml='<div id="methodology" style="max-width:1100px;margin:2rem auto;padding:0 1rem;box-sizing:border-box">';
+      // Header
+      mhtml+='<div style="background:linear-gradient(135deg,#1a3557,#2471a3);border-radius:12px 12px 0 0;padding:1.4rem 1.8rem;color:#fff">'
+        +'<div style="font-size:.72rem;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#a8d4f0;margin-bottom:.4rem">Audit Assurance &mdash; Enterprise Risk Management</div>'
+        +'<div style="font-size:1.25rem;font-weight:800;letter-spacing:.3px">&#128203; Risk-Based Audit Methodology</div>'
+        +'<div style="font-size:.84rem;color:#c8e4f8;margin-top:.5rem;line-height:1.6">This audit was conducted following a structured <strong>Risk-Based Audit Approach</strong> aligned with the <strong>COSO Internal Control — Integrated Framework</strong>. The methodology ensures complete coverage of all audit areas through formal risk identification, control mapping, and evidence-based testing — providing assurance that findings are grounded in an objective, systematic process.</div>'
+        +'</div>';
+      // Step cards (clickable to expand)
+      mhtml+='<div style="background:#f4f7fb;border:1px solid #c8d8ec;border-top:none;padding:1.2rem 1.4rem;display:flex;flex-direction:column;gap:.7rem">'
+        +'<div style="font-size:.72rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#1a3557;margin-bottom:.2rem">Audit Process — Click any step to expand</div>'
+        +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.7rem">';
+      for(var si=0;si<MSTEPS.length;si++){
+        var ms=MSTEPS[si];
+        mhtml+='<div onclick="(function(el){var b=el.nextElementSibling;b.style.display=b.style.display===\'none\'?\'block\':\'none\';})(this)" '
+          +'style="background:#fff;border:1px solid #dde4ee;border-top:4px solid '+ms.color+';border-radius:0 0 8px 8px;padding:.75rem 1rem;cursor:pointer;transition:box-shadow .2s" '
+          +'onmouseenter="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,.12)\'" onmouseleave="this.style.boxShadow=\'none\'">'
+          +'<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem">'
+          +'<span style="background:'+ms.color+';color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:800;flex-shrink:0">'+ms.n+'</span>'
+          +'<span style="font-size:.88rem;font-weight:700;color:'+ms.color+'">'+ms.icon+' '+ms.title+'</span>'
+          +'</div>'
+          +'<div style="font-size:.78rem;color:#555;line-height:1.5">'+ms.short+'</div>'
+          +'<div style="font-size:.68rem;color:#999;margin-top:.4rem;text-align:right">&#9660; expand</div>'
+          +'</div>'
+          +'<div style="display:none;background:#fff;border:1px solid #b8d0e8;border-left:4px solid '+ms.color+';border-radius:0 6px 6px 0;padding:.8rem 1.1rem;font-size:.81rem;color:#2a3a50;line-height:1.7;margin-top:-.5rem;position:relative;z-index:1">'+ms.detail+'</div>';
+      }
+      mhtml+='</div></div>';
+
+      // Risk & Control Matrix table
+      mhtml+='<div style="background:#fff;border:1px solid #c8d8ec;border-top:none;padding:1.2rem 1.4rem">'
+        +'<div style="font-size:.72rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#1a3557;margin-bottom:.8rem">&#128196; Risk &amp; Control Matrix — All Observations</div>'
+        +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.8rem">'
+        +'<thead><tr>'
+        +'<th style="background:#1a3557;color:#fff;padding:.5rem .65rem;text-align:left;font-size:.7rem;font-weight:700;letter-spacing:.4px;white-space:nowrap">#</th>'
+        +'<th style="background:#1a3557;color:#fff;padding:.5rem .65rem;text-align:left;font-size:.7rem;font-weight:700;letter-spacing:.4px">Observation</th>'
+        +'<th style="background:#1a3557;color:#fff;padding:.5rem .65rem;text-align:left;font-size:.7rem;font-weight:700;letter-spacing:.4px;white-space:nowrap">Risk Register</th>'
+        +'<th style="background:#1a3557;color:#fff;padding:.5rem .65rem;text-align:left;font-size:.7rem;font-weight:700;letter-spacing:.4px">Risk Name</th>'
+        +'<th style="background:#1a3557;color:#fff;padding:.5rem .65rem;text-align:center;font-size:.7rem;font-weight:700;letter-spacing:.4px;white-space:nowrap">Auditor Risk</th>'
+        +'<th style="background:#1a3557;color:#fff;padding:.5rem .65rem;text-align:center;font-size:.7rem;font-weight:700;letter-spacing:.4px;white-space:nowrap">Residual Risk</th>'
+        +'<th style="background:#1a3557;color:#fff;padding:.5rem .65rem;text-align:center;font-size:.7rem;font-weight:700;letter-spacing:.4px">Materiality</th>'
+        +'<th style="background:#1a3557;color:#fff;padding:.5rem .65rem;text-align:left;font-size:.7rem;font-weight:700;letter-spacing:.4px;white-space:nowrap">Control Activity</th>'
+        +'<th style="background:#1a3557;color:#fff;padding:.5rem .65rem;text-align:left;font-size:.7rem;font-weight:700;letter-spacing:.4px">Control Name</th>'
+        +'</tr></thead><tbody>';
+      var riskBg={High:'#fdecea','Medium-High':'#fef3e2',Medium:'#eaf4fb','Low-Medium':'#e8f4ff',Low:'#e9f7ef'};
+      var riskCol={High:'#c0392b','Medium-High':'#d68910',Medium:'#2471a3','Low-Medium':'#1a6e8a',Low:'#1a7a4a'};
+      var matBgMap={'Systemic / Pervasive':'#c0392b','Significant':'#e67e22','Isolated / Limited':'#2980b9','Not Quantified':'#95a5a6'};
+      for(var mi=0;mi<all.length;mi++){
+        var mo=all[mi];
+        var mlbl=labMap[mo.id]||'?';
+        var mfw=getFw(mo);
+        var mot=obsText(mo);
+        var minst=parseObsInstances(mo.id,mot);
+        var msk=sensitivityMap[mo.id]||'—';
+        var madjR=minst.uplift>0?upliftRisk(mfw.mx.residual,minst.uplift):mfw.mx.residual;
+        var mrid=mlbl.replace('.','-');
+        var mrowBg=mi%2===0?'#fafbfc':'#fff';
+        mhtml+='<tr onclick="highlightSynRow(\'syn-row-'+mrid+'\')" style="cursor:pointer;background:'+mrowBg+';border-bottom:1px solid #e8edf4" '
+          +'onmouseenter="this.style.background=\'#eef4fb\'" onmouseleave="this.style.background=\''+mrowBg+'\'">'
+          +'<td style="padding:.42rem .65rem;font-weight:700;color:#1a3557;white-space:nowrap">'+e(mlbl)+'</td>'
+          +'<td style="padding:.42rem .65rem;max-width:200px"><div style="font-weight:600;color:#2a3a50">'+e(mo.title)+'</div>'+(mo.category?'<div style="font-size:.7rem;color:#888">'+e(mo.category)+'</div>':'')+'</td>'
+          +'<td style="padding:.42rem .65rem;white-space:nowrap"><span style="background:#1a3557;color:#fff;border-radius:4px;padding:.12rem .45rem;font-size:.68rem;font-weight:700">'+e(mfw.rr.id)+'</span></td>'
+          +'<td style="padding:.42rem .65rem;font-size:.78rem;color:#c0392b;font-weight:600;max-width:160px">'+e(mfw.rr.name)+'</td>'
+          +'<td style="padding:.42rem .65rem;text-align:center"><span style="display:inline-block;background:'+(riskBg[msk]||'#f4f4f4')+';color:'+(riskCol[msk]||'#555')+';border-radius:20px;padding:.1rem .6rem;font-size:.7rem;font-weight:700;white-space:nowrap">'+e(msk)+'</span></td>'
+          +'<td style="padding:.42rem .65rem;text-align:center"><span style="display:inline-block;background:'+(riskBg[madjR]||'#f4f4f4')+';color:'+(riskCol[madjR]||'#555')+';border-radius:20px;padding:.1rem .6rem;font-size:.7rem;font-weight:700;white-space:nowrap">'+e(madjR)+'</span></td>'
+          +'<td style="padding:.42rem .65rem;text-align:center"><span style="display:inline-block;background:'+(matBgMap[minst.label]||'#95a5a6')+';color:#fff;border-radius:20px;padding:.1rem .6rem;font-size:.68rem;font-weight:700;white-space:nowrap">'+e(minst.label)+'</span></td>'
+          +'<td style="padding:.42rem .65rem;white-space:nowrap"><span style="background:#1a7a4a;color:#fff;border-radius:4px;padding:.12rem .45rem;font-size:.68rem;font-weight:700">'+e(mfw.ca.id)+'</span></td>'
+          +'<td style="padding:.42rem .65rem;font-size:.78rem;color:#1a7a4a;font-weight:600;max-width:160px">'+e(mfw.ca.name)+'</td>'
+          +'</tr>';
+      }
+      mhtml+='</tbody></table></div>'
+        +'<div style="font-size:.72rem;color:#888;margin-top:.6rem;font-style:italic">&#128161; Click any row to scroll to that observation in the Synopsis above.</div>'
+        +'</div>';
+
+      // ERM Assurance Statement
+      mhtml+='<div style="background:linear-gradient(135deg,#f0f7e8,#e8f4f8);border:1px solid #b0d4c8;border-top:none;border-radius:0 0 12px 12px;padding:1.2rem 1.8rem">'
+        +'<div style="font-size:.72rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#1a6040;margin-bottom:.6rem">&#9989; Audit Assurance Statement</div>'
+        +'<p style="font-size:.84rem;color:#2a4a3a;line-height:1.75;margin-bottom:.8rem">The Systems &amp; Audit Department confirms that this audit engagement was conducted in accordance with the <strong>Risk-Based Internal Audit Methodology</strong> consistent with the <strong>COSO Internal Control — Integrated Framework</strong> and aligned with principles of <strong>Enterprise Risk Management (ERM)</strong>. The audit covered all five COSO components:</p>'
+        +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:.55rem;margin-bottom:.9rem">'
+        +'<div style="background:#fff;border-left:4px solid #1a3557;border-radius:0 6px 6px 0;padding:.55rem .8rem"><div style="font-size:.72rem;font-weight:700;color:#1a3557">1. Control Environment</div><div style="font-size:.75rem;color:#555;margin-top:.2rem">Tone at the top, ethics, governance structure and management oversight.</div></div>'
+        +'<div style="background:#fff;border-left:4px solid #2471a3;border-radius:0 6px 6px 0;padding:.55rem .8rem"><div style="font-size:.72rem;font-weight:700;color:#2471a3">2. Risk Assessment</div><div style="font-size:.75rem;color:#555;margin-top:.2rem">Identification and analysis of risks that may prevent achievement of objectives.</div></div>'
+        +'<div style="background:#fff;border-left:4px solid #d68910;border-radius:0 6px 6px 0;padding:.55rem .8rem"><div style="font-size:.72rem;font-weight:700;color:#d68910">3. Control Activities</div><div style="font-size:.75rem;color:#555;margin-top:.2rem">Policies and procedures ensuring management directives are carried out.</div></div>'
+        +'<div style="background:#fff;border-left:4px solid #1a7a4a;border-radius:0 6px 6px 0;padding:.55rem .8rem"><div style="font-size:.72rem;font-weight:700;color:#1a7a4a">4. Information &amp; Communication</div><div style="font-size:.75rem;color:#555;margin-top:.2rem">Quality information identified, captured and communicated in a timely manner.</div></div>'
+        +'<div style="background:#fff;border-left:4px solid #7d3c98;border-radius:0 6px 6px 0;padding:.55rem .8rem"><div style="font-size:.72rem;font-weight:700;color:#7d3c98">5. Monitoring Activities</div><div style="font-size:.75rem;color:#555;margin-top:.2rem">Ongoing evaluations to ascertain whether each component is present and functioning.</div></div>'
+        +'</div>'
+        +'<p style="font-size:.8rem;color:#3a5a4a;line-height:1.65;border-top:1px solid #b0d4c8;padding-top:.7rem;margin-top:.2rem">Audit observations documented in this report represent instances where <strong>identified risks were not adequately mitigated</strong> by the corresponding control activities. All findings have been discussed with the Branch Head and relevant staff. The auditee\'s response has been recorded for each observation. Risk ratings reflect the auditor\'s professional judgement informed by the risk framework, instance count, and financial impact where applicable.</p>'
+        +'</div>';
+
+      mhtml+='</div>';
+      return mhtml;
+    }())
 
     // (Standalone card sections removed — all detail available via synopsis Detail expansion)
 
