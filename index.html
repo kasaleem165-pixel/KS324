@@ -15295,20 +15295,39 @@ function ra_initBranches(){
   ra_buildBranchDatalist();
 }
 
-function ra_buildBranchDatalist(){
-  var dl=document.getElementById('ra-dl-branch');
-  if(!dl) return;
-  var h='';
+function ra_buildBranchDatalist(){ // kept for backwards compat — delegates to select builder
+  ra_buildBranchSelect();
+}
+function ra_buildBranchSelect(){
+  var sel=document.getElementById('ra-sel_branch');
+  if(!sel) return;
+  // Group by region
+  var regions={};
   for(var i=0;i<RA_BRANCHES.length;i++){
-    h+='<option value="'+ra_esc(RA_BRANCHES[i].name)+'">'+ra_esc(RA_BRANCHES[i].code)+' -- '+ra_esc(RA_BRANCHES[i].city)+'</option>';
+    var b=RA_BRANCHES[i];
+    if(!regions[b.region]) regions[b.region]=[];
+    regions[b.region].push(b);
   }
-  dl.innerHTML=h;
+  var h='<option value="">-- Select Branch --</option>';
+  var rKeys=Object.keys(regions).sort();
+  for(var r=0;r<rKeys.length;r++){
+    var rg=rKeys[r];
+    h+='<optgroup label="'+ra_esc(rg)+' Region">';
+    var bList=regions[rg].sort(function(a,b2){return a.name.localeCompare(b2.name);});
+    for(var bi=0;bi<bList.length;bi++){
+      var br=bList[bi];
+      h+='<option value="'+ra_esc(br.name)+'">'+ra_esc(br.code)+' — '+ra_esc(br.name)+'</option>';
+    }
+    h+='</optgroup>';
+  }
+  sel.innerHTML=h;
 }
 
 function ra_esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function ra_toast(msg){ var el=document.getElementById('ra-toast'); if(!el) return; el.textContent=msg; el.className='ra-show'; setTimeout(function(){el.className='';},2800); }
 
-function ra_onBranchInput(val){
+function ra_onBranchInput(val){ ra_onBranchSelect(val); } // backward compat alias
+function ra_onBranchSelect(val){
   ra_currentBranch=null;
   for(var i=0;i<RA_BRANCHES.length;i++){
     if(RA_BRANCHES[i].name===val||RA_BRANCHES[i].code===val){
@@ -15319,6 +15338,38 @@ function ra_onBranchInput(val){
   var ci=document.getElementById('ra-sel_city');
   if(re) re.value=ra_currentBranch?ra_currentBranch.region:'';
   if(ci) ci.value=ra_currentBranch?ra_currentBranch.city:'';
+  var mw=document.getElementById('ra-branch-mismatch');
+  if(mw) mw.style.display='none';
+}
+
+function ra_detectBranchInText(text){
+  if(!text||!RA_BRANCHES.length) return null;
+  var lower=text.toLowerCase().substring(0,8000);
+  // Longer/more-specific names first to avoid partial matches
+  var sorted=RA_BRANCHES.slice().sort(function(a,b){return b.name.length-a.name.length;});
+  for(var i=0;i<sorted.length;i++){
+    var b=sorted[i];
+    if(lower.indexOf(b.name.toLowerCase())!==-1) return b.name;
+  }
+  // Fallback: try code match
+  for(var j=0;j<RA_BRANCHES.length;j++){
+    var b2=RA_BRANCHES[j];
+    if(b2.code&&lower.indexOf(b2.code.toLowerCase())!==-1) return b2.name;
+  }
+  return null;
+}
+
+function ra_branchMatch(selected, detected){
+  if(!selected||!detected) return true; // can't determine — allow
+  var sl=selected.toLowerCase(); var dl=detected.toLowerCase();
+  return sl===dl||dl.indexOf(sl)!==-1||sl.indexOf(dl)!==-1;
+}
+
+function ra_showBranchMismatch(selected, detected){
+  var mw=document.getElementById('ra-branch-mismatch');
+  if(!mw) return;
+  mw.innerHTML='&#9888; Branch Mismatch — The loaded report appears to be for <strong>"'+ra_esc(detected)+'"</strong> but the selected branch is <strong>"'+ra_esc(selected)+'"</strong>. Please select the correct branch above or load the correct report.';
+  mw.style.display='block';
 }
 
 function ra_handleFilePick(input){
@@ -15344,7 +15395,8 @@ function ra_handleFilePick(input){
               sb.value=sess.formData.brname;
               ra_onBranchInput(sess.formData.brname);
             }
-            ra_addLoadedReport(file.name,date,sess,text);
+            var detBr=sess.formData&&sess.formData.brname?sess.formData.brname:ra_detectBranchInText(text);
+            ra_addLoadedReport(file.name,date,sess,text,detBr);
           }catch(err){ ra_toast('Could not read JSON: '+file.name); }
         };
         r.readAsText(file);
@@ -15352,7 +15404,7 @@ function ra_handleFilePick(input){
         var r2=new FileReader();
         r2.onload=function(e){
           ra_parseDocxFile(e.target.result,function(text){
-            ra_addLoadedReport(file.name,'',null,text||'');
+            ra_addLoadedReport(file.name,'',null,text||'',ra_detectBranchInText(text));
             if(!text) ra_toast('Warning: could not extract text from '+file.name);
           });
         };
@@ -15361,14 +15413,14 @@ function ra_handleFilePick(input){
         var r4=new FileReader();
         r4.onload=function(e){
           ra_parseXlsxFile(e.target.result,function(text){
-            ra_addLoadedReport(file.name,'',null,text||'');
+            ra_addLoadedReport(file.name,'',null,text||'',ra_detectBranchInText(text));
             if(!text) ra_toast('Warning: could not extract text from '+file.name);
           });
         };
         r4.readAsArrayBuffer(file);
       } else {
         var r3=new FileReader();
-        r3.onload=function(e){ ra_addLoadedReport(file.name,'',null,e.target.result||''); };
+        r3.onload=function(e){ ra_addLoadedReport(file.name,'',null,e.target.result||'',ra_detectBranchInText(e.target.result)); };
         r3.readAsText(file);
       }
     })(files[fi]);
@@ -15376,13 +15428,19 @@ function ra_handleFilePick(input){
   input.value='';
 }
 
-function ra_addLoadedReport(name,date,sess,text){
+function ra_addLoadedReport(name,date,sess,text,detectedBranch){
   for(var i=0;i<ra_loadedReports.length;i++){
     if(ra_loadedReports[i].name===name){ ra_toast(name+' is already loaded.'); return; }
   }
-  ra_loadedReports.push({name:name,date:date,sess:sess,text:text});
+  var selectedBranch=(document.getElementById('ra-sel_branch')||{}).value||'';
+  if(selectedBranch&&detectedBranch&&!ra_branchMatch(selectedBranch,detectedBranch)){
+    ra_showBranchMismatch(selectedBranch,detectedBranch);
+    alert('Branch Mismatch!\n\nThe loaded file appears to be for:\n"'+detectedBranch+'"\n\nSelected branch is:\n"'+selectedBranch+'"\n\nThe report has NOT been loaded. Please select the correct branch or load the correct report.');
+    return;
+  }
+  ra_loadedReports.push({name:name,date:date,sess:sess,text:text,detectedBranch:detectedBranch||''});
   ra_renderLoadedFilesList();
-  ra_toast('Loaded: '+name);
+  ra_toast('Loaded: '+name+(detectedBranch?' ('+detectedBranch+')':''));
 }
 
 function ra_removeLoadedReport(idx){
@@ -15404,6 +15462,7 @@ function ra_renderLoadedFilesList(){
     h+='<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #eaeff6">';
     h+='<span style="font-size:14px;flex-shrink:0">'+icon+'</span>';
     h+='<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:700;color:#1a3a5c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+ra_esc(rp.name)+'</div>';
+    if(rp.detectedBranch) h+='<div style="font-size:10px;color:#1a7040;font-weight:600;margin-top:1px">&#10003; '+ra_esc(rp.detectedBranch)+'</div>';
     h+='<div style="display:flex;align-items:center;gap:6px;margin-top:3px"><input type="date" value="'+ra_esc(rp.date||'')+'" style="padding:2px 5px;font-size:10px;width:130px;border:1px solid #c8d8ec;border-radius:3px" onchange="ra_loadedReports['+i+'].date=this.value">';
     h+='<span style="font-size:10px;color:#9a9a9a">'+wc+' words</span></div></div>';
     h+='<button onclick="ra_removeLoadedReport('+i+')" title="Remove" style="padding:3px 7px;font-size:11px;border:1px solid #f0a0a0;border-radius:4px;background:#f5f8fd;color:#c03030;cursor:pointer;font-weight:600;flex-shrink:0">&#10005;</button>';
@@ -15625,7 +15684,15 @@ function ra_runAnalysis(){
   var ptEl=document.getElementById('ra-paste_text'); var pasteText=ptEl?ptEl.value.trim():'';
   var atEl=document.getElementById('ra-next_autype'); var autype=atEl?atEl.value.trim():'Routine Audit Visit';
   var pbEl=document.getElementById('ra-next_pb'); var pb=pbEl?pbEl.value.trim():'';
+  if(!branchName||branchName==='Unknown Branch'){ alert('Please select a branch before generating the audit plan.'); return; }
   if(!pasteText&&!ra_loadedReports.length){ ra_toast('Please load or paste at least one previous audit report first.'); return; }
+  // Check pasted text branch match
+  if(pasteText){
+    var pasteDetected=ra_detectBranchInText(pasteText);
+    if(pasteDetected&&!ra_branchMatch(branchName,pasteDetected)){
+      if(!confirm('Branch Mismatch Warning!\n\nThe pasted report text appears to be for:\n"'+pasteDetected+'"\n\nSelected branch is:\n"'+branchName+'"\n\nDo you want to continue anyway?')) return;
+    }
+  }
   var allSources=[];
   for(var li=0;li<ra_loadedReports.length;li++) allSources.push({text:ra_loadedReports[li].text,sess:ra_loadedReports[li].sess,date:ra_loadedReports[li].date});
   if(pasteText) allSources.push({text:pasteText,sess:null,date:''});
@@ -16264,8 +16331,10 @@ function ra_renderRiskRegister(scores){
         <div class="ra-sh">&#128205; Branch Being Audited</div>
         <div class="ra-fr">
           <label>Branch</label>
-          <input type="text" id="ra-sel_branch" list="ra-dl-branch" placeholder="Type branch name or code..." autocomplete="off" oninput="ra_onBranchInput(this.value)">
-          <datalist id="ra-dl-branch"></datalist>
+          <select id="ra-sel_branch" onchange="ra_onBranchSelect(this.value)" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:12px;background:#fff;color:#1e2d40">
+            <option value="">-- Select Branch --</option>
+          </select>
+          <div id="ra-branch-mismatch" style="display:none;margin-top:6px;background:#fde8e8;border:1px solid #f0a0a0;border-radius:5px;padding:8px 10px;font-size:11px;color:#9b1a1a;font-weight:600;line-height:1.5"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <div class="ra-fr" style="margin-bottom:0"><label>Region</label><input type="text" id="ra-sel_region" readonly style="background:#f5f8fd"></div>
