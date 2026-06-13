@@ -13074,20 +13074,18 @@ function finalizeReport(){
   var fSensRef={'High':[],'M to H':[],'L to M':[],'Low':[],'':[]};
   var fSensLabels={'High':'High Risk','M to H':'Medium-High','L to M':'Low-Medium','Low':'Low Risk','':'Not Rated'};
   var fSensCols={'High':'#c0392b','M to H':'#e67e22','L to M':'#f1c40f','Low':'#27ae60','':'#95a5a6'};
-  var fLblMap={};var fnum=0;
+  var fLblMap={};
   (function(){
-    var dbO2=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbO2.push(DB.observations[j]);}
-    var cu2=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cu2.push(customs[k]);}
-    var allF=dbO2.concat(cu2);
-    // Re-build labMap for finalize context
-    var rep2=[],nw2=[];
-    for(var a2=0;a2<allF.length;a2++){var t2=(obsTypeMap[allF[a2].id]||allF[a2].type||'New').toLowerCase();if(t2==='repeated')rep2.push(allF[a2]);else nw2.push(allF[a2]);}
-    var sn=0,idx=0;
-    function assignLabels(list,sn){var cats2={};for(var i=0;i<list.length;i++){var c2=list[i].category||'Others';if(!cats2[c2])cats2[c2]=[];cats2[c2].push(list[i]);}var catOrd=catOrderByDef(cats2);var ci2=0;for(var cc2=0;cc2<catOrd.length;cc2++){var oo=cats2[catOrd[cc2]];for(var oi2=0;oi2<oo.length;oi2++){ci2++;fLblMap[oo[oi2].id]=sn+'.'+ci2;}}}
-    assignLabels(rep2,1); assignLabels(nw2,2);
+    for(var fsi2=0;fsi2<finSections.length;fsi2++){
+      var fsec=finSections[fsi2]; var sn=fsi2+1;
+      var fcats={};
+      for(var fx=0;fx<fsec.obs.length;fx++){var fc=fsec.obs[fx].category||'Others';if(!fcats[fc])fcats[fc]=[];fcats[fc].push(fsec.obs[fx]);}
+      var fcatOrd=catOrderByDef(fcats); var fn=0;
+      for(var fcc=0;fcc<fcatOrd.length;fcc++){var fobs=fcats[fcatOrd[fcc]];for(var fo2=0;fo2<fobs.length;fo2++){fn++;fLblMap[fobs[fo2].id]=sn+'.'+fn;}}
+    }
   }());
   for(var fe=0;fe<all.length;fe++){
-    var feo=all[fe]; var felbl=fLblMap[feo.id]||labMap[feo.id]||'?';
+    var feo=all[fe]; var felbl=fLblMap[feo.id]||'?';
     var fck=cosoMap[feo.id]||''; if(!(fck in fCosoCnt))fck='';
     fCosoCnt[fck]++; fCosoRef[fck].push(felbl);
     var fsk=sensitivityMap[feo.id]||''; if(!(fsk in fSensCnt))fsk='';
@@ -13131,7 +13129,7 @@ function finalizeReport(){
   // ── Section F: Sensitivity Matrix ────────────────────────────────────────
   var FMHIGH=[],FMMH=[],FMLM=[],FMLOW=[];
   for(var fsi=0;fsi<all.length;fsi++){
-    var fso=all[fsi]; var fslbl=fLblMap[fso.id]||labMap[fso.id]||'?';
+    var fso=all[fsi]; var fslbl=fLblMap[fso.id]||'?';
     var fsk2=sensitivityMap[fso.id]||'';
     if(fsk2==='High')FMHIGH.push(fslbl); else if(fsk2==='M to H')FMMH.push(fslbl); else if(fsk2==='L to M')FMLM.push(fslbl); else if(fsk2==='Low')FMLOW.push(fslbl);
   }
