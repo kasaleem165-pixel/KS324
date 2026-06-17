@@ -10452,7 +10452,8 @@ function renderRpt(){
       h+='<div class="oc '+tc+'" id="oc-'+o.id+'">';
       h+='<div class="och"><span class="onum">Obs. '+num+'</span>';
       var priorRefDraft=lastRefMap[o.id]||'';
-      h+='<span class="otl">'+esc(o.title)+' <span class="badge '+tc+'">'+esc(effType)+'</span>'+(tc==='repeated'?(priorRefDraft?'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fff8f0;color:#8a3000;border:1px solid #f0b080;margin-left:3px">Prior: '+esc(priorRefDraft)+'</span>':'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fde8e8;color:#9b1a1a;border:1px solid #f0a0a0;margin-left:3px" title="Prior Audit Reference required">&#9888; Prior Ref required</span>'):'')+'</span>';
+      h+='<span class="otl">'+esc(o.title)+' <span class="badge '+tc+'">'+esc(effType)+'</span>'+(tc==='repeated'?(priorRefDraft?'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fff8f0;color:#8a3000;border:1px solid #f0b080;margin-left:3px">Prior: '+esc(priorRefDraft)+'</span>':'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fde8e8;color:#9b1a1a;border:1px solid #f0a0a0;margin-left:3px" title="Prior Audit Reference required">&#9888; Prior Ref required</span>'):'')
+      +obsReadinessBadge(o)+'</span>';
       h+='<select id="sens-sel-'+o.id+'" class="sens-sel '+sensClass+'" title="Sensitivity Level" onchange="setSensitivity(\''+o.id+'\',this)">';
       h+='<option value="">Sensitivity</option>';
       h+='<option value="High"'+(curSens==='High'?' selected':'')+'>High</option>';
@@ -13135,6 +13136,69 @@ function _checkPriorRefs(all){
   return missing;
 }
 
+// ── Pre-flight readiness check per observation ────────────────
+// Returns {score, total, blocking:[], advisory:[]}
+function getObsReadiness(o){
+  var id=o.id;
+  var obsType=(obsTypeMap[id]||o.type||'New').toLowerCase();
+  var obsText=(obsEdits[id]&&obsEdits[id].observation!=null)?obsEdits[id].observation:(o.observation||'');
+  var recText=(obsEdits[id]&&obsEdits[id].recommendation!=null)?obsEdits[id].recommendation:(o.recommendation||'');
+  var blocking=[], advisory=[];
+
+  // 1. Observation text present (blocking)
+  if(!obsText||obsText.trim().length<10)
+    blocking.push({field:'Observation',msg:'Observation text is missing or too short'});
+
+  // 2. Recommendation text present (blocking)
+  if(!recText||recText.trim().length<10)
+    blocking.push({field:'Recommendation',msg:'Recommendation text is missing or too short'});
+
+  // 3. Prior Audit Reference for Repeated observations (blocking)
+  if(obsType==='repeated'&&!lastRefMap[id])
+    blocking.push({field:'Prior Audit Ref',msg:'Prior Audit Report Reference is required for Repeated observations'});
+
+  // 4. Sensitivity rating (advisory)
+  if(!sensitivityMap[id])
+    advisory.push({field:'Sensitivity',msg:'Risk sensitivity level (High / M to H / L to M / Low) not set'});
+
+  // 5. COSO component (advisory)
+  if(!cosoMap[id])
+    advisory.push({field:'COSO',msg:'COSO framework component not mapped (CE / RA / CA / IC / M)'});
+
+  // 6. Financial Impact / Instance count (advisory — especially for High/M-to-H)
+  var hasInstCount=(instCountMap[id]&&instCountMap[id]>0);
+  var hasInstAmt=(instAmountMap[id]&&instAmountMap[id]>0);
+  var hasInlineTable=(function(){var ls=obsText.split('\n'),r=0;for(var li=0;li<ls.length;li++){var ln=ls[li].trim();if(ln.indexOf('|')===-1||/^\|[\s\-:|]+\|?\s*$/.test(ln))continue;r++;}return r>1;}());
+  if(!hasInstCount&&!hasInstAmt&&!hasInlineTable){
+    var sens=sensitivityMap[id]||'';
+    var sev=(sens==='High'||sens==='M to H')?'blocking':'advisory';
+    if(sev==='blocking')
+      blocking.push({field:'Financial Impact',msg:'No instance count or financial impact entered — required for High / Medium-High sensitivity observations'});
+    else
+      advisory.push({field:'Financial Impact',msg:'Instance count and financial impact not quantified (enter values or include an inline table in the observation text)'});
+  }
+
+  // 7. Audit Report Reference (advisory for all types)
+  if(!lastRefMap[id])
+    advisory.push({field:'Report Reference',msg:(obsType==='repeated'?'':'Current ')+'Audit Report Reference not recorded — fill this so future auditors can trace this finding'});
+
+  var total=2+1+(obsType==='repeated'?1:0)+3; // obs+rec+sensitivity+coso+financial+ref (+prior if repeated)
+  var passed=total-blocking.length-advisory.length;
+  return{blocking:blocking,advisory:advisory,score:passed,total:total,obsType:obsType};
+}
+
+// Readiness badge HTML for use in observation card headers
+function obsReadinessBadge(o){
+  var r=getObsReadiness(o);
+  if(r.blocking.length){
+    return '<span style="display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;background:#fde8e8;color:#9b1a1a;border:1px solid #f0a0a0;margin-left:4px" title="'+r.blocking.length+' blocking issue'+(r.blocking.length>1?'s':'')+' — click Finalize to see details">&#9888; '+r.blocking.length+' Fix Required</span>';
+  }
+  if(r.advisory.length){
+    return '<span style="display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;background:#fff8e0;color:#7a5000;border:1px solid #f0d060;margin-left:4px" title="'+r.advisory.length+' advisory item'+(r.advisory.length>1?'s':'')+' — recommended before finalizing">&#9432; '+r.advisory.length+' Advisory</span>';
+  }
+  return '<span style="display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;background:#e4f7ea;color:#1a6030;border:1px solid #80c8a0;margin-left:4px">&#10003; Ready</span>';
+}
+
 function finalizeReport(){
   var H=getHdrVals();
   var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
@@ -14608,58 +14672,96 @@ function generateIssuedReport(){
 }
 
 function showSaveDialog(){
-  // Prior Ref check — repeated observations must have a prior audit reference
-  {
-    var _prDbObs=[]; for(var _pj=0;_pj<DB.observations.length;_pj++){if(selIds[DB.observations[_pj].id])_prDbObs.push(DB.observations[_pj]);}
-    var _prCu=[]; for(var _pk=0;_pk<customs.length;_pk++){if(selIds[customs[_pk].id])_prCu.push(customs[_pk]);}
-    var _prAll=_prDbObs.concat(_prCu);
-    var _prMiss=_checkPriorRefs(_prAll);
-    if(_prMiss.length){
-      var _prNames=_prMiss.map(function(o,i){return (i+1)+'. '+o.title;}).join('\n');
-      alert('Cannot finalize — Prior Audit Reference is missing for '+_prMiss.length+' repeated observation'+(_prMiss.length>1?'s':'')+':\n\n'+_prNames+'\n\nPlease enter the prior audit report reference number for each repeated observation in the selection list before finalizing.');
-      return;
+  // ── Comprehensive Pre-flight Readiness Check ─────────────────────────────
+  if(!showSaveDialog._skipPreflight){
+    var _pfDbObs=[]; for(var _pfj=0;_pfj<DB.observations.length;_pfj++){if(selIds[DB.observations[_pfj].id])_pfDbObs.push(DB.observations[_pfj]);}
+    var _pfCu=[]; for(var _pfk=0;_pfk<customs.length;_pfk++){if(selIds[customs[_pfk].id])_pfCu.push(customs[_pfk]);}
+    var _pfAll=_pfDbObs.concat(_pfCu);
+    if(!_pfAll.length){toast('No observations selected.');return;}
+
+    // Run readiness on all observations
+    var _pfIssues=[], _pfBlocking=0, _pfAdvisory=0;
+    for(var _pfi=0;_pfi<_pfAll.length;_pfi++){
+      var _pfo=_pfAll[_pfi];
+      var _pfr=getObsReadiness(_pfo);
+      if(_pfr.blocking.length||_pfr.advisory.length){
+        _pfIssues.push({o:_pfo,r:_pfr});
+        _pfBlocking+=_pfr.blocking.length;
+        _pfAdvisory+=_pfr.advisory.length;
+      }
     }
-  }
-  // Materiality scan — must pass before finalize proceeds
-  if(!showSaveDialog._skipMatScan){
-    var _dbObs2=[]; for(var j2=0;j2<DB.observations.length;j2++){if(selIds[DB.observations[j2].id])_dbObs2.push(DB.observations[j2]);}
-    var _cu2=[]; for(var k2=0;k2<customs.length;k2++){if(selIds[customs[k2].id])_cu2.push(customs[k2]);}
-    var _all2=_dbObs2.concat(_cu2);
-    if(!_all2.length){alert('No observations selected.');return;}
-    // Build a quick labMap for scan display
-    var _lm2={},_rep2=[],_new2=[];
-    for(var a2=0;a2<_all2.length;a2++){var _t2=(obsTypeMap[_all2[a2].id]||_all2[a2].type||'New').toLowerCase();if(_t2==='repeated')_rep2.push(_all2[a2]);else _new2.push(_all2[a2]);}
-    var _n2=0;
-    function _asgn2(list,sec){var n=0;var g=buildCatGroupsFor(list);for(var ci=0;ci<g.catOrder.length;ci++){var ob=g.cats[g.catOrder[ci]];for(var oi=0;oi<ob.length;oi++){n++;_lm2[ob[oi].id]=sec+'.'+n;}}}
-    _asgn2(_rep2,1);_asgn2(_new2,2);
-    function _ot2(o){return (obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:(o.observation||'');}
-    var _miss2=getMissingMateriality(_all2,_lm2,_ot2);
-    if(_miss2.length){
-      var _ml2=_miss2.map(function(m){return '<li style="padding:.3rem 0;border-bottom:1px solid #eee;font-size:.84rem"><strong>'+esc(m.lbl)+'</strong> &mdash; '+esc(m.title)+'</li>';}).join('');
-      var _ov2=document.createElement('div');
-      _ov2.style.cssText='position:fixed;inset:0;background:rgba(10,20,40,.6);z-index:99999;display:flex;align-items:center;justify-content:center';
-      _ov2.innerHTML='<div style="background:#fff;border-radius:12px;max-width:560px;width:93%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.35);padding:1.4rem 1.6rem">'
-        +'<div style="font-size:1rem;font-weight:800;color:#c0392b;margin-bottom:.7rem">&#9888; Framework Materiality Not Defined</div>'
-        +'<p style="font-size:.85rem;color:#444;margin-bottom:.8rem">The following <strong>'+_miss2.length+' observation'+(+_miss2.length>1?'s':'')+' </strong>have no instance count or financial impact entered, and no inline table was detected in their text.</p>'
-        +'<ul style="list-style:none;margin-bottom:1rem;max-height:220px;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:.4rem .8rem">'+_ml2+'</ul>'
-        +'<div style="display:flex;gap:.7rem;flex-wrap:wrap">'
-        +'<button id="mat2-back" style="flex:1;padding:.55rem 1rem;background:#eef1f5;color:#1a3557;border:1px solid #c0ccd8;border-radius:6px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#9664; Go Back &amp; Fill</button>'
-        +'<button id="mat2-proceed" style="flex:1;padding:.55rem 1rem;background:#1a3557;color:#fff;border:none;border-radius:6px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Proceed — Mark as Not Quantified</button>'
+
+    if(_pfIssues.length){
+      // Build checklist rows
+      var _pfRows='';
+      for(var _pfi2=0;_pfi2<_pfIssues.length;_pfi2++){
+        var _pfItem=_pfIssues[_pfi2];
+        _pfRows+='<div style="border:1px solid '+((_pfItem.r.blocking.length)?'#f0a0a0':'#f0d060')+';border-radius:7px;margin-bottom:8px;overflow:hidden">';
+        _pfRows+='<div style="background:'+((_pfItem.r.blocking.length)?'#fdf0f0':'#fffbe8')+';padding:6px 10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid '+((_pfItem.r.blocking.length)?'#f0c0c0':'#ede8a0')+'">';
+        _pfRows+='<span style="font-size:11px;font-weight:800;color:'+((_pfItem.r.blocking.length)?'#9b1a1a':'#7a5000')+'">'+esc(_pfItem.o.title)+'</span>';
+        if(_pfItem.r.blocking.length) _pfRows+='<span style="margin-left:auto;font-size:10px;font-weight:700;background:#c0392b;color:#fff;border-radius:10px;padding:1px 7px">'+_pfItem.r.blocking.length+' Must Fix</span>';
+        if(_pfItem.r.advisory.length) _pfRows+='<span style="'+((!_pfItem.r.blocking.length)?'margin-left:auto;':'')+';font-size:10px;font-weight:700;background:#e6a020;color:#fff;border-radius:10px;padding:1px 7px">'+_pfItem.r.advisory.length+' Advisory</span>';
+        _pfRows+='</div>';
+        _pfRows+='<div style="padding:6px 10px">';
+        for(var _bki=0;_bki<_pfItem.r.blocking.length;_bki++){
+          _pfRows+='<div style="display:flex;align-items:flex-start;gap:5px;padding:3px 0;border-bottom:1px solid #fde8e8;font-size:11px">'
+            +'<span style="color:#c0392b;font-weight:700;white-space:nowrap;min-width:90px">&#9888; '+esc(_pfItem.r.blocking[_bki].field)+'</span>'
+            +'<span style="color:#5a2020">'+esc(_pfItem.r.blocking[_bki].msg)+'</span>'
+            +'<a href="#oc-'+esc(_pfItem.o.id)+'" onclick="document.getElementById(\'_pfOv\').remove();document.getElementById(\'oc-'+esc(_pfItem.o.id)+'\').scrollIntoView({behavior:\'smooth\',block:\'center\'});return false;" style="margin-left:auto;font-size:10px;color:#1a3557;text-decoration:underline;white-space:nowrap;font-weight:700">Go to Obs &#8595;</a>'
+            +'</div>';
+        }
+        for(var _adi=0;_adi<_pfItem.r.advisory.length;_adi++){
+          _pfRows+='<div style="display:flex;align-items:flex-start;gap:5px;padding:3px 0;border-bottom:1px solid #f8f0d0;font-size:11px">'
+            +'<span style="color:#9a6000;font-weight:700;white-space:nowrap;min-width:90px">&#9432; '+esc(_pfItem.r.advisory[_adi].field)+'</span>'
+            +'<span style="color:#5a4010">'+esc(_pfItem.r.advisory[_adi].msg)+'</span>'
+            +'<a href="#oc-'+esc(_pfItem.o.id)+'" onclick="document.getElementById(\'_pfOv\').remove();document.getElementById(\'oc-'+esc(_pfItem.o.id)+'\').scrollIntoView({behavior:\'smooth\',block:\'center\'});return false;" style="margin-left:auto;font-size:10px;color:#1a3557;text-decoration:underline;white-space:nowrap;font-weight:700">Go to Obs &#8595;</a>'
+            +'</div>';
+        }
+        _pfRows+='</div></div>';
+      }
+
+      var _pfOv=document.createElement('div');
+      _pfOv.id='_pfOv';
+      _pfOv.style.cssText='position:fixed;inset:0;background:rgba(10,20,40,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+      _pfOv.innerHTML=
+        '<div style="background:#fff;border-radius:12px;max-width:640px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.4)">'
+        // Header
+        +'<div style="background:linear-gradient(90deg,#1a3557,#2a5080);color:#fff;padding:12px 18px;border-radius:12px 12px 0 0;display:flex;align-items:center;gap:10px;flex-shrink:0">'
+          +'<span style="font-size:18px">&#9989;</span>'
+          +'<div><div style="font-size:13px;font-weight:800;letter-spacing:.3px">Pre-flight Readiness Check</div>'
+            +'<div style="font-size:11px;opacity:.8;margin-top:1px">Review all items before finalizing the report</div></div>'
+          +'<button onclick="document.getElementById(\'_pfOv\').remove()" style="margin-left:auto;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;width:28px;height:28px;font-size:16px;cursor:pointer;font-family:inherit">&#10005;</button>'
+        +'</div>'
+        // Summary bar
+        +'<div style="display:flex;gap:0;flex-shrink:0;border-bottom:1px solid #eee">'
+          +(_pfBlocking?'<div style="flex:1;padding:8px 14px;background:#fdf0f0;border-right:1px solid #f0c0c0;text-align:center"><div style="font-size:18px;font-weight:800;color:#c0392b">'+_pfBlocking+'</div><div style="font-size:10px;color:#9b1a1a;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Must Fix (Blocking)</div></div>':'')
+          +(_pfAdvisory?'<div style="flex:1;padding:8px 14px;background:#fffbe8;border-right:1px solid #ede8a0;text-align:center"><div style="font-size:18px;font-weight:800;color:#c08000">'+_pfAdvisory+'</div><div style="font-size:10px;color:#7a5000;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Advisory (Recommended)</div></div>':'')
+          +'<div style="flex:1;padding:8px 14px;background:#f0f8f0;text-align:center"><div style="font-size:18px;font-weight:800;color:#1a6030">'+(_pfAll.length-_pfIssues.length)+'</div><div style="font-size:10px;color:#1a6030;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Ready</div></div>'
+        +'</div>'
+        // Body
+        +'<div style="padding:14px 16px;overflow-y:auto;flex:1">'+_pfRows+'</div>'
+        // Footer
+        +'<div style="padding:12px 16px;border-top:1px solid #eee;display:flex;gap:8px;flex-shrink:0;background:#f8fafc;border-radius:0 0 12px 12px">'
+          +'<button id="_pfBack" style="flex:1;padding:.55rem 1rem;background:#eef1f5;color:#1a3557;border:1px solid #c0ccd8;border-radius:7px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#9664; Go Back &amp; Fix</button>'
+          +(_pfBlocking?'<button id="_pfProceed" disabled title="Resolve all blocking items first" style="flex:1.4;padding:.55rem 1rem;background:#aaa;color:#fff;border:none;border-radius:7px;font-size:.85rem;font-weight:700;cursor:not-allowed;font-family:inherit">&#128229; Finalize Report</button>'
+            :'<button id="_pfProceed" style="flex:1.4;padding:.55rem 1rem;background:#1a6030;color:#fff;border:none;border-radius:7px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Proceed &amp; Finalize</button>')
         +'</div>'
         +'</div>';
-      document.body.appendChild(_ov2);
-      document.getElementById('mat2-back').onclick=function(){_ov2.remove();};
-      document.getElementById('mat2-proceed').onclick=function(){
-        _ov2.remove();
-        showSaveDialog._skipMatScan=true;
-        showSaveDialog();
-        showSaveDialog._skipMatScan=false;
-      };
+      document.body.appendChild(_pfOv);
+      document.getElementById('_pfBack').onclick=function(){_pfOv.remove();};
+      if(!_pfBlocking){
+        document.getElementById('_pfProceed').onclick=function(){
+          _pfOv.remove();
+          showSaveDialog._skipPreflight=true;
+          showSaveDialog();
+          showSaveDialog._skipPreflight=false;
+        };
+      }
       return;
     }
   }
-  showSaveDialog._skipMatScan=false;
-  // ── End materiality scan ─────────────────────────────────────────────────
+  showSaveDialog._skipPreflight=false;
+  // ── End pre-flight check ─────────────────────────────────────────────────
 
   // Build the final content first
   finalizeReport();
