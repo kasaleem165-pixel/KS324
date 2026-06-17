@@ -14793,14 +14793,26 @@ function showSaveDialog(){
     var _pfAll=_pfDbObs.concat(_pfCu);
     if(!_pfAll.length){toast('No observations selected.');return;}
 
-    // Build sequential obs numbers (same order as renderRpt: Repeated first, then New)
+    // Build observation numbers exactly matching renderRpt:
+    // num resets to 0 at the start of each section (Repeated, then New),
+    // so "Obs. 3 Repeated" and "Obs. 3 New" can both exist — same as the draft report.
     var _pfNumMap={};
     (function(){
       var _rp=[],_nw=[];
-      for(var _ni=0;_ni<_pfAll.length;_ni++){var _t=(obsTypeMap[_pfAll[_ni].id]||_pfAll[_ni].type||'New').toLowerCase();(_t==='repeated'?_rp:_nw).push(_pfAll[_ni]);}
-      var _n=0;
-      function _assign(list){var g=buildCatGroupsFor(list);for(var ci=0;ci<g.catOrder.length;ci++){var ob=g.cats[g.catOrder[ci]];for(var oi=0;oi<ob.length;oi++){_n++;_pfNumMap[ob[oi].id]='Obs. '+_n;}}}
-      _assign(_rp);_assign(_nw);
+      for(var _ni=0;_ni<_pfAll.length;_ni++){
+        var _t=(obsTypeMap[_pfAll[_ni].id]||_pfAll[_ni].type||'New').toLowerCase();
+        (_t==='repeated'?_rp:_nw).push(_pfAll[_ni]);
+      }
+      function _assign(list,secLabel){
+        var _n=0; // reset per section — matches renderRpt behaviour
+        var g=buildCatGroupsFor(list);
+        for(var ci=0;ci<g.catOrder.length;ci++){
+          var ob=g.cats[g.catOrder[ci]];
+          for(var oi=0;oi<ob.length;oi++){_n++;_pfNumMap[ob[oi].id]='Obs. '+_n+' ('+secLabel+')';}
+        }
+      }
+      _assign(_rp,'Repeated');
+      _assign(_nw,'New');
     }());
 
     // Run readiness on all observations
