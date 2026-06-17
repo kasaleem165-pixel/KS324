@@ -10431,7 +10431,7 @@ function renderRpt(){
 
   for(var si=0;si<sections.length;si++){
     if(!sections[si].obs.length) continue;
-    var num=0;
+    var num=0; var secPfx=si===0?'1':'2';
     h+='<div class="sectitle">'+esc(sections[si].label)+'</div>';
     var grp=buildCatGroups(sections[si].obs);
     for(var ci=0;ci<grp.catOrder.length;ci++){
@@ -10450,7 +10450,7 @@ function renderRpt(){
       var curCoso=cosoMap[o.id]||'';
       var cosoClass=curCoso==='CE'?'c-ce':curCoso==='RA'?'c-ra':curCoso==='CA'?'c-ca':curCoso==='IC'?'c-ic':curCoso==='M'?'c-m':'';
       h+='<div class="oc '+tc+'" id="oc-'+o.id+'">';
-      h+='<div class="och"><span class="onum">Obs. '+num+'</span>';
+      h+='<div class="och"><span class="onum">Obs. '+secPfx+'.'+num+'</span>';
       var priorRefDraft=lastRefMap[o.id]||'';
       h+='<span class="otl">'+esc(o.title)+' <span class="badge '+tc+'">'+esc(effType)+'</span>'+(tc==='repeated'?(priorRefDraft?'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fff8f0;color:#8a3000;border:1px solid #f0b080;margin-left:3px">Prior: '+esc(priorRefDraft)+'</span>':'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fde8e8;color:#9b1a1a;border:1px solid #f0a0a0;margin-left:3px" title="Prior Audit Reference required">&#9888; Prior Ref required</span>'):'')
       +obsReadinessBadge(o)+'</span>';
@@ -11769,9 +11769,9 @@ function downloadDraft(individual){
     }
 
     // ── Pre-assign observation numbers so summary tables can reference them ──
-    var obsNums={};   // id -> number string like "R-1", "N-2"
+    var obsNums={};   // id -> number string like "1.1", "2.3"
     var allDraftObs=[];
-    var prefixes=['R','N'];
+    var prefixes=['1','2'];
     for(var ps=0;ps<sections.length;ps++){
       var catMapP={};
       for(var pi=0;pi<sections[ps].obs.length;pi++){
@@ -11785,7 +11785,7 @@ function downloadDraft(individual){
         var parr=catMapP[catOrdP[pci]];
         for(var poi=0;poi<parr.length;poi++){
           pn++;
-          obsNums[parr[poi].id]=prefixes[ps]+'-'+pn;
+          obsNums[parr[poi].id]=prefixes[ps]+'.'+pn;
           allDraftObs.push(parr[poi]);
         }
       }
@@ -11996,7 +11996,7 @@ function downloadSoftCopy(){
   var catHd='font-family:Merriweather,serif;font-size:12px;font-weight:700;color:#1a3a5c;background:#edf2f8;border-left:4px solid #1a3a5c;padding:7px 12px;margin-bottom:10px;border-radius:0 4px 4px 0;text-transform:uppercase;letter-spacing:.4px';
   for(var si=0;si<scSections.length;si++){
     if(!scSections[si].obs.length) continue;
-    var num=0;
+    var num=0; var scPfx=si===0?'1':'2';
     obsSection+='<div style="'+sectHd+'">'+esc(scSections[si].label)+'</div>';
     var grp=scCatGroups(scSections[si].obs);
     for(var ci=0;ci<grp.catOrder.length;ci++){
@@ -12004,7 +12004,7 @@ function downloadSoftCopy(){
       obsSection+='<div style="margin-bottom:24px">';
       obsSection+='<div style="'+catHd+'">'+esc(cat)+'</div>';
       var obsList=grp.cats[cat];
-      for(var oi=0;oi<obsList.length;oi++){num++;obsSection+=obsHtml(obsList[oi],num);}
+      for(var oi=0;oi<obsList.length;oi++){num++;obsSection+=obsHtml(obsList[oi],scPfx+'.'+num);}
       obsSection+='</div>';
     }
   }
@@ -12250,8 +12250,8 @@ function getObsReportLabels(){
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
   var all=dbObs.concat(cuObs);
   var secs=[
-    {prefix:'R', obs:[]},
-    {prefix:'N', obs:[]}
+    {prefix:'1', obs:[]},
+    {prefix:'2', obs:[]}
   ];
   for(var a=0;a<all.length;a++){
     var effT=(obsTypeMap[all[a].id]||all[a].type||'New').toLowerCase();
@@ -12263,7 +12263,7 @@ function getObsReportLabels(){
     var num=0;
     for(var ci=0;ci<grp.catOrder.length;ci++){
       var obs=grp.cats[grp.catOrder[ci]];
-      for(var oi=0;oi<obs.length;oi++){ num++; labels[obs[oi].id]=secs[si].prefix+'-'+num; }
+      for(var oi=0;oi<obs.length;oi++){ num++; labels[obs[oi].id]=secs[si].prefix+'.'+num; }
     }
   }
   return labels;
@@ -13389,7 +13389,7 @@ function finalizeReport(){
   var obsSection='';
   for(var si=0;si<finSections.length;si++){
     if(!finSections[si].obs.length) continue;
-    var num=0;
+    var num=0; var finPfx=si===0?'1':'2';
     obsSection+='<div style="'+sectHdFin+'">'+esc(finSections[si].label)+'</div>';
     var grp=finCatGroups(finSections[si].obs);
     for(var ci=0;ci<grp.catOrder.length;ci++){
@@ -13397,7 +13397,7 @@ function finalizeReport(){
       obsSection+='<div style="margin-bottom:24px">';
       obsSection+='<div style="'+catHdFin+'">'+esc(cat)+'</div>';
       var obsList=grp.cats[cat];
-      for(var oi=0;oi<obsList.length;oi++){num++;obsSection+=obsHtmlFinal(obsList[oi],num);}
+      for(var oi=0;oi<obsList.length;oi++){num++;obsSection+=obsHtmlFinal(obsList[oi],finPfx+'.'+num);}
       obsSection+='</div>';
     }
   }
@@ -14803,16 +14803,16 @@ function showSaveDialog(){
         var _t=(obsTypeMap[_pfAll[_ni].id]||_pfAll[_ni].type||'New').toLowerCase();
         (_t==='repeated'?_rp:_nw).push(_pfAll[_ni]);
       }
-      function _assign(list,secLabel){
-        var _n=0; // reset per section — matches renderRpt behaviour
+      function _assign(list,secPfx){
+        var _n=0;
         var g=buildCatGroupsFor(list);
         for(var ci=0;ci<g.catOrder.length;ci++){
           var ob=g.cats[g.catOrder[ci]];
-          for(var oi=0;oi<ob.length;oi++){_n++;_pfNumMap[ob[oi].id]='Obs. '+_n+' ('+secLabel+')';}
+          for(var oi=0;oi<ob.length;oi++){_n++;_pfNumMap[ob[oi].id]='Obs. '+secPfx+'.'+_n;}
         }
       }
-      _assign(_rp,'Repeated');
-      _assign(_nw,'New');
+      _assign(_rp,'1');
+      _assign(_nw,'2');
     }());
 
     // Run readiness on all observations
