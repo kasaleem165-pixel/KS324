@@ -14671,6 +14671,63 @@ function generateIssuedReport(){
   toast('Issued report saved as '+fname);
 }
 
+// ── Global helpers for pre-flight navigation (must be global for onclick strings) ──
+window._pfNavToObs = function(obsId){
+  // 1. Fully remove the overlay so nothing blocks the page
+  var ov=document.getElementById('_pfOv'); if(ov) ov.remove();
+  // 2. Scroll to and highlight the observation card
+  var el=document.getElementById('oc-'+obsId);
+  if(el){
+    el.scrollIntoView({behavior:'smooth',block:'center'});
+    el.style.outline='3px solid #e67e22';
+    el.style.outlineOffset='4px';
+    el.style.transition='outline .2s';
+    setTimeout(function(){el.style.outline='';el.style.outlineOffset='';},3500);
+  }
+  // 3. Show or refresh the floating resume bar
+  window._pfRefreshFloat();
+};
+
+window._pfRefreshFloat = function(){
+  // Count remaining issues fresh
+  var rem=0,blk=0;
+  var _fAll=[];
+  for(var _fj=0;_fj<DB.observations.length;_fj++){if(selIds[DB.observations[_fj].id])_fAll.push(DB.observations[_fj]);}
+  for(var _fk=0;_fk<customs.length;_fk++){if(selIds[customs[_fk].id])_fAll.push(customs[_fk]);}
+  for(var _fi=0;_fi<_fAll.length;_fi++){var _fr=getObsReadiness(_fAll[_fi]);rem+=_fr.blocking.length+_fr.advisory.length;blk+=_fr.blocking.length;}
+
+  var fb=document.getElementById('_pfFloat');
+  if(!fb){
+    fb=document.createElement('div');
+    fb.id='_pfFloat';
+    fb.style.cssText='position:fixed;bottom:20px;right:20px;z-index:99998;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.45);padding:11px 16px;display:flex;align-items:center;gap:10px;min-width:230px;cursor:pointer;font-family:inherit;user-select:none';
+    fb.innerHTML='<span id="_pfFloatIcon" style="font-size:22px">&#9989;</span>'
+      +'<div style="flex:1">'
+        +'<div style="font-size:12px;font-weight:800;color:#fff">Pre-flight Checklist</div>'
+        +'<div id="_pfFloatCount" style="font-size:10.5px;color:rgba(255,255,255,.85);margin-top:2px"></div>'
+      +'</div>'
+      +'<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.7);white-space:nowrap">&#9650; Resume</div>';
+    fb.onclick=function(){ fb.remove(); showSaveDialog(); };
+    document.body.appendChild(fb);
+  }
+  var lbl=document.getElementById('_pfFloatCount');
+  if(lbl) lbl.textContent=(blk?blk+' blocking · ':'')+rem+' item'+(rem!==1?'s':'')+' remaining';
+  var icon=document.getElementById('_pfFloatIcon');
+  if(blk){
+    fb.style.background='linear-gradient(135deg,#9b1a1a,#c0392b)';
+    fb.style.borderLeft='5px solid #ff8080';
+    if(icon) icon.textContent='⚠️';
+  } else if(rem){
+    fb.style.background='linear-gradient(135deg,#7a5000,#c08000)';
+    fb.style.borderLeft='5px solid #ffd060';
+    if(icon) icon.textContent='ℹ️';
+  } else {
+    fb.style.background='linear-gradient(135deg,#1a5a2a,#27ae60)';
+    fb.style.borderLeft='5px solid #a0ffb0';
+    if(icon) icon.textContent='✅';
+  }
+};
+
 function showSaveDialog(){
   // ── Comprehensive Pre-flight Readiness Check ─────────────────────────────
   if(!showSaveDialog._skipPreflight){
@@ -14679,7 +14736,7 @@ function showSaveDialog(){
     var _pfAll=_pfDbObs.concat(_pfCu);
     if(!_pfAll.length){toast('No observations selected.');return;}
 
-    // Build sequential obs numbers (Repeated first, then New — same order as renderRpt)
+    // Build sequential obs numbers (same order as renderRpt: Repeated first, then New)
     var _pfNumMap={};
     (function(){
       var _rp=[],_nw=[];
@@ -14702,69 +14759,37 @@ function showSaveDialog(){
     }
 
     if(_pfIssues.length){
-      // ── helper: show/hide the floating resume bar ──
-      function _pfShowFloat(){
-        var fb=document.getElementById('_pfFloat');
-        if(!fb){
-          fb=document.createElement('div');
-          fb.id='_pfFloat';
-          fb.style.cssText='position:fixed;bottom:18px;right:18px;z-index:99998;background:linear-gradient(135deg,#1a3557,#2a5080);color:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.4);padding:10px 14px;display:flex;align-items:center;gap:10px;min-width:220px;cursor:pointer;font-family:inherit';
-          fb.innerHTML='<span style="font-size:20px">&#9989;</span>'
-            +'<div style="flex:1"><div style="font-size:12px;font-weight:800">Pre-flight Checklist</div>'
-              +'<div id="_pfFloatCount" style="font-size:10px;opacity:.85;margin-top:1px"></div></div>'
-            +'<span style="font-size:18px;opacity:.7">&#9650;</span>';
-          fb.onclick=function(){fb.remove();showSaveDialog();};
-          document.body.appendChild(fb);
-        }
-        var rem=0,blk=0;
-        var _fbDbObs2=[]; for(var _fbj=0;_fbj<DB.observations.length;_fbj++){if(selIds[DB.observations[_fbj].id])_fbDbObs2.push(DB.observations[_fbj]);}
-        var _fbCu2=[]; for(var _fbk=0;_fbk<customs.length;_fbk++){if(selIds[customs[_fbk].id])_fbCu2.push(customs[_fbk]);}
-        var _fbAll=_fbDbObs2.concat(_fbCu2);
-        for(var _fbi=0;_fbi<_fbAll.length;_fbi++){var _fbr=getObsReadiness(_fbAll[_fbi]);rem+=_fbr.blocking.length+_fbr.advisory.length;blk+=_fbr.blocking.length;}
-        var lbl=document.getElementById('_pfFloatCount');
-        if(lbl) lbl.textContent=(blk?blk+' blocking · ':'')+rem+' item'+(rem!==1?'s':'')+' remaining';
-        fb.style.borderLeft=blk?'5px solid #e74c3c':'5px solid #27ae60';
-      }
-
       // Build checklist rows
       var _pfRows='';
       for(var _pfi2=0;_pfi2<_pfIssues.length;_pfi2++){
         var _pfItem=_pfIssues[_pfi2];
         var _pfHasBlk=_pfItem.r.blocking.length>0;
-        var _pfObsRef=_pfItem.num+(_pfItem.o.title?' — '+_pfItem.o.title:'');
         _pfRows+='<div style="border:1px solid '+(_pfHasBlk?'#f0a0a0':'#f0d060')+';border-radius:7px;margin-bottom:10px;overflow:hidden">';
-        // Observation header row
-        _pfRows+='<div style="background:'+(_pfHasBlk?'#fdf0f0':'#fffbe8')+';padding:7px 10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid '+(_pfHasBlk?'#f0c0c0':'#ede8a0')+'">';
-        _pfRows+='<span style="display:inline-block;background:'+(_pfHasBlk?'#c0392b':'#c08000')+';color:#fff;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:800;white-space:nowrap">'+esc(_pfItem.num)+'</span>';
-        _pfRows+='<span style="font-size:11.5px;font-weight:700;color:'+(_pfHasBlk?'#7a1a1a':'#5a3800')+';flex:1">'+esc(_pfItem.o.title)+'</span>';
-        if(_pfHasBlk) _pfRows+='<span style="font-size:10px;font-weight:700;background:#c0392b;color:#fff;border-radius:10px;padding:1px 8px;white-space:nowrap">'+_pfItem.r.blocking.length+' Must Fix</span>';
-        if(_pfItem.r.advisory.length) _pfRows+='<span style="font-size:10px;font-weight:700;background:#e6a020;color:#fff;border-radius:10px;padding:1px 8px;white-space:nowrap;margin-left:3px">'+_pfItem.r.advisory.length+' Advisory</span>';
-        // Navigate button — hides modal, scrolls to obs, shows float bar
-        _pfRows+='<button onclick="(function(){'
-          +'var ov=document.getElementById(\'_pfOv\');if(ov)ov.style.display=\'none\';'
-          +'var el=document.getElementById(\'oc-'+_pfItem.o.id+'\');'
-          +'if(el){el.scrollIntoView({behavior:\'smooth\',block:\'center\'});'
-            +'el.style.outline=\'3px solid #e67e22\';el.style.outlineOffset=\'3px\';'
-            +'setTimeout(function(){el.style.outline=\'\';el.style.outlineOffset=\'\';},3000);}'
-          +'if(typeof _pfShowFloat===\'function\')_pfShowFloat();'
-          +'})()" '
-          +'style="margin-left:6px;padding:3px 9px;background:#1a3557;color:#fff;border:none;border-radius:5px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">'
+        // Header row: [Obs. N badge] [Title] [Must Fix / Advisory counts] [Go to Obs button]
+        _pfRows+='<div style="background:'+(_pfHasBlk?'#fdf0f0':'#fffbe8')+';padding:7px 10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid '+(_pfHasBlk?'#f0c0c0':'#ede8a0')+';flex-wrap:wrap">';
+        _pfRows+='<span style="display:inline-block;background:'+(_pfHasBlk?'#c0392b':'#c08000')+';color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:800;white-space:nowrap">'+esc(_pfItem.num)+'</span>';
+        _pfRows+='<span style="font-size:11.5px;font-weight:700;color:'+(_pfHasBlk?'#7a1a1a':'#5a3800')+';flex:1;min-width:100px">'+esc(_pfItem.o.title)+'</span>';
+        if(_pfHasBlk) _pfRows+='<span style="font-size:10px;font-weight:700;background:#c0392b;color:#fff;border-radius:10px;padding:2px 8px;white-space:nowrap">&#9888; '+_pfItem.r.blocking.length+' Must Fix</span>';
+        if(_pfItem.r.advisory.length) _pfRows+='<span style="font-size:10px;font-weight:700;background:#e6a020;color:#fff;border-radius:10px;padding:2px 8px;white-space:nowrap;margin-left:2px">&#9432; '+_pfItem.r.advisory.length+' Advisory</span>';
+        // Go to Obs button — calls global _pfNavToObs()
+        _pfRows+='<button onclick="_pfNavToObs(\''+_pfItem.o.id+'\')" '
+          +'style="margin-left:4px;padding:4px 10px;background:#1a3557;color:#fff;border:none;border-radius:5px;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">'
           +'&#8595; Go to '+esc(_pfItem.num)+'</button>';
         _pfRows+='</div>';
-        // Issue rows
-        _pfRows+='<div style="padding:5px 10px">';
+        // Issue detail rows
+        _pfRows+='<div style="padding:5px 10px 3px">';
         for(var _bki=0;_bki<_pfItem.r.blocking.length;_bki++){
-          _pfRows+='<div style="display:flex;align-items:flex-start;gap:6px;padding:4px 0;border-bottom:1px solid #fde8e8">'
-            +'<span style="color:#c0392b;font-size:10px;font-weight:800;white-space:nowrap;margin-top:1px;min-width:14px">&#9888;</span>'
-            +'<span style="color:#c0392b;font-weight:700;font-size:11px;white-space:nowrap;min-width:110px">'+esc(_pfItem.r.blocking[_bki].field)+'</span>'
-            +'<span style="color:#5a2020;font-size:11px;line-height:1.4">'+esc(_pfItem.r.blocking[_bki].msg)+'</span>'
+          _pfRows+='<div style="display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid #fde8e8">'
+            +'<span style="color:#c0392b;font-size:13px;line-height:1;margin-top:1px">&#9888;</span>'
+            +'<span style="color:#c0392b;font-weight:700;font-size:11px;white-space:nowrap;min-width:120px;padding-top:1px">'+esc(_pfItem.r.blocking[_bki].field)+'</span>'
+            +'<span style="color:#5a2020;font-size:11px;line-height:1.45">'+esc(_pfItem.r.blocking[_bki].msg)+'</span>'
             +'</div>';
         }
         for(var _adi=0;_adi<_pfItem.r.advisory.length;_adi++){
-          _pfRows+='<div style="display:flex;align-items:flex-start;gap:6px;padding:4px 0;border-bottom:1px solid #f8f0d0">'
-            +'<span style="color:#c08000;font-size:10px;font-weight:800;white-space:nowrap;margin-top:1px;min-width:14px">&#9432;</span>'
-            +'<span style="color:#9a6000;font-weight:700;font-size:11px;white-space:nowrap;min-width:110px">'+esc(_pfItem.r.advisory[_adi].field)+'</span>'
-            +'<span style="color:#5a4010;font-size:11px;line-height:1.4">'+esc(_pfItem.r.advisory[_adi].msg)+'</span>'
+          _pfRows+='<div style="display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid #f8f0d0">'
+            +'<span style="color:#c08000;font-size:13px;line-height:1;margin-top:1px">&#9432;</span>'
+            +'<span style="color:#9a6000;font-weight:700;font-size:11px;white-space:nowrap;min-width:120px;padding-top:1px">'+esc(_pfItem.r.advisory[_adi].field)+'</span>'
+            +'<span style="color:#5a4010;font-size:11px;line-height:1.45">'+esc(_pfItem.r.advisory[_adi].msg)+'</span>'
             +'</div>';
         }
         _pfRows+='</div></div>';
@@ -14774,39 +14799,34 @@ function showSaveDialog(){
       _pfOv.id='_pfOv';
       _pfOv.style.cssText='position:fixed;inset:0;background:rgba(10,20,40,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
       _pfOv.innerHTML=
-        '<div style="background:#fff;border-radius:12px;max-width:660px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.4)">'
-        // Header
+        '<div style="background:#fff;border-radius:12px;max-width:680px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.4)">'
         +'<div style="background:linear-gradient(90deg,#1a3557,#2a5080);color:#fff;padding:12px 18px;border-radius:12px 12px 0 0;display:flex;align-items:center;gap:10px;flex-shrink:0">'
           +'<span style="font-size:18px">&#9989;</span>'
           +'<div><div style="font-size:13px;font-weight:800;letter-spacing:.3px">Pre-flight Readiness Check</div>'
-            +'<div style="font-size:11px;opacity:.8;margin-top:1px">Click <strong>&#8595; Go to Obs.</strong> to jump to an observation — the checklist will minimise and float in the corner. Fill the required fields and click it to return.</div></div>'
+            +'<div style="font-size:11px;opacity:.8;margin-top:2px">Click <strong>&#8595; Go to Obs. N</strong> — the checklist minimises to a floating bar. Fill the required fields, then click the bar to return and recheck.</div></div>'
           +'<button onclick="document.getElementById(\'_pfOv\').remove()" style="margin-left:auto;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;width:28px;height:28px;font-size:16px;cursor:pointer;font-family:inherit" title="Close">&#10005;</button>'
         +'</div>'
-        // Summary bar
-        +'<div style="display:flex;gap:0;flex-shrink:0;border-bottom:1px solid #eee">'
-          +(_pfBlocking?'<div style="flex:1;padding:8px 14px;background:#fdf0f0;border-right:1px solid #f0c0c0;text-align:center"><div style="font-size:20px;font-weight:800;color:#c0392b">'+_pfBlocking+'</div><div style="font-size:10px;color:#9b1a1a;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Must Fix</div></div>':'')
-          +(_pfAdvisory?'<div style="flex:1;padding:8px 14px;background:#fffbe8;border-right:1px solid #ede8a0;text-align:center"><div style="font-size:20px;font-weight:800;color:#c08000">'+_pfAdvisory+'</div><div style="font-size:10px;color:#7a5000;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Advisory</div></div>':'')
-          +'<div style="flex:1;padding:8px 14px;background:#f0f8f0;text-align:center"><div style="font-size:20px;font-weight:800;color:#1a6030">'+(_pfAll.length-_pfIssues.length)+'</div><div style="font-size:10px;color:#1a6030;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Ready</div></div>'
-          +'<div style="flex:1;padding:8px 14px;background:#f5f5f5;text-align:center"><div style="font-size:20px;font-weight:800;color:#1a3557">'+_pfAll.length+'</div><div style="font-size:10px;color:#1a3557;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Total Obs.</div></div>'
+        +'<div style="display:flex;flex-shrink:0;border-bottom:1px solid #eee">'
+          +(_pfBlocking?'<div style="flex:1;padding:9px 14px;background:#fdf0f0;border-right:1px solid #f0c0c0;text-align:center"><div style="font-size:22px;font-weight:800;color:#c0392b">'+_pfBlocking+'</div><div style="font-size:10px;color:#9b1a1a;font-weight:700;text-transform:uppercase;letter-spacing:.5px">&#9888; Must Fix</div></div>':'')
+          +(_pfAdvisory?'<div style="flex:1;padding:9px 14px;background:#fffbe8;border-right:1px solid #ede8a0;text-align:center"><div style="font-size:22px;font-weight:800;color:#c08000">'+_pfAdvisory+'</div><div style="font-size:10px;color:#7a5000;font-weight:700;text-transform:uppercase;letter-spacing:.5px">&#9432; Advisory</div></div>':'')
+          +'<div style="flex:1;padding:9px 14px;background:#f0f8f0;border-right:1px solid #c8e8d0;text-align:center"><div style="font-size:22px;font-weight:800;color:#1a6030">'+(_pfAll.length-_pfIssues.length)+'</div><div style="font-size:10px;color:#1a6030;font-weight:700;text-transform:uppercase;letter-spacing:.5px">&#10003; Ready</div></div>'
+          +'<div style="flex:1;padding:9px 14px;background:#f5f7fa;text-align:center"><div style="font-size:22px;font-weight:800;color:#1a3557">'+_pfAll.length+'</div><div style="font-size:10px;color:#1a3557;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Total Obs.</div></div>'
         +'</div>'
-        // Legend
-        +'<div style="display:flex;gap:16px;padding:6px 16px;background:#f8fafc;border-bottom:1px solid #eee;font-size:10px;color:#555;flex-shrink:0">'
-          +'<span><strong style="color:#c0392b">&#9888; Must Fix</strong> — Blocking: cannot finalize until resolved</span>'
-          +'<span><strong style="color:#c08000">&#9432; Advisory</strong> — Recommended: can finalize but consider filling</span>'
+        +'<div style="display:flex;gap:14px;padding:6px 16px;background:#f8fafc;border-bottom:1px solid #eee;font-size:10.5px;color:#555;flex-shrink:0">'
+          +'<span><span style="color:#c0392b;font-weight:700">&#9888; Must Fix</span> — Blocking: cannot finalize until resolved</span>'
+          +'<span><span style="color:#c08000;font-weight:700">&#9432; Advisory</span> — Recommended: can still finalize</span>'
         +'</div>'
-        // Body
         +'<div style="padding:14px 16px;overflow-y:auto;flex:1">'+_pfRows+'</div>'
-        // Footer
-        +'<div style="padding:12px 16px;border-top:1px solid #eee;display:flex;gap:8px;flex-shrink:0;background:#f8fafc;border-radius:0 0 12px 12px;align-items:center">'
-          +'<span style="font-size:11px;color:#888;flex:1">&#128161; Tip: Click <em>Go to Obs.</em> on any row — the checklist floats in the corner while you edit.</span>'
-          +'<button id="_pfBack" style="padding:.5rem 1rem;background:#eef1f5;color:#1a3557;border:1px solid #c0ccd8;border-radius:7px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#10005; Close</button>'
+        +'<div style="padding:11px 16px;border-top:1px solid #eee;display:flex;gap:8px;flex-shrink:0;background:#f8fafc;border-radius:0 0 12px 12px;align-items:center">'
+          +'<span style="font-size:11px;color:#888;flex:1">&#128161; After editing an observation, click the floating bar (bottom-right) to recheck.</span>'
+          +'<button id="_pfClose" style="padding:.45rem .9rem;background:#eef1f5;color:#1a3557;border:1px solid #c0ccd8;border-radius:7px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#10005; Close</button>'
           +(_pfBlocking
-            ?'<button id="_pfProceed" disabled title="Resolve all blocking (Must Fix) items first" style="padding:.5rem 1.2rem;background:#bbb;color:#fff;border:none;border-radius:7px;font-size:.85rem;font-weight:700;cursor:not-allowed;font-family:inherit">&#128229; Finalize Report</button>'
-            :'<button id="_pfProceed" style="padding:.5rem 1.2rem;background:#1a6030;color:#fff;border:none;border-radius:7px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Proceed &amp; Finalize</button>')
+            ?'<button disabled title="Resolve all Must Fix items first" style="padding:.45rem 1.1rem;background:#ccc;color:#fff;border:none;border-radius:7px;font-size:.85rem;font-weight:700;cursor:not-allowed;font-family:inherit">&#128229; Finalize Report</button>'
+            :'<button id="_pfProceed" style="padding:.45rem 1.1rem;background:#1a6030;color:#fff;border:none;border-radius:7px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Proceed &amp; Finalize</button>')
         +'</div>'
         +'</div>';
       document.body.appendChild(_pfOv);
-      document.getElementById('_pfBack').onclick=function(){_pfOv.remove();};
+      document.getElementById('_pfClose').onclick=function(){_pfOv.remove();};
       if(!_pfBlocking){
         document.getElementById('_pfProceed').onclick=function(){
           _pfOv.remove();
