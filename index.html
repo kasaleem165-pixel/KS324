@@ -15366,6 +15366,14 @@ function ra_initBranches(){
     if(el && el.textContent.trim()){ try{ RA_BRANCHES=JSON.parse(el.textContent); }catch(e){ RA_BRANCHES=[]; } }
   }
   ra_buildBranchDatalist();
+  // Close branch dropdown when clicking outside
+  document.addEventListener('click', function(e){
+    var dd=document.getElementById('ra-branch-dropdown');
+    var si=document.getElementById('ra-branch-search');
+    if(dd && si && !dd.contains(e.target) && e.target!==si){
+      dd.style.display='none';
+    }
+  });
 }
 
 // Called whenever BSS_BRANCHES changes so the RA branch select stays in sync
@@ -15376,32 +15384,188 @@ function ra_syncBranchList(){
   }
 }
 
-function ra_buildBranchDatalist(){ // kept for backwards compat — delegates to select builder
-  ra_buildBranchSelect();
-}
+// ── Branch search state ────────────────────────────────────────
+var _raBranchRegionFilter = '';   // '' | 'Centre' | 'North' | 'South'
+var _raBranchCityFilter   = '';
+var _raBranchDDIndex      = -1;   // keyboard-nav active index in dropdown
+
+function ra_buildBranchDatalist(){ ra_buildBranchSelect(); } // backward compat
+
 function ra_buildBranchSelect(){
+  // Populate hidden select (backward compat for code that reads ra-sel_branch value)
   var sel=document.getElementById('ra-sel_branch');
-  if(!sel) return;
-  // Group by region
-  var regions={};
+  if(sel){
+    var h='<option value="">-- Select Branch --</option>';
+    var sorted=RA_BRANCHES.slice().sort(function(a,b){return a.name.localeCompare(b.name);});
+    for(var i=0;i<sorted.length;i++){
+      h+='<option value="'+ra_esc(sorted[i].name)+'">'+ra_esc(sorted[i].code)+' — '+ra_esc(sorted[i].name)+'</option>';
+    }
+    sel.innerHTML=h;
+  }
+  // Populate city filter dropdown
+  ra_buildCityFilter();
+}
+
+function ra_buildCityFilter(){
+  var cf=document.getElementById('ra-city-filter');
+  if(!cf) return;
+  // Collect unique cities for active region filter
+  var cities={};
   for(var i=0;i<RA_BRANCHES.length;i++){
     var b=RA_BRANCHES[i];
-    if(!regions[b.region]) regions[b.region]=[];
-    regions[b.region].push(b);
+    if(_raBranchRegionFilter && b.region!==_raBranchRegionFilter) continue;
+    if(b.city) cities[b.city]=1;
   }
-  var h='<option value="">-- Select Branch --</option>';
-  var rKeys=Object.keys(regions).sort();
-  for(var r=0;r<rKeys.length;r++){
-    var rg=rKeys[r];
-    h+='<optgroup label="'+ra_esc(rg)+' Region">';
-    var bList=regions[rg].sort(function(a,b2){return a.name.localeCompare(b2.name);});
-    for(var bi=0;bi<bList.length;bi++){
-      var br=bList[bi];
-      h+='<option value="'+ra_esc(br.name)+'">'+ra_esc(br.code)+' — '+ra_esc(br.name)+'</option>';
+  var cityList=Object.keys(cities).sort();
+  var h='<option value="">All Cities</option>';
+  for(var ci=0;ci<cityList.length;ci++) h+='<option value="'+ra_esc(cityList[ci])+'">'+ra_esc(cityList[ci])+'</option>';
+  cf.innerHTML=h;
+  _raBranchCityFilter='';
+}
+
+function ra_setRegionFilter(region){
+  _raBranchRegionFilter=region;
+  // Update chip styles
+  var chips=['ra-rgn-all','ra-rgn-centre','ra-rgn-north','ra-rgn-south'];
+  var vals=['','Centre','North','South'];
+  for(var i=0;i<chips.length;i++){
+    var el=document.getElementById(chips[i]);
+    if(el) el.className='ra-chip'+(vals[i]===region?' ra-chip-on':'');
+  }
+  ra_buildCityFilter();
+  ra_onBranchSearchInput(document.getElementById('ra-branch-search')?document.getElementById('ra-branch-search').value:'');
+}
+
+function ra_applyCityFilter(){
+  var cf=document.getElementById('ra-city-filter');
+  _raBranchCityFilter=cf?cf.value:'';
+  ra_onBranchSearchInput(document.getElementById('ra-branch-search')?document.getElementById('ra-branch-search').value:'');
+}
+
+function ra_filteredBranches(query){
+  var q=(query||'').toLowerCase().trim();
+  var results=[];
+  for(var i=0;i<RA_BRANCHES.length;i++){
+    var b=RA_BRANCHES[i];
+    if(_raBranchRegionFilter && b.region!==_raBranchRegionFilter) continue;
+    if(_raBranchCityFilter   && b.city!==_raBranchCityFilter)     continue;
+    if(!q){ results.push(b); continue; }
+    var hay=(b.name+' '+(b.code||'')+' '+(b.city||'')+' '+(b.region||'')).toLowerCase();
+    if(hay.indexOf(q)!==-1) results.push(b);
+  }
+  results.sort(function(a,b2){ return a.name.localeCompare(b2.name); });
+  return results;
+}
+
+function ra_onBranchSearchInput(val){
+  var clr=document.getElementById('ra-branch-search-clear');
+  if(clr) clr.style.display=val?'':'none';
+  _raBranchDDIndex=-1;
+  var matches=ra_filteredBranches(val);
+  ra_renderBranchDropdown(matches, val);
+}
+
+function ra_renderBranchDropdown(matches, query){
+  var dd=document.getElementById('ra-branch-dropdown');
+  if(!dd) return;
+  var q=(query||'').toLowerCase();
+  if(!matches.length){
+    dd.innerHTML='<div class="ra-dd-empty">No branches found</div>';
+    dd.style.display='block';
+    return;
+  }
+  // Show dropdown only when user is typing
+  var searchEl=document.getElementById('ra-branch-search');
+  var hasQuery=searchEl&&searchEl.value.trim().length>0;
+  if(!hasQuery && !_raBranchRegionFilter && !_raBranchCityFilter){
+    dd.style.display='none';
+    return;
+  }
+  var h='';
+  var limit=Math.min(matches.length,80);
+  for(var i=0;i<limit;i++){
+    var b=matches[i];
+    var name=b.name;
+    // Highlight matching part
+    if(q){
+      var idx=name.toLowerCase().indexOf(q);
+      if(idx>=0) name=ra_esc(name.substring(0,idx))+'<strong>'+ra_esc(name.substring(idx,idx+q.length))+'</strong>'+ra_esc(name.substring(idx+q.length));
+      else name=ra_esc(name);
+    } else { name=ra_esc(name); }
+    h+='<div class="ra-dd-item" data-val="'+ra_esc(b.name)+'" onclick="ra_selectBranchFromDD(\''+ra_esc(b.name).replace(/'/g,"\\'")+'\')">'+
+         '<span class="ra-dd-code">'+ra_esc(b.code||'')+'</span>'+name+
+         '<div class="ra-dd-meta">'+ra_esc(b.region||'')+' Region'+(b.city?' &bull; '+ra_esc(b.city):'')+
+         '</div></div>';
+  }
+  if(matches.length>80) h+='<div class="ra-dd-empty">Showing 80 of '+matches.length+' — type more to narrow down</div>';
+  dd.innerHTML=h;
+  dd.style.display='block';
+}
+
+function ra_selectBranchFromDD(val){
+  // Close dropdown
+  var dd=document.getElementById('ra-branch-dropdown');
+  if(dd) dd.style.display='none';
+  // Update hidden select value
+  var sel=document.getElementById('ra-sel_branch');
+  if(sel) sel.value=val;
+  // Update search box display
+  var si=document.getElementById('ra-branch-search');
+  if(si) si.value=val;
+  var clr=document.getElementById('ra-branch-search-clear');
+  if(clr) clr.style.display=val?'':'none';
+  // Show badge
+  var badge=document.getElementById('ra-branch-badge');
+  var badgeTxt=document.getElementById('ra-branch-badge-text');
+  if(badge && badgeTxt){
+    badgeTxt.textContent=val;
+    badge.style.display=val?'flex':'none';
+  }
+  ra_onBranchSelect(val);
+}
+
+function ra_clearBranchSearch(){
+  var si=document.getElementById('ra-branch-search');
+  if(si){ si.value=''; si.focus(); }
+  var dd=document.getElementById('ra-branch-dropdown');
+  if(dd) dd.style.display='none';
+  var clr=document.getElementById('ra-branch-search-clear');
+  if(clr) clr.style.display='none';
+  var badge=document.getElementById('ra-branch-badge');
+  if(badge) badge.style.display='none';
+  var sel=document.getElementById('ra-sel_branch');
+  if(sel) sel.value='';
+  ra_onBranchSelect('');
+}
+
+function ra_branchSearchKey(e){
+  var dd=document.getElementById('ra-branch-dropdown');
+  if(!dd||dd.style.display==='none') return;
+  var items=dd.querySelectorAll('.ra-dd-item');
+  if(!items.length) return;
+  if(e.key==='ArrowDown'){
+    e.preventDefault();
+    _raBranchDDIndex=Math.min(_raBranchDDIndex+1,items.length-1);
+    ra_highlightDDItem(items);
+  } else if(e.key==='ArrowUp'){
+    e.preventDefault();
+    _raBranchDDIndex=Math.max(_raBranchDDIndex-1,0);
+    ra_highlightDDItem(items);
+  } else if(e.key==='Enter'){
+    e.preventDefault();
+    if(_raBranchDDIndex>=0 && items[_raBranchDDIndex]){
+      ra_selectBranchFromDD(items[_raBranchDDIndex].getAttribute('data-val'));
     }
-    h+='</optgroup>';
+  } else if(e.key==='Escape'){
+    dd.style.display='none';
   }
-  sel.innerHTML=h;
+}
+
+function ra_highlightDDItem(items){
+  for(var i=0;i<items.length;i++){
+    items[i].className='ra-dd-item'+(i===_raBranchDDIndex?' ra-dd-active':'');
+  }
+  if(items[_raBranchDDIndex]) items[_raBranchDDIndex].scrollIntoView({block:'nearest'});
 }
 
 function ra_esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -15421,6 +15585,17 @@ function ra_onBranchSelect(val){
   if(ci) ci.value=ra_currentBranch?ra_currentBranch.city:'';
   var mw=document.getElementById('ra-branch-mismatch');
   if(mw) mw.style.display='none';
+  // Sync search box and badge when called programmatically (e.g. session restore)
+  var si=document.getElementById('ra-branch-search');
+  if(si && si.value!==val) si.value=val||'';
+  var badge=document.getElementById('ra-branch-badge');
+  var badgeTxt=document.getElementById('ra-branch-badge-text');
+  if(badge && badgeTxt){
+    badgeTxt.textContent=val||'';
+    badge.style.display=val?'flex':'none';
+  }
+  var clr=document.getElementById('ra-branch-search-clear');
+  if(clr) clr.style.display=val?'':'none';
 }
 
 function ra_detectBranchInText(text, selectedBranch){
@@ -16606,6 +16781,16 @@ function ra_methodologyHtml(){
     #ra-panel .ra-gauge-ticks{display:flex;justify-content:space-between;font-size:9px;color:#6a7888;font-weight:700}
     #ra-panel #ra-toast{position:fixed;bottom:20px;right:20px;background:#1a2a3a;color:#fff;padding:9px 15px;border-radius:5px;font-size:13px;font-weight:500;opacity:0;transform:translateY(8px);transition:.3s;z-index:9999;pointer-events:none}
     #ra-panel #ra-toast.ra-show{opacity:1;transform:translateY(0)}
+    .ra-chip{padding:3px 10px;border-radius:12px;border:1px solid #b8cce0;background:#f0f5fb;color:#1a3a5c;font-size:11px;font-weight:600;cursor:pointer;transition:.15s}
+    .ra-chip:hover{background:#ddeeff}
+    .ra-chip.ra-chip-on{background:#1a3a5c;color:#fff;border-color:#1a3a5c}
+    #ra-branch-dropdown .ra-dd-item{padding:7px 10px;font-size:11.5px;cursor:pointer;border-bottom:1px solid #eef2f8;color:#1e2d40;line-height:1.4}
+    #ra-branch-dropdown .ra-dd-item:last-child{border-bottom:none}
+    #ra-branch-dropdown .ra-dd-item:hover,#ra-branch-dropdown .ra-dd-item.ra-dd-active{background:#e8f2ff;color:#1a3a5c}
+    #ra-branch-dropdown .ra-dd-item .ra-dd-code{font-size:10px;color:#6a7888;font-weight:700;margin-right:5px}
+    #ra-branch-dropdown .ra-dd-item .ra-dd-meta{font-size:10px;color:#8a9aaa;margin-top:1px}
+    #ra-branch-dropdown .ra-dd-empty{padding:10px;font-size:11.5px;color:#8a9aaa;text-align:center;font-style:italic}
+    #ra-branch-badge{display:none}
   </style>
   <div class="ra-wrap">
     <!-- LEFT PANEL -->
@@ -16621,11 +16806,43 @@ function ra_methodologyHtml(){
       </div>
       <div class="ra-sec" style="background:#f5f8fd">
         <div class="ra-sh">&#128205; Branch Being Audited</div>
-        <div class="ra-fr">
-          <label>Branch</label>
-          <select id="ra-sel_branch" onchange="ra_onBranchSelect(this.value)" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:12px;background:#fff;color:#1e2d40">
-            <option value="">-- Select Branch --</option>
+        <!-- Region / City quick-filter chips -->
+        <div style="margin-bottom:8px">
+          <div style="font-size:10px;font-weight:700;color:#6a7888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Filter by Region</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <button id="ra-rgn-all"    onclick="ra_setRegionFilter('')"        class="ra-chip ra-chip-on" >All</button>
+            <button id="ra-rgn-centre" onclick="ra_setRegionFilter('Centre')"  class="ra-chip">Centre</button>
+            <button id="ra-rgn-north"  onclick="ra_setRegionFilter('North')"   class="ra-chip">North</button>
+            <button id="ra-rgn-south"  onclick="ra_setRegionFilter('South')"   class="ra-chip">South</button>
+          </div>
+        </div>
+        <div class="ra-fr" style="margin-bottom:6px">
+          <label>City Filter <span style="font-weight:400;color:#8a9aaa">(optional)</span></label>
+          <select id="ra-city-filter" onchange="ra_applyCityFilter()" style="width:100%;padding:5px 8px;border:1px solid #c8d8ec;border-radius:4px;font-size:11.5px;background:#fff;color:#1e2d40">
+            <option value="">All Cities</option>
           </select>
+        </div>
+        <div class="ra-fr">
+          <label>Search Branch <span style="font-weight:400;color:#8a9aaa">— code, name, or any keyword</span></label>
+          <div style="position:relative">
+            <input type="text" id="ra-branch-search" placeholder="Type code or branch name…"
+              oninput="ra_onBranchSearchInput(this.value)"
+              onkeydown="ra_branchSearchKey(event)"
+              autocomplete="off"
+              style="width:100%;padding:7px 32px 7px 8px;border:1px solid #c8d8ec;border-radius:4px;font-size:12px;font-family:inherit;box-sizing:border-box">
+            <span id="ra-branch-search-clear" onclick="ra_clearBranchSearch()" title="Clear"
+              style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:#8a9aaa;font-size:14px;line-height:1">&#10005;</span>
+          </div>
+          <!-- Dropdown results list -->
+          <div id="ra-branch-dropdown" style="display:none;background:#fff;border:1px solid #b8cce0;border-top:none;border-radius:0 0 5px 5px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:500;position:relative">
+          </div>
+          <!-- Selected branch badge -->
+          <div id="ra-branch-badge" style="display:none;margin-top:6px;background:#e8f2ff;border:1px solid #b0cff0;border-radius:5px;padding:6px 10px;font-size:11.5px;color:#1a3a5c;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:6px">
+            <span id="ra-branch-badge-text"></span>
+            <span onclick="ra_clearBranchSearch()" title="Change branch" style="cursor:pointer;color:#8a9aaa;font-size:13px">&#10005;</span>
+          </div>
+          <!-- Hidden select kept for backward-compat JS that reads ra-sel_branch value -->
+          <select id="ra-sel_branch" onchange="ra_onBranchSelect(this.value)" style="display:none"></select>
           <div id="ra-branch-mismatch" style="display:none;margin-top:6px;background:#fde8e8;border:1px solid #f0a0a0;border-radius:5px;padding:8px 10px;font-size:11px;color:#9b1a1a;font-weight:600;line-height:1.5"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
