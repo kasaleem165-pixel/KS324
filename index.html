@@ -8568,14 +8568,20 @@ window.onload = function() {
   else { _idbQueue.push(_startRestore); }
 
   // Warn before closing if any data exists
-  window.onbeforeunload = function(e){
+  window.addEventListener('beforeunload', function(e){
     if(hasAnyData()){
-      autoSaveNow(); // last-chance auto-save
-      var msg = 'Your work will be saved automatically. To access it on another computer, use Save / Versions to export a session file before closing.';
+      // Use synchronous localStorage as last-resort save — IDB transactions
+      // are aborted by browsers during unload and must not be used here.
+      try{
+        var sess = captureSession();
+        sess._autoSavedAt = new Date().toISOString();
+        localStorage.setItem(AS_KEY, JSON.stringify(sess));
+      }catch(ex){}
+      var msg = 'Your work has been auto-saved. To access it on another computer, use \u{1F4BE} Save / Versions before closing.';
       e.returnValue = msg;
       return msg;
     }
-  };
+  });
 
   // Auto-save every 60 seconds silently
   setInterval(function(){
@@ -9908,9 +9914,17 @@ function autoSaveNow(){
 }
 
 function hasAnyData(){
+  // Check all possible sources of user data
   var brname = document.getElementById('brname');
   if(brname && brname.value.trim()) return true;
   if(Object.keys(selIds).length > 0) return true;
+  if(customs && customs.length > 0) return true;
+  if(annexures && annexures.length > 0) return true;
+  // Check intro text fields
+  for(var ii=0;ii<INTRO_SECTION_IDS.length;ii++){
+    var el=document.getElementById(INTRO_SECTION_IDS[ii]);
+    if(el && el.value.trim()) return true;
+  }
   return false;
 }
 var _showAnalysis = false;
