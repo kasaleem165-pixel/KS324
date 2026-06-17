@@ -14681,20 +14681,20 @@ window._pfNavToObs = function(obsId){
   for(var _i=0;_i<DB.observations.length;_i++){if(DB.observations[_i].id===obsId){obsObj=DB.observations[_i];break;}}
   if(!obsObj) for(var _ci=0;_ci<customs.length;_ci++){if(customs[_ci].id===obsId){obsObj=customs[_ci];break;}}
 
-  // 3. Scroll the RIGHT PANEL (#RP has overflow-y:auto — window.scrollTo has no effect here)
+  // 3. Scroll #RP to the exact card.
+  //    scrollIntoView correctly targets the nearest scrollable ancestor (#RP).
+  //    We use 'instant' + manual toolbar nudge — avoids all race conditions
+  //    with getBoundingClientRect() that caused off-by-one landings.
   setTimeout(function(){
     var card=document.getElementById('oc-'+obsId);
     var rp=document.getElementById('RP');
     if(card && rp){
-      // Position of card relative to the RP scroll container
-      var rpRect=rp.getBoundingClientRect();
-      var cardRect=card.getBoundingClientRect();
-      // cardRect.top is relative to viewport; convert to RP scroll offset
-      var targetScroll=rp.scrollTop+(cardRect.top-rpRect.top)-80;
-      rp.scrollTo({top:Math.max(0,targetScroll),behavior:'smooth'});
+      card.scrollIntoView({behavior:'instant', block:'start'});
+      // Nudge back up by toolbar height (44px) + small padding
+      rp.scrollTop = Math.max(0, rp.scrollTop - 60);
     }
 
-    // 4. Highlight exact fields after scroll settles
+    // 4. Highlight exact fields after landing
     if(obsObj && card){
       var _r=getObsReadiness(obsObj);
       var _fmap={
