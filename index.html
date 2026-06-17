@@ -10462,7 +10462,7 @@ function renderRpt(){
       h+='<option value="Low"'+(curSens==='Low'?' selected':'')+'>Low</option>';
       h+='</select>';
       h+='<span id="fw-sug-'+o.id+'"></span>';
-      h+='<select class="coso-sel '+cosoClass+'" title="COSO Component" onchange="setCoso(\''+o.id+'\',this)">';
+      h+='<select id="coso-sel-'+o.id+'" class="coso-sel '+cosoClass+'" title="COSO Component" onchange="setCoso(\''+o.id+'\',this)">';
       h+='<option value="">COSO</option>';
       h+='<option value="CE"'+(curCoso==='CE'?' selected':'')+'>CE</option>';
       h+='<option value="RA"'+(curCoso==='RA'?' selected':'')+'>RA</option>';
@@ -14675,16 +14675,62 @@ function generateIssuedReport(){
 window._pfNavToObs = function(obsId){
   // 1. Fully remove the overlay so nothing blocks the page
   var ov=document.getElementById('_pfOv'); if(ov) ov.remove();
-  // 2. Scroll to and highlight the observation card
-  var el=document.getElementById('oc-'+obsId);
-  if(el){
-    el.scrollIntoView({behavior:'smooth',block:'center'});
-    el.style.outline='3px solid #e67e22';
-    el.style.outlineOffset='4px';
-    el.style.transition='outline .2s';
-    setTimeout(function(){el.style.outline='';el.style.outlineOffset='';},3500);
+
+  // 2. Scroll the card into view
+  var card=document.getElementById('oc-'+obsId);
+  if(card) card.scrollIntoView({behavior:'smooth',block:'center'});
+
+  // 3. Re-run readiness and highlight the exact fields that need attention
+  var obsObj=null;
+  for(var _i=0;_i<DB.observations.length;_i++){if(DB.observations[_i].id===obsId){obsObj=DB.observations[_i];break;}}
+  if(!obsObj) for(var _ci=0;_ci<customs.length;_ci++){if(customs[_ci].id===obsId){obsObj=customs[_ci];break;}}
+
+  if(obsObj){
+    var _r=getObsReadiness(obsObj);
+    // field name → DOM element id(s) inside the observation card
+    var _fmap={
+      'Observation':     ['oe-'+obsId],
+      'Recommendation':  ['re-'+obsId],
+      'Prior Audit Ref': ['lr-rpt-'+obsId],
+      'Report Reference':['lr-rpt-'+obsId],
+      'Sensitivity':     ['sens-sel-'+obsId],
+      'COSO':            ['coso-sel-'+obsId],
+      'Financial Impact':['fw-inst-'+obsId,'fw-amt-'+obsId]
+    };
+    // Remove any previous highlights on this card
+    if(card){ var _old=card.querySelectorAll('._pf-hl-badge'); for(var _oi=0;_oi<_old.length;_oi++)_old[_oi].remove(); }
+
+    setTimeout(function(){
+      function _hlField(elId, color, fieldLabel, isBlocking){
+        var fel=document.getElementById(elId); if(!fel) return;
+        // Highlight the input/select itself
+        fel.style.outline='3px solid '+color;
+        fel.style.outlineOffset='3px';
+        // Insert a small label badge immediately before the element
+        var badge=document.createElement('div');
+        badge.className='_pf-hl-badge';
+        badge.style.cssText='font-size:9.5px;font-weight:700;color:#fff;background:'+color
+          +';border-radius:4px;padding:1px 6px;margin-bottom:3px;display:inline-block;letter-spacing:.3px';
+        badge.textContent=(isBlocking?'⚠ ':'ℹ ')+fieldLabel+' required';
+        fel.parentNode.insertBefore(badge,fel);
+        // Remove after 8s
+        setTimeout(function(){
+          fel.style.outline=''; fel.style.outlineOffset='';
+          if(badge.parentNode) badge.parentNode.removeChild(badge);
+        },8000);
+      }
+      for(var _bi=0;_bi<_r.blocking.length;_bi++){
+        var _bids=_fmap[_r.blocking[_bi].field]||[];
+        for(var _bii=0;_bii<_bids.length;_bii++) _hlField(_bids[_bii],'#c0392b',_r.blocking[_bi].field,true);
+      }
+      for(var _ai=0;_ai<_r.advisory.length;_ai++){
+        var _aids=_fmap[_r.advisory[_ai].field]||[];
+        for(var _aii=0;_aii<_aids.length;_aii++) _hlField(_aids[_aii],'#c08000',_r.advisory[_ai].field,false);
+      }
+    },500);
   }
-  // 3. Show or refresh the floating resume bar
+
+  // 4. Show / refresh the floating resume bar
   window._pfRefreshFloat();
 };
 
@@ -14764,17 +14810,23 @@ function showSaveDialog(){
       for(var _pfi2=0;_pfi2<_pfIssues.length;_pfi2++){
         var _pfItem=_pfIssues[_pfi2];
         var _pfHasBlk=_pfItem.r.blocking.length>0;
+        var _pfObsType=(_pfItem.r.obsType||'new');
+        var _pfTypeBg=_pfObsType==='repeated'?'#d06020':'#2070b8';
         _pfRows+='<div style="border:1px solid '+(_pfHasBlk?'#f0a0a0':'#f0d060')+';border-radius:7px;margin-bottom:10px;overflow:hidden">';
-        // Header row: [Obs. N badge] [Title] [Must Fix / Advisory counts] [Go to Obs button]
+        // Header: single [Obs. N · New/Repeated] badge + title + counts + Edit button (no duplicate number)
         _pfRows+='<div style="background:'+(_pfHasBlk?'#fdf0f0':'#fffbe8')+';padding:7px 10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid '+(_pfHasBlk?'#f0c0c0':'#ede8a0')+';flex-wrap:wrap">';
-        _pfRows+='<span style="display:inline-block;background:'+(_pfHasBlk?'#c0392b':'#c08000')+';color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:800;white-space:nowrap">'+esc(_pfItem.num)+'</span>';
-        _pfRows+='<span style="font-size:11.5px;font-weight:700;color:'+(_pfHasBlk?'#7a1a1a':'#5a3800')+';flex:1;min-width:100px">'+esc(_pfItem.o.title)+'</span>';
+        // Combined Obs number + type badge (single place)
+        _pfRows+='<span style="display:inline-flex;align-items:center;gap:0;border-radius:5px;overflow:hidden;flex-shrink:0">'
+          +'<span style="background:#1a3557;color:#fff;padding:2px 7px;font-size:10px;font-weight:800;white-space:nowrap">'+esc(_pfItem.num)+'</span>'
+          +'<span style="background:'+_pfTypeBg+';color:#fff;padding:2px 7px;font-size:10px;font-weight:700;white-space:nowrap">'+(_pfObsType==='repeated'?'Repeated':'New')+'</span>'
+          +'</span>';
+        _pfRows+='<span style="font-size:11.5px;font-weight:700;color:'+(_pfHasBlk?'#7a1a1a':'#5a3800')+';flex:1;min-width:80px">'+esc(_pfItem.o.title)+'</span>';
         if(_pfHasBlk) _pfRows+='<span style="font-size:10px;font-weight:700;background:#c0392b;color:#fff;border-radius:10px;padding:2px 8px;white-space:nowrap">&#9888; '+_pfItem.r.blocking.length+' Must Fix</span>';
         if(_pfItem.r.advisory.length) _pfRows+='<span style="font-size:10px;font-weight:700;background:#e6a020;color:#fff;border-radius:10px;padding:2px 8px;white-space:nowrap;margin-left:2px">&#9432; '+_pfItem.r.advisory.length+' Advisory</span>';
-        // Go to Obs button — calls global _pfNavToObs()
+        // Edit button — number NOT repeated here
         _pfRows+='<button onclick="_pfNavToObs(\''+_pfItem.o.id+'\')" '
           +'style="margin-left:4px;padding:4px 10px;background:#1a3557;color:#fff;border:none;border-radius:5px;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">'
-          +'&#8595; Go to '+esc(_pfItem.num)+'</button>';
+          +'&#9998; Edit</button>';
         _pfRows+='</div>';
         // Issue detail rows
         _pfRows+='<div style="padding:5px 10px 3px">';
