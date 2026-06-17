@@ -14796,7 +14796,7 @@ function showSaveDialog(){
     // Build observation numbers exactly matching renderRpt:
     // num resets to 0 at the start of each section (Repeated, then New),
     // so "Obs. 3 Repeated" and "Obs. 3 New" can both exist — same as the draft report.
-    var _pfNumMap={};
+    var _pfNumMap={}, _pfOrdered=[];
     (function(){
       var _rp=[],_nw=[];
       for(var _ni=0;_ni<_pfAll.length;_ni++){
@@ -14808,17 +14808,17 @@ function showSaveDialog(){
         var g=buildCatGroupsFor(list);
         for(var ci=0;ci<g.catOrder.length;ci++){
           var ob=g.cats[g.catOrder[ci]];
-          for(var oi=0;oi<ob.length;oi++){_n++;_pfNumMap[ob[oi].id]='Obs. '+secPfx+'.'+_n;}
+          for(var oi=0;oi<ob.length;oi++){_n++;_pfNumMap[ob[oi].id]='Obs. '+secPfx+'.'+_n;_pfOrdered.push(ob[oi]);}
         }
       }
       _assign(_rp,'1');
       _assign(_nw,'2');
     }());
 
-    // Run readiness on all observations
+    // Run readiness on all observations in report order
     var _pfIssues=[], _pfBlocking=0, _pfAdvisory=0;
-    for(var _pfi=0;_pfi<_pfAll.length;_pfi++){
-      var _pfo=_pfAll[_pfi];
+    for(var _pfi=0;_pfi<_pfOrdered.length;_pfi++){
+      var _pfo=_pfOrdered[_pfi];
       var _pfr=getObsReadiness(_pfo);
       if(_pfr.blocking.length||_pfr.advisory.length){
         _pfIssues.push({o:_pfo,r:_pfr,num:_pfNumMap[_pfo.id]||''});
