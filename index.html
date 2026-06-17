@@ -14676,29 +14676,39 @@ window._pfNavToObs = function(obsId){
   // 1. Fully remove the overlay so nothing blocks the page
   var ov=document.getElementById('_pfOv'); if(ov) ov.remove();
 
-  // 2. Scroll the card into view
-  var card=document.getElementById('oc-'+obsId);
-  if(card) card.scrollIntoView({behavior:'smooth',block:'center'});
-
-  // 3. Re-run readiness and highlight the exact fields that need attention
+  // 2. Find obs object first (needed for highlighting)
   var obsObj=null;
   for(var _i=0;_i<DB.observations.length;_i++){if(DB.observations[_i].id===obsId){obsObj=DB.observations[_i];break;}}
   if(!obsObj) for(var _ci=0;_ci<customs.length;_ci++){if(customs[_ci].id===obsId){obsObj=customs[_ci];break;}}
 
-  if(obsObj){
-    var _r=getObsReadiness(obsObj);
-    // field name → DOM element id(s) inside the observation card
-    var _fmap={
-      'Observation':     ['oe-'+obsId],
-      'Recommendation':  ['re-'+obsId],
-      'Prior Audit Ref': ['lr-rpt-'+obsId],
-      'Report Reference':['lr-rpt-'+obsId],
-      'Sensitivity':     ['sens-sel-'+obsId],
-      'COSO':            ['coso-sel-'+obsId],
-      'Financial Impact':['fw-inst-'+obsId,'fw-amt-'+obsId]
-    };
-    // Remove any previous highlights on this card
-    if(card){ var _old=card.querySelectorAll('._pf-hl-badge'); for(var _oi=0;_oi<_old.length;_oi++)_old[_oi].remove(); }
+  // 3. Delay scroll so the page fully settles after overlay removal before scrolling.
+  //    Without this the browser's scroll-restoration fires after scrollIntoView,
+  //    landing one card too early.
+  setTimeout(function(){
+    var card=document.getElementById('oc-'+obsId);
+    if(card){
+      // Get card's absolute top position and scroll there minus a fixed offset
+      // so the toolbar doesn't cover it (more reliable than scrollIntoView block:'center')
+      var rect=card.getBoundingClientRect();
+      var absTop=window.pageYOffset+rect.top;
+      var offset=80; // pixels below top of viewport to land the card
+      window.scrollTo({top:Math.max(0,absTop-offset),behavior:'smooth'});
+    }
+
+    // 4. Highlight exact fields after scroll settles
+    if(obsObj && card){
+      var _r=getObsReadiness(obsObj);
+      var _fmap={
+        'Observation':     ['oe-'+obsId],
+        'Recommendation':  ['re-'+obsId],
+        'Prior Audit Ref': ['lr-rpt-'+obsId],
+        'Report Reference':['lr-rpt-'+obsId],
+        'Sensitivity':     ['sens-sel-'+obsId],
+        'COSO':            ['coso-sel-'+obsId],
+        'Financial Impact':['fw-inst-'+obsId,'fw-amt-'+obsId]
+      };
+      // Clear any stale highlights on this card
+      var _old=card.querySelectorAll('._pf-hl-badge'); for(var _oi=0;_oi<_old.length;_oi++)_old[_oi].remove();
 
     setTimeout(function(){
       function _hlField(elId, color, fieldLabel, isBlocking){
@@ -14727,10 +14737,12 @@ window._pfNavToObs = function(obsId){
         var _aids=_fmap[_r.advisory[_ai].field]||[];
         for(var _aii=0;_aii<_aids.length;_aii++) _hlField(_aids[_aii],'#c08000',_r.advisory[_ai].field,false);
       }
-    },500);
-  }
+    },600); // wait for smooth scroll to finish before highlighting
+    } // end if(obsObj && card)
 
-  // 4. Show / refresh the floating resume bar
+  },150); // end scroll-settle timeout
+
+  // 5. Show / refresh the floating resume bar immediately
   window._pfRefreshFloat();
 };
 
