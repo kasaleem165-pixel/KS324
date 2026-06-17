@@ -8270,7 +8270,7 @@ function pwCheck(){
 // LOAD DATA from safe JSON tag
 // ============================================================
 var DB = JSON.parse(document.getElementById('audit-data').textContent);
-var BHS_BRANCHES = JSON.parse(document.getElementById('branch-data').textContent);
+var BSS_BRANCHES = JSON.parse(document.getElementById('branch-data').textContent);
 
 // ============================================================
 // BRANCH AUTO-FILL
@@ -8282,8 +8282,8 @@ var BHS_BRANCHES = JSON.parse(document.getElementById('branch-data').textContent
   var dlCity=document.getElementById('dl-brcity');
   var codeH='', nameH='';
   var regions={}, cities={};
-  for(var i=0;i<BHS_BRANCHES.length;i++){
-    var b=BHS_BRANCHES[i];
+  for(var i=0;i<BSS_BRANCHES.length;i++){
+    var b=BSS_BRANCHES[i];
     codeH+='<option value="'+esc(b.code)+'">'+esc(b.name)+'</option>';
     nameH+='<option value="'+esc(b.name)+'"></option>';
     if(b.region) regions[b.region]=1;
@@ -8303,16 +8303,16 @@ function brAutoFill(field, val){
   val=val.trim();
   var b=null;
   // Exact match on unique-key fields
-  for(var i=0;i<BHS_BRANCHES.length;i++){
-    var br=BHS_BRANCHES[i];
+  for(var i=0;i<BSS_BRANCHES.length;i++){
+    var br=BSS_BRANCHES[i];
     if(field==='code' && br.code===val){ b=br; break; }
     if(field==='name' && br.name===val){ b=br; break; }
   }
   // For region or city: fill only if exactly one branch matches
   if(!b && (field==='region'||field==='city')){
     var matches=[];
-    for(var j=0;j<BHS_BRANCHES.length;j++){
-      if(BHS_BRANCHES[j][field]===val) matches.push(BHS_BRANCHES[j]);
+    for(var j=0;j<BSS_BRANCHES.length;j++){
+      if(BSS_BRANCHES[j][field]===val) matches.push(BSS_BRANCHES[j]);
     }
     if(matches.length===1) b=matches[0];
   }
@@ -8323,7 +8323,7 @@ function brAutoFill(field, val){
   setFld('brregion', b.region);
   setFld('brcity',   b.city);
   // Auto-fill address from saved directory
-  var savedAddrs=sg('bhs_br_addr',{});
+  var savedAddrs=sg('bss_br_addr',{});
   var addr=savedAddrs[b.code]||'';
   setFld('braddress', addr);
 }
@@ -8332,9 +8332,9 @@ function saveBrAddress(){
   var code=document.getElementById('brcode').value.trim();
   var addr=document.getElementById('braddress').value.trim();
   if(!code) return;
-  var savedAddrs=sg('bhs_br_addr',{});
+  var savedAddrs=sg('bss_br_addr',{});
   if(addr) savedAddrs[code]=addr; else delete savedAddrs[code];
-  ss('bhs_br_addr', savedAddrs);
+  ss('bss_br_addr', savedAddrs);
 }
 
 // ============================================================
@@ -8411,11 +8411,11 @@ function idbGetUsageInfo(cb){
 }
 
 // ============================================================
-// DATABANK EXTENSION (persisted in localStorage)
+// DATABANK EXTENSION (persisted in localStorage) — S&A Dept.
 // New observations approved from final reports are stored here
 // and merged into DB.observations so all existing code sees them
 // ============================================================
-var DB_EXT_KEY = 'bhs_dbext_v1';
+var DB_EXT_KEY = 'bss_dbext_v1';
 (function initDbExt(){
   var ext = sg(DB_EXT_KEY, []);
   // Merge into DB.observations — only add if ID not already present
@@ -8430,9 +8430,9 @@ var DB_EXT_KEY = 'bhs_dbext_v1';
 })();
 function ss(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 (function(){
-  if(sg('bhs_v','')!==STORE_VER){
-    ['bhs_v','bhs_br','bhs_pb','bhs_ty','bhs_ca'].forEach(function(k){try{localStorage.removeItem(k);}catch(e){}});
-    ss('bhs_v',STORE_VER);
+  if(sg('bss_v','')!==STORE_VER){
+    ['bss_v','bss_br','bss_pb','bss_ty','bss_ca'].forEach(function(k){try{localStorage.removeItem(k);}catch(e){}});
+    ss('bss_v',STORE_VER);
   }
 })();
 
@@ -8454,9 +8454,9 @@ function catOrderByDef(catsObj){
 // ============================================================
 // APP STATE
 // ============================================================
-var PREPBY   = sg('bhs_pb', DEF_PB);
-var TYPES    = sg('bhs_ty', DEF_TY);
-var CATS     = sg('bhs_ca', DEF_CA);
+var PREPBY   = sg('bss_pb', DEF_PB);
+var TYPES    = sg('bss_ty', DEF_TY);
+var CATS     = sg('bss_ca', DEF_CA);
 
 var selIds   = {};   // {obsId: true}
 var annexMap = {};   // {obsId: "text"}
@@ -8514,7 +8514,7 @@ window.onload = function() {
     if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();applyFilter();}
   });
   // Apply persisted observation text overrides to in-memory DB
-  var stored=sg('bhs_obs_overrides',{});
+  var stored=sg('bss_obs_overrides',{});
   var okeys=Object.keys(stored);
   for(var oi=0;oi<okeys.length;oi++){
     var oid=okeys[oi];
@@ -9475,7 +9475,7 @@ function getHdrVals(){
 // SESSION SAVE / VERSION HISTORY  (max 6 versions in localStorage)
 // ============================================================
 var MAX_VERSIONS = 6;
-var VH_KEY = 'bhs_sessions';
+var VH_KEY = 'bss_sessions';
 
 function captureSession() {
   syncAnnexTextFromDom();
@@ -9680,7 +9680,7 @@ function closeVH(){var m=document.getElementById('vhModal');if(m)m.parentNode.re
 // FULL DATA BACKUP — export / restore all app localStorage data
 // Use before replacing the app file with a new version from HO
 // ============================================================
-var APP_DATA_KEYS = ['bhs_dbext_v1','bhs_v','bhs_br','bhs_pb','bhs_ty','bhs_ca','bhs_br_addr'];
+var APP_DATA_KEYS = ['bss_dbext_v1','bss_v','bss_br','bss_pb','bss_ty','bss_ca','bss_br_addr'];
 var APP_IDB_KEYS  = [VH_KEY, AS_KEY]; // large data now in IndexedDB
 
 function exportFullBackup(){
@@ -9728,7 +9728,7 @@ function importFullBackup(event){
       }
       // Restore IDB keys (v2 backup) or legacy sessions (v1 backup)
       var idbData = backup.idb || {};
-      // Legacy v1: sessions were in data['bhs_sessions']
+      // Legacy v1: sessions were in data['bss_sessions']
       if(backup._version<2 && backup.data[VH_KEY]) idbData[VH_KEY]=backup.data[VH_KEY];
       var idbKeys = Object.keys(idbData);
       var pending = idbKeys.length || 1;
@@ -9897,7 +9897,7 @@ var _reportEverGenerated = false;  // dirty popup only active after first genera
 // ============================================================
 // CONTINUOUS AUTO-SAVE
 // ============================================================
-var AS_KEY = 'bhs_autosave_v1'; // separate from version history
+var AS_KEY = 'bss_autosave_v1'; // separate from version history
 
 function autoSaveNow(){
   try{
@@ -10108,7 +10108,7 @@ function flushObsEditsToDb(){
   var editIds=Object.keys(obsEdits);
   if(!editIds.length) return;
   // Load persisted overrides or start fresh
-  var stored=sg('bhs_obs_overrides',{});
+  var stored=sg('bss_obs_overrides',{});
   for(var i=0;i<editIds.length;i++){
     var id=editIds[i];
     var ed=obsEdits[id];
@@ -10133,7 +10133,7 @@ function flushObsEditsToDb(){
     if(ed.observation!=null) stored[id].observation=ed.observation;
     if(ed.recommendation!=null) stored[id].recommendation=ed.recommendation;
   }
-  ss('bhs_obs_overrides', stored);
+  ss('bss_obs_overrides', stored);
   // Clear obsEdits since edits are now the DB baseline
   obsEdits={};
 }
@@ -10677,7 +10677,7 @@ function editBr(i){
     var code=document.getElementById('bcode'+i).value.trim();
     var name=document.getElementById('bname'+i).value.trim();
     if(!code||!name){toast('Code and name required.');return;}
-    BRANCHES[i].code=code; BRANCHES[i].name=name; ss('bhs_br',BRANCHES);
+    BRANCHES[i].code=code; BRANCHES[i].name=name; ss('bss_br',BRANCHES);
     buildBrSel(); renderRpt();
     lab.innerHTML='<strong>'+esc(code)+'</strong> – '+esc(name);
     lab.style.display=''; ed.style.display='none'; btn.textContent='Edit';
@@ -10686,22 +10686,22 @@ function editBr(i){
 
 function delBr(i){
   if(!confirm('Delete branch "'+BRANCHES[i].name+'"?'))return;
-  BRANCHES.splice(i,1); ss('bhs_br',BRANCHES); buildBrSel(); openM('branch');
+  BRANCHES.splice(i,1); ss('bss_br',BRANCHES); buildBrSel(); openM('branch');
 }
 
 function addBr(){
   var code=document.getElementById('nbcode').value.trim();
   var name=document.getElementById('nbname').value.trim();
   if(!code||!name){toast('Enter code and name.');return;}
-  BRANCHES.push({id:'B'+Date.now(),code:code,name:name}); ss('bhs_br',BRANCHES);
+  BRANCHES.push({id:'B'+Date.now(),code:code,name:name}); ss('bss_br',BRANCHES);
   buildBrSel(); openM('branch'); toast('Branch added.');
 }
 
 function getArr(k){return k==='prepby'?PREPBY:k==='type'?TYPES:CATS;}
 function saveArr(k,a){
-  if(k==='prepby'){PREPBY=a;ss('bhs_pb',a);buildSel('spb',a);}
-  else if(k==='type'){TYPES=a;ss('bhs_ty',a);buildSel('styp',a);}
-  else{CATS=a;ss('bhs_ca',a);buildSel('scat',a);buildCatSel();}
+  if(k==='prepby'){PREPBY=a;ss('bss_pb',a);buildSel('spb',a);}
+  else if(k==='type'){TYPES=a;ss('bss_ty',a);buildSel('styp',a);}
+  else{CATS=a;ss('bss_ca',a);buildSel('scat',a);buildCatSel();}
 }
 
 function renderListM(b, key){
@@ -12073,7 +12073,7 @@ function downloadSoftCopy(){
   // Inline JS — Layer 1 (auto-save) + Layer 2 (save/load progress file)
   softHtml+='<script>\n';
   softHtml+='var _meta=JSON.parse(document.getElementById("report-meta").textContent||"{}"),\n';
-  softHtml+='    _KEY="bhs_ar_"+(_meta.rno||"")+"|"+(_meta.brcode||"");\n';
+  softHtml+='    _KEY="bss_ar_"+(_meta.rno||"")+"|"+(_meta.brcode||"");\n';
   // Save file with picker (showSaveFilePicker) or fallback
   softHtml+='function saveFileAs(blob,name){\n';
   softHtml+='  var ext=(name.split(".").pop()||"").toLowerCase();\n';
@@ -14800,7 +14800,7 @@ function toast(msg){
 // ===================================================================
 // AUDIT WORK STATUS — embedded panel
 // ===================================================================
-var AWS_STORE_KEY = 'bhs_aws_v1_data';
+var AWS_STORE_KEY = 'bss_aws_v1_data';
 var aws_state = {};
 var aws_catCollapsed = [];
 var aws_rptTab = 'table';
@@ -15358,9 +15358,9 @@ function toggleRAPanel(){
 
 function ra_initBranches(){
   if(RA_BRANCHES.length) return;
-  // Share the same branch list as the Report Interface (BHS_BRANCHES from #branch-data)
-  if(typeof BHS_BRANCHES !== 'undefined' && BHS_BRANCHES.length){
-    RA_BRANCHES = BHS_BRANCHES;
+  // Share the same branch list as the Report Interface (BSS_BRANCHES from #branch-data)
+  if(typeof BSS_BRANCHES !== 'undefined' && BSS_BRANCHES.length){
+    RA_BRANCHES = BSS_BRANCHES;
   } else {
     var el=document.getElementById('ra-branch-data');
     if(el && el.textContent.trim()){ try{ RA_BRANCHES=JSON.parse(el.textContent); }catch(e){ RA_BRANCHES=[]; } }
@@ -15368,10 +15368,10 @@ function ra_initBranches(){
   ra_buildBranchDatalist();
 }
 
-// Called whenever BHS_BRANCHES changes so the RA branch select stays in sync
+// Called whenever BSS_BRANCHES changes so the RA branch select stays in sync
 function ra_syncBranchList(){
-  if(typeof BHS_BRANCHES !== 'undefined'){
-    RA_BRANCHES = BHS_BRANCHES;
+  if(typeof BSS_BRANCHES !== 'undefined'){
+    RA_BRANCHES = BSS_BRANCHES;
     ra_buildBranchSelect();
   }
 }
@@ -16578,7 +16578,7 @@ function ra_methodologyHtml(){
 </script>
 
 <!-- ===== RISK ASSESSMENT PANEL ===== -->
-<!-- ra-branch-data is intentionally empty; RA panel uses BHS_BRANCHES from #branch-data (same source as Report Interface) -->
+<!-- ra-branch-data is intentionally empty; RA panel uses BSS_BRANCHES from #branch-data (same source as Report Interface) -->
 <script type="application/json" id="ra-branch-data">
 </script>
 <div id="ra-panel" style="display:none;max-width:100%;background:#f0f3f8;min-height:calc(100vh - 50px)">
