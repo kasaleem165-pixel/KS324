@@ -8338,10 +8338,77 @@ function saveBrAddress(){
 }
 
 // ============================================================
-// STORAGE HELPERS
+// STORAGE HELPERS  (localStorage for small settings)
 // ============================================================
 var STORE_VER = 'v6';
 function sg(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+
+// ============================================================
+// INDEXEDDB — large session/version storage (replaces localStorage for sessions)
+// Falls back to localStorage automatically if IndexedDB unavailable
+// ============================================================
+var IDB_NAME='sa_audit_idb', IDB_VER=1, IDB_STORE='sessions';
+var _idb=null, _idbReady=false, _idbQueue=[];
+(function initIDB(){
+  if(!window.indexedDB){ _idbReady=true; return; }
+  try{
+    var req=indexedDB.open(IDB_NAME,IDB_VER);
+    req.onupgradeneeded=function(e){
+      var db=e.target.result;
+      if(!db.objectStoreNames.contains(IDB_STORE))
+        db.createObjectStore(IDB_STORE,{keyPath:'key'});
+    };
+    req.onsuccess=function(e){
+      _idb=e.target.result; _idbReady=true;
+      // Migrate existing localStorage sessions to IDB (one-time)
+      try{
+        var old=localStorage.getItem(VH_KEY);
+        if(old){ idbSet(VH_KEY,JSON.parse(old),function(){ try{localStorage.removeItem(VH_KEY);}catch(ex){} }); }
+        var oldAs=localStorage.getItem(AS_KEY);
+        if(oldAs){ idbSet(AS_KEY,JSON.parse(oldAs),function(){ try{localStorage.removeItem(AS_KEY);}catch(ex){} }); }
+      }catch(ex){}
+      _idbQueue.forEach(function(fn){fn();}); _idbQueue=[];
+    };
+    req.onerror=function(){ _idbReady=true; _idbQueue.forEach(function(fn){fn();}); _idbQueue=[]; };
+  }catch(ex){ _idbReady=true; }
+})();
+
+function idbSet(key,val,cb){
+  if(!_idb){ ss(key,val); if(cb)cb(); return; }
+  try{
+    var tx=_idb.transaction(IDB_STORE,'readwrite');
+    var req=tx.objectStore(IDB_STORE).put({key:key,val:val});
+    req.onsuccess=function(){ if(cb)cb(); };
+    req.onerror=function(){ ss(key,val); if(cb)cb(); };
+  }catch(ex){ ss(key,val); if(cb)cb(); }
+}
+function idbGet(key,def,cb){
+  if(!_idb){ cb(sg(key,def)); return; }
+  try{
+    var tx=_idb.transaction(IDB_STORE,'readonly');
+    var req=tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess=function(e){ cb(e.target.result?e.target.result.val:def); };
+    req.onerror=function(){ cb(sg(key,def)); };
+  }catch(ex){ cb(sg(key,def)); }
+}
+function idbDel(key,cb){
+  if(!_idb){ try{localStorage.removeItem(key);}catch(ex){} if(cb)cb(); return; }
+  try{
+    var tx=_idb.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).delete(key);
+    tx.oncomplete=function(){ if(cb)cb(); };
+  }catch(ex){ try{localStorage.removeItem(key);}catch(e2){} if(cb)cb(); }
+}
+// IDB usage info for storage display
+function idbGetUsageInfo(cb){
+  if(!_idb){ cb({used:'localStorage',sessions:'unknown',limit:'5-10 MB'}); return; }
+  idbGet(VH_KEY,[],function(sessions){
+    var count=Array.isArray(sessions)?sessions.length:0;
+    var size=0;
+    try{ size=new Blob([JSON.stringify(sessions)]).size; }catch(ex){}
+    cb({used:'IndexedDB',sessions:count,size:size});
+  });
+}
 
 // ============================================================
 // DATABANK EXTENSION (persisted in localStorage)
@@ -8461,45 +8528,44 @@ window.onload = function() {
     }
   }
   // Auto-restore: prefer auto-save if newer than latest manual version
-  var sessions = sg(VH_KEY, []);
-  var autoSaved = sg(AS_KEY, null);
-  var restored = false;
-
-  // Pick the most recent source
-  var manualLatest = null;
-  if(sessions.length){
-    sessions.sort(function(a,b){return (b.ver||0)-(a.ver||0);});
-    manualLatest = sessions[0];
-  }
-
-  var useAuto = false;
-  if(autoSaved && autoSaved._autoSavedAt){
-    if(!manualLatest){
-      useAuto = true;
-    } else {
-      useAuto = (autoSaved._autoSavedAt > (manualLatest.ts||''));
+  // Uses IndexedDB (async) with localStorage fallback
+  function _doAutoRestore(sessions, autoSaved){
+    var manualLatest = null;
+    if(sessions && sessions.length){
+      sessions.sort(function(a,b){return (b.ver||0)-(a.ver||0);});
+      manualLatest = sessions[0];
     }
-  }
-
-  var sourceSession = useAuto ? autoSaved : manualLatest;
-
-  if(sourceSession){
-    var hasWork = (sourceSession.selCount > 0) ||
-                  (sourceSession.formData && sourceSession.formData.brname);
-    if(hasWork){
-      _brInfoHasData = true;
-      restoreSession(sourceSession);
-      var brn = (sourceSession.formData && sourceSession.formData.brname) || 'your last session';
-      var savedAt = useAuto ? sourceSession._autoSavedAt : sourceSession.ts;
-      var savedLabel = savedAt ? fmtTs(savedAt) : '';
-      showWelcomeBack(brn, savedLabel, useAuto);
-      restored = true;
+    var useAuto = false;
+    if(autoSaved && autoSaved._autoSavedAt){
+      useAuto = !manualLatest || (autoSaved._autoSavedAt > (manualLatest.ts||''));
     }
+    var sourceSession = useAuto ? autoSaved : manualLatest;
+    if(sourceSession){
+      var hasWork = (sourceSession.selCount > 0) ||
+                    (sourceSession.formData && sourceSession.formData.brname);
+      if(hasWork){
+        _brInfoHasData = true;
+        restoreSession(sourceSession);
+        var brn = (sourceSession.formData && sourceSession.formData.brname) || 'your last session';
+        var savedAt = useAuto ? sourceSession._autoSavedAt : sourceSession.ts;
+        showWelcomeBack(brn, savedAt ? fmtTs(savedAt) : '', useAuto);
+      }
+    }
+    updateStageBadge();
+    if(_brInfoHasData) lockBrInfo();
+    showPrompt();
   }
 
-  updateStageBadge();
-  if(_brInfoHasData) lockBrInfo();
-  showPrompt();
+  function _startRestore(){
+    idbGet(VH_KEY, [], function(sessions){
+      idbGet(AS_KEY, null, function(autoSaved){
+        _doAutoRestore(sessions, autoSaved);
+      });
+    });
+  }
+
+  if(_idbReady){ _startRestore(); }
+  else { _idbQueue.push(_startRestore); }
 
   // Warn before closing if any data exists
   window.onbeforeunload = function(e){
@@ -9512,49 +9578,30 @@ function restoreSession(sess) {
   captureLpBaseline();
 }
 
-function saveVersion() {
-  var sessions = sg(VH_KEY, []);
-  var sess = captureSession();
-  var selCount = Object.keys(selIds).length;
-  // Count pending adds too
-  var pids=Object.keys(window.pendingSel||{});
-  for(var pi=0;pi<pids.length;pi++){if(window.pendingSel[pids[pi]].checked)selCount++;}
-  sess.selCount = selCount;
-  // Auto-increment version number
-  var maxVer = 0;
-  for(var i=0;i<sessions.length;i++){if((sessions[i].ver||0)>maxVer)maxVer=sessions[i].ver||0;}
-  sess.ver = maxVer + 1;
-
-  var deleted = null;
-  if(sessions.length >= MAX_VERSIONS){
-    // Remove the oldest (lowest ver number)
-    sessions.sort(function(a,b){return (a.ver||0)-(b.ver||0);});
-    deleted = sessions.shift();
-  }
-  sessions.push(sess);
-  // Try saving with full file data; if localStorage quota is exceeded, strip file blobs and retry
-  try {
-    localStorage.setItem(VH_KEY, JSON.stringify(sessions));
-  } catch(e) {
-    // Strip file dataUrls (can be large) to fit in storage; user will need to re-attach files after restore
-    var stripped = sessions.map(function(s){
-      if(!s.annexures) return s;
-      var sc = JSON.parse(JSON.stringify(s));
-      sc.annexures = sc.annexures.map(function(a){
-        var ac=JSON.parse(JSON.stringify(a));
-        ac.files=(a.files||[]).map(function(f){return {name:f.name,type:f.type,dataUrl:'',_stripped:true};});
-        return ac;
-      });
-      return sc;
+function saveVersion(cb) {
+  idbGet(VH_KEY, [], function(sessions){
+    var sess = captureSession();
+    var selCount = Object.keys(selIds).length;
+    var pids=Object.keys(window.pendingSel||{});
+    for(var pi=0;pi<pids.length;pi++){if(window.pendingSel[pids[pi]].checked)selCount++;}
+    sess.selCount = selCount;
+    var maxVer = 0;
+    for(var i=0;i<sessions.length;i++){if((sessions[i].ver||0)>maxVer)maxVer=sessions[i].ver||0;}
+    sess.ver = maxVer + 1;
+    var deleted = null;
+    if(sessions.length >= MAX_VERSIONS){
+      sessions.sort(function(a,b){return (a.ver||0)-(b.ver||0);});
+      deleted = sessions.shift();
+    }
+    sessions.push(sess);
+    idbSet(VH_KEY, sessions, function(){
+      updateAutoSaveLabel();
+      _brInfoHasData = true;
+      lockBrInfo();
+      if(cb) cb({ver: sess.ver, deleted: deleted});
     });
-    try { localStorage.setItem(VH_KEY, JSON.stringify(stripped)); } catch(e2) {}
-  }
-
-  // Update autosave indicator and re-lock branch info
-  updateAutoSaveLabel();
-  _brInfoHasData = true;
-  lockBrInfo();
-  return {ver: sess.ver, deleted: deleted};
+  });
+  return {ver: -1, deleted: null}; // immediate return; actual result via cb
 }
 
 function updateAutoSaveLabel(){
@@ -9574,7 +9621,11 @@ function fmtTs(iso){
 }
 
 function showVersionHistory(){
-  var sessions = sg(VH_KEY, []);
+  idbGet(VH_KEY, [], function(sessions){
+    _renderVersionHistory(sessions);
+  });
+}
+function _renderVersionHistory(sessions){
   sessions.sort(function(a,b){return (b.ver||0)-(a.ver||0);}); // newest first
 
   var rows='';
@@ -9609,7 +9660,7 @@ function showVersionHistory(){
     '<div class="vh-box">'+
     '<div class="vh-head"><h3>&#128190; Save &amp; Version History</h3><button onclick="closeVH()">&#10005;</button></div>'+
     '<div class="vh-body">'+
-    '<p>Up to <strong>'+MAX_VERSIONS+' versions</strong> are kept. When the limit is reached, the oldest version is deleted automatically.</p>'+
+    '<p>Up to <strong>'+MAX_VERSIONS+' versions</strong> are kept in <strong>IndexedDB</strong> (large capacity — no 5 MB limit). When the limit is reached, the oldest version is removed automatically. Always export a .json file for permanent backup.</p>'+
     '<div class="vh-list">'+rows+'</div>'+
     '</div>'+
     '<div class="vh-autosave"><span class="vh-dot"></span><span id="autosave-ts">Last saved: '+lastSave+'</span></div>'+
@@ -9621,7 +9672,7 @@ function showVersionHistory(){
     '<button class="vh-close-btn" onclick="closeVH()">Close</button>'+
     '</div></div>';
   document.body.appendChild(el);
-}
+} // end _renderVersionHistory
 
 function closeVH(){var m=document.getElementById('vhModal');if(m)m.parentNode.removeChild(m);}
 
@@ -9629,21 +9680,31 @@ function closeVH(){var m=document.getElementById('vhModal');if(m)m.parentNode.re
 // FULL DATA BACKUP — export / restore all app localStorage data
 // Use before replacing the app file with a new version from HO
 // ============================================================
-var APP_DATA_KEYS = ['bhs_sessions','bhs_dbext_v1','bhs_v','bhs_br','bhs_pb','bhs_ty','bhs_ca','bhs_br_addr'];
+var APP_DATA_KEYS = ['bhs_dbext_v1','bhs_v','bhs_br','bhs_pb','bhs_ty','bhs_ca','bhs_br_addr'];
+var APP_IDB_KEYS  = [VH_KEY, AS_KEY]; // large data now in IndexedDB
 
 function exportFullBackup(){
-  var backup = { _type:'SA_FullDataBackup', _version:1, _exportedAt:new Date().toISOString(), data:{} };
+  var backup = { _type:'SA_FullDataBackup', _version:2, _exportedAt:new Date().toISOString(), data:{}, idb:{} };
+  // Collect small localStorage settings
   for(var i=0;i<APP_DATA_KEYS.length;i++){
-    try{
-      var raw = localStorage.getItem(APP_DATA_KEYS[i]);
-      if(raw !== null) backup.data[APP_DATA_KEYS[i]] = JSON.parse(raw);
-    }catch(e){}
+    try{ var raw=localStorage.getItem(APP_DATA_KEYS[i]); if(raw!==null) backup.data[APP_DATA_KEYS[i]]=JSON.parse(raw); }catch(e){}
   }
-  var count = Object.keys(backup.data).length;
-  if(!count){ toast('No app data found to back up.'); return; }
-  var fname = 'SA_AppDataBackup_'+new Date().toISOString().substring(0,10)+'.json';
-  saveFileAs(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}), fname);
-  toast('Full data backup saved ('+count+' data stores). Keep this file safe before updating the app.');
+  // Collect IDB keys (sessions + autosave)
+  var pending = APP_IDB_KEYS.length;
+  function finish(){
+    var count = Object.keys(backup.data).length + Object.keys(backup.idb).length;
+    if(!count){ toast('No app data found to back up.'); return; }
+    var fname = 'SA_AppDataBackup_'+new Date().toISOString().substring(0,10)+'.json';
+    saveFileAs(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}), fname);
+    toast('Full data backup saved (IndexedDB + settings). Keep this file safe.');
+  }
+  APP_IDB_KEYS.forEach(function(k){
+    idbGet(k, null, function(val){
+      if(val!==null) backup.idb[k]=val;
+      pending--;
+      if(pending<=0) finish();
+    });
+  });
 }
 
 function importFullBackup(event){
@@ -9657,15 +9718,23 @@ function importFullBackup(event){
         toast('Invalid file. Please select a valid Full Data Backup file.');
         event.target.value=''; return;
       }
-      if(!confirm('Restore all data from backup?\n\nThis will replace your current sessions, databank extensions, and settings with the data from the backup file.\n\nYour current data will be overwritten. Proceed?')){
+      if(!confirm('Restore all data from backup?\n\nThis will replace your current sessions, databank extensions, and settings.\n\nProceed?')){
         event.target.value=''; return;
       }
+      // Restore localStorage keys
       var keys = Object.keys(backup.data);
       for(var i=0;i<keys.length;i++){
         try{ localStorage.setItem(keys[i], JSON.stringify(backup.data[keys[i]])); }catch(e){}
       }
-      toast('Data restored from backup ('+keys.length+' stores). Reloading app...');
-      setTimeout(function(){ window.location.reload(); }, 1500);
+      // Restore IDB keys (v2 backup) or legacy sessions (v1 backup)
+      var idbData = backup.idb || {};
+      // Legacy v1: sessions were in data['bhs_sessions']
+      if(backup._version<2 && backup.data[VH_KEY]) idbData[VH_KEY]=backup.data[VH_KEY];
+      var idbKeys = Object.keys(idbData);
+      var pending = idbKeys.length || 1;
+      function done(){ toast('Data restored from backup. Reloading app...'); setTimeout(function(){window.location.reload();},1500); }
+      if(!idbKeys.length){ done(); return; }
+      idbKeys.forEach(function(k){ idbSet(k, idbData[k], function(){ pending--; if(pending<=0) done(); }); });
     }catch(ex){
       toast('Could not read backup file. Please select a valid SA_AppDataBackup file.');
     }
@@ -9675,54 +9744,56 @@ function importFullBackup(event){
 }
 
 function doSaveNow(){
-  var result=saveVersion();
   _lastSavedTs = Date.now();
   closeVH();
-  var msg='Version '+result.ver+' saved.';
-  if(result.deleted) msg+='\n\nOldest version (Ver. '+result.deleted.ver+', saved '+fmtTs(result.deleted.ts)+') has been removed to stay within the 6-version limit.';
-  toast(msg.split('\n\n')[0]);
-  if(result.deleted) setTimeout(function(){alert(msg);},400);
-  // Also offer Save As dialog to write the session to a file
-  var sess=captureSession();
-  var H=getHdrVals();
-  var brSlug=(H.brname||'SA').replace(/[^a-zA-Z0-9]+/g,'_').substring(0,25);
-  var fname='SA_Session_v'+result.ver+'_'+brSlug+'.json';
-  var blob=new Blob([JSON.stringify(sess,null,2)],{type:'application/json'});
-  saveFileAs(blob, fname);
+  saveVersion(function(result){
+    var msg='Version '+result.ver+' saved (IndexedDB).';
+    if(result.deleted) msg+='\n\nOldest version (Ver. '+result.deleted.ver+', saved '+fmtTs(result.deleted.ts)+') removed to stay within the '+MAX_VERSIONS+'-version limit.';
+    toast(msg.split('\n\n')[0]);
+    if(result.deleted) setTimeout(function(){alert(msg);},400);
+    // Also download session file to PC
+    var sess=captureSession();
+    var H=getHdrVals();
+    var brSlug=(H.brname||'SA').replace(/[^a-zA-Z0-9]+/g,'_').substring(0,25);
+    var fname='SA_Session_v'+result.ver+'_'+brSlug+'.json';
+    var blob=new Blob([JSON.stringify(sess,null,2)],{type:'application/json'});
+    saveFileAs(blob, fname);
+  });
 }
 
 function loadVersion(ver){
-  var sessions=sg(VH_KEY,[]);
-  for(var i=0;i<sessions.length;i++){
-    if((sessions[i].ver||0)===ver){
-      if(!confirm('Load Version '+ver+' (saved '+fmtTs(sessions[i].ts)+')?\n\nThis will replace your current unsaved work.')) return;
-      closeVH();
-      restoreSession(sessions[i]);
-      toast('Version '+ver+' loaded.');
-      return;
+  idbGet(VH_KEY,[],function(sessions){
+    for(var i=0;i<sessions.length;i++){
+      if((sessions[i].ver||0)===ver){
+        if(!confirm('Load Version '+ver+' (saved '+fmtTs(sessions[i].ts)+')?\n\nThis will replace your current unsaved work.')) return;
+        closeVH();
+        restoreSession(sessions[i]);
+        toast('Version '+ver+' loaded.');
+        return;
+      }
     }
-  }
+  });
 }
 
 function exportVersion(ver){
-  var sessions=sg(VH_KEY,[]);
-  for(var i=0;i<sessions.length;i++){
-    if((sessions[i].ver||0)===ver){
-      var blob=new Blob([JSON.stringify(sessions[i],null,2)],{type:'application/json'});
-      var brSlug=((sessions[i].formData&&sessions[i].formData.brname)||'SA').replace(/[^a-zA-Z0-9]+/g,'_').substring(0,25);
-      saveFileAs(blob,'SA_Session_v'+ver+'_'+brSlug+'.json');
-      return;
+  idbGet(VH_KEY,[],function(sessions){
+    for(var i=0;i<sessions.length;i++){
+      if((sessions[i].ver||0)===ver){
+        var blob=new Blob([JSON.stringify(sessions[i],null,2)],{type:'application/json'});
+        var brSlug=((sessions[i].formData&&sessions[i].formData.brname)||'SA').replace(/[^a-zA-Z0-9]+/g,'_').substring(0,25);
+        saveFileAs(blob,'SA_Session_v'+ver+'_'+brSlug+'.json');
+        return;
+      }
     }
-  }
+  });
 }
 
 function deleteVersion(ver){
   if(!confirm('Delete Version '+ver+' permanently?')) return;
-  var sessions=sg(VH_KEY,[]);
-  sessions=sessions.filter(function(s){return (s.ver||0)!==ver;});
-  ss(VH_KEY,sessions);
-  closeVH();
-  setTimeout(showVersionHistory,50);
+  idbGet(VH_KEY,[],function(sessions){
+    sessions=sessions.filter(function(s){return (s.ver||0)!==ver;});
+    idbSet(VH_KEY,sessions,function(){ closeVH(); setTimeout(showVersionHistory,50); });
+  });
 }
 
 function importSessionFile(e){
@@ -9734,19 +9805,17 @@ function importSessionFile(e){
       var sess=JSON.parse(ev.target.result);
       if(!sess.ts) throw new Error('Invalid session file');
       if(!confirm('Import session from file "'+file.name+'"?\n\nThis will replace your current unsaved work.')) return;
-      // Save as new version first then restore
-      sess.ver=(function(){
-        var all=sg(VH_KEY,[]);
-        var max=0;for(var i=0;i<all.length;i++){if((all[i].ver||0)>max)max=all[i].ver||0;}
-        return max+1;
-      })();
-      sess.ts=new Date().toISOString();
-      var sessions=sg(VH_KEY,[]);
-      if(sessions.length>=MAX_VERSIONS){sessions.sort(function(a,b){return (a.ver||0)-(b.ver||0);});sessions.shift();}
-      sessions.push(sess);
-      ss(VH_KEY,sessions);
-      restoreSession(sess);
-      toast('Session imported as Version '+sess.ver+'.');
+      idbGet(VH_KEY,[],function(sessions){
+        var max=0;for(var i=0;i<sessions.length;i++){if((sessions[i].ver||0)>max)max=sessions[i].ver||0;}
+        sess.ver=max+1;
+        sess.ts=new Date().toISOString();
+        if(sessions.length>=MAX_VERSIONS){sessions.sort(function(a,b){return (a.ver||0)-(b.ver||0);});sessions.shift();}
+        sessions.push(sess);
+        idbSet(VH_KEY,sessions,function(){
+          restoreSession(sess);
+          toast('Session imported as Version '+sess.ver+'.');
+        });
+      });
     } catch(err){alert('Could not load session file: '+err.message);}
     e.target.value='';
   };
@@ -9834,7 +9903,7 @@ function autoSaveNow(){
   try{
     var sess = captureSession();
     sess._autoSavedAt = new Date().toISOString();
-    localStorage.setItem(AS_KEY, JSON.stringify(sess));
+    idbSet(AS_KEY, sess);
   }catch(e){}
 }
 
