@@ -12193,21 +12193,53 @@ function downloadSoftCopy(){
   softHtml+='  for(var i=0;i<tas.length;i++){if(!tas[i].value.trim())blank.push("Obs. "+(tas[i].getAttribute("data-obs-num")||String(i+1)));}\n';
   softHtml+='  return blank;\n';
   softHtml+='}\n';
-  // Build response HTML
+  // Build response HTML — full formatted document with embedded JSON for import
   softHtml+='function buildHtml(data,isDraft){\n';
   softHtml+='  var json=JSON.stringify(data).replace(/<\\/script>/gi,"<\\\\/script>");\n';
   softHtml+='  var tas=document.querySelectorAll("textarea[name^=\\"resp_\\"]"),total=tas.length,done=0;\n';
   softHtml+='  for(var i=0;i<tas.length;i++){if(tas[i].value.trim())done++;}\n';
-  softHtml+='  var banner=isDraft?"<div style=\\"background:#c0392b;color:#fff;text-align:center;font-family:Arial,sans-serif;font-size:16px;font-weight:700;padding:14px 20px;letter-spacing:1px\\">&#9888; DRAFT &mdash; NOT FOR FORWARDING &mdash; "+done+" of "+total+" responses completed</div>":"";\n';
-  softHtml+='  return "<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>"+(isDraft?"[DRAFT] ":"")+"Auditee Responses<\\/title>"\n';
+  softHtml+='  var banner=isDraft?"<div style=\\"background:#c0392b;color:#fff;text-align:center;font-family:Arial,sans-serif;font-size:15px;font-weight:700;padding:12px 20px;letter-spacing:.5px\\">&#9888; DRAFT &mdash; NOT FOR FORWARDING &mdash; "+done+" of "+total+" responses completed</div>":"";\n';
+  // Clone #rp (contains only report content — action bar and notice are outside it)
+  softHtml+='  var clone=document.getElementById("rp").cloneNode(true);\n';
+  // Replace resp_ textareas with styled read-only divs showing the entered value
+  softHtml+='  var clTas=clone.querySelectorAll("textarea[name^=\\"resp_\\"]");\n';
+  softHtml+='  for(var ti=clTas.length-1;ti>=0;ti--){\n';
+  softHtml+='    var ct=clTas[ti],cv=data[ct.name]||"";\n';
+  softHtml+='    var cdv=document.createElement("div");\n';
+  softHtml+='    cdv.style.cssText="font-size:12.5px;line-height:1.65;white-space:pre-wrap;padding:4px 0;min-height:18px;"+(cv.trim()?"color:#2a3a50":"color:#aaa;font-style:italic");\n';
+  softHtml+='    cdv.textContent=cv.trim()||"(No response entered)";\n';
+  softHtml+='    ct.parentNode.replaceChild(cdv,ct);\n';
+  softHtml+='  }\n';
+  // Replace eta_ inputs with static spans
+  softHtml+='  var clInps=clone.querySelectorAll("input[name^=\\"eta_\\"]");\n';
+  softHtml+='  for(var ii=clInps.length-1;ii>=0;ii--){\n';
+  softHtml+='    var ci=clInps[ii],cv2=data[ci.name]||"";\n';
+  softHtml+='    var cisp=document.createElement("span");\n';
+  softHtml+='    cisp.style.cssText="font-size:13px;font-weight:600;color:#1a6030";\n';
+  softHtml+='    cisp.textContent=cv2||"\\u2014";\n';
+  softHtml+='    ci.parentNode.replaceChild(cisp,ci);\n';
+  softHtml+='  }\n';
+  // Submission stamp prepended at top of clone
+  softHtml+='  var stamp=document.createElement("div");\n';
+  softHtml+='  stamp.style.cssText="text-align:center;background:#1a3a5c;color:#fff;padding:12px 20px;border-radius:4px;margin-bottom:20px";\n';
+  softHtml+='  stamp.innerHTML=\'<div style="font-size:9px;letter-spacing:2px;color:#c9c070;text-transform:uppercase;margin-bottom:4px">Beaconhouse Group &nbsp;|&nbsp; Systems &amp; Audit</div>\'\n';
+  softHtml+='    +\'<div style="font-size:17px;font-weight:700;letter-spacing:.5px">AUDITEE RESPONSE DOCUMENT</div>\'\n';
+  softHtml+='    +(isDraft\n';
+  softHtml+='      ?\'<div style="font-size:11px;color:#ffc0c0;margin-top:4px">DRAFT &mdash; NOT FOR FORWARDING</div>\'\n';
+  softHtml+='      :\'<div style="font-size:11px;color:#a8ffb8;margin-top:4px">&#10003; FINAL SUBMISSION &mdash; \'+done+\' of \'+total+\' responses completed</div>\');\n';
+  softHtml+='  clone.insertBefore(stamp,clone.firstChild);\n';
+  // Footer appended at bottom
+  softHtml+='  var ftr=document.createElement("div");\n';
+  softHtml+='  ftr.style.cssText="margin-top:26px;padding-top:12px;border-top:1px solid #dde2ea;font-size:10px;color:#8a9ab0;text-align:center;line-height:1.9";\n';
+  softHtml+='  ftr.innerHTML="Beaconhouse Group &mdash; Systems &amp; Audit Department &mdash; Auditee Response Record<br>"\n';
+  softHtml+='    +"Generated: "+(new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}));\n';
+  softHtml+='  clone.appendChild(ftr);\n';
+  // Outer page styles
+  softHtml+='  var ocss="*{box-sizing:border-box}body{font-family:Inter,Arial,sans-serif;font-size:13px;color:#1e2d40;background:#f3f5f8;padding:20px}#wrap{max-width:860px;margin:0 auto}#rp{background:#fff;border-radius:6px;padding:28px 32px;box-shadow:0 2px 8px rgba(0,0,0,.1)}@media print{body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}}";\n';
+  // Return the full HTML — embedded JSON preserved for import; formatted body for human reading
+  softHtml+='  return "<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>"+(isDraft?"[DRAFT] ":"")+"Auditee Response<\\/title>"\n';
   softHtml+='    +\'<script id="bhs-resp-data" type="application/json">\'+json+\'<\\/script>\'\n';
-  softHtml+='    +"<\\/head><body style=\\"font-family:Arial,sans-serif;padding:0;color:#333\\">"\n';
-  softHtml+='    +banner\n';
-  softHtml+='    +"<div style=\\"padding:30px\\"><h2>&#128203; Auditee Response File<\\/h2>"\n';
-  softHtml+='    +"<p>Please email this file back to the auditor who will load it via the <strong>Load Response<\\/strong> button.<\\/p>"\n';
-  softHtml+='    +"<p style=\\"color:#888;font-size:12px\\">Responses completed: "+done+" of "+total+"<\\/p>"\n';
-  softHtml+='    +(isDraft?"<p style=\\"color:#c0392b;font-weight:700;font-size:13px\\">&#9888; DRAFT — Complete all responses before submitting the final version.<\\/p>":"")\n';
-  softHtml+='    +"<\\/div><\\/body><\\/html>";\n';
+  softHtml+='    +"<style>"+ocss+"<\\/style><\\/head><body>"+banner+\'<div id="wrap"><div id="rp">\'+clone.innerHTML+\'<\\/div><\\/div><\\/body><\\/html>\';\n';
   softHtml+='}\n';
   // Save Draft
   softHtml+='function saveDraft(){\n';
