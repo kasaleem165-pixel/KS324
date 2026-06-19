@@ -508,6 +508,14 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
 .aws-remark-btn.active{background:#fff8e1;border-color:#c9962a}
 .aws-remark-row td{padding:2px 10px 8px 10px!important}
 .aws-remark-input{width:100%;padding:5px 8px;border:1px solid #c9962a;border-radius:4px;font-size:12px;color:#333;font-family:inherit}
+.aws-risk-badge{display:inline-block;color:#fff;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700;letter-spacing:.3px;cursor:default;white-space:nowrap;line-height:1.4}
+.aws-risk-wrap{position:relative;display:inline-block}
+.aws-risk-wrap .aws-risk-tip{display:none;position:absolute;right:0;top:calc(100% + 5px);z-index:9999;background:#1a2d44;color:#fff;border-radius:6px;padding:9px 12px;min-width:230px;max-width:290px;box-shadow:0 4px 14px rgba(0,0,0,.28);font-size:11px;line-height:1.55;pointer-events:none}
+.aws-risk-wrap:hover .aws-risk-tip{display:block}
+.aws-risk-tip .tip-srr{font-size:10px;font-weight:800;letter-spacing:.4px;opacity:.75;margin-bottom:2px}
+.aws-risk-tip .tip-name{font-size:12px;font-weight:700;margin-bottom:5px}
+.aws-risk-tip .tip-rr{font-size:10.5px;color:#a8c8e8;margin-bottom:4px}
+.aws-risk-tip .tip-ctrl{font-size:10.5px;color:#c0dda0;border-top:1px solid rgba(255,255,255,.15);padding-top:5px;margin-top:3px}
 /* top controls within panel */
 #aws-top-controls{display:flex;align-items:center;gap:12px;margin-bottom:16px;background:#fff;border-radius:8px;padding:10px 16px;border:1px solid #dde3ec}
 #aws-branch-inp{padding:5px 10px;border:1px solid #c8d8ec;border-radius:4px;font-size:13px;font-family:inherit;width:200px}
@@ -9554,6 +9562,7 @@ function showDemoAuth(){
 // INIT
 // ============================================================
 window.onload = function() {
+  buildObsSrrCache();
   if(_hoAuthed) _hoActivateBtns();
   buildSel('spb', PREPBY);
   buildSel('scat', CATS);
@@ -14131,6 +14140,82 @@ var FW_CA={
   op:   {id:'CA-OPS-08',  name:'Operational Planning & Capacity Control',  desc:'Annual review of class capacity, space allocation, enrolment plans, and operational continuity compliance with BSS guidelines.'},
   gen:  {id:'CA-OPS-05',  name:'General Operations Compliance Control',    desc:'Routine review of branch administrative records, registers, and SOPs by the Branch Head and Accounts staff.'}
 };
+// ── Sub-Risk (SRR) definitions for Workload tab risk badge ───────────────────
+var SRR_DEF={
+  'SRR-FIN-01':{name:'Budget & Expenditure Control Risk',       rr:'RR-FIN-01',rrName:'Financial Mismanagement Risk',                col:'#c0392b',ca:'SCA-FIN-01',caName:'Budget Monitoring & Authorisation Control',          kw:['budget','expenditure','savings','capex','booked','head of account','chart of account']},
+  'SRR-FIN-02':{name:'Vendor & Procurement Compliance Risk',    rr:'RR-FIN-01',rrName:'Financial Mismanagement Risk',                col:'#c0392b',ca:'SCA-FIN-02',caName:'Procurement Governance & Vendor Control',             kw:['vendor','quotation','purchase committee','procurement','preferred vendor','contractor','rate','market','supplier','splitting','fake quotation','canteen','photocopy','paint','equal opportunity','fair comparison','brand']},
+  'SRR-FIN-03':{name:'Tax & Regulatory Compliance Risk',        rr:'RR-FIN-01',rrName:'Financial Mismanagement Risk',                col:'#c0392b',ca:'SCA-FIN-03',caName:'Tax Compliance Monitoring Control',                   kw:['withholding tax','tax','pessi','excess payment to pessi']},
+  'SRR-FIN-04':{name:'Voucher, Documentation & Accounting Risk',rr:'RR-FIN-01',rrName:'Financial Mismanagement Risk',                col:'#c0392b',ca:'SCA-FIN-04',caName:'Voucher Review & Accounting Accuracy Control',        kw:['voucher','accounting','ledger','invoice','bill','unapproved','serial number','journal','bank payment voucher','vendor ledger','third party','balance confirmation','specimen signature','cambridge','donation','electricity','utility','telephone','cheque number','recipient acknowledgement','policy','chart of account']},
+  'SRR-FIN-05':{name:'Reimbursement & Claims Management Risk',  rr:'RR-FIN-01',rrName:'Financial Mismanagement Risk',                col:'#c0392b',ca:'SCA-FIN-05',caName:'Claims Verification & Timely Processing Control',     kw:['reimbursement','reimburse','ta/da','outstation','claim','delay in claiming','delay reimbursement']},
+  'SRR-CASH-01':{name:'Cash Limit & Custody Risk',              rr:'RR-FIN-02',rrName:'Cash & Bank Management Risk',                 col:'#e74c3c',ca:'SCA-CASH-01',caName:'Daily Cash Count & Limit Enforcement Control',       kw:['cash in hand','exceeded','limit','negative balance of cash','credit balance of cash','cash in hand account']},
+  'SRR-CASH-02':{name:'Bank Account Management Risk',           rr:'RR-FIN-02',rrName:'Cash & Bank Management Risk',                 col:'#e74c3c',ca:'SCA-CASH-02',caName:'Bank Reconciliation & Signatory Compliance Control', kw:['bank ledger','bank payment','bank account','bank signatory','cheque number','bank payments booked','credit balance of bank','negative balance of bank','record for bank','no bank account','descrepancies in bank']},
+  'SRR-CASH-03':{name:'Cash Collection & Deposit Risk',         rr:'RR-FIN-02',rrName:'Cash & Bank Management Risk',                 col:'#e74c3c',ca:'SCA-CASH-03',caName:'Cash Collection Deposit & Recording Control',        kw:['cash collection','deposit','collection activity','purchase procedure not followed for cash','bank deposit slip','cash collection activities not recorded']},
+  'SRR-HR-01':{name:'Recruitment & Screening Risk',             rr:'RR-HR-01', rrName:'Human Resource Compliance Risk',              col:'#8e44ad',ca:'SCA-HR-01', caName:'Recruitment Authorisation & Documentation Control', kw:['recruitment','screening','interview','reference check','appointment letter','lofa','shortlisting','hiring','blood relative','manpower','talent acquisition','joining']},
+  'SRR-HR-02':{name:'Employee File & Records Risk',             rr:'RR-HR-01', rrName:'Human Resource Compliance Risk',              col:'#8e44ad',ca:'SCA-HR-02', caName:'Employee File Completeness Review Control',          kw:['employee file','incomplete','employee record','personal file','file of transfer','file of left employee','jd','incomplete employee','next of kin','record missing','files of transferred']},
+  'SRR-HR-03':{name:'Attendance & Leave Risk',                  rr:'RR-HR-01', rrName:'Human Resource Compliance Risk',              col:'#8e44ad',ca:'SCA-HR-03', caName:'Biometric Attendance & Leave Monitoring Control',    kw:['attendance','leave','biometric','short office hours','outgoing','departure attendance','sandwich leave','leave applications','contractual staff attendance','out attendance']},
+  'SRR-HR-04':{name:'Payroll & Salary Risk',                    rr:'RR-HR-01', rrName:'Human Resource Compliance Risk',              col:'#8e44ad',ca:'SCA-HR-04', caName:'Payroll Verification & Disbursement Control',        kw:['salary','payroll','overpaid','excess salary','delay in salary','washing allowance','livery maintenance','fuel allowance','medical insurance','mobile allowance','mobile phone allowance','hire purchase','loan repayment','eobi','social security','pessi']},
+  'SRR-HR-05':{name:'Probation & Confirmation Risk',            rr:'RR-HR-01', rrName:'Human Resource Compliance Risk',              col:'#8e44ad',ca:'SCA-HR-05', caName:'Probation Tracking & Confirmation Approval Control',  kw:['probation','confirmation','early confirmation','delay in confirmation','confirmed']},
+  'SRR-HR-06':{name:'Exit, Settlement & Resignation Risk',      rr:'RR-HR-01', rrName:'Human Resource Compliance Risk',              col:'#8e44ad',ca:'SCA-HR-06', caName:'Exit Processing & Final Settlement Control',          kw:['final settlement','settlement','resignation','exit','handing','taking over','clearance','left employee','terminated','retirement','departure']},
+  'SRR-HR-07':{name:'Performance Appraisal & Promotion Risk',   rr:'RR-HR-01', rrName:'Human Resource Compliance Risk',              col:'#8e44ad',ca:'SCA-HR-07', caName:'Appraisal Quality Assurance & Promotion Review Control',kw:['appraisal','promotion','succession','performance','cpd','training needs','differentiation']},
+  'SRR-HR-08':{name:'Code of Conduct & Policy Compliance Risk', rr:'RR-HR-01', rrName:'Human Resource Compliance Risk',              col:'#8e44ad',ca:'SCA-HR-08', caName:'HR Policy Communication & Conduct Monitoring Control', kw:['code of conduct','conduct','misconduct','daycare','intern','nda','livery items','livery record','livery provided']},
+  'SRR-HR-09':{name:'Travel, Assets & Resource Allocation Risk',rr:'RR-HR-01', rrName:'Human Resource Compliance Risk',              col:'#8e44ad',ca:'SCA-HR-09', caName:'Asset & Travel Authorisation Control',                kw:['travel','outstation','laptop','it asset','pool vehicle','pool bike','vehicle','outstation claimed','international travel','domestic travel']},
+  'SRR-FA-01':{name:'Asset Register Accuracy Risk',             rr:'RR-OPS-01',rrName:'Fixed Asset Management Risk',                 col:'#1a6030',ca:'SCA-FA-01', caName:'Fixed Asset Register Maintenance Control',           kw:['register','duplicate','same code','same asset code','unnumbered','un-numbered','missing aspect','columns','classified','categoris','depreciation method','depreciation commenced','incorrect date','aspects of assets']},
+  'SRR-FA-02':{name:'Physical Verification & Custody Risk',     rr:'RR-OPS-01',rrName:'Fixed Asset Management Risk',                 col:'#1a6030',ca:'SCA-FA-02', caName:'Annual Physical Verification Control',               kw:['physical verification','untraced','out of order','unmatched','un-matched','surplus','unlocked','found in branch','repairable','not maintained','screen protector','geyser']},
+  'SRR-FA-03':{name:'Asset Disposal & Transfer Risk',           rr:'RR-OPS-01',rrName:'Fixed Asset Management Risk',                 col:'#1a6030',ca:'SCA-FA-03', caName:'Asset Disposal & Transfer Authorisation Control',    kw:['disposal','aidn','disposed','transfer','grn','awaiting aidn','pending aidn','sale proceeds','obsolete','broken','disposal note','transfer notes','transferred out']},
+  'SRR-FA-04':{name:'Third-Party & Landlord Asset Risk',        rr:'RR-OPS-01',rrName:'Fixed Asset Management Risk',                 col:'#1a6030',ca:'SCA-FA-04', caName:'Third-Party Asset Segregation Control',               kw:['landlord','canteen','memorandum','inventory record','list of landlord','iqra','memorandum register']},
+  'SRR-LIB-01':{name:'KOHA Module & Data Entry Risk',           rr:'RR-OPS-02',rrName:'Library Resource Management Risk',            col:'#16a085',ca:'SCA-LIB-01',caName:'KOHA Data Quality & Entry Control',                    kw:['koha','data entry','barcode','entered in','not entered','issued through','not issued through','not accessed','accessed in','discrepancies with library module','difference in quantity','books not entered','incomplete/wrong data']},
+  'SRR-LIB-02':{name:'Stock Management & Physical Verification Risk',rr:'RR-OPS-02',rrName:'Library Resource Management Risk',       col:'#16a085',ca:'SCA-LIB-02',caName:'Library Stock Taking & Reconciliation Control',        kw:['stock','missing books','stock taking','overdue','accession register','clearance form','disposed off books','shortage of space','pending deposit','recovered','lost books','awaiting aidn','high item per child','low item per child','item per child','bi-annually']},
+  'SRR-LIB-03':{name:'Book Condition & Maintenance Risk',       rr:'RR-OPS-02',rrName:'Library Resource Management Risk',            col:'#16a085',ca:'SCA-LIB-03',caName:'Book Condition Monitoring & Maintenance Control',      kw:['poor condition','torn','double stack','rack','display','mend','repair','bad condition','books in poor']},
+  'SRR-LIB-04':{name:'Library Operations & Resource Risk',      rr:'RR-OPS-02',rrName:'Library Resource Management Risk',            col:'#16a085',ca:'SCA-LIB-04',caName:'Library Operational Compliance Control',              kw:['ups','internet','scanner','printer','barcode scanner','handing','minutes','meeting','slow internet','budget','fund release','policy communicated','policy not formally']},
+  'SRR-STU-01':{name:'Registration & Admission Process Risk',   rr:'RR-OPS-03',rrName:'Student Admissions & Record Management Risk', col:'#2980b9',ca:'SCA-STU-01',caName:'Admissions Compliance & Documentation Control',       kw:['registration','admission','receipt','registration fee','deposit','collection','registration form','anomalies in registration','obsolete prospectus','reason for waiver','inconsistent communication']},
+  'SRR-STU-02':{name:'Student File & BEAMS Data Risk',          rr:'RR-OPS-03',rrName:'Student Admissions & Record Management Risk', col:'#2980b9',ca:'SCA-STU-02',caName:'Student Records Completeness & BEAMS Accuracy Control',kw:['student file','incomplete student','beams','emergency contact','transfer','withdrawal','parent information','files of transfer']},
+  'SRR-STU-03':{name:'Fee Concession & Security Refund Risk',   rr:'RR-OPS-03',rrName:'Student Admissions & Record Management Risk', col:'#2980b9',ca:'SCA-STU-03',caName:'Fee Concession Authorisation & Refund Processing Control',kw:['concession','exemption','security refund','refund','unclaimed','fee concession','unapproved fee','deposit slip','outdated cheque','stale cheque','intimation']},
+  'SRR-STU-04':{name:'Scholarship Management Risk',             rr:'RR-OPS-03',rrName:'Student Admissions & Record Management Risk', col:'#2980b9',ca:'SCA-STU-04',caName:'Scholarship Governance & Reporting Control',          kw:['scholarship','merit','sports scholarship','quota','renewal','validity','expiry','beneficiar','utilisation report','reporting deadline','transparent selection','unauthorised personnel','published criteria','education continuity']},
+  'SRR-STU-05':{name:'Academic Quality & Curriculum Risk',      rr:'RR-OPS-03',rrName:'Student Admissions & Record Management Risk', col:'#2980b9',ca:'SCA-STU-05',caName:'Academic Quality Monitoring & Curriculum Compliance Control',kw:['curriculum','training','homework','remote learning','differentiated','parental involvement','assessment','blp','sel','digital platform','classroom management','motivation','self-directed','ilp','sen','individual learning plan','academic quality','teaching']},
+  'SRR-SEC-01':{name:'Security Contract Compliance Risk',       rr:'RR-SEC-01',rrName:'Safety, Security & Student Protection Risk',  col:'#e67e22',ca:'SCA-SEC-01',caName:'Security Contract Performance Review Control',        kw:['contract','ex-armed forces','guard strength','substitute','security company','civilian','approved copy','non-compliance with security','security related contract']},
+  'SRR-SEC-02':{name:'CCTV & Surveillance Risk',                rr:'RR-SEC-01',rrName:'Safety, Security & Student Protection Risk',  col:'#e67e22',ca:'SCA-SEC-02',caName:'CCTV System Integrity & Coverage Control',             kw:['cctv','camera','recording','backup','offline','unexploited','coverage','ups not installed with cctv','cctv recording','lack of cctv','insufficient backup time','issues in coverage']},
+  'SRR-SEC-03':{name:'Armed Guard & Weapon Management Risk',    rr:'RR-SEC-01',rrName:'Safety, Security & Student Protection Risk',  col:'#e67e22',ca:'SCA-SEC-03',caName:'Weapon Register & Firing Practice Control',             kw:['firing practice','weapon','ammunition','armed','annual firing','quarterly firing','weekly maintenance']},
+  'SRR-SEC-04':{name:'Emergency Preparedness & Access Control Risk',rr:'RR-SEC-01',rrName:'Safety, Security & Student Protection Risk',col:'#e67e22',ca:'SCA-SEC-04',caName:'Emergency Protocol & Access Control Review',          kw:['assembly area','evacuation','emergency exit','scanning room','screening room','alarm switch','visitor register','gate pass','access control','safety risk','glass key box']},
+  'SRR-SEC-05':{name:'General Safety & Infrastructure Risk',    rr:'RR-SEC-01',rrName:'Safety, Security & Student Protection Risk',  col:'#e67e22',ca:'SCA-SEC-05',caName:'Safety Infrastructure Inspection Control',             kw:['out of order assets','surplus','idle assets','ups not available','control room','safety risk associated','building','backup system','no backup system','discrepancies in maintaining science']},
+  'SRR-LAB-01':{name:'Laboratory Stock & Register Management Risk',rr:'RR-OPS-04',rrName:'Laboratory & Academic Resource Risk',      col:'#27ae60',ca:'SCA-LAB-01',caName:'Laboratory Inventory & Register Control',              kw:['science laboratory','laboratory','lab','stock register','consumable','science resource','discrepancies in laboratory']},
+  'SRR-GEN-01':{name:'Generator & Utility Management Risk',     rr:'RR-OPS-05',rrName:'General Operational Compliance Risk',         col:'#546e7a',ca:'SCA-GEN-01',caName:'Generator & Utility Monitoring Control',               kw:['generator','fuel','logbook','log book','average fuel','fuel average','unusual fuel','oil','ups maintenance','electricity stolen','discrepancies in precautionary','anomalies in usage','motorbike','pool bike']},
+  'SRR-GEN-02':{name:'Branch Registers & Administrative Records Risk',rr:'RR-OPS-05',rrName:'General Operational Compliance Risk',   col:'#546e7a',ca:'SCA-GEN-02',caName:'Administrative Records Completeness Control',        kw:['memorandum register','demolition register','sports register','music register','printed stationery register','printing stationery','document tracking','safe keeping','backup of branch data','inward gate pass','gate pass record','school business registration','shortcomings in sports','shortcomings in maths']},
+  'SRR-GEN-03':{name:'Third-Party Contracts & Canteen Management Risk',rr:'RR-OPS-05',rrName:'General Operational Compliance Risk',  col:'#546e7a',ca:'SCA-GEN-03',caName:'Contract Repository & Compliance Control',           kw:['contracts for canteen','contracts with third','photocopy contract','inventory record of landlord']},
+  'SRR-GEN-04':{name:'IT Data & Security Compliance Risk',      rr:'RR-OPS-05',rrName:'General Operational Compliance Risk',         col:'#546e7a',ca:'SCA-GEN-04',caName:'IT Compliance & Data Governance Control',              kw:['data retention','data custodian','it equipment','handling and storage','data security']},
+  'SRR-GEN-05':{name:'Energy & Operational Policy Compliance Risk',rr:'RR-OPS-05',rrName:'General Operational Compliance Risk',      col:'#546e7a',ca:'SCA-GEN-05',caName:'Operational Policy Communication & Compliance Control',kw:['energy','conservation','birthday','celebration','section merger','class section','validated paint','paintable area','paint area']}
+};
+var SRR_AREA_ORDER={
+  fin: ['SRR-FIN-01','SRR-FIN-02','SRR-FIN-03','SRR-FIN-04','SRR-FIN-05'],
+  cash:['SRR-CASH-01','SRR-CASH-02','SRR-CASH-03'],
+  hr:  ['SRR-HR-01','SRR-HR-02','SRR-HR-03','SRR-HR-04','SRR-HR-05','SRR-HR-06','SRR-HR-07','SRR-HR-08','SRR-HR-09'],
+  fa:  ['SRR-FA-01','SRR-FA-02','SRR-FA-03','SRR-FA-04'],
+  lib: ['SRR-LIB-01','SRR-LIB-02','SRR-LIB-03','SRR-LIB-04'],
+  stu: ['SRR-STU-01','SRR-STU-02','SRR-STU-03','SRR-STU-04','SRR-STU-05'],
+  sec: ['SRR-SEC-01','SRR-SEC-02','SRR-SEC-03','SRR-SEC-04','SRR-SEC-05'],
+  lab: ['SRR-LAB-01'],
+  gen: ['SRR-GEN-01','SRR-GEN-02','SRR-GEN-03','SRR-GEN-04','SRR-GEN-05'],
+  it:  [], proc:[], crm:[], comm:[], op:[]
+};
+var _obsSrrCache={};
+function _getObsSrr(o){
+  var area=getFwKey(o.category||'');
+  var tl=(o.title||'').toLowerCase();
+  var order=SRR_AREA_ORDER[area]||[];
+  var best=null,bestScore=0;
+  for(var i=0;i<order.length;i++){
+    var def=SRR_DEF[order[i]];
+    if(!def)continue;
+    var sc=0;
+    for(var k=0;k<def.kw.length;k++){if(tl.indexOf(def.kw[k])!==-1)sc++;}
+    if(sc>bestScore){bestScore=sc;best=order[i];}
+  }
+  return best||(order.length?order[order.length-1]:null);
+}
+function buildObsSrrCache(){
+  _obsSrrCache={};
+  var all=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
+  for(var i=0;i<all.length;i++) _obsSrrCache[all[i].id]=_getObsSrr(all[i]);
+}
 var FW_MX={
   'High':  {likelihood:'High',  impact:'High',  inherent:'High',        residual:'Medium-High',appetite:'Low'},
   'M to H':{likelihood:'Medium',impact:'High',  inherent:'Medium-High', residual:'Medium',     appetite:'Low-Medium'},
@@ -16554,7 +16639,7 @@ function awsRenderCategories(){
     html+='<button class="aws-toggle-btn" id="aws_tog_'+i+'">'+arrow+'</button>';
     html+='</div>';
     html+='<div class="aws-cat-body'+collapsed+'" id="aws_cat_body_'+i+'">';
-    html+='<table class="aws-obs-table"><thead><tr><th style="width:36px">Done</th><th style="width:72px">ID</th><th>Observation</th><th style="width:170px">Status</th><th style="width:36px">&#128221;</th></tr></thead><tbody>';
+    html+='<table class="aws-obs-table"><thead><tr><th style="width:36px">Done</th><th style="width:72px">ID</th><th>Observation</th><th style="width:120px">Risk Link</th><th style="width:170px">Status</th><th style="width:36px">&#128221;</th></tr></thead><tbody>';
     for(var j=0;j<list.length;j++){
       var obs=list[j];
       var st=awsGetObsState(obs.id);
@@ -16564,6 +16649,22 @@ function awsRenderCategories(){
       html+='<td style="text-align:center"><input type="checkbox" class="aws-obs-cb"'+cbChk+' onchange="awsSetObs(\''+obs.id+'\',\'checked\',this.checked)"></td>';
       html+='<td style="font-size:11px;color:#888">'+awsEsc(obs.id)+'</td>';
       html+='<td>'+awsEsc(obs.title)+'</td>';
+      // Risk badge cell
+      var srrId=_obsSrrCache[obs.id]||null;
+      var srrDef=srrId?SRR_DEF[srrId]:null;
+      if(srrDef){
+        html+='<td style="text-align:center"><div class="aws-risk-wrap">'
+          +'<span class="aws-risk-badge" style="background:'+srrDef.col+'">'+srrId+'</span>'
+          +'<div class="aws-risk-tip">'
+          +'<div class="tip-srr">'+srrId+'</div>'
+          +'<div class="tip-name">'+awsEsc(srrDef.name)+'</div>'
+          +'<div class="tip-rr">&#9656; '+awsEsc(srrDef.rr)+' &mdash; '+awsEsc(srrDef.rrName)+'</div>'
+          +'<div class="tip-ctrl">&#10003; Control: <strong>'+awsEsc(srrDef.caName)+'</strong></div>'
+          +'</div>'
+          +'</div></td>';
+      } else {
+        html+='<td style="text-align:center;color:#ccc;font-size:11px">&mdash;</td>';
+      }
       var selH='<select class="aws-status-sel '+awsStatusClass(st.status)+'" onchange="awsSetObs(\''+obs.id+'\',\'status\',this.value)">';
       for(var k=0;k<AWS_STATUS_OPTS.length;k++){
         var sel=st.status===AWS_STATUS_OPTS[k]?' selected':'';
@@ -16576,7 +16677,7 @@ function awsRenderCategories(){
       html+='</tr>';
       var rdsp=hasR?'':' style="display:none"';
       html+='<tr class="aws-remark-row" id="aws_rrow_'+obs.id+'"'+rdsp+'>';
-      html+='<td colspan="5"><input type="text" class="aws-remark-input" placeholder="Remark..." value="'+awsEsc(st.remark||'')+'" oninput="awsSetObs(\''+obs.id+'\',\'remark\',this.value)" id="aws_ri_'+obs.id+'"></td></tr>';
+      html+='<td colspan="6"><input type="text" class="aws-remark-input" placeholder="Remark..." value="'+awsEsc(st.remark||'')+'" oninput="awsSetObs(\''+obs.id+'\',\'remark\',this.value)" id="aws_ri_'+obs.id+'"></td></tr>';
     }
     html+='</tbody></table></div></div>';
   }
