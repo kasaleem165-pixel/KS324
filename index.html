@@ -12049,45 +12049,28 @@ function showUpdateDbModal(){
   modal.className = 'updb-bg'; modal.id = 'updbModal';
   modal.innerHTML =
     '<div class="updb-box">' +
-    '<div class="updb-head"><h3>&#128194; Databank Management</h3><button onclick="closeUpdbModal()">&#10005;</button></div>' +
+    '<div class="updb-head"><h3>&#128194; HO Validation — New Observation Review</h3><button onclick="closeUpdbModal()">&#10005;</button></div>' +
     '<div class="updb-body">' +
 
-    // SECTION A: HO — Load final report and approve new observations
     '<div class="updb-section">' +
-    '<h4>&#127968; HO Only — Step 1: Load a Final Issued Report</h4>' +
-    '<p>Select the final issued report session file (.json). The system will compare its observations against the databank and list any new ones for your approval.</p>' +
+    '<h4>&#128203; Load a Final Report Session File to Review New Observations</h4>' +
+    '<p>Select a final issued report session file (.json). The system will identify any observations not yet in the core databank, auto-suggest their Risk and Control linkage, and present them for your review and approval before they are added.</p>' +
     '<div class="updb-drop" onclick="document.getElementById(\'updb-file-input\').click()">' +
     '&#128229; <strong>Click to select a Final Report Session File (.json)</strong>' +
-    '<p style="margin:4px 0 0;font-size:11px;color:#888">The session file saved via Save / Versions → Export</p>' +
+    '<p style="margin:4px 0 0;font-size:11px;color:#888">The session file saved via Save / Versions &rarr; Export</p>' +
     '</div>' +
     '<input type="file" id="updb-file-input" accept=".json" style="display:none" onchange="updbReadFile(this)">' +
     '<div id="updb-cand-area"></div>' +
     '<div class="updb-foot" id="updb-approve-foot" style="display:none">' +
-    '<button style="background:#2e7d32;color:#fff" onclick="updbApproveSelected()">&#10003; Add Selected to Databank</button>' +
+    '<button style="background:#2e7d32;color:#fff" onclick="updbApproveSelected()">&#10003; Approve &amp; Add Selected to Databank</button>' +
     '<button style="background:#e8edf5;color:#444" onclick="updbClearCandidates()">&#10005; Cancel</button>' +
     '</div>' +
     '</div>' +
 
-    // SECTION B: HO — Export databank update file to distribute
     '<div class="updb-section">' +
-    '<h4>&#127968; HO Only — Step 2: Export &amp; Distribute Databank Update</h4>' +
-    '<p>After approving new observations above, export a <strong>Databank Update File</strong> and send it to all auditors via email or OneDrive. Auditors will import this file to keep their databanks in sync with HO.</p>' +
+    '<h4>&#128203; Approved Custom Observations in Databank</h4>' +
+    '<p style="font-size:12px;color:#555;margin-bottom:8px">Observations approved by HO and added to the databank extension. These are available to all users on this Netlify deployment immediately upon next refresh.</p>' +
     '<div id="updb-ext-area">' + buildUpdbExtList(extObs) + '</div>' +
-    '<div class="updb-foot" style="margin-top:8px">' +
-    '<button style="background:#1a3a5c;color:#fff" onclick="updbExportExt()">&#128228; Export Databank Update File</button>' +
-    '</div>' +
-    '</div>' +
-
-    // SECTION C: Field Auditors — Import databank update from HO
-    '<div class="updb-section">' +
-    '<h4>&#128203; Field Auditors — Import Databank Update from HO</h4>' +
-    '<p>Received a Databank Update File from HO? Import it here. New observations will be added to your local databank so you can use them in your reports. Observations already in your databank will be skipped.</p>' +
-    '<div class="updb-drop" onclick="document.getElementById(\'updb-imp-input\').click()">' +
-    '&#128193; <strong>Click to select the Databank Update File received from HO</strong>' +
-    '<p style="margin:4px 0 0;font-size:11px;color:#888">File name starts with: DatabankUpdate_</p>' +
-    '</div>' +
-    '<input type="file" id="updb-imp-input" accept=".json" style="display:none" onchange="updbImportExt(this)">' +
-    '<div id="updb-imp-area"></div>' +
     '</div>' +
 
     '</div></div>';
@@ -12103,15 +12086,29 @@ function closeUpdbModal(){
 }
 
 function buildUpdbExtList(extObs){
-  if(!extObs.length) return '<div style="padding:14px;text-align:center;color:#aaa;font-size:12px">No custom observations have been added to the databank yet.</div>';
+  if(!extObs.length) return '<div style="padding:14px;text-align:center;color:#aaa;font-size:12px">No approved observations in databank extension yet.</div>';
   var h = '<div class="updb-ext-list">';
   for(var i=0;i<extObs.length;i++){
     var o = extObs[i];
     var addedOn = o._dbAddedAt ? o._dbAddedAt.substring(0,10) : '';
-    h += '<div class="updb-ext-row">' +
-         '<div class="updb-ext-info"><strong>'+esc(o.title)+'</strong>' +
-         '<div class="updb-ext-meta">'+esc(o.category)+(addedOn?' &nbsp;|&nbsp; Added to databank: '+addedOn:'')+'</div></div>' +
-         '<button onclick="updbRemoveExt(\''+esc(o.id)+'\')" style="padding:3px 9px;background:#8b1a1a;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">Remove</button>' +
+    var riskLine = '';
+    if(o._srrId){
+      var srrDef2 = SRR_DEF[o._srrId]||null;
+      var col2 = srrDef2 ? srrDef2.col : '#555';
+      riskLine = '<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+        +'<span style="display:inline-block;background:'+col2+';color:#fff;border-radius:3px;padding:1px 6px;font-size:9.5px;font-weight:700">'+esc(o._srrId)+'</span>'
+        +'<span style="font-size:10.5px;color:#3a5a3a;font-weight:600">'+esc(o._srrName||'')+'</span>'
+        +'<span style="font-size:10px;color:#888">&mdash;</span>'
+        +'<span style="display:inline-block;background:#1a6030;color:#fff;border-radius:3px;padding:1px 6px;font-size:9.5px;font-weight:700">'+esc(o._caId||'')+'</span>'
+        +'<span style="font-size:10.5px;color:#2a5a3a;font-weight:600">'+esc(o._caName||'')+'</span>'
+        +'</div>';
+    }
+    h += '<div class="updb-ext-row" style="flex-wrap:wrap">' +
+         '<div class="updb-ext-info" style="flex:1;min-width:0"><strong>'+esc(o.title)+'</strong>' +
+         '<div class="updb-ext-meta">'+esc(o.category)+(addedOn?' &nbsp;|&nbsp; Approved: '+addedOn:'')+'</div>' +
+         riskLine +
+         '</div>' +
+         '<button onclick="updbRemoveExt(\''+esc(o.id)+'\')" style="padding:3px 9px;background:#8b1a1a;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;align-self:flex-start;margin-top:2px">Remove</button>' +
          '</div>';
   }
   h += '</div>';
@@ -12163,17 +12160,40 @@ function updbReadFile(input){
         return;
       }
 
-      var h = '<div style="font-size:12px;font-weight:700;color:#2e7d32;margin:8px 0 6px">'+_updbCandidates.length+' new observation(s) found — select which to add to the databank'+(alreadyIn?' ('+alreadyIn+' already in databank — skipped)':'')+':</div>';
-      h += '<div style="margin-bottom:6px"><label style="font-size:11px;cursor:pointer"><input type="checkbox" id="updb-sel-all" onchange="updbToggleAll(this.checked)" checked> <strong>Select All</strong></label></div>';
+      var h = '<div style="font-size:12px;font-weight:700;color:#2e7d32;margin:8px 0 6px">'+_updbCandidates.length+' new observation(s) found — review Risk &amp; Control linkage and select which to approve'+(alreadyIn?' ('+alreadyIn+' already in databank — skipped)':'')+':</div>';
+      h += '<div style="margin-bottom:8px"><label style="font-size:11px;cursor:pointer"><input type="checkbox" id="updb-sel-all" onchange="updbToggleAll(this.checked)" checked> <strong>Select All</strong></label></div>';
       h += '<div class="updb-cand-list">';
       for(var m=0;m<_updbCandidates.length;m++){
         var c = _updbCandidates[m];
+        // Auto-suggest risk & control linkage
+        var srrId = _getObsSrr(c);
+        var srrDef = srrId ? SRR_DEF[srrId] : null;
+        var riskBlock = '';
+        if(srrDef){
+          riskBlock =
+            '<div style="margin-top:7px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;padding:7px 10px">' +
+            '<div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#1a3a5c;margin-bottom:5px">System-Suggested Risk &amp; Control Linkage</div>' +
+            '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start">' +
+            '<div style="flex:1;min-width:160px">' +
+            '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-bottom:2px">Sub-Risk</div>' +
+            '<span style="display:inline-block;background:'+srrDef.col+';color:#fff;border-radius:3px;padding:1px 7px;font-size:10px;font-weight:700;margin-bottom:3px">'+srrId+'</span>' +
+            '<div style="font-size:11.5px;font-weight:700;color:#1a2d44">'+esc(srrDef.name)+'</div>' +
+            '<div style="font-size:10.5px;color:#4a6a8a;margin-top:1px">&#9656; '+esc(srrDef.rr)+' &mdash; '+esc(srrDef.rrName)+'</div>' +
+            '</div>' +
+            '<div style="flex:1;min-width:160px">' +
+            '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-bottom:2px">Key Control</div>' +
+            '<span style="display:inline-block;background:#1a6030;color:#fff;border-radius:3px;padding:1px 7px;font-size:10px;font-weight:700;margin-bottom:3px">'+esc(srrDef.ca)+'</span>' +
+            '<div style="font-size:11.5px;font-weight:700;color:#0a3020">'+esc(srrDef.caName)+'</div>' +
+            '</div>' +
+            '</div></div>';
+        }
         h += '<div class="updb-cand-row">' +
              '<input type="checkbox" class="updb-cand-chk" data-idx="'+m+'" checked>' +
-             '<div class="updb-cand-info">' +
+             '<div class="updb-cand-info" style="width:100%">' +
              '<div class="updb-cand-title">'+esc(c.title)+'</div>' +
              '<div class="updb-cand-meta">'+esc(c.category||'Others')+(c.type?' &nbsp;|&nbsp; '+esc(c.type):'')+'</div>' +
-             (c.observation ? '<div style="font-size:11px;color:#555;margin-top:3px;line-height:1.4">'+esc(c.observation).substring(0,120)+(c.observation.length>120?'…':'')+'</div>' : '') +
+             (c.observation ? '<div style="font-size:11px;color:#555;margin-top:3px;line-height:1.4">'+esc(c.observation).substring(0,180)+(c.observation.length>180?'&hellip;':'')+'</div>' : '') +
+             riskBlock +
              '</div></div>';
       }
       h += '</div>';
@@ -12221,17 +12241,27 @@ function updbApproveSelected(){
     if(existingExtIds[o.id]) continue;
     o._dbAddedAt = new Date().toISOString();
     o.custom = true;
+    // Store auto-suggested risk & control linkage
+    var srrId = _getObsSrr(o);
+    var srrDef = srrId ? SRR_DEF[srrId] : null;
+    if(srrDef){
+      o._srrId   = srrId;
+      o._srrName = srrDef.name;
+      o._rrId    = srrDef.rr;
+      o._rrName  = srrDef.rrName;
+      o._caId    = srrDef.ca;
+      o._caName  = srrDef.caName;
+    }
     ext.push(o);
-    // Also add to live DB.observations immediately for this session
     DB.observations.push(o);
     added++;
   }
   ss(DB_EXT_KEY, ext);
+  buildObsSrrCache(); // rebuild cache so new obs appear in Workload tab
 
-  toast(added+' observation(s) added to the databank. They are now available for all future reports.');
+  toast(added+' observation(s) approved and added to the databank with Risk & Control linkage.');
   _updbCandidates = [];
 
-  // Refresh ext list and clear candidates
   var extArea = document.getElementById('updb-ext-area');
   if(extArea) extArea.innerHTML = buildUpdbExtList(ext);
   updbClearCandidates();
