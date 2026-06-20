@@ -17062,22 +17062,29 @@ function loadDemoData(){
 // ===================================================================
 // RISK ASSESSMENT — embedded panel
 // ===================================================================
+// areaWt: organisational weight (0.05–0.25, sums to 1.00) — set by S&A Department
 var RA_DB_CATS = {
-  'Financial Management':     {count:108, weight:4, titles:['Expenditure Exceeded Budgeted Amount','Accounting Procedure not Followed / Bank Payment Vouchers','Withholding Tax Deposited with Delay','Procurement at Higher Rates than Market','Purchase Committee not Properly Functioning','Splitting of Transactions to Bypass Company Policies','Bank Payments Recorded through Journal Vouchers','Procurement Procedures not Complied']},
-  'HR & Payroll':             {count:67,  weight:4, titles:['Incomplete Employee Files','Delay in Employee Confirmations','EOBI Numbers not Updated in BEAMS','Reference / Security Reference Check not in Practice','Short Office Hours','Delay in Final Settlement of Employees','Outgoing/Departure Attendance not Marked','Delay in Confirmation of Employees']},
-  'Safety & Security':        {count:40,  weight:5, titles:['Guards Strength Approved Copy not Available','CCTV Recording Gaps','Annual Firing Practice not Conducted Regularly','Discrepancies in Security Guard Documentation','Weapon/Ammunition Register Discrepancies','UPS not Available / Control Room Deficiencies','Security Guards Frequently Changed','Scanning Room not Available']},
-  'Fixed Assets & Inventory': {count:36,  weight:3, titles:['Untraced Fixed Assets','Out of Order Assets','Un-Numbered Assets','Physical Verification Report not Available','Duplicate / Same Codes on Assets','Asset Disposal Pending AIDN','Stock Register not Maintained','Fixed Asset Register Missing Columns']},
-  'Library & Records':        {count:47,  weight:2, titles:['Low Item Per Child Ratio in Library','Books not Entered in Library Module KOHA','Incomplete Barcode Labelling on Books','Library Books in Poor Condition','Discrepancies in Cost of Books / Wrong Data in KOHA','Transfer and Disposal of Books not Processed','High Item Per Child Book Ratio','Delay in Return of Library Books']},
-  'Student Records & Fee':    {count:22,  weight:3, titles:['Registration Fee Deposited with Delay','Incomplete / Wrong Student Information in BEAMS','Incomplete Student Files','Unclaimed Student Security','Fee Concession Approvals not Filed','Anomalies in Registration Fee Collection','Files of Transferred-In Students not Available','Security Refund not Processed Timely']},
-  'General Administration':   {count:39,  weight:2, titles:['Discrepancies in Memorandum Registers','Document Tracking Sheet not in Practice','Generator Log Book not Maintained','Inward Gate Pass not in Practice','Renewed School Business Registration Not Available','Demolition Register not Maintained','Printed Stationery Register not Maintained','Renewal of Utilities Contracts Pending']}
+  'Financial Management':     {count:108, weight:4, areaWt:0.25, titles:['Expenditure Exceeded Budgeted Amount','Accounting Procedure not Followed / Bank Payment Vouchers','Withholding Tax Deposited with Delay','Procurement at Higher Rates than Market','Purchase Committee not Properly Functioning','Splitting of Transactions to Bypass Company Policies','Bank Payments Recorded through Journal Vouchers','Procurement Procedures not Complied']},
+  'Cash & Bank':              {count:55,  weight:3, areaWt:0.10, titles:['Bank Reconciliation not Prepared / Reconciling Items','Petty Cash in Excess of Limit','Undocumented Cash Payments','Bank Signatories not Updated','Imprest Account Irregularities','Cash Counts not Conducted','Bank Statement not Obtained Regularly','Unauthorized Bank Transfers']},
+  'HR & Payroll':             {count:67,  weight:4, areaWt:0.15, titles:['Incomplete Employee Files','Delay in Employee Confirmations','EOBI Numbers not Updated in BEAMS','Reference / Security Reference Check not in Practice','Short Office Hours','Delay in Final Settlement of Employees','Outgoing/Departure Attendance not Marked','Delay in Confirmation of Employees']},
+  'Student Records & Fee':    {count:22,  weight:3, areaWt:0.10, titles:['Registration Fee Deposited with Delay','Incomplete / Wrong Student Information in BEAMS','Incomplete Student Files','Unclaimed Student Security','Fee Concession Approvals not Filed','Anomalies in Registration Fee Collection','Files of Transferred-In Students not Available','Security Refund not Processed Timely']},
+  'Fixed Assets & Inventory': {count:36,  weight:3, areaWt:0.10, titles:['Untraced Fixed Assets','Out of Order Assets','Un-Numbered Assets','Physical Verification Report not Available','Duplicate / Same Codes on Assets','Asset Disposal Pending AIDN','Stock Register not Maintained','Fixed Asset Register Missing Columns']},
+  'Library & Records':        {count:47,  weight:2, areaWt:0.10, titles:['Low Item Per Child Ratio in Library','Books not Entered in Library Module KOHA','Incomplete Barcode Labelling on Books','Library Books in Poor Condition','Discrepancies in Cost of Books / Wrong Data in KOHA','Transfer and Disposal of Books not Processed','High Item Per Child Book Ratio','Delay in Return of Library Books']},
+  'Science Laboratory':       {count:18,  weight:2, areaWt:0.05, titles:['Lab Equipment not Maintained','Lab Register not Updated','Hazardous Material Storage Non-Compliance','Lab Safety Equipment Missing','Practical Records Incomplete','Lab Inventory Discrepancies','Chemical Disposal not in Practice','Lab Log Book not Maintained']},
+  'Safety & Security':        {count:40,  weight:5, areaWt:0.05, titles:['Guards Strength Approved Copy not Available','CCTV Recording Gaps','Annual Firing Practice not Conducted Regularly','Discrepancies in Security Guard Documentation','Weapon/Ammunition Register Discrepancies','UPS not Available / Control Room Deficiencies','Security Guards Frequently Changed','Scanning Room not Available']},
+  'General Administration':   {count:39,  weight:2, areaWt:0.10, titles:['Discrepancies in Memorandum Registers','Document Tracking Sheet not in Practice','Generator Log Book not Maintained','Inward Gate Pass not in Practice','Renewed School Business Registration Not Available','Demolition Register not Maintained','Printed Stationery Register not Maintained','Renewal of Utilities Contracts Pending']}
 };
+// Sensitivity weights set by S&A Department (used in risk scoring)
+var RA_SENS_WT = {'High':1.00, 'M to H':0.64, 'L to M':0.40, 'Low':0.20};
 var RA_CAT_KEYWORDS = {
-  'Financial Management':     ['financial','payment','voucher','bank','budget','tax','withholding','procurement','purchase','committee','reimbursement','expenditure','imprest','splitting','invoice','petty cash','reconcil','accounts','bpv','journal','jv'],
+  'Financial Management':     ['financial','payment','voucher','budget','tax','withholding','procurement','purchase','committee','reimbursement','expenditure','imprest','splitting','invoice','accounts','bpv','journal','jv','head of account'],
+  'Cash & Bank':              ['cash','bank','petty cash','reconcil','bank statement','bank reconcil','imprest account','bank signator','cash count','cash payment','bank transfer','bank balance'],
   'HR & Payroll':             ['employee','payroll','staff','hr','eobi','pessi','sessi','attendance','leave','salary','confirmation','settlement','hire','recruitment','reference check','departure','short office'],
-  'Safety & Security':        ['security','guard','cctv','camera','fire','safety','metal detector','wtmd','ammunition','weapon','firing','ups','control room','scanning','access','cso'],
-  'Fixed Assets & Inventory': ['asset','fixed asset','far','aidn','disposal','equipment','inventory','stock','register','physical verification','tagged','barcode','asset code','grn'],
-  'Library & Records':        ['library','book','koha','ratio','reading','item per child','barcode','librarian','transfer of books','library module'],
   'Student Records & Fee':    ['student','fee','security refund','registration','ism','enrollment','challan','beams student','student file','concession','unclaimed'],
+  'Fixed Assets & Inventory': ['asset','fixed asset','far','aidn','disposal','equipment','inventory','stock','physical verification','tagged','barcode','asset code','grn'],
+  'Library & Records':        ['library','book','koha','ratio','reading','item per child','librarian','transfer of books','library module'],
+  'Science Laboratory':       ['lab','laboratory','science lab','lab equipment','lab register','hazardous','practical','chemical','lab log','lab inventory','lab safety'],
+  'Safety & Security':        ['security','guard','cctv','camera','fire','safety','metal detector','wtmd','ammunition','weapon','firing','ups','control room','scanning','access','cso'],
   'General Administration':   ['register','record','documentation','gate pass','stationery','generator','demolition','daycare','inward','outward','maintenance','renewal','contract','log book']
 };
 var RA_BRANCHES = [];
@@ -17653,9 +17660,9 @@ function ra_parseXlsxFile(arrayBuffer,callback){
 
 function ra_parseReport(text,sess){
   var result={}; var catNames=Object.keys(RA_DB_CATS);
-  for(var i=0;i<catNames.length;i++) result[catNames[i]]={obs:0,repeated:0,new:0};
+  for(var i=0;i<catNames.length;i++) result[catNames[i]]={obs:0,repeated:0,new:0,sensTotals:{}};
   if(sess){
-    var om=sess.obsTypeMap||{}; var si=sess.selIds||{}; var ids=Object.keys(si);
+    var om=sess.obsTypeMap||{}; var si=sess.selIds||{}; var sm=sess.sensitivityMap||{}; var ids=Object.keys(si);
     var rep=0,nw=0;
     for(var j=0;j<ids.length;j++){ if((om[ids[j]]||'New').toLowerCase()==='repeated') rep++; else nw++; }
     var total=rep+nw;
@@ -17668,12 +17675,35 @@ function ra_parseReport(text,sess){
         var top3=catNames.slice().sort(function(a,b){return RA_DB_CATS[b].weight-RA_DB_CATS[a].weight;}).slice(0,3);
         for(var ti=0;ti<top3.length;ti++){ result[top3[ti]].obs=Math.round(total/3); result[top3[ti]].repeated=Math.round(rep/3); result[top3[ti]].new=result[top3[ti]].obs-result[top3[ti]].repeated; }
       }
+      // Build sensitivity totals per category from session sensitivityMap
+      for(var si2=0;si2<ids.length;si2++){
+        var oid=ids[si2]; var sk=sm[oid]||''; if(!sk) continue;
+        // Find category of this obs from session DB
+        var obsObj=null;
+        if(sess.DB&&sess.DB.observations){ for(var dx=0;dx<sess.DB.observations.length;dx++){if(sess.DB.observations[dx].id===oid){obsObj=sess.DB.observations[dx];break;}}}
+        if(!obsObj&&sess.customs){ for(var cx=0;cx<sess.customs.length;cx++){if(sess.customs[cx].id===oid){obsObj=sess.customs[cx];break;}}}
+        var cat=obsObj?(obsObj.category||''):'';
+        // Map category string to RA_DB_CATS key via keywords
+        var matchCat=ra_mapCatToKey(cat);
+        if(matchCat&&result[matchCat]){ result[matchCat].sensTotals[sk]=(result[matchCat].sensTotals[sk]||0)+1; }
+      }
     }
   } else if(text&&text.trim()){
     var tCats2=ra_parseTextCategories(text); var repLines=ra_countRepeatedInText(text);
     for(var c3 in tCats2){ if(result[c3]){ result[c3].obs=tCats2[c3]; result[c3].repeated=repLines[c3]||0; result[c3].new=Math.max(0,result[c3].obs-result[c3].repeated); } }
   }
   return result;
+}
+
+function ra_mapCatToKey(cat){
+  if(!cat) return null;
+  var low=cat.toLowerCase();
+  var catNames=Object.keys(RA_CAT_KEYWORDS);
+  for(var i=0;i<catNames.length;i++){
+    var kws=RA_CAT_KEYWORDS[catNames[i]];
+    for(var k=0;k<kws.length;k++){ if(low.indexOf(kws[k])!==-1) return catNames[i]; }
+  }
+  return null;
 }
 
 function ra_parseTextCategories(text){
@@ -17704,11 +17734,32 @@ function ra_scoreCategory(catName,rpt1,rpt2){
   var d1=rpt1[catName]||{obs:0,repeated:0}; var d2=rpt2?(rpt2[catName]||{obs:0,repeated:0}):null;
   var db=RA_DB_CATS[catName]; var tot=0;
   for(var c in rpt1) tot+=rpt1[c].obs||0; if(tot<1) tot=1;
-  var freq=(d1.obs/tot)*40;
-  var rec=0; if(d1.obs>0) rec=(d1.repeated/d1.obs)*30; if(d2&&d2.obs>0&&d1.obs>0) rec=Math.min(30,rec+10);
-  var dbs=Math.min(20,(db.count/108)*db.weight*4);
-  var sev=(catName==='Safety & Security')?10:0;
-  return Math.min(100,Math.round(freq+rec+dbs+sev));
+
+  // Component 1 — Observation Frequency (max 30): share of total obs in this category
+  var freq=(d1.obs/tot)*30;
+
+  // Component 2 — Repeat Rate (max 25): proportion of repeated obs + trend bonus
+  var rec=0; if(d1.obs>0) rec=(d1.repeated/d1.obs)*25; if(d2&&d2.obs>0&&d1.obs>0) rec=Math.min(25,rec+8);
+
+  // Component 3 — Area Organisational Weight (max 25): set by S&A, reflects area importance
+  var areaWt=db.areaWt||0.10;
+  var areaComp=areaWt*100; // 0.25→25, 0.15→15, 0.10→10, 0.05→5
+
+  // Component 4 — Sensitivity Weight (max 15): avg sensitivity of obs loaded from report
+  var sensComp=0;
+  if(d1.obs>0&&d1.sensTotals){
+    var sw=0,sc=0;
+    for(var sk in d1.sensTotals){sw+=(RA_SENS_WT[sk]||0)*d1.sensTotals[sk];sc+=d1.sensTotals[sk];}
+    if(sc>0) sensComp=(sw/sc)*15;
+  } else {
+    // No sensitivity data — use area weight as fallback
+    sensComp=areaWt*15;
+  }
+
+  // Component 5 — Databank Baseline (max 5): historical S&A prevalence
+  var dbs=Math.min(5,(db.count/108)*db.weight*1.5);
+
+  return Math.min(100,Math.round(freq+rec+areaComp+sensComp+dbs));
 }
 
 function ra_scoreToLevel(score){ return score>=75?'critical':score>=50?'high':score>=25?'medium':'low'; }
@@ -18396,15 +18447,43 @@ function ra_methodologyHtml(){
 
   // 3. Scoring Formula
   h+=sec('&#128290;','Risk Scoring Formula',
-    '<p style="font-size:12px;color:#2a3a50;line-height:1.8;margin:0 0 14px">Each audit category receives a <strong>Risk Score (0–100)</strong> composed of four components:</p>'
+    '<p style="font-size:12px;color:#2a3a50;line-height:1.8;margin:0 0 14px">Each audit category receives a <strong>Risk Score (0–100)</strong> composed of five components. The area weights and sensitivity weights are set by the S&amp;A Department and reflect the organisational importance of each area and finding severity:</p>'
     +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
-    +'<thead><tr><th style="background:#1a3a5c;color:#fff;padding:9px 12px;text-align:left">Component</th><th style="background:#1a3a5c;color:#fff;padding:9px 12px;text-align:left">Formula</th><th style="background:#1a3a5c;color:#fff;padding:9px 12px;text-align:left">Max</th><th style="background:#1a3a5c;color:#fff;padding:9px 12px;text-align:left">What it measures</th></tr></thead>'
+    +'<thead><tr><th style="background:#1a3a5c;color:#fff;padding:9px 12px;text-align:left">Component</th><th style="background:#1a3a5c;color:#fff;padding:9px 12px;text-align:left">Formula</th><th style="background:#1a3a5c;color:#fff;padding:9px 12px;text-align:center">Max</th><th style="background:#1a3a5c;color:#fff;padding:9px 12px;text-align:left">What it measures</th></tr></thead>'
     +'<tbody>'
-    +'<tr style="background:#f5f8fd"><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-weight:700;color:#1a3a5c">Observation Frequency</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-family:monospace;color:#1e5c3a">(obs_in_cat / total_obs) × 40</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;text-align:center;font-weight:700;color:#c9962a">40</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;color:#4a5a70">Share of total observations that fell in this category — higher share = higher risk weight</td></tr>'
-    +'<tr style="background:#fff"><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-weight:700;color:#1a3a5c">Repeat Rate</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-family:monospace;color:#1e5c3a">(repeated / obs) × 30 + trend bonus</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;text-align:center;font-weight:700;color:#c9962a">30</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;color:#4a5a70">Proportion of observations that recurred from a prior report; +10 bonus if worsening trend across two loaded reports</td></tr>'
-    +'<tr style="background:#f5f8fd"><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-weight:700;color:#1a3a5c">Databank Frequency</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-family:monospace;color:#1e5c3a">min(20, (count/108) × weight × 4)</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;text-align:center;font-weight:700;color:#c9962a">20</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;color:#4a5a70">Historical prevalence in S&amp;A databank relative to Financial Management (108 findings, the maximum). Weighted by category risk weight (1–5).</td></tr>'
-    +'<tr style="background:#fff"><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-weight:700;color:#1a3a5c">Severity Bonus</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-family:monospace;color:#1e5c3a">+10 for Safety &amp; Security only</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;text-align:center;font-weight:700;color:#c9962a">10</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;color:#4a5a70">Safety observations carry the highest inherent risk weight — any Safety finding escalates the score</td></tr>'
+    +'<tr style="background:#f5f8fd"><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-weight:700;color:#1a3a5c">1. Observation Frequency</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-family:monospace;color:#1e5c3a">(obs_in_cat / total_obs) × 30</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;text-align:center;font-weight:700;color:#c9962a">30</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;color:#4a5a70">Share of total observations that fell in this category — more findings = higher risk signal</td></tr>'
+    +'<tr style="background:#fff"><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-weight:700;color:#1a3a5c">2. Repeat Rate</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-family:monospace;color:#1e5c3a">(repeated / obs) × 25 + trend bonus (8)</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;text-align:center;font-weight:700;color:#c9962a">25</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;color:#4a5a70">Proportion of observations that recurred from prior report; +8 bonus if worsening trend when two reports are loaded</td></tr>'
+    +'<tr style="background:#f5f8fd"><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-weight:700;color:#1a3a5c">3. Area Organisational Weight</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-family:monospace;color:#1e5c3a">areaWt × 100</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;text-align:center;font-weight:700;color:#c9962a">25</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;color:#4a5a70">S&amp;A Department-defined importance of this audit area (0.05–0.25). Financial Mgmt carries highest weight (0.25 = 25 pts); Lab &amp; Safety lowest (0.05 = 5 pts)</td></tr>'
+    +'<tr style="background:#fff"><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-weight:700;color:#1a3a5c">4. Sensitivity Weight</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-family:monospace;color:#1e5c3a">avg(sens_wt per obs) × 15</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;text-align:center;font-weight:700;color:#c9962a">15</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;color:#4a5a70">Average sensitivity weight of all observations in the category (High=1.00, M to H=0.64, L to M=0.40, Low=0.20). Available only when a JSON session is loaded.</td></tr>'
+    +'<tr style="background:#f5f8fd"><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-weight:700;color:#1a3a5c">5. Databank Baseline</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;font-family:monospace;color:#1e5c3a">min(5, (count/108) × weight × 1.5)</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;text-align:center;font-weight:700;color:#c9962a">5</td><td style="padding:9px 12px;border-bottom:1px solid #eaeff6;color:#4a5a70">Historical S&amp;A prevalence — baseline inherent risk even for categories with no current observations</td></tr>'
     +'</tbody></table></div>'
+
+    // Area weights sub-table
+    +'<div style="margin-top:18px"><div style="font-size:11.5px;font-weight:800;color:#1a3a5c;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Area Organisational Weights (set by S&amp;A Department)</div>'
+    +'<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11.5px;width:100%">'
+    +'<thead><tr><th style="background:#1a3a5c;color:#fff;padding:6px 10px;text-align:left">Sr.</th><th style="background:#1a3a5c;color:#fff;padding:6px 10px;text-align:left">Audit Area</th><th style="background:#1a3a5c;color:#fff;padding:6px 10px;text-align:center">Weight</th><th style="background:#1a3a5c;color:#fff;padding:6px 10px;text-align:center">Score Contribution (max)</th></tr></thead><tbody>'
+    +'<tr style="background:#f5f8fd"><td style="padding:6px 10px;border-bottom:1px solid #eee">1</td><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:700">Branch Imprest, Payments &amp; Accounts</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;font-weight:700;color:#c0392b">0.25</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center">25 pts</td></tr>'
+    +'<tr style="background:#fff"><td style="padding:6px 10px;border-bottom:1px solid #eee">2</td><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:700">Cash &amp; Bank</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;font-weight:700;color:#e67e22">0.10</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center">10 pts</td></tr>'
+    +'<tr style="background:#f5f8fd"><td style="padding:6px 10px;border-bottom:1px solid #eee">3</td><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:700">Recruitment, Payroll &amp; Employee Record</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;font-weight:700;color:#e67e22">0.15</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center">15 pts</td></tr>'
+    +'<tr style="background:#fff"><td style="padding:6px 10px;border-bottom:1px solid #eee">4</td><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:700">Students\' Record</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;font-weight:700;color:#2980b9">0.10</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center">10 pts</td></tr>'
+    +'<tr style="background:#f5f8fd"><td style="padding:6px 10px;border-bottom:1px solid #eee">5</td><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:700">Fixed Assets</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;font-weight:700;color:#2980b9">0.10</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center">10 pts</td></tr>'
+    +'<tr style="background:#fff"><td style="padding:6px 10px;border-bottom:1px solid #eee">6</td><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:700">Library</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;font-weight:700;color:#2980b9">0.10</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center">10 pts</td></tr>'
+    +'<tr style="background:#f5f8fd"><td style="padding:6px 10px;border-bottom:1px solid #eee">7</td><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:700">Laboratory</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;font-weight:700;color:#27ae60">0.05</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center">5 pts</td></tr>'
+    +'<tr style="background:#fff"><td style="padding:6px 10px;border-bottom:1px solid #eee">8</td><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:700">Safety &amp; Security</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;font-weight:700;color:#27ae60">0.05</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center">5 pts</td></tr>'
+    +'<tr style="background:#f5f8fd"><td style="padding:6px 10px">9</td><td style="padding:6px 10px;font-weight:700">Others / General Administration</td><td style="padding:6px 10px;text-align:center;font-weight:700;color:#2980b9">0.10</td><td style="padding:6px 10px;text-align:center">10 pts</td></tr>'
+    +'</tbody><tfoot><tr style="background:#e8edf4"><td colspan="2" style="padding:6px 10px;font-weight:800;color:#1a3a5c">Total</td><td style="padding:6px 10px;text-align:center;font-weight:800;color:#1a3a5c">1.00</td><td style="padding:6px 10px;text-align:center;font-weight:800;color:#1a3a5c">—</td></tr></tfoot>'
+    +'</table></div></div>'
+
+    // Sensitivity weights sub-table
+    +'<div style="margin-top:18px"><div style="font-size:11.5px;font-weight:800;color:#1a3a5c;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Sensitivity Weights (set by S&amp;A Department)</div>'
+    +'<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11.5px;width:100%">'
+    +'<thead><tr><th style="background:#1a3a5c;color:#fff;padding:6px 10px;text-align:left">Sensitivity</th><th style="background:#1a3a5c;color:#fff;padding:6px 10px;text-align:center">Weight</th><th style="background:#1a3a5c;color:#fff;padding:6px 10px;text-align:left">Effect on Score (Component 4)</th></tr></thead><tbody>'
+    +'<tr style="background:#fdecea"><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:700;color:#c0392b">High</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;font-weight:800;color:#c0392b">1.00</td><td style="padding:6px 10px;border-bottom:1px solid #eee;color:#4a5a70">Full 15 pts if all obs in category are High</td></tr>'
+    +'<tr style="background:#fef3e2"><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:700;color:#e67e22">M to H</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;font-weight:800;color:#e67e22">0.64</td><td style="padding:6px 10px;border-bottom:1px solid #eee;color:#4a5a70">Up to 9.6 pts</td></tr>'
+    +'<tr style="background:#eaf4fb"><td style="padding:6px 10px;border-bottom:1px solid #eee;font-weight:700;color:#2980b9">L to M</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;font-weight:800;color:#2980b9">0.40</td><td style="padding:6px 10px;border-bottom:1px solid #eee;color:#4a5a70">Up to 6.0 pts</td></tr>'
+    +'<tr style="background:#e9f7ef"><td style="padding:6px 10px;font-weight:700;color:#27ae60">Low</td><td style="padding:6px 10px;text-align:center;font-weight:800;color:#27ae60">0.20</td><td style="padding:6px 10px;color:#4a5a70">Up to 3.0 pts</td></tr>'
+    +'</tbody></table></div></div>'
+
     +'<div style="margin-top:14px;background:#f5f8fd;border-radius:6px;padding:12px 16px;font-size:12px;color:#2a3a50;line-height:1.7">'
     +'<strong>Risk Levels:</strong>&nbsp;'
     +'<span style="background:#fde8e8;color:#9b1a1a;border:1px solid #f0a0a0;border-radius:6px;padding:2px 8px;font-weight:700;font-size:11px">Critical</span> ≥ 75 &nbsp;|&nbsp; '
@@ -18412,7 +18491,7 @@ function ra_methodologyHtml(){
     +'<span style="background:#fffbe0;color:#806000;border:1px solid #e0c030;border-radius:6px;padding:2px 8px;font-weight:700;font-size:11px">Medium</span> ≥ 25 &nbsp;|&nbsp; '
     +'<span style="background:#e8f8e8;color:#1a6020;border:1px solid #80c880;border-radius:6px;padding:2px 8px;font-weight:700;font-size:11px">Low</span> &lt; 25'
     +'</div>'
-    +note('The Observation Frequency and Repeat Rate components are zero when no observations appear in the loaded report. The Databank Frequency and Severity Bonus still apply, giving a baseline inherent risk even for unobserved categories.')
+    +note('Components 1 &amp; 2 (Frequency &amp; Repeat Rate) are zero when no observations appear in the loaded report. Components 3, 4 &amp; 5 still apply, providing a baseline risk score for every area even if the loaded report had no findings there. Sensitivity Weight (Component 4) is only populated when a JSON session file is loaded — for text/Word/Excel files it falls back to the area weight baseline.')
   );
 
   // 4. Categories table
