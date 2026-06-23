@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CAPEX Challenge Agent | Beaconhouse Group Finance</title>
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --surface: #ffffff;
+      --border: #dde1e8;
+      --navy: #1a2e4a;
+      --blue: #1d5fa6;
+      --blue-light: #e8f0fb;
+      --red: #c0392b;
+      --red-light: #fdf0ef;
+      --amber: #d97706;
+      --amber-light: #fffbeb;
+      --green: #0f7a4a;
+      --green-light: #edfaf3;
+      --text: #1e2a38;
+      --muted: #6b7a8d;
+      --radius: 8px;
+      --shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--navy);
+      color: #fff;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+    }
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .logo-mark {
+      width: 36px; height: 36px;
+      background: var(--blue);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 18px; letter-spacing: -1px;
+    }
+    .header-title { font-size: 15px; font-weight: 600; }
+    .header-sub { font-size: 12px; opacity: 0.6; margin-top: 1px; }
+    .header-badge {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.8);
+    }
+
+    /* ── Layout ── */
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 24px 80px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    @media (max-width: 720px) { main { grid-template-columns: 1fr; } }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .card-header {
+      background: var(--navy);
+      color: #fff;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .card-header .icon {
+      width: 28px; height: 28px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+    }
+    .card-header h2 { font-size: 14px; font-weight: 600; }
+    .card-header p { font-size: 11px; opacity: 0.65; margin-top: 1px; }
+    .card-body { padding: 20px; }
+
+    /* ── Form ── */
+    .field-group { margin-bottom: 16px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+    input[type="text"], input[type="password"], select, textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-size: 13px;
+      color: var(--text);
+      font-family: inherit;
+      background: #fff;
+      transition: border-color 0.15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(29,95,166,0.1);
+    }
+    textarea { resize: vertical; min-height: 90px; line-height: 1.5; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .section-divider {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--blue);
+      margin: 20px 0 14px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid var(--blue-light);
+    }
+
+    /* API key row */
+    .api-key-row {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+    .api-key-row input { flex: 1; }
+    .btn-toggle {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0 10px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--muted);
+      transition: background 0.15s;
+    }
+    .btn-toggle:hover { background: var(--border); }
+
+    /* Analyse button */
+    .btn-analyse {
+      width: 100%;
+      padding: 13px;
+      background: var(--blue);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-analyse:hover:not(:disabled) { background: #1649a0; }
+    .btn-analyse:active:not(:disabled) { transform: scale(0.99); }
+    .btn-analyse:disabled { background: var(--muted); cursor: not-allowed; }
+
+    /* Spinner */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Output Panel (full width) ── */
+    .output-full {
+      grid-column: 1 / -1;
+    }
+
+    /* Status bar */
+    .status-bar {
+      background: var(--blue-light);
+      border: 1px solid #c3d9f5;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--blue);
+      display: none;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .status-bar.visible { display: flex; }
+    .status-dot {
+      width: 8px; height: 8px;
+      background: var(--blue);
+      border-radius: 50%;
+      animation: pulse 1s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ── Challenge Note ── */
+    .challenge-note { display: none; }
+    .challenge-note.visible { display: block; }
+
+    .note-header {
+      border-bottom: 3px solid var(--navy);
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+    .note-header h3 { font-size: 18px; color: var(--navy); }
+    .note-meta {
+      display: flex;
+      gap: 24px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .meta-chip {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .meta-chip strong { color: var(--text); }
+
+    /* Overall verdict */
+    .verdict-bar {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+    .verdict-cell {
+      border-radius: 6px;
+      padding: 10px 8px;
+      text-align: center;
+    }
+    .verdict-cell .vc-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.75; }
+    .verdict-cell .vc-rating { font-size: 15px; font-weight: 700; margin-top: 4px; }
+
+    .rating-strong { background: var(--green-light); color: var(--green); }
+    .rating-adequate { background: #eef9ff; color: #0369a1; }
+    .rating-weak { background: var(--amber-light); color: var(--amber); }
+    .rating-gap { background: var(--red-light); color: var(--red); }
+    .rating-na { background: var(--bg); color: var(--muted); }
+
+    /* Four sections */
+    .sections-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 640px) { .sections-grid { grid-template-columns: 1fr; } }
+
+    .section-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .section-card-header {
+      padding: 11px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-card-header .sh-left { display: flex; align-items: center; gap: 8px; }
+    .section-num {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700;
+      background: var(--navy); color: #fff;
+    }
+    .section-card-header h4 { font-size: 13px; font-weight: 600; }
+    .rating-pill {
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 20px;
+      padding: 3px 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .section-card-body { padding: 14px 16px; }
+    .finding-block { margin-bottom: 12px; }
+    .finding-block:last-child { margin-bottom: 0; }
+    .fb-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 5px;
+    }
+    .fb-label.strengths { color: var(--green); }
+    .fb-label.gaps { color: var(--red); }
+    .fb-label.upgrade { color: var(--blue); }
+    .fb-label.challenges { color: var(--amber); }
+
+    ul.finding-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    ul.finding-list li {
+      font-size: 12px;
+      line-height: 1.55;
+      padding-left: 16px;
+      position: relative;
+      color: var(--text);
+    }
+    ul.finding-list li::before {
+      content: attr(data-bullet);
+      position: absolute;
+      left: 0;
+      font-weight: 700;
+    }
+    ul.finding-list.str li::before { content: "✓"; color: var(--green); }
+    ul.finding-list.gap li::before { content: "✗"; color: var(--red); }
+    ul.finding-list.upg li::before { content: "→"; color: var(--blue); }
+    ul.finding-list.chg li::before { content: "?"; color: var(--amber); }
+
+    /* Overall recommendation */
+    .recommendation-box {
+      border: 2px solid var(--navy);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .rec-header {
+      background: var(--navy);
+      color: #fff;
+      padding: 10px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .rec-body { padding: 14px 16px; font-size: 13px; line-height: 1.65; }
+
+    /* Formatted text in rec-body */
+    .rec-body p { margin-bottom: 8px; }
+    .rec-body p:last-child { margin-bottom: 0; }
+
+    /* Footer note */
+    .output-footer {
+      margin-top: 20px;
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    /* Sample loader */
+    .sample-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .sample-btn {
+      background: var(--blue-light);
+      color: var(--blue);
+      border: 1px solid #c3d9f5;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .sample-btn:hover { background: #d4e7fc; }
+
+    .helper-text { font-size: 11px; color: var(--muted); margin-top: 5px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="logo-mark">BG</div>
+    <div>
+      <div class="header-title">Capital Expenditure Challenge Agent</div>
+      <div class="header-sub">Group Finance | Beaconhouse Group</div>
+    </div>
+  </div>
+  <div class="header-badge">UC4-F · FY 2025-26</div>
+</header>
+
+<main>
+
+  <!-- ── Left column: Config + Request Form ── -->
+  <div>
+
+    <!-- API Key -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header">
+        <div class="icon">🔑</div>
+        <div>
+          <h2>Agent Configuration</h2>
+          <p>Claude API connection</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="field-group">
+          <label>Anthropic API Key</label>
+          <div class="api-key-row">
+            <input type="password" id="apiKey" placeholder="sk-ant-api03-…" autocomplete="off" />
+            <button class="btn-toggle" onclick="toggleKey()" title="Show/hide key">👁</button>
+          </div>
+          <p class="helper-text">Your key is used only in-browser and never transmitted elsewhere.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CAPEX Form -->
+    <div class="card">
+      <div class="card-header">
+        <div class="icon">📋</div>
+        <div>
+          <h2>Capital Expenditure Request</h2>
+          <p>Complete all sections — partial submissions will be flagged</p>
+        </div>
+      </div>
+      <div class="card-body">
+
+        <!-- Load sample -->
+        <div class="field-group">
+          <label>Load test scenario</label>
+          <div class="sample-row">
+            <button class="sample-btn" onclick="loadSample(1)">1 · IT Infrastructure</button>
+            <button class="sample-btn" onclick="loadSample(2)">2 · Staff Café Expansion</button>
+            <button class="sample-btn" onclick="loadSample(3)">3 · Hunza Solar Install</button>
+          </div>
+        </div>
+
+        <div class="section-divider">Request Details</div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label>Request Reference</label>
+            <input type="text" id="f_ref" placeholder="e.g. CAPEX-2026-IT-004" />
+          </div>
+          <div class="field-group">
+            <label>Amount Requested (PKR)</label>
+            <input type="text" id="f_amount" placeholder="e.g. 18,400,000" />
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label>Submitted By</label>
+            <input type="text" id="f_submitter" placeholder="Name / Title" />
+          </div>
+          <div class="field-group">
+            <label>Date Submitted</label>
+            <input type="text" id="f_date" placeholder="e.g. 2 June 2026" />
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label>Budget Classification</label>
+            <select id="f_budget">
+              <option value="">— Select —</option>
+              <option>Capital expenditure</option>
+              <option>Revenue expenditure</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label>Approval Deadline</label>
+            <input type="text" id="f_deadline" placeholder="e.g. 30 June 2026" />
+          </div>
+        </div>
+
+        <div class="section-divider">Business Case</div>
+        <div class="field-group">
+          <textarea id="f_case" rows="5" placeholder="Describe the problem being solved, evidence of need, and what the expenditure covers…"></textarea>
+        </div>
+
+        <div class="section-divider">Alternatives Considered</div>
+        <div class="field-group">
+          <textarea id="f_alts" rows="4" placeholder="List alternatives evaluated, costs examined, and reasons for rejection…"></textarea>
+        </div>
+
+        <div class="section-divider">Financial Projections</div>
+        <div class="field-group">
+          <textarea id="f_fin" rows="4" placeholder="ROI, payback period, cost savings, revenue impact, assumptions used…"></textarea>
+        </div>
+
+        <div class="section-divider">Risk Assessment</div>
+        <div class="field-group">
+          <textarea id="f_risk" rows="4" placeholder="Key risks, likelihood, impact, and mitigations…"></textarea>
+        </div>
+
+        <button class="btn-analyse" id="analyseBtn" onclick="runAnalysis()">
+          <span id="btnSpinner" class="spinner"></span>
+          <span id="btnText">Analyse Request</span>
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Right column: placeholder when no output ── -->
+  <div id="placeholderCol">
+    <div class="card" style="border:2px dashed var(--border); box-shadow:none; background: transparent;">
+      <div class="card-body" style="padding:48px 24px; text-align:center; color:var(--muted);">
+        <div style="font-size:40px;margin-bottom:16px;">📊</div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:8px;">Challenge note will appear here</div>
+        <div style="font-size:12px;line-height:1.6;">Complete the form on the left and click <strong>Analyse Request</strong> to receive a structured four-section challenge note with gaps, strengths, and information requirements.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Output: full-width ── -->
+  <div class="output-full" id="outputSection">
+
+    <div class="status-bar" id="statusBar">
+      <div class="status-dot"></div>
+      <span id="statusText">Initialising analysis…</span>
+    </div>
+
+    <div class="card challenge-note" id="challengeNote">
+      <div class="card-header">
+        <div class="icon">📝</div>
+        <div>
+          <h2>Structured Challenge Note</h2>
+          <p>Group Finance · Capital Expenditure Review</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="note-header">
+          <h3 id="noteTitle">Challenge Note</h3>
+          <div class="note-meta" id="noteMeta"></div>
+        </div>
+        <div class="verdict-bar" id="verdictBar"></div>
+        <div class="sections-grid" id="sectionsGrid"></div>
+        <div class="recommendation-box">
+          <div class="rec-header">Overall Assessment & Recommendation</div>
+          <div class="rec-body" id="recBody"></div>
+        </div>
+        <div class="output-footer">
+          Generated by CAPEX Challenge Agent · Beaconhouse Group Finance · UC4-F<br>
+          This note is an analytical aid and does not constitute an approval or rejection decision.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<script>
+// ── Sample data ────────────────────────────────────────────────────────────────
+const SAMPLES = {
+  1: {
+    ref: "CAPEX-2026-IT-004",
+    amount: "18,400,000",
+    submitter: "Director Information Technology",
+    date: "2 June 2026",
+    budget: "Capital expenditure",
+    deadline: "30 June 2026 (before financial year close)",
+    case: `The Group's primary data centre currently operates on server hardware that is five years old and outside vendor support. Three of the seven production servers experienced unplanned downtime in the past six months, resulting in cumulative system unavailability of 14.3 hours, equivalent to PKR 2.1 million in estimated productivity loss based on staff cost rates.
+
+This request covers the procurement of four replacement servers, one additional storage unit, and associated rack and power infrastructure. Vendor quotes have been obtained from three suppliers: Netsol Technologies (PKR 19.2 million), TechVista (PKR 18.4 million), and Arwen Tech (PKR 21.1 million). TechVista is recommended on price and delivery timeline.`,
+    alts: `Cloud migration was evaluated as an alternative to on-premises replacement. A preliminary analysis indicated that a full cloud migration would cost approximately PKR 38 million in year one due to data transfer, licensing, and professional services costs, with ongoing annual costs of PKR 14 million thereafter. On-premises replacement was determined to be more cost-effective over a five-year horizon.`,
+    fin: `The replacement infrastructure is expected to remain in service for a minimum of five years. Annual maintenance cost of PKR 1.8 million is included in the IT operational budget. No direct revenue generation is associated with this expenditure; the financial case is based on avoided downtime cost and risk reduction.`,
+    risk: `If the replacement is not approved, the risk of further unplanned outages will increase as hardware ages further. BEAMS, the Group's school management system, is hosted on the current infrastructure. An extended outage during peak examination processing would have material operational impact. A secondary risk is that the current hardware cannot support the BEAMS 2.0 upgrade planned for Q1 FY2026-27.`
+  },
+  2: {
+    ref: "CAPEX-2026-OPS-011",
+    amount: "6,750,000",
+    submitter: "Director Operations",
+    date: "5 June 2026",
+    budget: "Capital expenditure",
+    deadline: "15 July 2026",
+    case: `The existing staff cafe at Gulberg Head Office serves approximately 340 staff members across three mealtimes. Current seating capacity is 48. During peak lunch hours, queuing regularly extends into the corridor, creating a safety concern and negatively affecting the staff experience. This request covers a 60-square-metre extension to the existing cafe footprint, incorporating additional seating for 40 persons, an updated servery layout, and improved ventilation.`,
+    alts: `No formal alternatives were evaluated. A staggered lunch rota was discussed informally but was not considered operationally feasible given departmental scheduling constraints.`,
+    fin: `The expansion is projected to generate cost savings through reduced staff time lost to queuing, estimated at 8 minutes per person per day across approximately 200 affected staff members. At an average blended staff cost of PKR 850 per hour, this represents an annualised saving of PKR 4,760,000, yielding a payback period of approximately 17 months.`,
+    risk: `Section not completed. To be provided on request.`
+  },
+  3: {
+    ref: "CAPEX-2026-FHS-003",
+    amount: "22,800,000",
+    submitter: "General Manager, Ambiance Hunza",
+    date: "1 June 2026",
+    budget: "Capital expenditure",
+    deadline: "31 July 2026 (to meet installation window before winter)",
+    case: `Ambiance Hunza currently relies entirely on diesel generation for electricity, at a monthly fuel cost of PKR 1,340,000 during peak season (April to October) and PKR 680,000 during off-peak months. Grid connectivity is not available at the property location. A 120 kWp solar installation with battery storage would reduce diesel consumption by an estimated 78% during daylight hours, with full grid replacement during peak solar months (May to August).`,
+    alts: `Three alternatives were reviewed: a smaller 60 kWp installation at PKR 13.2 million (insufficient to meet peak load); a hybrid diesel-solar system from an alternative vendor at PKR 24.1 million (higher cost, less proven technology); and continued diesel-only operation (baseline, rejected on financial and sustainability grounds). The 120 kWp system from SunPower Pakistan was selected on cost-effectiveness and installation track record.`,
+    fin: `Annual diesel cost saving is projected at PKR 9,840,000, based on 78% reduction across 12 months at current fuel prices. The system is rated for a 25-year operational life, with a performance warranty for 20 years. Net of annual maintenance (PKR 420,000), the annualised saving is PKR 9,420,000. Return on investment is projected at 41.3% per annum, with a payback period of 28 months.`,
+    risk: `Key risks include: seasonal variation in solar yield (mitigated by battery storage and retained diesel backup); vendor delivery timeline (SunPower Pakistan has completed two comparable installations in Gilgit-Baltistan; references available); and diesel price fluctuation (current projections use a conservative PKR 290 per litre; savings increase if prices rise). The installation window is constrained by weather: works must be completed before November or deferred to April 2027, creating a seven-month delay if approval is not received in July.`
+  }
+};
+
+function loadSample(n) {
+  const s = SAMPLES[n];
+  document.getElementById('f_ref').value = s.ref;
+  document.getElementById('f_amount').value = s.amount;
+  document.getElementById('f_submitter').value = s.submitter;
+  document.getElementById('f_date').value = s.date;
+  document.getElementById('f_budget').value = s.budget;
+  document.getElementById('f_deadline').value = s.deadline;
+  document.getElementById('f_case').value = s.case;
+  document.getElementById('f_alts').value = s.alts;
+  document.getElementById('f_fin').value = s.fin;
+  document.getElementById('f_risk').value = s.risk;
+}
+
+function toggleKey() {
+  const el = document.getElementById('apiKey');
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+
+// ── Rating helpers ──────────────────────────────────────────────────────────
+const RATING_MAP = {
+  'STRONG':   { css: 'rating-strong',    label: 'Strong' },
+  'ADEQUATE': { css: 'rating-adequate',  label: 'Adequate' },
+  'WEAK':     { css: 'rating-weak',      label: 'Weak' },
+  'GAP':      { css: 'rating-gap',       label: 'Gap' },
+  'N/A':      { css: 'rating-na',        label: 'N/A' },
+};
+function ratingClass(r) {
+  const key = (r||'').toUpperCase().trim();
+  return RATING_MAP[key] || { css: 'rating-na', label: r };
+}
+
+// ── Render output ───────────────────────────────────────────────────────────
+function renderOutput(data) {
+  // Title & meta
+  document.getElementById('noteTitle').textContent =
+    `Challenge Note — ${data.request_title || 'Capital Expenditure Request'}`;
+
+  const meta = document.getElementById('noteMeta');
+  meta.innerHTML = [
+    ['Reference', data.request_ref],
+    ['Amount', data.amount ? `PKR ${data.amount}` : '—'],
+    ['Submitted By', data.submitted_by],
+    ['Date', data.date_submitted],
+  ].map(([k,v]) => v ? `<div class="meta-chip"><strong>${k}:</strong> ${v}</div>` : '').join('');
+
+  // Verdict bar
+  const vbar = document.getElementById('verdictBar');
+  const dims = [
+    { key: 'business_case',   label: 'Business Case' },
+    { key: 'alternatives',    label: 'Alternatives' },
+    { key: 'financials',      label: 'Financials' },
+    { key: 'timing',          label: 'Timing' },
+    { key: 'risk_assessment', label: 'Risk' },
+  ];
+  vbar.innerHTML = dims.map(d => {
+    const s = data.sections?.[d.key];
+    const r = ratingClass(s?.rating || 'N/A');
+    return `<div class="verdict-cell ${r.css}">
+      <div class="vc-label">${d.label}</div>
+      <div class="vc-rating">${r.label}</div>
+    </div>`;
+  }).join('');
+
+  // Four sections
+  const SECTION_DEFS = [
+    { key: 'business_case',   num: '1', title: 'Business Case Quality' },
+    { key: 'alternatives',    num: '2', title: 'Alternatives Analysis' },
+    { key: 'financials',      num: '3', title: 'Financial Consistency' },
+    { key: 'risk_assessment', num: '4', title: 'Risk Assessment' },
+  ];
+
+  const grid = document.getElementById('sectionsGrid');
+  grid.innerHTML = SECTION_DEFS.map(def => {
+    const s = data.sections?.[def.key] || {};
+    const r = ratingClass(s.rating || 'N/A');
+
+    function makeList(items, cls, label, lblCls) {
+      if (!items || !items.length) return '';
+      return `<div class="finding-block">
+        <div class="fb-label ${lblCls}">${label}</div>
+        <ul class="finding-list ${cls}">
+          ${items.map(i => `<li>${escHtml(i)}</li>`).join('')}
+        </ul>
+      </div>`;
+    }
+
+    const inner = [
+      makeList(s.strengths,         'str', 'Strengths',              'strengths'),
+      makeList(s.challenges,        'chg', 'Challenges',             'challenges'),
+      makeList(s.gaps,              'gap', 'Gaps',                   'gaps'),
+      makeList(s.upgrade_requires,  'upg', 'To upgrade gap → strength','upgrade'),
+    ].join('');
+
+    return `<div class="section-card">
+      <div class="section-card-header">
+        <div class="sh-left">
+          <div class="section-num">${def.num}</div>
+          <h4>${def.title}</h4>
+        </div>
+        <span class="rating-pill ${r.css}">${r.label}</span>
+      </div>
+      <div class="section-card-body">${inner || '<p style="font-size:12px;color:var(--muted)">No findings returned.</p>'}</div>
+    </div>`;
+  }).join('');
+
+  // Recommendation
+  const rec = document.getElementById('recBody');
+  rec.innerHTML = escHtml(data.overall_recommendation || '—')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br>');
+  rec.innerHTML = '<p>' + rec.innerHTML + '</p>';
+
+  // Show
+  document.getElementById('challengeNote').classList.add('visible');
+  document.getElementById('placeholderCol').style.display = 'none';
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// ── Main analysis ───────────────────────────────────────────────────────────
+async function runAnalysis() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) { alert('Please enter your Anthropic API key.'); return; }
+
+  const fields = {
+    ref:        document.getElementById('f_ref').value.trim(),
+    amount:     document.getElementById('f_amount').value.trim(),
+    submitter:  document.getElementById('f_submitter').value.trim(),
+    date:       document.getElementById('f_date').value.trim(),
+    budget:     document.getElementById('f_budget').value.trim(),
+    deadline:   document.getElementById('f_deadline').value.trim(),
+    bcase:      document.getElementById('f_case').value.trim(),
+    alts:       document.getElementById('f_alts').value.trim(),
+    fin:        document.getElementById('f_fin').value.trim(),
+    risk:       document.getElementById('f_risk').value.trim(),
+  };
+
+  if (!fields.bcase) { alert('Please provide a business case before analysing.'); return; }
+
+  // UI: loading state
+  const btn = document.getElementById('analyseBtn');
+  btn.disabled = true;
+  document.getElementById('btnSpinner').style.display = 'block';
+  document.getElementById('btnText').textContent = 'Analysing…';
+  document.getElementById('challengeNote').classList.remove('visible');
+
+  const statusBar = document.getElementById('statusBar');
+  const statusText = document.getElementById('statusText');
+  statusBar.classList.add('visible');
+  statusText.textContent = 'Sending request to Claude…';
+
+  const prompt = buildPrompt(fields);
+
+  try {
+    statusText.textContent = 'Agent is reviewing your submission…';
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-calls': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-8',
+        max_tokens: 4096,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `HTTP ${resp.status}`);
+    }
+
+    const result = await resp.json();
+    const raw = result.content?.[0]?.text || '';
+
+    statusText.textContent = 'Parsing challenge note…';
+
+    // Extract JSON from response
+    const jsonMatch = raw.match(/```json\s*([\s\S]*?)\s*```/) ||
+                      raw.match(/(\{[\s\S]*\})/);
+    if (!jsonMatch) throw new Error('Could not parse agent response. Raw:\n' + raw);
+
+    const data = JSON.parse(jsonMatch[1]);
+    statusBar.classList.remove('visible');
+    renderOutput(data);
+
+  } catch (e) {
+    statusBar.classList.remove('visible');
+    alert('Analysis failed: ' + e.message);
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    document.getElementById('btnSpinner').style.display = 'none';
+    document.getElementById('btnText').textContent = 'Analyse Request';
+  }
+}
+
+function buildPrompt(f) {
+  return `You are a senior finance controller at Beaconhouse Group, responsible for challenging capital expenditure requests before they reach the investment committee. Your role is rigorous, fair, and evidence-driven.
+
+You will assess the following CAPEX submission across five dimensions, then produce a structured challenge note in exactly the JSON format specified below.
+
+---
+CAPEX SUBMISSION
+---
+Request Reference: ${f.ref || 'Not provided'}
+Amount Requested: PKR ${f.amount || 'Not provided'}
+Submitted By: ${f.submitter || 'Not provided'}
+Date: ${f.date || 'Not provided'}
+Budget Classification: ${f.budget || 'Not provided'}
+Approval Deadline: ${f.deadline || 'Not provided'}
+
+BUSINESS CASE:
+${f.bcase || 'Not provided'}
+
+ALTERNATIVES CONSIDERED:
+${f.alts || 'Not provided'}
+
+FINANCIAL PROJECTIONS:
+${f.fin || 'Not provided'}
+
+RISK ASSESSMENT:
+${f.risk || 'Not provided'}
+---
+
+ASSESSMENT FRAMEWORK — apply ALL five tests:
+
+1. BUSINESS CASE QUALITY
+   - Is the need grounded in evidence (data, incidents, measurements) or assertion (opinions, generalisations)?
+   - Are claimed costs and productivity losses backed by a clear methodology?
+   - Is the scope of spend proportionate to the stated problem?
+
+2. ALTERNATIVES ANALYSIS
+   - Were alternatives genuinely evaluated with comparable rigour, or dismissed without quantified analysis?
+   - Is the recommendation free from self-serving framing (e.g. only one alternative compared, at an extreme)?
+   - Were low-cost or phased options considered?
+
+3. FINANCIAL CONSISTENCY
+   - Are the numbers internally consistent (do savings × assumptions = payback period)?
+   - Are assumptions (costs, staff rates, utilisation, asset life) stated and reasonable?
+   - Are there silent assumptions or gaps in the projection logic?
+   - Verify any arithmetic you can check.
+
+4. TIMING JUSTIFICATION
+   - Is the urgency or deadline externally driven (operational constraint, seasonal window, contract deadline) or internally convenient (year-end budget, budget availability)?
+   - Does the stated timeline create appropriate or artificial pressure?
+
+5. RISK ASSESSMENT
+   - Does the risk section identify the THREE most likely failure modes for this type of investment?
+   - Are mitigations specific or generic?
+   - What material risks are absent?
+
+---
+RATING SCALE:
+- STRONG: Well-evidenced, no material gaps
+- ADEQUATE: Mostly sound with minor gaps
+- WEAK: Present but insufficiently substantiated
+- GAP: Section missing, cursory, or fundamentally flawed
+
+---
+OUTPUT FORMAT — respond ONLY with this JSON object, no other text:
+
+\`\`\`json
+{
+  "request_title": "Short descriptive title (e.g. IT Infrastructure Upgrade)",
+  "request_ref": "Reference number",
+  "amount": "Amount as submitted",
+  "submitted_by": "Submitter name/title",
+  "date_submitted": "Date",
+  "sections": {
+    "business_case": {
+      "rating": "STRONG|ADEQUATE|WEAK|GAP",
+      "strengths": ["concise bullet point", "..."],
+      "challenges": ["concise challenge question or observation", "..."],
+      "gaps": ["specific gap identified", "..."],
+      "upgrade_requires": ["exactly what information would close this gap", "..."]
+    },
+    "alternatives": {
+      "rating": "STRONG|ADEQUATE|WEAK|GAP",
+      "strengths": ["..."],
+      "challenges": ["..."],
+      "gaps": ["..."],
+      "upgrade_requires": ["..."]
+    },
+    "financials": {
+      "rating": "STRONG|ADEQUATE|WEAK|GAP",
+      "strengths": ["..."],
+      "challenges": ["..."],
+      "gaps": ["..."],
+      "upgrade_requires": ["..."]
+    },
+    "timing": {
+      "rating": "STRONG|ADEQUATE|WEAK|GAP",
+      "strengths": ["..."],
+      "challenges": ["..."],
+      "gaps": ["..."],
+      "upgrade_requires": ["..."]
+    },
+    "risk_assessment": {
+      "rating": "STRONG|ADEQUATE|WEAK|GAP",
+      "strengths": ["..."],
+      "challenges": ["..."],
+      "gaps": ["identify any of the three most likely failure modes that are missing", "..."],
+      "upgrade_requires": ["..."]
+    }
+  },
+  "overall_recommendation": "2–4 sentence narrative. State the overall quality of the submission, the single most important question the investment committee should ask, and whether the request should proceed, be returned for revision, or be rejected pending further information."
+}
+\`\`\``;
+}
+</script>
+
+</body>
+</html>
