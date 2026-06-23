@@ -555,8 +555,13 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
 })();
 function pwCheck(){
   var v=document.getElementById('pw-input').value;
-  var isHO = (v === [72,79,64,83,38,65,50,48,50,54].map(function(c){return String.fromCharCode(c);}).join(''));
-  if(v==='S&A2026' || isHO){
+  var _defUser='S&A2026';
+  var _defHO=[72,79,64,83,38,65,50,48,50,54].map(function(c){return String.fromCharCode(c);}).join('');
+  var _curUser=_defUser, _curHO=_defHO;
+  try{ _curUser=localStorage.getItem('sa_pw_user')||_defUser; }catch(e){}
+  try{ _curHO=localStorage.getItem('sa_pw_ho')||_defHO; }catch(e){}
+  var isHO=(v===_curHO);
+  if(v===_curUser || isHO){
     try{sessionStorage.setItem('sa_auth_2026','1');}catch(e){}
     if(isHO){ try{ window._hoAuthed=true; _hoActivateBtns(); }catch(e){} }
     document.getElementById('pw-screen').style.display='none';
@@ -569,6 +574,106 @@ function pwCheck(){
 }
 </script>
 <!-- END PASSWORD SCREEN -->
+
+<!-- CHANGE PASSWORD MODAL -->
+<div id="chpw-modal" style="display:none;position:fixed;inset:0;z-index:999998;background:rgba(0,0,0,.55);align-items:center;justify-content:center;font-family:Inter,Arial,sans-serif">
+  <div style="background:#fff;border-radius:10px;padding:36px 40px;max-width:400px;width:92%;box-shadow:0 8px 40px rgba(0,0,0,.4)">
+    <div style="font-size:16px;font-weight:700;color:#1a3a5c;margin-bottom:4px">&#128272; Change Password</div>
+    <div style="font-size:12px;color:#666;margin-bottom:20px">Select the account whose password you want to change.</div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:12px;font-weight:600;color:#1a3a5c;display:block;margin-bottom:6px">Account</label>
+      <div style="display:flex;gap:10px">
+        <label style="flex:1;cursor:pointer;border:2px solid #c8d8ec;border-radius:6px;padding:9px 10px;font-size:13px;display:flex;align-items:center;gap:7px;transition:border .15s" id="chpw-lbl-user">
+          <input type="radio" name="chpw-acct" value="user" checked onchange="chpwAcctChange()" style="accent-color:#1a3a5c"> User (S&amp;A)
+        </label>
+        <label style="flex:1;cursor:pointer;border:2px solid #c8d8ec;border-radius:6px;padding:9px 10px;font-size:13px;display:flex;align-items:center;gap:7px;transition:border .15s" id="chpw-lbl-ho">
+          <input type="radio" name="chpw-acct" value="ho" onchange="chpwAcctChange()" style="accent-color:#1a3a5c"> Head Office
+        </label>
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:12px;font-weight:600;color:#1a3a5c;display:block;margin-bottom:5px">Current Password</label>
+      <input id="chpw-cur" type="password" placeholder="Current password" style="width:100%;padding:9px 12px;border:2px solid #c8d8ec;border-radius:6px;font-size:13px;font-family:Inter,Arial,sans-serif;outline:none;box-sizing:border-box">
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:12px;font-weight:600;color:#1a3a5c;display:block;margin-bottom:5px">New Password</label>
+      <input id="chpw-new" type="password" placeholder="New password (min 6 chars)" style="width:100%;padding:9px 12px;border:2px solid #c8d8ec;border-radius:6px;font-size:13px;font-family:Inter,Arial,sans-serif;outline:none;box-sizing:border-box">
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:12px;font-weight:600;color:#1a3a5c;display:block;margin-bottom:5px">Confirm New Password</label>
+      <input id="chpw-cfm" type="password" placeholder="Repeat new password" style="width:100%;padding:9px 12px;border:2px solid #c8d8ec;border-radius:6px;font-size:13px;font-family:Inter,Arial,sans-serif;outline:none;box-sizing:border-box">
+    </div>
+    <div id="chpw-err" style="font-size:12px;color:#c0392b;min-height:16px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:10px">
+      <button onclick="doChangePw()" style="flex:1;padding:10px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,Arial,sans-serif">Save Password</button>
+      <button onclick="hideChangePwModal()" style="flex:1;padding:10px;background:#ecf0f1;color:#333;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:Inter,Arial,sans-serif">Cancel</button>
+    </div>
+  </div>
+</div>
+<script>
+function showChangePwModal(){
+  ['chpw-cur','chpw-new','chpw-cfm'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('chpw-err').textContent='';
+  document.querySelector('input[name="chpw-acct"][value="user"]').checked=true;
+  chpwAcctChange();
+  var m=document.getElementById('chpw-modal');
+  m.style.display='flex';
+}
+function hideChangePwModal(){
+  document.getElementById('chpw-modal').style.display='none';
+}
+function chpwAcctChange(){
+  var v=document.querySelector('input[name="chpw-acct"]:checked').value;
+  document.getElementById('chpw-lbl-user').style.borderColor=(v==='user'?'#1a3a5c':'#c8d8ec');
+  document.getElementById('chpw-lbl-ho').style.borderColor=(v==='ho'?'#1a3a5c':'#c8d8ec');
+}
+function _getActivePw(type){
+  // Returns the currently active password for 'user' or 'ho'
+  var stored=null;
+  try{ stored=localStorage.getItem('sa_pw_'+type); }catch(e){}
+  if(stored) return stored;
+  if(type==='user') return 'S&A2026';
+  if(type==='ho') return [72,79,64,83,38,65,50,48,50,54].map(function(c){return String.fromCharCode(c);}).join('');
+  return '';
+}
+function doChangePw(){
+  var acct=document.querySelector('input[name="chpw-acct"]:checked').value;
+  var cur=document.getElementById('chpw-cur').value;
+  var nw=document.getElementById('chpw-new').value;
+  var cfm=document.getElementById('chpw-cfm').value;
+  var errEl=document.getElementById('chpw-err');
+  errEl.textContent='';
+  if(cur!==_getActivePw(acct)){
+    errEl.textContent='Current password is incorrect.';
+    document.getElementById('chpw-cur').value='';
+    document.getElementById('chpw-cur').focus();
+    return;
+  }
+  if(nw.length<6){
+    errEl.textContent='New password must be at least 6 characters.';
+    document.getElementById('chpw-new').focus();
+    return;
+  }
+  if(nw!==cfm){
+    errEl.textContent='New passwords do not match.';
+    document.getElementById('chpw-cfm').value='';
+    document.getElementById('chpw-cfm').focus();
+    return;
+  }
+  try{ localStorage.setItem('sa_pw_'+acct, nw); }catch(e){
+    errEl.textContent='Could not save password (storage unavailable).';
+    return;
+  }
+  hideChangePwModal();
+  var label=acct==='ho'?'Head Office':'User';
+  setTimeout(function(){ alert('Password for '+label+' account updated successfully.'); },100);
+}
+// Close modal on backdrop click
+document.getElementById('chpw-modal').addEventListener('click',function(e){
+  if(e.target===this) hideChangePwModal();
+});
+</script>
+<!-- END CHANGE PASSWORD MODAL -->
 
 <!-- EMBEDDED DATA (safe JSON tag — not executed as JS directly) -->
 <script type="application/json" id="audit-data">
@@ -8967,6 +9072,7 @@ function pwCheck(){
     <button class="tbtn cmp rpt-btn" id="cmp-btn" onclick="showCompareModal()" style="opacity:0.55;filter:grayscale(0.4)" data-tip-title="Compare Report 🔒" data-tip="Restricted to Head Office. Compares a loaded report file against the databank to identify missing or present observations. Requires HO password.">&#128274; Compare</button>
     <button class="tbtn updb" id="updb-btn" onclick="showUpdateDbModal()" style="opacity:0.55;filter:grayscale(0.4)" data-tip-title="Update Databank 🔒" data-tip="Restricted to Head Office. Auditors can import a Databank Update File received from HO. HO users enter the HO password to access full update and export features.">&#128274; Update DB</button>
     <button class="tbtn rpt-btn" id="demo-btn" style="background:#c9962a;color:#111;border:2px solid #f0c040;font-weight:700;opacity:0.55;filter:grayscale(0.4)" onclick="showDemoAuth()" data-tip-title="Demo Mode 🔒" data-tip="Restricted to Head Office. Loads sample branch data and observations to explore all features without creating a real report.">&#128274; Demo</button>
+    <button class="tbtn rpt-btn" id="chpw-btn" onclick="showChangePwModal()" style="background:#2c3e50;color:#ecf0f1;border:1px solid #4a6278;" data-tip-title="Change Password" data-tip="Change the login password for your account (User or Head Office). You must know the current password to set a new one.">&#128272; Change PW</button>
   </div>
 </div>
 
@@ -9552,9 +9658,11 @@ function _hoActivateBtns(){
   var updb = document.getElementById('updb-btn');
   var cmp  = document.getElementById('cmp-btn');
   var demo = document.getElementById('demo-btn');
+  var chpw = document.getElementById('chpw-btn');
   if(updb){ updb.style.opacity='1'; updb.style.filter='none'; updb.innerHTML='&#128194; Update DB'; }
   if(cmp){  cmp.style.opacity='1';  cmp.style.filter='none';  cmp.innerHTML='&#128269; Compare'; }
   if(demo){ demo.style.opacity='1'; demo.style.filter='none'; demo.innerHTML='&#127919; Demo'; demo.onclick=function(){ loadDemoData(); }; }
+  if(chpw){ chpw.style.background='#1a3a5c'; chpw.style.borderColor='#c9962a'; chpw.innerHTML='&#128272; Change PW <small style="font-size:9px;opacity:.8">(HO)</small>'; }
 }
 
 function showDemoAuth(){
