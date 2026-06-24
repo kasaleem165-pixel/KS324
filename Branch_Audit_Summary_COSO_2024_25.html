@@ -156,7 +156,31 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   .page{display:block!important;padding:8px}
   .cat-body{display:block!important}
   .toggle-arrow,.filter-bar{display:none}
+  .ref-toggle-btn{display:none}
 }
+
+/* Referral feature */
+.ref-toggle-btn{display:inline-flex;align-items:center;gap:4px;border:none;background:none;cursor:pointer;padding:2px;border-radius:4px;transition:.15s;vertical-align:middle}
+.ref-toggle-btn:hover{background:#f0f4f8}
+.ref-chip{display:inline-block;padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700;white-space:nowrap}
+.ref-chip-bh{background:#1F4E79;color:#fff}
+.ref-chip-ro{background:#7B0000;color:#fff}
+.ref-chip-empty{background:#e8eef5;color:#888;font-size:9px;padding:2px 6px}
+.ref-note{display:inline-block;margin-top:4px;font-size:10px;font-style:italic;color:#7B0000;font-weight:600;
+          padding:2px 7px;background:#fff5f5;border-left:3px solid #7B0000;border-radius:0 4px 4px 0}
+/* Referral modal */
+.ref-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:999;align-items:center;justify-content:center}
+.ref-modal-bg.open{display:flex}
+.ref-modal{background:#fff;border-radius:10px;padding:22px 24px;min-width:280px;box-shadow:0 8px 30px rgba(0,0,0,.2)}
+.ref-modal h4{font-size:13px;font-weight:700;color:#1F3864;margin-bottom:4px}
+.ref-modal p{font-size:11px;color:#666;margin-bottom:16px;line-height:1.5}
+.ref-modal-obs{font-size:11px;font-weight:600;color:#333;margin-bottom:14px;padding:6px 10px;background:#f4f7fc;border-radius:6px}
+.ref-modal-btns{display:flex;gap:8px;flex-wrap:wrap}
+.ref-modal-btns button{flex:1;padding:8px 10px;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;transition:.15s}
+.ref-btn-bh{background:#1F4E79;color:#fff}.ref-btn-bh:hover{background:#16365c}
+.ref-btn-ro{background:#7B0000;color:#fff}.ref-btn-ro:hover{background:#5a0000}
+.ref-btn-clear{background:#e8eef5;color:#555}.ref-btn-clear:hover{background:#d8e4f0}
+.ref-btn-cancel{background:#f0f0f0;color:#555}.ref-btn-cancel:hover{background:#e0e0e0}
 </style>
 </head>
 <body>
@@ -458,6 +482,116 @@ function initCharts(){
              plugins:{legend:{labels:{font:{size:9}}}},responsive:true,maintainAspectRatio:false}
   });
 }
+
+// ── Referrals
+const REF_KEY='BSS_REFERRALS_2024_25';
+let _refModalKey='',_refModalBtn=null;
+
+function initReferrals(){
+  const stored=JSON.parse(localStorage.getItem(REF_KEY)||'{}');
+  document.querySelectorAll('.obs-table tbody tr').forEach(tr=>{
+    const obsEl=tr.querySelector('.obs-num');
+    const brEl=tr.querySelector('.branch-pill');
+    if(!obsEl) return;
+    const key=(obsEl.textContent.trim())+'|'+(brEl?brEl.textContent.trim():'');
+    const refCell=tr.cells[5];
+    if(!refCell) return;
+    const existing=refCell.textContent.trim();
+    const state=stored.hasOwnProperty(key)?stored[key]:(existing==='BH'?'BH':existing==='RO'?'RO':null);
+    refCell.innerHTML='';
+    refCell.style.textAlign='center';
+    const btn=document.createElement('button');
+    btn.className='ref-toggle-btn';
+    btn.title='Click to set/change referral';
+    btn.setAttribute('data-key',key);
+    btn.onclick=e=>{e.stopPropagation();openRefModal(btn,key,tr);};
+    _renderRefBtn(btn,state);
+    refCell.appendChild(btn);
+    _renderRefNote(tr,state);
+  });
+}
+
+function _renderRefBtn(btn,state){
+  if(state==='BH') btn.innerHTML='<span class="ref-chip ref-chip-bh">&#9654; BH</span>';
+  else if(state==='RO') btn.innerHTML='<span class="ref-chip ref-chip-ro">&#9654; RO</span>';
+  else btn.innerHTML='<span class="ref-chip ref-chip-empty">Refer ＋</span>';
+}
+
+function _renderRefNote(tr,state){
+  const titleCell=tr.querySelector('.obs-title');
+  if(!titleCell) return;
+  const old=titleCell.querySelector('.ref-note');
+  if(old) old.remove();
+  if(state){
+    const whom=state==='RO'?'Regional Office':'Branch Head';
+    const note=document.createElement('div');
+    note.className='ref-note';
+    note.textContent=`Referred to ${whom}`;
+    titleCell.appendChild(note);
+  }
+}
+
+function openRefModal(btn,key,tr){
+  _refModalKey=key; _refModalBtn=btn;
+  const obsTitle=tr.querySelector('.obs-title');
+  const label=obsTitle?obsTitle.childNodes[0]?.textContent||'':key.split('|')[0];
+  document.getElementById('ref-modal-obsname').textContent=label+' — '+key.split('|')[1];
+  document.getElementById('ref-modal-bg').classList.add('open');
+  // Store tr reference for re-render
+  btn._tr=tr;
+}
+
+function closeRefModal(){document.getElementById('ref-modal-bg').classList.remove('open');}
+
+function applyRef(state){
+  const stored=JSON.parse(localStorage.getItem(REF_KEY)||'{}');
+  if(state) stored[_refModalKey]=state;
+  else delete stored[_refModalKey];
+  localStorage.setItem(REF_KEY,JSON.stringify(stored));
+  _renderRefBtn(_refModalBtn,state||null);
+  _renderRefNote(_refModalBtn._tr,state||null);
+  closeRefModal();
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  initReferrals();
+  // Filter button for referred
+  const fb=document.querySelector('.filter-bar');
+  if(fb){
+    const refBtn=document.createElement('button');
+    refBtn.className='fb';
+    refBtn.style.cssText='border-color:#7B0000;color:#7B0000';
+    refBtn.innerHTML='&#9654; Referred';
+    refBtn.onclick=()=>{
+      document.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));
+      refBtn.classList.add('active');
+      let count=0;
+      document.querySelectorAll('.obs-table tbody tr').forEach(tr=>{
+        const note=tr.querySelector('.ref-note');
+        const show=!!note;
+        tr.style.display=show?'':'none';
+        if(show) count++;
+      });
+      document.getElementById('fcount').textContent=`Showing ${count} referred observation${count!==1?'s':''}`;
+    };
+    fb.insertBefore(refBtn,fb.querySelector('.fc'));
+  }
+});
 </script>
+
+<!-- Referral Modal -->
+<div class="ref-modal-bg" id="ref-modal-bg" onclick="if(event.target===this)closeRefModal()">
+  <div class="ref-modal">
+    <h4>&#9654; Set Referral Status</h4>
+    <p>Mark this observation as referred to:</p>
+    <div class="ref-modal-obs" id="ref-modal-obsname"></div>
+    <div class="ref-modal-btns">
+      <button class="ref-btn-bh" onclick="applyRef('BH')">Branch Head</button>
+      <button class="ref-btn-ro" onclick="applyRef('RO')">Regional Office</button>
+      <button class="ref-btn-clear" onclick="applyRef(null)">&#10005; Clear</button>
+      <button class="ref-btn-cancel" onclick="closeRefModal()">Cancel</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
