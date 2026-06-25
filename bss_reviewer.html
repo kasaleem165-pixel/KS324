@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>BSS Audit Report — Reviewer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,Arial,sans-serif;background:#f0f4f8;font-size:13px;color:#2a3a50}
+.topbar{background:#1a3a5c;color:#fff;padding:10px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.topbar h1{font-size:15px;font-weight:800;flex:1}
+.tbtn{padding:5px 13px;border:none;border-radius:4px;cursor:pointer;font-size:11.5px;font-weight:700;font-family:inherit}
+.stage-badge{font-size:10px;padding:3px 10px;border-radius:12px;font-weight:800}
+.load-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100vh - 48px);gap:16px}
+.load-box{background:#fff;border-radius:12px;padding:32px 40px;box-shadow:0 4px 20px rgba(0,0,0,.1);text-align:center;max-width:480px}
+.load-box h2{font-size:18px;color:#1a3a5c;margin-bottom:8px}
+.load-box p{font-size:12px;color:#666;margin-bottom:20px;line-height:1.6}
+.load-btn{display:inline-block;padding:10px 24px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.main{display:none;padding:14px 18px}
+.obs-card{background:#fff;border-radius:8px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.07);border:1px solid #dde6f0;overflow:hidden}
+.obs-card.flagged{border-color:#c0392b;border-width:2px}
+.obs-card.sendback-flag{background:#fff5f5;border:2px solid #c0392b}
+.obs-hdr{padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.obs-hdr:hover{background:#f5f8fc}
+.obs-body{display:none;padding:14px;border-top:1px solid #eaeff6}
+.obs-body.open{display:block}
+.sec-lbl{font-size:10.5px;font-weight:700;color:#1a3a5c;margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px}
+.sec-val{font-size:11.5px;color:#2a3a50;background:#f5f8fc;border-radius:5px;padding:9px;margin-bottom:10px;line-height:1.55;white-space:pre-wrap}
+.diff-box{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.diff-orig{background:#fde8e8;border-radius:5px;padding:9px;font-size:11px;line-height:1.5;border:1px solid #f0b0b0}
+.diff-edit{background:#e8fde8;border-radius:5px;padding:9px;font-size:11px;line-height:1.5;border:1px solid #b0f0b0}
+.diff-lbl{font-size:9.5px;font-weight:700;margin-bottom:4px}
+.action-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:#f8fafc;border-top:1px solid #eaeff6}
+.flag-row{background:#fff3e0;border-radius:6px;padding:10px;margin-top:8px;display:none}
+.flag-row.show{display:block}
+.sendback-comments{background:#fde8e8;border-radius:6px;padding:10px;margin-bottom:10px;border:1px solid #f0b0b0}
+.amend-box{background:#f0f8ff;border-radius:6px;padding:10px;margin-top:8px;display:none}
+.amend-box.show{display:block}
+.inp{width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-size:11.5px;font-family:inherit}
+.inp-area{width:100%;min-height:60px;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-size:11.5px;font-family:inherit;resize:vertical}
+.summary-bar{background:#fff;border-radius:8px;padding:12px 16px;margin-bottom:14px;display:flex;gap:20px;box-shadow:0 1px 4px rgba(0,0,0,.07);flex-wrap:wrap}
+.stat{text-align:center}
+.stat .n{font-size:22px;font-weight:800;color:#1a3a5c}
+.stat .l{font-size:10px;color:#888;margin-top:2px}
+.accept-row{display:flex;gap:6px;margin-top:8px}
+.at-section{background:#fff;border-radius:8px;padding:14px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.at-entry{border-bottom:1px solid #eee;padding:7px 0;font-size:11.5px}
+</style>
+</head><body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <h1>&#128203; BSS Audit Report — Reviewer</h1>
+  <span id="stage-badge" class="stage-badge" style="background:#555;color:#fff">No file loaded</span>
+  <span id="branch-lbl" style="font-size:11px;color:#a0c0e0"></span>
+  <div style="flex:1"></div>
+  <button class="tbtn" onclick="loadFile()" style="background:#1e5c3a;color:#fff">&#128228; Load Review File</button>
+  <button class="tbtn" id="sendback-btn" onclick="doSendBack()" style="background:#8b1a1a;color:#fff;display:none">&#8617; Send Back</button>
+  <button class="tbtn" id="forward-btn" onclick="doForward()" style="background:#2a1a7c;color:#fff;display:none">&#9654; Forward</button>
+  <button class="tbtn" id="issue-btn" onclick="doIssue()" style="background:#1a6e35;color:#fff;display:none">&#9989; Issue Report</button>
+</div>
+
+<!-- LOAD SCREEN -->
+<div class="load-screen" id="load-screen">
+  <div class="load-box">
+    <div style="font-size:40px;margin-bottom:12px">&#128203;</div>
+    <h2>BSS Audit Reviewer</h2>
+    <p>Load a review file generated from the BSS Audit System.<br>
+    The file tells this reviewer what stage it is at and what you can do.</p>
+    <button class="load-btn" onclick="loadFile()">&#128228; Load Review File (.json)</button>
+    <div style="margin-top:12px;font-size:11px;color:#aaa">Accepted from Auditor (RO Review) or from RO Manager (HO Review)</div>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main" id="main-content">
+  <div class="summary-bar">
+    <div class="stat"><div class="n" id="s-total">0</div><div class="l">Observations</div></div>
+    <div class="stat"><div class="n" id="s-wc" style="color:#e67e22">0</div><div class="l">Wording Changes</div></div>
+    <div class="stat"><div class="n" id="s-flagged" style="color:#c0392b">0</div><div class="l">Flagged by Me</div></div>
+    <div class="stat"><div class="n" id="s-sb" style="color:#c0392b">0</div><div class="l">Sent-Back Items</div></div>
+    <div class="stat"><div class="n" id="s-amended" style="color:#8e44ad">0</div><div class="l">Response Amendments</div></div>
+  </div>
+
+  <!-- Audit Trail summary -->
+  <div class="at-section" id="at-section" style="display:none">
+    <div style="font-size:12px;font-weight:700;color:#1a3a5c;margin-bottom:8px">&#128203; Audit Trail — Changes Made During Draft</div>
+    <div id="at-list-rv"></div>
+  </div>
+
+  <!-- Observations -->
+  <div id="obs-list"></div>
+</div>
+
+<!-- Hidden file input -->
+<input type="file" id="file-inp" accept=".json" style="display:none" onchange="onFileChosen(this)">
+
+<script>
+var SESSION = null;
+var STAGE   = null;
+var ROLE    = null;
+var OBS_MAP = {};
+var myFlags         = {};
+var myComments      = {};
+var myCorrections   = {};
+var wcDecisions     = {}; // obsId → 'accept'|'decline'
+var respAmendments  = {};
+
+var STAGE_LABELS = {
+  ro_review:            'RO Manager Review',
+  sent_back_to_auditor: 'Sent Back — Auditor Correction',
+  ho_review:            'HO Final Review',
+  sent_back_to_ro:      'Sent Back — RO Correction',
+  issued:               'ISSUED'
+};
+var STAGE_COLORS = {
+  ro_review:            {bg:'#2a1a7c',color:'#fff'},
+  sent_back_to_auditor: {bg:'#8b1a1a',color:'#fff'},
+  ho_review:            {bg:'#4a1a7c',color:'#fff'},
+  sent_back_to_ro:      {bg:'#8b1a1a',color:'#fff'},
+  issued:               {bg:'#1a6e35',color:'#fff'}
+};
+
+function loadFile(){ document.getElementById('file-inp').click(); }
+
+function onFileChosen(inp){
+  var f = inp.files[0]; if(!f) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      SESSION = JSON.parse(e.target.result);
+      STAGE   = SESSION.reviewStage || 'ro_review';
+      ROLE    = SESSION.reviewRole  || 'ro';
+      // Restore reviewer state if any
+      myFlags        = SESSION._myFlags        || {};
+      myComments     = SESSION._myComments     || {};
+      myCorrections  = SESSION._myCorrections  || {};
+      wcDecisions    = SESSION._wcDecisions    || {};
+      respAmendments = SESSION.respAmendments  || {};
+      buildOBSMap();
+      render();
+    }catch(ex){ alert('Could not read file: '+ex.message); }
+  };
+  reader.readAsText(f);
+}
+
+function buildOBSMap(){
+  OBS_MAP = {};
+  var obs = SESSION.observations || [];
+  obs.forEach(function(o){ OBS_MAP[o.id] = o; });
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function render(){
+  document.getElementById('load-screen').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
+
+  // Stage badge
+  var badge = document.getElementById('stage-badge');
+  var bc = STAGE_COLORS[STAGE]||{bg:'#555',color:'#fff'};
+  badge.textContent  = STAGE_LABELS[STAGE]||STAGE;
+  badge.style.background = bc.bg; badge.style.color = bc.color;
+
+  // Branch label
+  var bl = document.getElementById('branch-lbl');
+  bl.textContent = (SESSION.formData&&SESSION.formData.brname)||'';
+
+  // Buttons based on stage
+  var sbBtn = document.getElementById('sendback-btn');
+  var fwBtn = document.getElementById('forward-btn');
+  var isBtn = document.getElementById('issue-btn');
+  sbBtn.style.display = (STAGE==='ro_review'||STAGE==='ho_review') ? 'inline-block' : 'none';
+  fwBtn.style.display = STAGE==='ro_review'  ? 'inline-block' : 'none';
+  isBtn.style.display = STAGE==='ho_review'  ? 'inline-block' : 'none';
+
+  // Audit trail
+  renderAuditTrail();
+
+  // Observations
+  renderObs();
+  updateStats();
+}
+
+function renderAuditTrail(){
+  var trail = SESSION.auditTrail || [];
+  var sec = document.getElementById('at-section');
+  var list = document.getElementById('at-list-rv');
+  if(!trail.length){ sec.style.display='none'; return; }
+  sec.style.display = 'block';
+  var typeMap = {sensitivity:'Sensitivity Override',coso:'COSO Change',srr:'SRR Reassignment',wording:'Wording Change'};
+  var colMap  = {sensitivity:'#c0392b',coso:'#2980b9',srr:'#8e44ad',wording:'#e67e22'};
+  var html = '';
+  trail.forEach(function(e){
+    var dt = e.ts ? new Date(e.ts).toLocaleString() : '—';
+    var tl = typeMap[e.type]||e.type;
+    var c  = colMap[e.type]||'#555';
+    html += '<div class="at-entry"><span style="background:'+c+';color:#fff;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:3px">'+esc(tl)+'</span> '
+          + '<b>'+esc(e.obsTitle||e.obsId)+'</b> '
+          + (e.type==='sensitivity'?'Sys: <b>'+esc(e.sysRec)+'</b> → Auditor: <b>'+esc(e.auditorSel)+'</b>':'')
+          + (e.type==='wording'?'Observation or Recommendation text was edited':'')
+          + (e.type==='srr'?'SRR: <b>'+esc(e.origSrr)+'</b> → <b>'+esc(e.newSrr)+'</b>':'')
+          + ' <span style="font-size:10px;color:#aaa">'+dt+'</span></div>';
+  });
+  list.innerHTML = html;
+}
+
+function renderObs(){
+  var selIds = SESSION.selIds || {};
+  var obs    = SESSION.observations || [];
+  var wc     = SESSION.wordingChanges || {};
+  var sbFlags= SESSION.sendBackFlags    || {};
+  var sbComs = SESSION.sendBackComments || {};
+  var sbFrom = SESSION.sendBackFrom     || '';
+
+  // For sent-back stages only show flagged items
+  var isSentBack = (STAGE==='sent_back_to_auditor'||STAGE==='sent_back_to_ro');
+
+  var container = document.getElementById('obs-list');
+  var html = '';
+  var shown = 0;
+
+  obs.forEach(function(o){
+    if(!selIds[o.id]) return;
+    if(isSentBack && !sbFlags[o.id]) return; // only show flagged
+    shown++;
+    var isWC   = !!(wc[o.id]);
+    var isSB   = !!sbFlags[o.id];
+    var isMyFlagged = !!myFlags[o.id];
+    var typeCol = (SESSION.obsTypeMap&&SESSION.obsTypeMap[o.id])==='Repeated'||o.type==='Repeated'?'#c0392b':'#1e5c3a';
+    var typeLbl = (SESSION.obsTypeMap&&SESSION.obsTypeMap[o.id])||o.type||'New';
+    var cardCls = 'obs-card'+(isMyFlagged?' flagged':'')+(isSB?' sendback-flag':'');
+
+    html += '<div class="'+cardCls+'" id="card-'+o.id+'">';
+    html += '<div class="obs-hdr" onclick="toggleCard(\''+o.id+'\')">';
+    html += '<span style="font-size:10px;color:#888;min-width:80px">'+esc(o.id)+'</span>';
+    html += '<span style="font-size:9.5px;background:'+typeCol+';color:#fff;border-radius:3px;padding:1px 6px;font-weight:700;margin-right:6px">'+esc(typeLbl)+'</span>';
+    html += '<span style="font-weight:700;flex:1">'+esc(o.title||'')+'</span>';
+    if(isWC)       html += '<span style="font-size:9px;background:#e67e22;color:#fff;border-radius:3px;padding:1px 5px;margin-left:4px">Wording Changed</span>';
+    if(isSB)       html += '<span style="font-size:9px;background:#c0392b;color:#fff;border-radius:3px;padding:1px 5px;margin-left:4px">&#9888; Correction Required</span>';
+    if(isMyFlagged)html += '<span style="font-size:9px;background:#c0392b;color:#fff;border-radius:3px;padding:1px 5px;margin-left:4px">&#9873; Flagged</span>';
+    html += '<span style="font-size:11px;color:#888;margin-left:8px">&#9660;</span>';
+    html += '</div>';
+
+    html += '<div class="obs-body" id="body-'+o.id+'">';
+
+    // Sent-back comment from reviewer
+    if(isSB){
+      html += '<div class="sendback-comments">';
+      html += '<div style="font-size:10px;font-weight:700;color:#8b1a1a;margin-bottom:4px">&#9888; '+esc(sbFrom.toUpperCase())+' MANAGER COMMENT — Correction Required</div>';
+      html += '<div style="font-size:11.5px;color:#2a3a50">'+esc(sbComs[o.id]||'')+'</div>';
+      html += '</div>';
+    }
+
+    // Wording changes
+    if(isWC){
+      var w = wc[o.id];
+      html += '<div style="margin-bottom:10px"><div class="sec-lbl" style="color:#e67e22">&#9998; Wording Changes — Review Required</div>';
+      if(w.obsEdit){
+        html += '<div style="font-size:10px;font-weight:700;color:#666;margin-bottom:4px">OBSERVATION TEXT</div>';
+        html += '<div class="diff-box">';
+        html += '<div class="diff-orig"><div class="diff-lbl" style="color:#c0392b">ORIGINAL (Databank)</div>'+esc(w.obsOrig)+'</div>';
+        html += '<div class="diff-edit"><div class="diff-lbl" style="color:#1a6e35">EDITED (Auditor)</div>'+esc(w.obsEdit)+'</div>';
+        html += '</div>';
+        var dec = wcDecisions[o.id+'_obs']||'';
+        html += '<div class="accept-row">';
+        html += '<button onclick="setWCDecision(\''+o.id+'_obs\',\'accept\')" style="padding:4px 12px;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit;background:'+(dec==='accept'?'#1a6e35':'#eee')+';color:'+(dec==='accept'?'#fff':'#333')+'">&#10003; Accept Edit</button>';
+        html += '<button onclick="setWCDecision(\''+o.id+'_obs\',\'decline\')" style="padding:4px 12px;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit;background:'+(dec==='decline'?'#c0392b':'#eee')+';color:'+(dec==='decline'?'#fff':'#333')+'">&#10005; Decline (Revert)</button>';
+        html += '</div>';
+      }
+      if(w.recEdit){
+        html += '<div style="font-size:10px;font-weight:700;color:#666;margin-bottom:4px;margin-top:8px">RECOMMENDATION TEXT</div>';
+        html += '<div class="diff-box">';
+        html += '<div class="diff-orig"><div class="diff-lbl" style="color:#c0392b">ORIGINAL</div>'+esc(w.recOrig)+'</div>';
+        html += '<div class="diff-edit"><div class="diff-lbl" style="color:#1a6e35">EDITED</div>'+esc(w.recEdit)+'</div>';
+        html += '</div>';
+        var decr = wcDecisions[o.id+'_rec']||'';
+        html += '<div class="accept-row">';
+        html += '<button onclick="setWCDecision(\''+o.id+'_rec\',\'accept\')" style="padding:4px 12px;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit;background:'+(decr==='accept'?'#1a6e35':'#eee')+';color:'+(decr==='accept'?'#fff':'#333')+'">&#10003; Accept Edit</button>';
+        html += '<button onclick="setWCDecision(\''+o.id+'_rec\',\'decline\')" style="padding:4px 12px;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit;background:'+(decr==='decline'?'#c0392b':'#eee')+';color:'+(decr==='decline'?'#fff':'#333')+'">&#10005; Decline (Revert)</button>';
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+
+    // Observation + Recommendation
+    html += '<div class="sec-lbl">Observation</div><div class="sec-val">'+esc(o.observation||'—')+'</div>';
+    html += '<div class="sec-lbl">Recommendation</div><div class="sec-val">'+esc(o.recommendation||'—')+'</div>';
+
+    // Branch response
+    var resp = (SESSION.respMap&&SESSION.respMap[o.id])||'';
+    html += '<div class="sec-lbl">Auditee (Branch) Response</div>';
+    html += '<div class="sec-val" style="border:1px solid #b0d4ec">'+esc(resp||'No response recorded')+'</div>';
+
+    // Sent-back: correction field
+    if(isSB){
+      html += '<div style="margin-top:8px"><div class="sec-lbl" style="color:#1a6e35">Your Correction / Response to '+esc(sbFrom.toUpperCase())+' Comment</div>';
+      html += '<textarea class="inp-area" id="corr-'+o.id+'" style="border-color:#1a6e35" placeholder="Enter your correction here..." onchange="myCorrections[\''+o.id+'\']=this.value;updateStats()">'+esc(myCorrections[o.id]||'')+'</textarea></div>';
+    }
+
+    // Action bar
+    html += '<div class="action-bar">';
+    if(STAGE==='ro_review'||STAGE==='ho_review'){
+      var fl = !!myFlags[o.id];
+      html += '<button onclick="toggleFlag(\''+o.id+'\')" id="flagbtn-'+o.id+'" style="padding:4px 12px;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit;background:'+(fl?'#c0392b':'#fff3e0')+';color:'+(fl?'#fff':'#b04400')+';border:1px solid '+(fl?'#c0392b':'#f0b060')+'">'+(fl?'&#9873; Flagged — Unflag':'&#9873; Flag for Send-Back')+'</button>';
+      html += '<button onclick="toggleAmend(\''+o.id+'\')" style="padding:4px 12px;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit;background:#e8f0fc;color:#1a3a7c;border:1px solid #b0c8ec">&#9998; Amend Response</button>';
+    }
+    html += '</div>';
+
+    // Flag comment area
+    html += '<div class="flag-row" id="flagrow-'+o.id+'">';
+    html += '<div class="sec-lbl" style="color:#b04400;margin-bottom:4px">Your comment to auditor (required for send-back)</div>';
+    html += '<textarea class="inp-area" id="flagcom-'+o.id+'" placeholder="What needs to be corrected? Be specific." onchange="myComments[\''+o.id+'\']=this.value;updateStats()">'+esc(myComments[o.id]||'')+'</textarea>';
+    html += '</div>';
+
+    // Amend response area
+    html += '<div class="amend-box" id="amendbox-'+o.id+'">';
+    html += '<div class="sec-lbl" style="color:#1a3a7c;margin-bottom:6px">Amend Auditee Response</div>';
+    html += '<div style="font-size:10px;color:#666;margin-bottom:5px">Original branch response is preserved. Amended version will appear in the issued report with an indicator.</div>';
+    var am = respAmendments[o.id];
+    html += '<textarea class="inp-area" id="amend-text-'+o.id+'" placeholder="Enter the corrected/amended response..." onchange="if(!respAmendments[\''+o.id+'\'])respAmendments[\''+o.id+'\']={original:\''+o.id+'\'};respAmendments[\''+o.id+'\'].amended=this.value;updateStats()">'+esc(am?am.amended:'')+'</textarea>';
+    html += '<div style="margin-top:6px"><div class="sec-lbl" style="margin-bottom:4px">Reason for Amendment</div>';
+    html += '<input class="inp" id="amend-reason-'+o.id+'" placeholder="e.g. Branch sent email on 15-Jun with corrected response" onchange="if(!respAmendments[\''+o.id+'\'])respAmendments[\''+o.id+'\']={};respAmendments[\''+o.id+'\'].reason=this.value" value="'+esc(am?am.reason||'':'')+'"></div>';
+    html += '<div style="margin-top:6px"><div class="sec-lbl" style="margin-bottom:4px">Evidence File (email / letter)</div>';
+    html += '<input type="file" id="amend-file-'+o.id+'" onchange="attachEvidence(\''+o.id+'\',this)" style="font-size:11px"><div id="amend-file-lbl-'+o.id+'" style="font-size:10px;color:#1a6e35;margin-top:3px">'+esc(am&&am.evidenceFile?'Attached: '+am.evidenceFile:'No file attached — file will be saved separately alongside the review output.')+'</div></div>';
+    html += '</div>';
+
+    html += '</div></div>';
+  });
+
+  if(!shown) html = '<div style="text-align:center;padding:40px;color:#aaa">No observations to display for this stage.</div>';
+  document.getElementById('obs-list').innerHTML = html;
+
+  // Restore flag row visibility
+  Object.keys(myFlags).forEach(function(id){
+    if(myFlags[id]){
+      var fr = document.getElementById('flagrow-'+id);
+      if(fr) fr.classList.add('show');
+    }
+  });
+  // Restore amend box visibility
+  Object.keys(respAmendments).forEach(function(id){
+    var ab = document.getElementById('amendbox-'+id);
+    if(ab) ab.classList.add('show');
+  });
+}
+
+function toggleCard(id){
+  var b = document.getElementById('body-'+id);
+  if(b) b.classList.toggle('open');
+}
+
+function toggleFlag(id){
+  myFlags[id] = !myFlags[id];
+  var fr  = document.getElementById('flagrow-'+id);
+  var btn = document.getElementById('flagbtn-'+id);
+  var card= document.getElementById('card-'+id);
+  if(fr) fr.classList.toggle('show', myFlags[id]);
+  if(card) card.classList.toggle('flagged', myFlags[id]);
+  if(btn){
+    btn.style.background = myFlags[id]?'#c0392b':'#fff3e0';
+    btn.style.color      = myFlags[id]?'#fff':'#b04400';
+    btn.style.borderColor= myFlags[id]?'#c0392b':'#f0b060';
+    btn.textContent      = myFlags[id]?'⚑ Flagged — Unflag':'⚑ Flag for Send-Back';
+  }
+  updateStats();
+}
+
+function toggleAmend(id){
+  var ab = document.getElementById('amendbox-'+id);
+  if(ab) ab.classList.toggle('show');
+}
+
+function setWCDecision(key, dec){
+  wcDecisions[key] = dec;
+  // Re-render just this obs card buttons - simpler to full re-render
+  renderObs();
+}
+
+function attachEvidence(obsId, inp){
+  var f = inp.files[0]; if(!f) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    if(!respAmendments[obsId]) respAmendments[obsId]={};
+    respAmendments[obsId].evidenceFile = f.name;
+    respAmendments[obsId].evidenceDataUrl = e.target.result;
+    var lbl = document.getElementById('amend-file-lbl-'+obsId);
+    if(lbl) lbl.textContent = 'Attached: '+f.name+' (will be saved as separate file)';
+    updateStats();
+  };
+  reader.readAsDataURL(f);
+}
+
+function updateStats(){
+  var selIds = SESSION.selIds||{};
+  var total  = Object.keys(selIds).filter(function(id){ return selIds[id]; }).length;
+  var wc     = Object.keys(SESSION.wordingChanges||{}).length;
+  var fl     = Object.keys(myFlags).filter(function(id){ return myFlags[id]; }).length;
+  var sb     = Object.keys(SESSION.sendBackFlags||{}).length;
+  var am     = Object.keys(respAmendments).filter(function(id){ return respAmendments[id]&&respAmendments[id].amended; }).length;
+  document.getElementById('s-total').textContent   = total;
+  document.getElementById('s-wc').textContent      = wc;
+  document.getElementById('s-flagged').textContent = fl;
+  document.getElementById('s-sb').textContent      = sb;
+  document.getElementById('s-amended').textContent = am;
+}
+
+function _buildOutput(overrideStage){
+  // Apply wording change decisions to session
+  var sess = JSON.parse(JSON.stringify(SESSION));
+  sess.wordingChanges = sess.wordingChanges || {};
+  // Apply declined wording changes — revert obsEdits
+  Object.keys(sess.wordingChanges||{}).forEach(function(id){
+    var w = sess.wordingChanges[id];
+    if(wcDecisions[id+'_obs']==='decline'){ if(!sess.obsEdits) sess.obsEdits={}; if(!sess.obsEdits[id]) sess.obsEdits[id]={}; sess.obsEdits[id].observation = w.obsOrig; }
+    if(wcDecisions[id+'_rec']==='decline'){ if(!sess.obsEdits) sess.obsEdits={}; if(!sess.obsEdits[id]) sess.obsEdits[id]={}; sess.obsEdits[id].recommendation = w.recOrig; }
+  });
+  // Embed reviewer state
+  sess._myFlags       = myFlags;
+  sess._myComments    = myComments;
+  sess._myCorrections = myCorrections;
+  sess._wcDecisions   = wcDecisions;
+  sess.respAmendments = respAmendments;
+  sess.reviewStage    = overrideStage || STAGE;
+  // Build audit trail entry for this review action
+  if(!sess.auditTrail) sess.auditTrail=[];
+  sess.auditTrail.unshift({type:'review_action', stage:STAGE, role:ROLE, outputStage:sess.reviewStage, ts:new Date().toISOString(), flagCount:Object.keys(myFlags).filter(function(id){return myFlags[id];}).length});
+  return sess;
+}
+
+function _saveOutput(sess, suffix){
+  var branch = (SESSION.formData&&SESSION.formData.brname)||'Branch';
+  var dt = new Date().toISOString().slice(0,10);
+  var fname = 'BSS_Review_'+suffix+'_'+branch.replace(/[^a-zA-Z0-9]/g,'_').substring(0,20)+'_'+dt+'.json';
+  var json = JSON.stringify(sess,null,2);
+  var blob = new Blob([json],{type:'application/json'});
+  var url  = URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=fname; a.click(); URL.revokeObjectURL(url);
+  // Save evidence files separately
+  Object.keys(respAmendments).forEach(function(id){
+    var am = respAmendments[id];
+    if(am&&am.evidenceDataUrl&&am.evidenceFile){
+      var ext = am.evidenceFile.split('.').pop();
+      var ef  = 'BSS_Evidence_'+id+'_'+dt+'.'+ext;
+      var blo = dataURLtoBlob(am.evidenceDataUrl);
+      var eu  = URL.createObjectURL(blo); var ea=document.createElement('a'); ea.href=eu; ea.download=ef; ea.click(); URL.revokeObjectURL(eu);
+    }
+  });
+  return fname;
+}
+
+function dataURLtoBlob(dataUrl){
+  var arr=dataUrl.split(','), mime=arr[0].match(/:(.*?);/)[1], bstr=atob(arr[1]), n=bstr.length, u8=new Uint8Array(n);
+  while(n--){ u8[n]=bstr.charCodeAt(n); }
+  return new Blob([u8],{type:mime});
+}
+
+function doSendBack(){
+  var flaggedIds = Object.keys(myFlags).filter(function(id){ return myFlags[id]; });
+  if(!flaggedIds.length){ alert('Please flag at least one observation with a comment before sending back.'); return; }
+  var missingComment = flaggedIds.filter(function(id){ return !(myComments[id]||'').trim(); });
+  if(missingComment.length){ alert('Please add a comment for each flagged observation:\n\n'+missingComment.join(', ')); return; }
+  var toRole    = STAGE==='ro_review' ? 'auditor' : 'ro';
+  var toLabel   = STAGE==='ro_review' ? 'Auditor' : 'RO Manager';
+  var newStage  = STAGE==='ro_review' ? 'sent_back_to_auditor' : 'sent_back_to_ro';
+  if(!confirm('Send back to '+toLabel+' with '+flaggedIds.length+' flagged observation(s)?')) return;
+  var sess = _buildOutput(newStage);
+  sess.sendBackFlags    = myFlags;
+  sess.sendBackComments = myComments;
+  sess.sendBackFrom     = ROLE;
+  var fname = _saveOutput(sess, 'SendBack_to_'+toLabel.replace(' ',''));
+  alert('Send-back file saved: '+fname+'\nShare this file with the '+toLabel+'.\nThey open bss_reviewer.html and load this file to see the flagged items.');
+}
+
+function doForward(){
+  if(!confirm('Forward this report to HO for final review?')) return;
+  var sess = _buildOutput('ho_review');
+  sess.reviewRole  = 'ho';
+  sess.reviewStage = 'ho_review';
+  var fname = _saveOutput(sess, 'Forward_to_HO');
+  alert('HO review file saved: '+fname+'\nShare this file with HO.\nHO opens bss_reviewer.html and loads this file.');
+}
+
+function doIssue(){
+  if(!confirm('Confirm final issuance of this report? This action is final.')) return;
+  var sess = _buildOutput('issued');
+  var fname = _saveOutput(sess, 'ISSUED');
+  alert('Issued report package saved: '+fname+'\nReturn this file to the Auditor to generate the final issued report in the BSS Audit System.');
+}
+</script>
+</body></html>

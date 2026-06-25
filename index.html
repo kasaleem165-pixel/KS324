@@ -9068,6 +9068,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
     <button class="tbtn rpt-btn" id="analysis-btn" onclick="toggleAnalysis()" data-tip-title="Sensitivity &amp; COSO Analysis" data-tip="Displays the Sensitivity Matrix and COSO Framework analysis for all selected observations directly in the report preview area.">&#128200; Analysis</button>
     <button class="tbtn load rpt-btn" onclick="triggerLoad()"        data-tip-title="Load Response" data-tip="Loads the completed auditee response file (returned by the auditee) back into the system. Responses and estimated resolution times are automatically mapped to each observation.">&#128193; Load Resp</button>
     <button class="tbtn fin rpt-btn"  onclick="showSaveDialog()"     data-tip-title="Finalize Report" data-tip="Generates the final signed-off audit report for official issuance. Includes all observations, auditee responses, audit views, and annexures in a ready-to-submit format.">&#9989; Finalize</button>
+    <button class="tbtn rpt-btn" onclick="sendToReviewer('ro')" style="background:#2a1a7c;color:#fff;border:1px solid #5a4aac" data-tip-title="Send to RO" data-tip="Generates a self-contained reviewer file for the RO Manager. RO can review, flag, comment, amend responses and forward to HO or send back to auditor.">&#128228; Send to RO</button>
     <button class="tbtn rpt-btn" style="background:#1a3557;color:#fff" onclick="generateIssuedReport()" data-tip-title="Issue Report" data-tip="Generates a polished, interactive issued audit report HTML file — with management synopsis, KPI tiles, sensitivity matrix, inline detail panels, and full observation cards — matching the official issued report format.">&#128203; Issue Rpt</button>
     <button class="tbtn rpt-btn" style="background:#1e5c3a;color:#fff" onclick="showWordToReportModal()" data-tip-title="Word → Report" data-tip="Upload a Beaconhouse audit report Word (.docx) file and convert it into a fully interactive issued report HTML — same format as the Issue Report button.">&#128196; Word&#8594;Rpt</button>
     <button class="tbtn cmp rpt-btn" id="cmp-btn" onclick="showCompareModal()" style="opacity:0.55;filter:grayscale(0.4)" data-tip-title="Compare Report 🔒" data-tip="Restricted to Head Office. Compares a loaded report file against the databank to identify missing or present observations. Requires HO password.">&#128274; Compare</button>
@@ -10711,17 +10712,71 @@ function fmtRange(from,to){
   return f||t;
 }
 var RPT_STAGE_LABELS = {
-  draft_bh: 'Draft – Branch Head Review',
-  draft_ar: 'Draft – Auditee Response',
-  draft_av: 'Draft – Audit View / Action Taken',
-  final:    'FINAL'
+  draft_bh:              'Draft – Branch Head Review',
+  draft_ar:              'Draft – Auditee Response',
+  draft_av:              'Draft – Audit View / Action Taken',
+  final:                 'FINAL',
+  ro_review:             'RO Manager Review',
+  sent_back_to_auditor:  'Sent Back – Auditor Correction Required',
+  ho_review:             'HO Final Review',
+  sent_back_to_ro:       'Sent Back – RO Correction Required',
+  issued:                'ISSUED'
 };
 var RPT_STAGE_COLORS = {
-  draft_bh: {bg:'#fff4e0',color:'#8a5000'},
-  draft_ar: {bg:'#e8f0fb',color:'#1a3a7c'},
-  draft_av: {bg:'#f0f0f0',color:'#444'},
-  final:    {bg:'#e6f9ec',color:'#1a6e35'}
+  draft_bh:             {bg:'#fff4e0',color:'#8a5000'},
+  draft_ar:             {bg:'#e8f0fb',color:'#1a3a7c'},
+  draft_av:             {bg:'#f0f0f0',color:'#444'},
+  final:                {bg:'#e6f9ec',color:'#1a6e35'},
+  ro_review:            {bg:'#e8f0fc',color:'#2a1a7c'},
+  sent_back_to_auditor: {bg:'#fde8e8',color:'#8b1a1a'},
+  ho_review:            {bg:'#f0e8fc',color:'#4a1a7c'},
+  sent_back_to_ro:      {bg:'#fde8e8',color:'#8b1a1a'},
+  issued:               {bg:'#1a3a5c',color:'#ffffff'}
 };
+
+// ── Wording change tracking ──
+var wordingChanges  = {}; // obsId → {obsOrig,obsEdit,recOrig,recEdit,detectedAt}
+var roFlags         = {}; // obsId → true
+var roComments      = {}; // obsId → string
+var roCorrections   = {}; // obsId → string
+var roAccepted      = {}; // obsId → true
+var hoFlags         = {}; // obsId → true
+var hoComments      = {}; // obsId → string
+var hoCorrections   = {}; // obsId → string
+var hoAccepted      = {}; // obsId → true
+var respAmendments  = {}; // obsId → {amendedBy,original,amended,reason,evidenceFile,evidenceData,ts}
+
+function WC_detect(obsId){
+  var obs = _getObsRecord(obsId); if(!obs) return;
+  var obsOrig = obs.observation||'';
+  var recOrig = obs.recommendation||'';
+  var obsEdit = (obsEdits[obsId]&&obsEdits[obsId].observation!=null) ? obsEdits[obsId].observation : obsOrig;
+  var recEdit = (obsEdits[obsId]&&obsEdits[obsId].recommendation!=null) ? obsEdits[obsId].recommendation : recOrig;
+  var obsChanged = obsEdit.trim() !== obsOrig.trim();
+  var recChanged = recEdit.trim() !== recOrig.trim();
+  if(!obsChanged && !recChanged){ delete wordingChanges[obsId]; return; }
+  var prev = wordingChanges[obsId];
+  var isNew = !prev;
+  wordingChanges[obsId] = {
+    obsOrig: obsOrig, obsEdit: obsChanged ? obsEdit : null,
+    recOrig: recOrig, recEdit: recChanged ? recEdit : null,
+    detectedAt: prev ? prev.detectedAt : new Date().toISOString()
+  };
+  if(isNew){
+    AT_log({type:'wording', obsId:obsId, obsTitle:_getObsTitle(obsId),
+            obsChanged:obsChanged, recChanged:recChanged});
+  }
+}
+
+function WC_detectAll(){
+  var all = (DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
+  all.forEach(function(o){ if(selIds[o.id]) WC_detect(o.id); });
+}
+
+function WC_getSummary(){
+  var ids = Object.keys(wordingChanges);
+  return { count: ids.length, ids: ids };
+}
 
 function getRptStage(){
   var el=document.getElementById('rpt_stage');
@@ -10808,6 +10863,10 @@ function captureSession() {
     instCountMap : instCountMap,
     instAmountMap: instAmountMap,
     instSourceMap: instSourceMap,
+    wordingChanges: wordingChanges,
+    roFlags: roFlags, roComments: roComments, roCorrections: roCorrections, roAccepted: roAccepted,
+    hoFlags: hoFlags, hoComments: hoComments, hoCorrections: hoCorrections, hoAccepted: hoAccepted,
+    respAmendments: respAmendments,
     customs  : customs,
     responseLoaded: responseLoaded,
     introSections: getIntroSectionVals(),
@@ -10848,7 +10907,17 @@ function restoreSession(sess) {
   refMap         = sess.refMap         || {};
   instCountMap   = sess.instCountMap   || {};
   instAmountMap  = sess.instAmountMap  || {};
-  instSourceMap  = sess.instSourceMap  || {};
+  instSourceMap   = sess.instSourceMap   || {};
+  wordingChanges  = sess.wordingChanges  || {};
+  roFlags         = sess.roFlags         || {};
+  roComments      = sess.roComments      || {};
+  roCorrections   = sess.roCorrections   || {};
+  roAccepted      = sess.roAccepted      || {};
+  hoFlags         = sess.hoFlags         || {};
+  hoComments      = sess.hoComments      || {};
+  hoCorrections   = sess.hoCorrections   || {};
+  hoAccepted      = sess.hoAccepted      || {};
+  respAmendments  = sess.respAmendments  || {};
   // Restore responseLoaded — also infer it if assessMap or respMap has entries
   responseLoaded = sess.responseLoaded || Object.keys(assessMap).length>0 || Object.keys(sess.respMap||{}).length>0;
   customs   = sess.customs   || [];
@@ -11767,7 +11836,7 @@ function renderRpt(){
       // 1. Observation (editable)
       var obsText=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:o.observation||'';
       h+='<div class="osl">Observation</div>';
-      h+='<textarea class="oedit" id="oe-'+o.id+'" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].observation=this.value">'+esc(obsText)+'</textarea>';
+      h+='<textarea class="oedit" id="oe-'+o.id+'" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].observation=this.value;WC_detect('"+(o.id)+"'">'+esc(obsText)+'</textarea>';
       // Auto-detect materiality from inline table or linked annexure
       autoDetectMateriality(o.id, obsText, getLinkedAnnexures(o.id));
       // 2b. Risk Framework — Instances & Financial Impact fields (after Observation, before Recommendation)
@@ -11791,7 +11860,7 @@ function renderRpt(){
       // 3. Recommendation (editable)
       var recText=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
       h+='<div class="osl">Recommendation</div>';
-      h+='<textarea class="oedit" id="re-'+o.id+'" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].recommendation=this.value">'+esc(recText)+'</textarea>';
+      h+='<textarea class="oedit" id="re-'+o.id+'" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].recommendation=this.value;WC_detect('"+(o.id)+"'">'+esc(recText)+'</textarea>';
       // 3b. Audit Report Reference (editable, all obs types)
       var curLrRef=lastRefMap[o.id]||'';
       var lrIsRepeated=(effType==='Repeated'||effType==='repeated');
@@ -17991,6 +18060,55 @@ function ra_scoreCategory(catName,rpt1,rpt2){
   return Math.min(100,Math.round(freq+rec+areaComp+sensComp+dbs));
 }
 
+
+
+/* ══════════════════════════════════════════════════════════
+   REVIEW WORKFLOW — Send to RO/HO, Send Back, Wording Changes
+   ══════════════════════════════════════════════════════════ */
+
+function sendToReviewer(role){
+  WC_detectAll(); // snapshot all wording changes before packaging
+  var sess = captureSession();
+  sess.reviewRole  = role; // 'ro' or 'ho'
+  sess.reviewStage = role === 'ro' ? 'ro_review' : 'ho_review';
+  sess.observations = (DB&&DB.observations?DB.observations:[]).map(function(o){
+    return {id:o.id,title:o.title,category:o.category,type:o.type,
+            observation:o.observation,recommendation:o.recommendation,
+            audit_view:o.audit_view,keywords:o.keywords};
+  });
+  var json = JSON.stringify(sess, null, 2);
+  var branch = (document.getElementById('brname')||{}).value||'Branch';
+  var dt = new Date().toISOString().slice(0,10);
+  var fname = 'BSS_Review_'+role.toUpperCase()+'_'+branch.replace(/[^a-zA-Z0-9]/g,'_').substring(0,20)+'_'+dt+'.json';
+  var blob = new Blob([json],{type:'application/json'});
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a'); a.href=url; a.download=fname; a.click();
+  URL.revokeObjectURL(url);
+  showToast('Review file generated: '+fname+'\nShare this file with the '+(role==='ro'?'RO Manager':'HO')+'.\nThey open bss_reviewer.html and load this file.', 4000);
+}
+
+function generateSendBack(toRole, flags, comments){
+  // Called from bss_reviewer.html via a loaded session — package send-back
+  var sess = captureSession();
+  sess.reviewStage = toRole === 'auditor' ? 'sent_back_to_auditor' : 'sent_back_to_ro';
+  sess.sendBackFlags    = flags;
+  sess.sendBackComments = comments;
+  sess.sendBackFrom     = toRole === 'auditor' ? 'ro' : 'ho';
+  return sess;
+}
+
+function showToast(msg, duration){
+  var t=document.getElementById('toast-msg');
+  if(!t){ t=document.createElement('div'); t.id='toast-msg';
+    t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a3a5c;color:#fff;padding:10px 20px;border-radius:8px;font-size:12px;z-index:99999;max-width:420px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.3);white-space:pre-line';
+    document.body.appendChild(t); }
+  t.textContent=msg; t.style.display='block';
+  clearTimeout(t._timer);
+  t._timer=setTimeout(function(){ t.style.display='none'; }, duration||2500);
+}
+
+// Detect wording changes when clearing to reset
+var _origDoClear = typeof doClear === 'function' ? doClear : null;
 
 /* ══════════════════════════════════════════════════════════
    SRR MAPPING PANEL — JavaScript
