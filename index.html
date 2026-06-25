@@ -9062,6 +9062,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
     <button class="tbtn save rpt-btn" onclick="showVersionHistory()" data-tip-title="Save / Versions" data-tip="Saves the current report as a new version and shows the version history. You can restore any earlier version at any time.">&#128190; Save/Ver</button>
     <button class="tbtn r rpt-btn"    onclick="doClear()"            data-tip-title="Clear Draft" data-tip="Removes all selected observations and clears the draft report content. Branch &amp; Report Information is preserved. Use this to reset observation selections without losing the header data.">&#10005; Clear</button>
     <button class="tbtn"              id="aws-tab-btn" onclick="toggleAWSPanel()" data-tip-title="Work Status" data-tip="Opens the Audit Work Status panel — a category-wise checklist to track which observations have been reviewed, drafted, and signed off during fieldwork.">&#128203; Work Status</button>
+    <button class="tbtn" id="srr-tab-btn" onclick="toggleSRRPanel()" style="background:#1a4a6c;color:#fff;border:1px solid rgba(255,255,255,.25)" data-tip-title="SRR Mapping" data-tip="Opens the Sub-Risk Register Mapping panel — review and validate how each observation is mapped to a Sub-Risk. Flag mismatches and reassign where needed. All reassignments are logged in the Audit Trail.">&#128279; SRR Map</button>
     <button class="tbtn soft rpt-btn" onclick="downloadSoftCopy()"   data-tip-title="Auditee Copy" data-tip="Generates and downloads an HTML file for the auditee. It contains all observations with blank response fields that the auditee fills in and returns to the auditor.">&#128233; Auditee</button>
     <button class="tbtn draft rpt-btn" onclick="showDraftModal()"    data-tip-title="RO/HO Copy" data-tip="Downloads a formatted report copy for the Regional Office / Head Office, grouped by observation category.">&#128196; RO/HO</button>
     <button class="tbtn rpt-btn" id="analysis-btn" onclick="toggleAnalysis()" data-tip-title="Sensitivity &amp; COSO Analysis" data-tip="Displays the Sensitivity Matrix and COSO Framework analysis for all selected observations directly in the report preview area.">&#128200; Analysis</button>
@@ -17990,6 +17991,347 @@ function ra_scoreCategory(catName,rpt1,rpt2){
   return Math.min(100,Math.round(freq+rec+areaComp+sensComp+dbs));
 }
 
+
+/* ══════════════════════════════════════════════════════════
+   SRR MAPPING PANEL — JavaScript
+   ══════════════════════════════════════════════════════════ */
+var srr_flagged    = {};  // obsId → true
+var srr_reassigned = {};  // obsId → {srr_id,srr_name,rr_id,rr_name,col,note,custom}
+var srr_currentId  = null;
+
+// ── Panel toggle ──
+function toggleSRRPanel(){
+  var panel = document.getElementById('srr-panel');
+  var main  = document.getElementById('main');
+  var btn   = document.getElementById('srr-tab-btn');
+  var awsPanel = document.getElementById('aws-panel');
+  var raPanel  = document.getElementById('ra-panel');
+  if(!panel||!main) return;
+  var showing = panel.style.display === 'block';
+  if(showing){
+    panel.style.display = 'none';
+    main.style.display  = '';
+    if(btn){ btn.style.background='#1a4a6c'; btn.textContent='\u{1F517} SRR Map'; btn.classList.remove('tbtn-back'); }
+    setRptBtnsDisabled(false);
+  } else {
+    if(awsPanel) awsPanel.style.display = 'none';
+    if(raPanel)  raPanel.style.display  = 'none';
+    var raBtn=document.getElementById('ra-tab-btn');
+    var awsBtn=document.getElementById('aws-tab-btn');
+    if(raBtn)  { raBtn.textContent='\u{1F4CA} Risk Asmt';  raBtn.classList.remove('tbtn-back'); }
+    if(awsBtn) { awsBtn.textContent='\u{1F4CB} Work Status'; awsBtn.classList.remove('tbtn-back'); }
+    main.style.display  = 'none';
+    panel.style.display = 'block';
+    panel.classList.add('panel-fadein');
+    setTimeout(function(){ panel.classList.remove('panel-fadein'); }, 300);
+    if(btn){ btn.style.background='#c9962a'; btn.style.color='#111'; btn.textContent='\u{1F517} SRR Map ▶'; btn.classList.add('tbtn-back'); }
+    setRptBtnsDisabled(true);
+    srrBuildTable();
+  }
+}
+
+// ── Build SRR dropdown once ──
+function _srrBuildDropdown(){
+  var sel = document.getElementById('srr-sel-existing');
+  if(!sel || sel.options.length > 1) return;
+  var order = [];
+  for(var k in SRR_DEF) order.push(k);
+  order.sort();
+  order.forEach(function(id){
+    var d = SRR_DEF[id];
+    var opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = id + ' — ' + d.name;
+    sel.appendChild(opt);
+  });
+}
+
+// ── Build / refresh the mapping table ──
+function srrBuildTable(){
+  _srrBuildDropdown();
+  var obs = (DB&&DB.observations ? DB.observations : []).concat(typeof customs!=='undefined'?customs:[]);
+  var tbody = document.getElementById('srr-tbody');
+  if(!tbody) return;
+  var html = '';
+  var total = 0;
+  obs.forEach(function(o){
+    var srrId   = (srr_reassigned[o.id]||{}).srr_id || _obsSrrCache[o.id] || _getObsSrr(o);
+    var srrDef  = srrId ? SRR_DEF[srrId] : null;
+    var srrName = srr_reassigned[o.id] ? srr_reassigned[o.id].srr_name : (srrDef ? srrDef.name : '—');
+    var col     = srr_reassigned[o.id] ? (srr_reassigned[o.id].col||'#555') : (srrDef ? srrDef.col : '#999');
+    var isFlagged    = !!srr_flagged[o.id];
+    var isReassigned = !!srr_reassigned[o.id];
+    var rowBg = isReassigned ? '#f0f8f0' : isFlagged ? '#fff5f0' : (total%2===0?'#fff':'#f8fafc');
+    total++;
+    html += '<tr class="srr-obs-row" data-obsid="'+o.id+'" data-cat="'+(o.category||'')+'" data-flagged="'+isFlagged+'" data-reassigned="'+isReassigned+'"'
+          + ' style="background:'+rowBg+';border-bottom:1px solid #eaeff6">'
+          + '<td style="padding:7px 8px;text-align:center">'
+          +   '<input type="checkbox" class="srr-flag-check" data-obsid="'+o.id+'"'+(isFlagged?' checked':'')+' title="Flag as mismatch" style="cursor:pointer;width:15px;height:15px"></td>'
+          + '<td style="padding:7px 8px;font-size:10.5px;color:#888;font-weight:600">'+o.id+'</td>'
+          + '<td style="padding:7px 10px;font-weight:600;cursor:pointer" class="srr-title-cell" data-obsid="'+o.id+'">'+_srrEsc(o.title||'')
+          +   (isReassigned ? ' <span style="font-size:9px;background:#1e5c3a;color:#fff;border-radius:3px;padding:1px 4px;margin-left:4px">Reassigned</span>' : '')
+          +   (isFlagged    ? ' <span style="font-size:9px;background:#c0392b;color:#fff;border-radius:3px;padding:1px 4px;margin-left:4px">Flagged</span>' : '')
+          + '</td>'
+          + '<td style="padding:7px 8px;font-size:10.5px;color:#555">'+_srrEsc((o.category||'').replace('Branch Imprest, Payments & Accounts','Fin. Mgmt').replace('Recruitment/Payroll/Employee Record','HR/Payroll'))+'</td>'
+          + '<td style="padding:7px 8px"><span style="font-size:10px;background:'+(o.type==='Repeated'?'#c0392b':'#1e5c3a')+';color:#fff;border-radius:3px;padding:1px 6px;font-weight:700">'+(o.type||'New')+'</span></td>'
+          + '<td style="padding:7px 8px"><span style="font-size:10px;background:'+col+';color:#fff;border-radius:3px;padding:1px 5px;font-weight:700">'+_srrEsc(srrId||'—')+'</span></td>'
+          + '<td style="padding:7px 8px;font-size:11px;color:#2a3a50">'+_srrEsc(srrName)+'</td>'
+          + '<td style="padding:7px 8px"><button class="srr-read-btn" data-obsid="'+o.id+'" style="font-size:10.5px;padding:3px 9px;background:#e8f4fb;border:1px solid #b0d4ec;color:#1a3a5c;border-radius:4px;cursor:pointer;font-weight:600;font-family:inherit">&#128196; Read</button></td>'
+          + '</tr>';
+  });
+  tbody.innerHTML = html;
+  // Wire events
+  tbody.querySelectorAll('.srr-read-btn, .srr-title-cell').forEach(function(el){
+    el.addEventListener('click', function(){ srrOpenDetail(this.dataset.obsid); });
+  });
+  tbody.querySelectorAll('.srr-flag-check').forEach(function(cb){
+    cb.addEventListener('change', function(){ srrOnFlag(this.dataset.obsid, this.checked); });
+  });
+  srrUpdateStats();
+  // Close detail if open
+  var det = document.getElementById('srr-detail');
+  if(det) det.style.display = 'none';
+  srr_currentId = null;
+}
+
+function srrUpdateStats(){
+  var rows = document.querySelectorAll('.srr-obs-row');
+  var flagCount=0, reassCount=0, showCount=0;
+  rows.forEach(function(r){
+    if(r.dataset.flagged==='true') flagCount++;
+    if(r.dataset.reassigned==='true') reassCount++;
+    if(r.style.display!=='none') showCount++;
+  });
+  var t = document.getElementById('srr-stat-total');
+  var f = document.getElementById('srr-stat-flagged');
+  var rs = document.getElementById('srr-stat-reassigned');
+  var sh = document.getElementById('srr-stat-showing');
+  if(t)  t.textContent  = rows.length;
+  if(f)  f.textContent  = flagCount;
+  if(rs) rs.textContent = reassCount;
+  if(sh) sh.textContent = showCount;
+}
+
+function srrApplyFilters(){
+  var search = (document.getElementById('srr-search')||{}).value||'';
+  var catF   = (document.getElementById('srr-cat-filter')||{}).value||'';
+  var flagF  = (document.getElementById('srr-flag-filter')||{}).value||'';
+  var sq = search.toLowerCase();
+  document.querySelectorAll('.srr-obs-row').forEach(function(r){
+    var title = (r.querySelector('.srr-title-cell')||{}).textContent||'';
+    var cat   = r.dataset.cat||'';
+    var flagged    = r.dataset.flagged==='true';
+    var reassigned = r.dataset.reassigned==='true';
+    var show = true;
+    if(sq && title.toLowerCase().indexOf(sq)===-1) show=false;
+    if(catF && cat.indexOf(catF)===-1) show=false;
+    if(flagF==='flagged'    && !flagged)    show=false;
+    if(flagF==='reassigned' && !reassigned) show=false;
+    r.style.display = show ? '' : 'none';
+  });
+  srrUpdateStats();
+}
+
+// ── Detail panel ──
+function srrOpenDetail(obsId){
+  var obs=null;
+  var all=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
+  for(var i=0;i<all.length;i++){ if(all[i].id===obsId){obs=all[i];break;} }
+  if(!obs) return;
+  srr_currentId = obsId;
+
+  var srrId  = (srr_reassigned[obsId]||{}).srr_id || _obsSrrCache[obsId] || _getObsSrr(obs);
+  var srrDef = srrId ? SRR_DEF[srrId] : null;
+  var col    = srr_reassigned[obsId] ? (srr_reassigned[obsId].col||'#555') : (srrDef?srrDef.col:'#999');
+  var srrName= srr_reassigned[obsId] ? srr_reassigned[obsId].srr_name : (srrDef?srrDef.name:'—');
+  var rrId   = srr_reassigned[obsId] ? srr_reassigned[obsId].rr_id   : (srrDef?srrDef.rr:'—');
+  var rrName = srr_reassigned[obsId] ? srr_reassigned[obsId].rr_name : (srrDef?srrDef.rrName:'—');
+
+  var dm = document.getElementById('srr-d-meta');
+  var dt = document.getElementById('srr-d-title');
+  var dob = document.getElementById('srr-d-obs');
+  var drec = document.getElementById('srr-d-rec');
+  var dbadge = document.getElementById('srr-d-srr-badge');
+  var dname = document.getElementById('srr-d-srr-name');
+  var dref  = document.getElementById('srr-d-rr-ref');
+
+  if(dm)     dm.textContent    = obsId + ' | ' + (obs.category||'');
+  if(dt)     dt.textContent    = obs.title||'';
+  if(dob)    dob.textContent   = obs.observation||'—';
+  if(drec)   drec.textContent  = obs.recommendation||'—';
+  if(dbadge){ dbadge.textContent=srrId||'—'; dbadge.style.background=col; }
+  if(dname)  dname.textContent = srrName;
+  if(dref)   dref.textContent  = (rrId||'') + ' — ' + (rrName||'');
+
+  // Flag button state
+  var fb = document.getElementById('srr-flag-btn');
+  if(fb){
+    if(srr_flagged[obsId]){
+      fb.style.background='#c0392b'; fb.style.color='#fff'; fb.textContent='⚑ Flagged — Click to Unflag';
+    } else {
+      fb.style.background='#fff3e0'; fb.style.color='#b04400'; fb.textContent='⚑ Flag Mismatch';
+    }
+  }
+  // Undo row
+  var ur = document.getElementById('srr-undo-row');
+  if(ur) ur.style.display = srr_reassigned[obsId] ? 'block' : 'none';
+
+  // Reset reassign fields
+  document.getElementById('srr-note-ex').value  = '';
+  document.getElementById('srr-cust-id').value   = '';
+  document.getElementById('srr-cust-name').value = '';
+  document.getElementById('srr-cust-rrid').value = '';
+  document.getElementById('srr-cust-rrname').value='';
+  document.getElementById('srr-cust-note').value = '';
+  document.getElementById('srr-src-text').value  = '';
+  srrSwitchTab('existing');
+  srrUpdatePreview();
+
+  var det = document.getElementById('srr-detail');
+  if(det){ det.style.display='flex'; }
+
+  // Highlight row
+  document.querySelectorAll('.srr-obs-row.srr-active').forEach(function(r){ r.classList.remove('srr-active'); });
+  var row = document.querySelector('.srr-obs-row[data-obsid="'+obsId+'"]');
+  if(row){ row.classList.add('srr-active'); row.scrollIntoView({block:'nearest',behavior:'smooth'}); }
+}
+
+function srrCloseDetail(){
+  var det = document.getElementById('srr-detail');
+  if(det) det.style.display = 'none';
+  document.querySelectorAll('.srr-obs-row.srr-active').forEach(function(r){ r.classList.remove('srr-active'); });
+  srr_currentId = null;
+}
+
+function srrSwitchTab(name){
+  var ex = document.getElementById('srr-pane-ex');
+  var cu = document.getElementById('srr-pane-cu');
+  var tex= document.getElementById('srr-tab-ex');
+  var tcu= document.getElementById('srr-tab-cu');
+  if(!ex||!cu) return;
+  if(name==='existing'){
+    ex.style.display='block'; cu.style.display='none';
+    tex.style.borderBottomColor='#1a3a5c'; tex.style.color='#1a3a5c'; tex.style.fontWeight='700';
+    tcu.style.borderBottomColor='transparent'; tcu.style.color='#888'; tcu.style.fontWeight='400';
+  } else {
+    ex.style.display='none'; cu.style.display='block';
+    tcu.style.borderBottomColor='#1a3a5c'; tcu.style.color='#1a3a5c'; tcu.style.fontWeight='700';
+    tex.style.borderBottomColor='transparent'; tex.style.color='#888'; tex.style.fontWeight='400';
+  }
+}
+
+function srrUpdatePreview(){
+  var sel = document.getElementById('srr-sel-existing');
+  var pre = document.getElementById('srr-preview');
+  if(!sel||!pre) return;
+  var d = sel.value ? SRR_DEF[sel.value] : null;
+  pre.textContent = d ? (sel.value + ' | ' + d.name + ' | Parent: ' + d.rrName) : '';
+}
+
+// ── Flag ──
+function srrOnFlag(obsId, checked){
+  if(checked) srr_flagged[obsId]=true; else delete srr_flagged[obsId];
+  // Update row attributes
+  var row = document.querySelector('.srr-obs-row[data-obsid="'+obsId+'"]');
+  if(row){ row.dataset.flagged = checked?'true':'false'; }
+  srrBuildTable(); // re-render to refresh badges
+  if(srr_currentId===obsId){
+    srrOpenDetail(obsId); // refresh detail panel if open
+  }
+}
+
+function srrToggleFlag(){
+  if(!srr_currentId) return;
+  var wasFlagged = !!srr_flagged[srr_currentId];
+  var cb = document.querySelector('.srr-flag-check[data-obsid="'+srr_currentId+'"]');
+  if(cb) cb.checked = !wasFlagged;
+  srrOnFlag(srr_currentId, !wasFlagged);
+}
+
+// ── Reassign ──
+function srrApplyReassign(isCustom){
+  if(!srr_currentId) return;
+  var obsId = srr_currentId;
+  var r;
+  if(!isCustom){
+    var sel = document.getElementById('srr-sel-existing');
+    var id  = sel ? sel.value : '';
+    if(!id){ alert('Please select a Sub-Risk first.'); return; }
+    var d = SRR_DEF[id];
+    if(!d) return;
+    r = { srr_id:id, srr_name:d.name, rr_id:d.rr, rr_name:d.rrName, col:d.col||'#555',
+          note:(document.getElementById('srr-note-ex')||{}).value||'', custom:false };
+  } else {
+    var cid   = ((document.getElementById('srr-cust-id')||{}).value||'').trim();
+    var cname = ((document.getElementById('srr-cust-name')||{}).value||'').trim();
+    if(!cid||!cname){ alert('Please enter at least a New Sub-Risk ID and Name.'); return; }
+    r = { srr_id:cid, srr_name:cname,
+          rr_id:((document.getElementById('srr-cust-rrid')||{}).value||'').trim(),
+          rr_name:((document.getElementById('srr-cust-rrname')||{}).value||'').trim(),
+          col:'#2c3e50', note:((document.getElementById('srr-cust-note')||{}).value||'').trim(), custom:true };
+  }
+  // Get original SRR for audit trail
+  var obs=null;
+  var all=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
+  for(var i=0;i<all.length;i++){ if(all[i].id===obsId){obs=all[i];break;} }
+  var origSrr = _obsSrrCache[obsId] || (obs?_getObsSrr(obs):null);
+
+  srr_reassigned[obsId] = r;
+  // Log to Audit Trail
+  AT_log({ type:'srr', obsId:obsId, obsTitle:obs?obs.title:obsId,
+           origSrr:origSrr, newSrr:r.srr_id, note:r.note, custom:r.custom });
+
+  srrBuildTable();
+  srrOpenDetail(obsId);
+}
+
+function srrUndoReassign(){
+  if(!srr_currentId) return;
+  delete srr_reassigned[srr_currentId];
+  srrBuildTable();
+  srrOpenDetail(srr_currentId);
+}
+
+// ── Reset all ──
+function srrResetAll(){
+  if(!confirm('Reset all flags and reassignments? This cannot be undone.')) return;
+  srr_flagged={};  srr_reassigned={};
+  srrBuildTable();
+}
+
+// ── Export ──
+function srrExport(){
+  var all=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
+  var rows=[['Obs ID','Title','Category','Type','SRR ID','SRR Name','Parent Risk','Flagged','Reassigned','Note']];
+  all.forEach(function(o){
+    var ra = srr_reassigned[o.id];
+    var srrId  = (ra||{}).srr_id || _obsSrrCache[o.id] || _getObsSrr(o);
+    var srrDef = srrId?SRR_DEF[srrId]:null;
+    rows.push([
+      o.id, o.title||'', o.category||'', o.type||'',
+      srrId||'', ra?ra.srr_name:(srrDef?srrDef.name:''),
+      ra?ra.rr_name:(srrDef?srrDef.rrName:''),
+      srr_flagged[o.id]?'Yes':'No',
+      ra?'Yes':'No',
+      ra?ra.note:''
+    ]);
+  });
+  var csv=rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+  var blob=new Blob([csv],{type:'text/csv'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=url; a.download='BSS_SRR_Mapping.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function _srrEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Wire close button on DOMContentLoaded
+document.addEventListener('DOMContentLoaded', function(){
+  var cb = document.getElementById('srr-close-btn');
+  if(cb) cb.addEventListener('click', srrCloseDetail);
+  _AT_updateBadge();
+});
+
 /* ══════════════════════════════════════════════════════════
    AUDIT TRAIL  —  sa_audit_trail in localStorage
    ══════════════════════════════════════════════════════════ */
@@ -19886,5 +20228,136 @@ function _w2rBuildHtml(d){
   +'<script>\n'+js+'\n<\/script>\n</body>\n</html>';
 }
 </script>
+
+<!-- ══════════════════════════════════════════════════════════
+     SRR MAPPING PANEL
+     ══════════════════════════════════════════════════════════ -->
+<div id="srr-panel" style="display:none;max-width:100%;background:#f0f3f8;min-height:calc(100vh - 50px)">
+  <div style="background:#1a3a5c;color:#fff;padding:11px 18px;display:flex;align-items:center;gap:12px">
+    <div style="font-size:15px;font-weight:800;flex:1">&#128279; Observation → Sub-Risk Mapping</div>
+    <div style="font-size:11px;color:#a0c0e0">Review and validate how each observation is linked to a Sub-Risk Register entry. Flag mismatches and reassign where needed.</div>
+    <button onclick="toggleSRRPanel()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:13px;padding:3px 10px;border-radius:4px;cursor:pointer;font-family:inherit">&#10005; Close</button>
+  </div>
+  <!-- Toolbar -->
+  <div style="background:#fff;border-bottom:1px solid #dde6f0;padding:9px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <input id="srr-search" type="text" placeholder="Search observations..." style="padding:5px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:inherit;width:200px" oninput="srrApplyFilters()">
+    <select id="srr-cat-filter" onchange="srrApplyFilters()" style="padding:5px 8px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:inherit">
+      <option value="">All Categories</option>
+      <option>Branch Imprest, Payments &amp; Accounts</option>
+      <option>Cash and Bank</option>
+      <option>Fixed Assets</option>
+      <option>HR &amp; Payroll</option>
+      <option>Library</option>
+      <option>Recruitment/Payroll/Employee Record</option>
+      <option>Safety &amp; Security</option>
+      <option>Science Laboratory</option>
+      <option>Student Record</option>
+      <option>Others</option>
+    </select>
+    <select id="srr-flag-filter" onchange="srrApplyFilters()" style="padding:5px 8px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:inherit">
+      <option value="">All Observations</option>
+      <option value="flagged">Flagged only</option>
+      <option value="reassigned">Reassigned only</option>
+    </select>
+    <button onclick="srrResetAll()" style="padding:5px 11px;background:#8b1a1a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit">&#8635; Reset All</button>
+    <button onclick="srrExport()" style="padding:5px 11px;background:#1e5c3a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit">&#11123; Export CSV</button>
+    <span style="font-size:11px;color:#888;margin-left:4px" id="srr-count-lbl"></span>
+  </div>
+  <!-- Stats bar -->
+  <div style="background:#fff;border-bottom:1px solid #dde6f0;padding:6px 16px;display:flex;gap:16px">
+    <span style="font-size:11px;color:#1a3a5c">Total: <b id="srr-stat-total">0</b></span>
+    <span style="font-size:11px;color:#c0392b">Flagged: <b id="srr-stat-flagged">0</b></span>
+    <span style="font-size:11px;color:#8e44ad">Reassigned: <b id="srr-stat-reassigned">0</b></span>
+    <span style="font-size:11px;color:#888">Showing: <b id="srr-stat-showing">0</b></span>
+  </div>
+  <!-- Table container -->
+  <div style="padding:14px 16px;overflow-x:auto">
+    <table id="srr-table" style="width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);font-size:12px">
+      <thead>
+        <tr style="background:#1a3a5c;color:#fff">
+          <th style="padding:9px 10px;text-align:left;width:36px"></th>
+          <th style="padding:9px 10px;text-align:left;width:80px">ID</th>
+          <th style="padding:9px 10px;text-align:left">Observation Title</th>
+          <th style="padding:9px 10px;text-align:left;width:110px">Category</th>
+          <th style="padding:9px 10px;text-align:left;width:90px">Type</th>
+          <th style="padding:9px 10px;text-align:left;width:130px">Linked SRR</th>
+          <th style="padding:9px 10px;text-align:left;width:160px">Sub-Risk Name</th>
+          <th style="padding:9px 10px;text-align:left;width:80px">Action</th>
+        </tr>
+      </thead>
+      <tbody id="srr-tbody"></tbody>
+    </table>
+  </div>
+  <!-- Detail / Reassign panel -->
+  <div id="srr-detail" style="display:none;position:fixed;top:50px;right:0;width:480px;height:calc(100vh - 50px);background:#fff;border-left:2px solid #c8d8ec;flex-direction:column;z-index:8000;box-shadow:-4px 0 18px rgba(0,0,0,.15);display:none;flex-direction:column">
+    <div style="background:#1a3a5c;color:#fff;padding:11px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0">
+      <div style="flex:1"><div style="font-size:10px;color:#a0c0e0" id="srr-d-meta"></div><div style="font-size:13px;font-weight:700" id="srr-d-title"></div></div>
+      <button id="srr-close-btn" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:13px;width:26px;height:26px;border-radius:4px;cursor:pointer">&#10005;</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:14px">
+      <!-- Observation text -->
+      <div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:4px">OBSERVATION</div>
+      <div id="srr-d-obs" style="font-size:11.5px;color:#2a3a50;background:#f5f8fc;border-radius:5px;padding:9px;margin-bottom:10px;line-height:1.55"></div>
+      <div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:4px">RECOMMENDATION</div>
+      <div id="srr-d-rec" style="font-size:11px;color:#4a5a70;background:#f5f8fc;border-radius:5px;padding:9px;margin-bottom:12px;line-height:1.5"></div>
+      <!-- Current SRR -->
+      <div style="background:#e8f0fc;border-radius:6px;padding:10px;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:700;color:#1a3a5c;margin-bottom:4px">CURRENT SRR MAPPING</div>
+        <span id="srr-d-srr-badge" style="font-size:11px;font-weight:700;color:#fff;border-radius:3px;padding:2px 8px"></span>
+        <div style="font-size:12px;font-weight:600;color:#1a3a5c;margin-top:5px" id="srr-d-srr-name"></div>
+        <div style="font-size:10px;color:#888;margin-top:2px" id="srr-d-rr-ref"></div>
+      </div>
+      <!-- Flag toggle -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <button id="srr-flag-btn" onclick="srrToggleFlag()" style="padding:5px 14px;border-radius:4px;border:none;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit">&#9873; Flag Mismatch</button>
+        <span style="font-size:11px;color:#888">Flag this observation if the SRR assignment seems wrong</span>
+      </div>
+      <!-- Reassign section -->
+      <div style="border-top:1px solid #e0e8f0;padding-top:12px">
+        <div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:8px">REASSIGN TO DIFFERENT SRR</div>
+        <!-- Tabs -->
+        <div style="display:flex;border-bottom:2px solid #e0e8f0;margin-bottom:10px">
+          <button id="srr-tab-ex" onclick="srrSwitchTab('existing')" style="padding:5px 14px;border:none;border-bottom:2px solid #1a3a5c;margin-bottom:-2px;background:#fff;font-size:11px;font-weight:700;color:#1a3a5c;cursor:pointer;font-family:inherit">Choose Existing SRR</button>
+          <button id="srr-tab-cu" onclick="srrSwitchTab('custom')" style="padding:5px 14px;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;background:#fff;font-size:11px;color:#888;cursor:pointer;font-family:inherit">Define New Risk</button>
+        </div>
+        <!-- Existing SRR pane -->
+        <div id="srr-pane-ex" style="display:block">
+          <div style="font-size:10.5px;color:#555;margin-bottom:5px">Select the correct Sub-Risk</div>
+          <select id="srr-sel-existing" onchange="srrUpdatePreview()" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-size:11px;font-family:inherit;margin-bottom:6px"></select>
+          <div id="srr-preview" style="font-size:10.5px;color:#666;background:#f5f8fc;border-radius:4px;padding:7px;margin-bottom:8px;min-height:28px"></div>
+          <div style="font-size:10.5px;color:#555;margin-bottom:4px">Note / Reason (optional)</div>
+          <textarea id="srr-note-ex" style="width:100%;min-height:55px;padding:6px;border:1px solid #c8d8ec;border-radius:4px;font-size:11px;font-family:inherit;resize:vertical" placeholder="Why is the current match wrong?"></textarea>
+          <button onclick="srrApplyReassign(false)" style="margin-top:8px;width:100%;padding:7px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit">&#10003; Apply Reassignment</button>
+        </div>
+        <!-- Custom risk pane -->
+        <div id="srr-pane-cu" style="display:none">
+          <!-- Source text paste area -->
+          <div style="background:#1a2a1a;border:1px dashed #4a7a4a;border-radius:6px;padding:9px;margin-bottom:10px">
+            <div style="font-size:10px;color:#8bc88b;font-weight:700;margin-bottom:3px">&#128196; Paste Source Text (optional)</div>
+            <div style="font-size:9.5px;color:#7a9a7a;margin-bottom:5px">Paste Diligent risk text, policy clause, or reference material to help define the new risk.</div>
+            <textarea id="srr-src-text" style="width:100%;background:#0d1a0d;color:#b8d8b8;border:1px solid #3a6a3a;border-radius:4px;padding:7px;font-size:11px;font-family:inherit;resize:vertical;min-height:70px" placeholder="Paste reference text here..."></textarea>
+            <button type="button" onclick="document.getElementById('srr-src-text').value=''" style="margin-top:5px;font-size:10px;padding:2px 8px;background:#2a1a1a;color:#c88b8b;border:1px solid #6a3a3a;border-radius:3px;cursor:pointer">&#10005; Clear</button>
+          </div>
+          <div style="font-size:10.5px;color:#555;margin-bottom:3px">New Sub-Risk ID</div>
+          <input id="srr-cust-id" type="text" placeholder="SRR-NEW-01" style="width:100%;padding:5px 8px;border:1px solid #c8d8ec;border-radius:4px;font-size:11px;font-family:inherit;margin-bottom:6px">
+          <div style="font-size:10.5px;color:#555;margin-bottom:3px">New Sub-Risk Name</div>
+          <input id="srr-cust-name" type="text" placeholder="e.g. Honorarium Payment Compliance Risk" style="width:100%;padding:5px 8px;border:1px solid #c8d8ec;border-radius:4px;font-size:11px;font-family:inherit;margin-bottom:6px">
+          <div style="font-size:10.5px;color:#555;margin-bottom:3px">Parent Risk Register ID</div>
+          <input id="srr-cust-rrid" type="text" placeholder="RR-FIN-01" style="width:100%;padding:5px 8px;border:1px solid #c8d8ec;border-radius:4px;font-size:11px;font-family:inherit;margin-bottom:6px">
+          <div style="font-size:10.5px;color:#555;margin-bottom:3px">Parent Risk Name</div>
+          <input id="srr-cust-rrname" type="text" placeholder="e.g. Financial Mismanagement Risk" style="width:100%;padding:5px 8px;border:1px solid #c8d8ec;border-radius:4px;font-size:11px;font-family:inherit;margin-bottom:6px">
+          <div style="font-size:10.5px;color:#555;margin-bottom:3px">Justification / Description</div>
+          <textarea id="srr-cust-note" style="width:100%;min-height:55px;padding:6px;border:1px solid #c8d8ec;border-radius:4px;font-size:11px;font-family:inherit;resize:vertical" placeholder="Why does none of the existing SRRs fit?"></textarea>
+          <button onclick="srrApplyReassign(true)" style="margin-top:8px;width:100%;padding:7px;background:#1e5c3a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit">&#10003; Save New Risk Assignment</button>
+        </div>
+      </div>
+      <!-- Undo -->
+      <div id="srr-undo-row" style="display:none;margin-top:10px">
+        <button onclick="srrUndoReassign()" style="width:100%;padding:6px;background:#7a3a00;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit">&#8617; Undo Reassignment</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
