@@ -9073,6 +9073,33 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
     <button class="tbtn updb" id="updb-btn" onclick="showUpdateDbModal()" style="opacity:0.55;filter:grayscale(0.4)" data-tip-title="Update Databank 🔒" data-tip="Restricted to Head Office. Auditors can import a Databank Update File received from HO. HO users enter the HO password to access full update and export features.">&#128274; Update DB</button>
     <button class="tbtn rpt-btn" id="demo-btn" style="background:#c9962a;color:#111;border:2px solid #f0c040;font-weight:700;opacity:0.55;filter:grayscale(0.4)" onclick="showDemoAuth()" data-tip-title="Demo Mode 🔒" data-tip="Restricted to Head Office. Loads sample branch data and observations to explore all features without creating a real report.">&#128274; Demo</button>
     <button class="tbtn rpt-btn" id="chpw-btn" onclick="showChangePwModal()" style="opacity:0.45;filter:grayscale(0.5);cursor:not-allowed;background:#2c3e50;color:#ecf0f1;border:1px solid #4a6278;" disabled data-tip-title="Change Password 🔒" data-tip="Restricted to Head Office. Only HO users can change login passwords.">&#128274; Change PW</button>
+    <button class="tbtn rpt-btn" id="at-btn" onclick="toggleAuditTrail()" style="background:#5a3080;color:#fff;border:1px solid #7a50a0;position:relative;" data-tip-title="Audit Trail" data-tip="View all instances where auditor judgment differed from system recommendations. Includes sensitivity overrides, SRR reassignments, and COSO changes.">&#128203; Audit Trail <span id="at-count-badge" style="display:none;position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 5px;min-width:16px;text-align:center;line-height:14px"></span></button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     AUDIT TRAIL PANEL
+     ══════════════════════════════════════════════════════════ -->
+<div id="at-panel" style="display:none;position:fixed;top:0;right:0;width:560px;height:100vh;background:#fff;border-left:2px solid #c8d8ec;flex-direction:column;z-index:9000;box-shadow:-4px 0 18px rgba(0,0,0,.18)">
+  <div style="background:#3a1060;color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0">
+    <div style="font-size:15px;font-weight:800;flex:1">&#128203; Audit Trail</div>
+    <button onclick="AT_export()" style="font-size:11px;padding:4px 10px;background:#5a2a80;color:#fff;border:1px solid #8a5ab0;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:600">&#11123; Export CSV</button>
+    <button onclick="AT_clear()" style="font-size:11px;padding:4px 10px;background:#6a1a1a;color:#fff;border:1px solid #a04040;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:600">&#128465; Clear</button>
+    <button onclick="toggleAuditTrail()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:14px;width:26px;height:26px;border-radius:4px;cursor:pointer;line-height:1">&#10005;</button>
+  </div>
+  <div style="padding:10px 14px;background:#f5f0fa;border-bottom:1px solid #d8c8ec;display:flex;align-items:center;gap:8px;flex-shrink:0">
+    <span style="font-size:11px;color:#5a3080;font-weight:600">Filter:</span>
+    <select id="at-type-filter" onchange="AT_render()" style="font-size:11px;padding:3px 8px;border:1px solid #c8b0e0;border-radius:4px;background:#fff;font-family:inherit">
+      <option value="">All Events</option>
+      <option value="sensitivity">Sensitivity Overrides</option>
+      <option value="coso">COSO Changes</option>
+      <option value="srr">SRR Reassignments</option>
+    </select>
+    <span style="font-size:10px;color:#888;flex:1" id="at-summary-lbl"></span>
+  </div>
+  <div id="at-list" style="flex:1;overflow-y:auto;font-size:12px"></div>
+  <div style="padding:8px 14px;background:#f5f0fa;border-top:1px solid #d8c8ec;font-size:10px;color:#888;flex-shrink:0">
+    Entries are saved in browser localStorage and persist across sessions. Export CSV for permanent record.
   </div>
 </div>
 
@@ -10473,8 +10500,11 @@ function toggleStepGuide(){
 
 function setCoso(id, sel){
   var val = sel.value;
+  var prev = cosoMap[id]||'';
   if(val) cosoMap[id]=val; else delete cosoMap[id];
   sel.className = 'coso-sel'+(val==='CE'?' c-ce':val==='RA'?' c-ra':val==='CA'?' c-ca':val==='IC'?' c-ic':val==='M'?' c-m':'');
+  // Log COSO change to audit trail if it changed
+  if(val && val !== prev) AT_log({type:'coso', obsId:id, obsTitle:_getObsTitle(id), prev:prev, auditorSel:val});
 }
 
 function findDbAssessText(id, type){
@@ -17184,6 +17214,19 @@ var RA_DB_CATS = {
 };
 // Sensitivity weights set by S&A Department (used in risk scoring)
 var RA_SENS_WT = {'High':1.00, 'M to H':0.64, 'L to M':0.40, 'Low':0.20};
+// Diligent-derived area weight scores (avg Impact×0.6 + Likelihood×0.4)/5×25 per risk category
+// Source: BSS_Risk_Control_Gap_Analysis.xlsx — 630 branch-relevant risks
+var RA_DIL_WT = {
+  'Financial Management':     {avgImpact:2.70, avgLikelihood:1.78, areaWtScore:11.68, riskCount:74},
+  'Cash & Bank':              {avgImpact:2.00, avgLikelihood:2.00, areaWtScore:10.00, riskCount:4},
+  'HR & Payroll':             {avgImpact:2.01, avgLikelihood:1.59, areaWtScore:9.22,  riskCount:162},
+  'Student Records & Fee':    {avgImpact:3.22, avgLikelihood:3.20, areaWtScore:16.07, riskCount:90},
+  'Fixed Assets & Inventory': {avgImpact:1.54, avgLikelihood:1.31, areaWtScore:7.23,  riskCount:13},
+  'Library & Records':        {avgImpact:2.10, avgLikelihood:1.80, areaWtScore:9.90,  riskCount:59},
+  'Safety & Security':        {avgImpact:2.17, avgLikelihood:2.17, areaWtScore:10.83, riskCount:6},
+  'General Administration':   {avgImpact:2.80, avgLikelihood:2.62, areaWtScore:13.64, riskCount:69},
+  'Science Laboratory':       null
+};
 var RA_CAT_KEYWORDS = {
   'Financial Management':     ['financial','payment','voucher','budget','tax','withholding','procurement','purchase','committee','reimbursement','expenditure','imprest','splitting','invoice','accounts','bpv','journal','jv','head of account'],
   'Cash & Bank':              ['cash','bank','petty cash','reconcil','bank statement','bank reconcil','imprest account','bank signator','cash count','cash payment','bank transfer','bank balance'],
@@ -17849,9 +17892,9 @@ function ra_scoreCategory(catName,rpt1,rpt2){
   // Component 2 — Repeat Rate (max 25): proportion of repeated obs + trend bonus
   var rec=0; if(d1.obs>0) rec=(d1.repeated/d1.obs)*25; if(d2&&d2.obs>0&&d1.obs>0) rec=Math.min(25,rec+8);
 
-  // Component 3 — Area Organisational Weight (max 25): set by S&A, reflects area importance
-  var areaWt=db.areaWt||0.10;
-  var areaComp=areaWt*100; // 0.25→25, 0.15→15, 0.10→10, 0.05→5
+  // Component 3 — Area Weight (max 25): Diligent Impact×0.6 + Likelihood×0.4, fallback to static
+  var dilD=RA_DIL_WT[catName];
+  var areaComp=dilD ? dilD.areaWtScore : (db.areaWt||0.10)*100;
 
   // Component 4 — Sensitivity Weight (max 15): avg sensitivity of obs loaded from report
   var sensComp=0;
@@ -17868,6 +17911,111 @@ function ra_scoreCategory(catName,rpt1,rpt2){
   var dbs=Math.min(5,(db.count/108)*db.weight*1.5);
 
   return Math.min(100,Math.round(freq+rec+areaComp+sensComp+dbs));
+}
+
+/* ══════════════════════════════════════════════════════════
+   AUDIT TRAIL  —  sa_audit_trail in localStorage
+   ══════════════════════════════════════════════════════════ */
+var AT_KEY = 'sa_audit_trail';
+
+function AT_log(entry){
+  var trail = AT_getAll();
+  entry.ts = new Date().toISOString();
+  trail.unshift(entry); // newest first
+  try{ localStorage.setItem(AT_KEY, JSON.stringify(trail)); }catch(e){}
+  // Refresh badge count if panel open
+  var panel = document.getElementById('at-panel');
+  if(panel && panel.style.display !== 'none') AT_render();
+  _AT_updateBadge();
+}
+
+function AT_getAll(){
+  try{ return JSON.parse(localStorage.getItem(AT_KEY)||'[]'); }catch(e){ return []; }
+}
+
+function AT_clear(){
+  if(!confirm('Clear all audit trail entries? This cannot be undone.')) return;
+  try{ localStorage.removeItem(AT_KEY); }catch(e){}
+  AT_render();
+  _AT_updateBadge();
+}
+
+function _AT_updateBadge(){
+  var badge = document.getElementById('at-count-badge');
+  if(!badge) return;
+  var n = AT_getAll().length;
+  badge.textContent = n > 0 ? n : '';
+  badge.style.display = n > 0 ? 'inline-block' : 'none';
+}
+
+function AT_render(){
+  var list = document.getElementById('at-list');
+  if(!list) return;
+  var trail = AT_getAll();
+  _AT_updateBadge();
+  if(!trail.length){ list.innerHTML = '<div style="color:#aaa;padding:20px;text-align:center;font-size:12px;">No override events recorded yet.</div>'; return; }
+  var typeFilter = (document.getElementById('at-type-filter')||{}).value||'';
+  var filtered = typeFilter ? trail.filter(function(e){ return e.type===typeFilter; }) : trail;
+  var html = '';
+  filtered.forEach(function(e, i){
+    var dt = e.ts ? new Date(e.ts).toLocaleString() : '—';
+    var typeLabel = {sensitivity:'Sensitivity Override', coso:'COSO Change', srr:'SRR Reassignment'}[e.type]||e.type;
+    var typeCol   = {sensitivity:'#c0392b',              coso:'#2980b9',    srr:'#8e44ad'}[e.type]||'#555';
+    var detail = '';
+    if(e.type==='sensitivity'){
+      detail = 'System recommended <b>' + (e.sysRec||'—') + '</b> &rarr; Auditor selected <b>' + e.auditorSel + '</b>'
+             + (e.prev ? ' (was: '+e.prev+')' : '');
+    } else if(e.type==='coso'){
+      detail = 'Changed from <b>' + (e.prev||'—') + '</b> to <b>' + e.auditorSel + '</b>';
+    } else if(e.type==='srr'){
+      detail = 'Original: <b>' + (e.origSrr||'—') + '</b> &rarr; New: <b>' + (e.newSrr||'—') + '</b>'
+             + (e.custom ? ' <span style="background:#8e44ad;color:#fff;font-size:9px;padding:1px 5px;border-radius:3px;">Custom</span>' : '')
+             + (e.note ? '<br><span style="color:#666;font-size:10px;">Note: '+e.note+'</span>' : '');
+    }
+    html += '<div style="border-bottom:1px solid #e8eef6;padding:9px 12px;background:'+(i%2===0?'#fff':'#f8fafc')+'">'
+          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+          + '<span style="background:'+typeCol+';color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;white-space:nowrap">'+typeLabel+'</span>'
+          + '<span style="font-weight:600;font-size:12px;flex:1">'+_AT_esc(e.obsTitle||e.obsId||'')+'</span>'
+          + '<span style="font-size:10px;color:#999;white-space:nowrap">'+dt+'</span>'
+          + '</div>'
+          + '<div style="font-size:11.5px;color:#2a3a50;padding-left:2px">'+detail+'</div>'
+          + '<div style="font-size:10px;color:#aaa;margin-top:2px">'+_AT_esc(e.obsId||'')+'</div>'
+          + '</div>';
+  });
+  list.innerHTML = html;
+}
+
+function _AT_esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function AT_export(){
+  var trail = AT_getAll();
+  if(!trail.length){ alert('No audit trail entries to export.'); return; }
+  var rows = [['Date/Time','Event Type','Observation ID','Observation Title','System Recommendation','Auditor Selection','Previous Value','Note']];
+  trail.forEach(function(e){
+    rows.push([
+      e.ts ? new Date(e.ts).toLocaleString() : '',
+      e.type||'',
+      e.obsId||'',
+      e.obsTitle||'',
+      e.sysRec||e.origSrr||'',
+      e.auditorSel||e.newSrr||'',
+      e.prev||'',
+      e.note||''
+    ]);
+  });
+  var csv = rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+  var blob = new Blob([csv], {type:'text/csv'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href=url; a.download='BSS_Audit_Trail.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function toggleAuditTrail(){
+  var panel = document.getElementById('at-panel');
+  if(!panel) return;
+  var open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : 'flex';
+  if(!open){ AT_render(); }
 }
 
 function ra_scoreToLevel(score){ return score>=75?'critical':score>=50?'high':score>=25?'medium':'low'; }
