@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -783,7 +782,7 @@
   <!-- Common base fields -->
   <div class="grid-2">
     <div class="form-group"><label>Animal (Tag No) *</label><select class="form-control" id="healthTag"></select></div>
-    <div class="form-group"><label>Date *</label><input type="date" class="form-control" id="healthDate"></div>
+    <div class="form-group"><label>Date *</label><input type="date" class="form-control" id="healthDate" onchange="autoFillCalvingDate()"></div>
   </div>
   <!-- Treatment-specific -->
   <div id="hf-treatment" class="htype-fields">
@@ -825,9 +824,18 @@
     <div class="grid-2">
       <div class="form-group">
         <div class="lbl-row"><label>Reproductive Event *</label><span class="manage-link" onclick="openQuickManage('reproductiveEvents','hReproEvent',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
-        <select class="form-control" id="hReproEvent"></select>
+        <select class="form-control" id="hReproEvent" onchange="onReproEventChange()"></select>
       </div>
-      <div class="form-group"><label>Expected / Calving Date</label><input type="date" class="form-control" id="hExpectedDate"></div>
+      <div class="form-group">
+        <label>Expected / Calving Date
+          <span id="hExpectedDateHint" style="font-size:11px;color:#2d5c3e;font-weight:400;margin-left:6px;"></span>
+        </label>
+        <input type="date" class="form-control" id="hExpectedDate">
+      </div>
+      <div class="form-group" id="hSemenGroup" style="display:none;">
+        <div class="lbl-row"><label>Semen / Bull / Buck Name</label><span class="manage-link" onclick="openQuickManage('semenNames','hSemenName',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+        <select class="form-control" id="hSemenName"></select>
+      </div>
       <div class="form-group"><label>Lactation No.</label><input type="number" class="form-control" id="hLactationNo" min="0" placeholder="0"></div>
     </div>
   </div>
@@ -845,13 +853,26 @@
   <div id="hf-mortality" class="htype-fields" style="display:none;">
     <div class="form-group"><label>Cause of Death *</label><input class="form-control" id="hCauseOfDeath" placeholder="State cause of death..."></div>
   </div>
-  <!-- Common: Doctor, Cost, Next Due, Notes -->
+  <!-- Common: Service By, Doctor, Cost, Next Due, Notes -->
   <div class="grid-2">
-    <div class="form-group">
-      <div class="lbl-row"><label>Doctor / Vet</label><span class="manage-link" onclick="openQuickManage('doctorNames','healthDoctor',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
+    <div class="form-group" style="grid-column:1/-1;">
+      <label>Service By</label>
+      <div style="display:flex;gap:20px;align-items:center;margin-top:6px;">
+        <label style="display:flex;align-items:center;gap:7px;font-weight:normal;cursor:pointer;">
+          <input type="radio" name="hServiceBy" id="hServiceSelf" value="self" onchange="toggleDoctorFee()" checked>
+          <span>Self / Natural / No Doctor</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:7px;font-weight:normal;cursor:pointer;">
+          <input type="radio" name="hServiceBy" id="hServiceDoctor" value="doctor" onchange="toggleDoctorFee()">
+          <span>Doctor / Vet</span>
+        </label>
+      </div>
+    </div>
+    <div class="form-group" id="healthDoctorGroup" style="opacity:0.4;pointer-events:none;">
+      <div class="lbl-row"><label>Doctor / Vet Name</label><span class="manage-link" onclick="openQuickManage('doctorNames','healthDoctor',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
       <select class="form-control" id="healthDoctor"></select>
     </div>
-    <div class="form-group"><label>Cost (Rs)</label><input type="number" class="form-control" id="healthCost" min="0" placeholder="0"></div>
+    <div class="form-group" id="healthCostGroup" style="opacity:0.4;pointer-events:none;"><label>Doctor Fee (Rs)</label><input type="number" class="form-control" id="healthCost" min="0" placeholder="0"></div>
     <div class="form-group" id="nextDueGroup"><label>Next Due Date</label><input type="date" class="form-control" id="healthNextDue"></div>
   </div>
   <div class="form-group"><label>Notes / Description</label><textarea class="form-control" id="healthDesc" rows="2" placeholder="Additional notes..."></textarea></div>
@@ -1109,6 +1130,7 @@ const LOOKUP_DEFAULTS = {
   medicineNames:  ['Ivermectin','Albendazole','Fenbendazole','Oxytetracycline','Penicillin','Amoxicillin','Enrofloxacin','Dexamethasone','Calcium Borogluconate','Multivitamin'],
   diseaseNames:   ['FMD (Foot & Mouth)','LSD (Lumpy Skin)','Mastitis','Pneumonia','Diarrhea','Bloat','Milk Fever','Ketosis','Brucellosis','Theileriosis','Anaplasmosis'],
   reproductiveEvents: ['Heat Detection','Artificial Insemination','Natural Mating','Pregnancy Check (Positive)','Pregnancy Check (Negative)','Expected Calving','Calving','Abortion','Drying Off','Lactation Start'],
+  semenNames: ['HF Bull','Jersey Bull','Sahiwal Bull','Red Sindhi Bull','Nili Ravi Bull','Murrah Bull','Beetal Buck','Boer Buck','Kajli Ram','Lohi Ram','Local / Desi','Other'],
   expenseCategories:['Feed Purchase','Medicine','Vet Fees','Labor / Wages','Electricity','Fuel','Equipment','Repairs','Other'],
   paymentModes:   ['Cash','Bank Transfer','Cheque','Credit']
 };
@@ -1172,7 +1194,7 @@ function openQuickManage(lookupKey, targetSelId, afterFn) {
     animalSources:'Animal Sources', animalStatuses:'Animal Statuses',
     feedCategories:'Feed Categories', feedUnits:'Feed/Stock Units', voucherTypes:'Voucher Types',
     vaccineNames:'Vaccine Names', medicineNames:'Medicine Names', diseaseNames:'Disease Names',
-    reproductiveEvents:'Reproductive Events', doctorNames:'Doctor / Vet Names',
+    reproductiveEvents:'Reproductive Events', semenNames:'Semen / Bull Names', doctorNames:'Doctor / Vet Names',
     milkShifts:'Milk Shifts', milkUnits:'Milk Units', expenseCategories:'Expense Categories', paymentModes:'Payment Modes'
   };
   const descs = {
@@ -1188,6 +1210,7 @@ function openQuickManage(lookupKey, targetSelId, afterFn) {
     medicineNames:'Medicines/drugs used for treatment or deworming.',
     diseaseNames:'Disease names recorded on your farm.',
     reproductiveEvents:'Types of reproductive events (Calving, AI, Pregnancy Check, etc.).',
+    semenNames:'Semen / bull / buck / ram names used for AI or natural mating.',
     doctorNames:'Names of veterinary doctors.',
     milkShifts:'Milking time periods.',
     milkUnits:'Units for recording milk quantity.',
@@ -1355,6 +1378,7 @@ function populateAllDropdowns() {
   populateSel('hVaccineName', ['--Select--',...(lk.vaccineNames||[])], null);
   populateSel('hDewormMed', ['--Select--',...(lk.medicineNames||[])], null);
   populateSel('hReproEvent', lk.reproductiveEvents||[], null);
+  populateSel('hSemenName', lk.semenNames||[], null, null, 'Select / type semen name...');
 
   const allStages = getAllStages();
   populateSel('filterType', lk.animalTypes, 'All Types');
@@ -1461,6 +1485,7 @@ const LOOKUP_SECTIONS = [
   { key:'medicineNames', label:'Medicine / Drug Names',icon:'fa-pills',        desc:'Medicines used for treatment and deworming.' },
   { key:'diseaseNames',  label:'Disease Names',       icon:'fa-virus',         desc:'Common diseases recorded on your farm.' },
   { key:'reproductiveEvents',label:'Reproductive Events',icon:'fa-heart',      desc:'Types of reproductive events (Calving, AI, Pregnancy Check, etc.).' },
+  { key:'semenNames',    label:'Semen / Bull Names',  icon:'fa-dna',           desc:'Semen / bull / buck / ram names used for AI or natural mating.' },
   { key:'doctorNames',   label:'Doctor / Vet Names',  icon:'fa-user-md',       desc:'Names of veterinary doctors you use.' },
   { key:'expenseCategories',label:'Expense Categories',icon:'fa-rupee-sign',   desc:'Categories for farm expenses (Feed, Labor, Electricity, etc.).' },
   { key:'paymentModes',  label:'Payment Modes',       icon:'fa-wallet',        desc:'How expenses are paid (Cash, Bank Transfer, etc.).' },
@@ -2672,6 +2697,61 @@ function clearMilkFilters(){['filterMilkTag','filterMilkShift','filterMilkFrom',
 // ============================================================
 let _healthTypeFilter = '';
 
+// Gestation periods in days by animal type
+const GESTATION_DAYS = {
+  'Cow': 283, 'Buffalo': 310, 'Goat': 150, 'Sheep': 147
+};
+
+// Events that trigger auto-fill of expected/calving date
+const MATING_EVENTS = ['Artificial Insemination', 'Natural Mating'];
+
+function onReproEventChange() {
+  // Show/hide semen field
+  const event = document.getElementById('hReproEvent').value;
+  const semenGroup = document.getElementById('hSemenGroup');
+  if (semenGroup) semenGroup.style.display = MATING_EVENTS.includes(event) ? '' : 'none';
+  // Auto-fill calving date
+  autoFillCalvingDate();
+}
+
+function autoFillCalvingDate() {
+  const event = (document.getElementById('hReproEvent')||{}).value || '';
+  const date  = (document.getElementById('healthDate')||{}).value || '';
+  const hint  = document.getElementById('hExpectedDateHint');
+  if (!MATING_EVENTS.includes(event) || !date) {
+    if (hint) hint.textContent = '';
+    return;
+  }
+  // Look up animal type from selected tag
+  const tagNo = (document.getElementById('healthTag')||{}).value || '';
+  const animals = dbGet('animals');
+  const animal = animals.find(a => a.tagNo === tagNo);
+  const animalType = animal ? animal.animalType : '';
+  const days = GESTATION_DAYS[animalType] || 283;
+
+  const baseDate = new Date(date);
+  baseDate.setDate(baseDate.getDate() + days);
+  const yyyy = baseDate.getFullYear();
+  const mm   = String(baseDate.getMonth() + 1).padStart(2, '0');
+  const dd   = String(baseDate.getDate()).padStart(2, '0');
+  const expectedStr = `${yyyy}-${mm}-${dd}`;
+
+  const expectedEl = document.getElementById('hExpectedDate');
+  if (expectedEl && !expectedEl.value) expectedEl.value = expectedStr;
+  if (hint) hint.textContent = `(auto: +${days} days for ${animalType||'Cow'})`;
+}
+
+function toggleDoctorFee() {
+  const isDoctor = document.getElementById('hServiceDoctor').checked;
+  const doctorGrp = document.getElementById('healthDoctorGroup');
+  const costGrp   = document.getElementById('healthCostGroup');
+  if (doctorGrp) { doctorGrp.style.opacity = isDoctor ? '1' : '0.4'; doctorGrp.style.pointerEvents = isDoctor ? '' : 'none'; }
+  if (costGrp)   { costGrp.style.opacity   = isDoctor ? '1' : '0.4'; costGrp.style.pointerEvents   = isDoctor ? '' : 'none'; }
+  if (!isDoctor) {
+    const costEl = document.getElementById('healthCost'); if (costEl) costEl.value = '0';
+  }
+}
+
 function setHealthType(type) {
   document.getElementById('healthRecordType').value = type;
   document.querySelectorAll('.htype-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
@@ -2700,6 +2780,7 @@ function clearHealthModalFields() {
   ['healthDate','healthCost','healthNextDue','healthDesc','hDosage','hBatchNo','hDoseNo','hDewormDose','hSymptoms','hCauseOfDeath'].forEach(f=>{const el=document.getElementById(f);if(el)el.value='';});
   const fd=document.getElementById('hExpectedDate'); if(fd) fd.value='';
   const fl=document.getElementById('hLactationNo'); if(fl) fl.value='';
+  const fs=document.getElementById('hSemenName'); if(fs) fs.value='';
 }
 
 function openHealthModal(id) {
@@ -2708,6 +2789,9 @@ function openHealthModal(id) {
   document.getElementById('healthDate').value=new Date().toISOString().split('T')[0];
   clearHealthModalFields();
   document.getElementById('healthModalTitle').textContent='Add Health Record';
+  document.getElementById('hServiceSelf').checked = true; toggleDoctorFee();
+  document.getElementById('hSemenGroup').style.display = 'none';
+  const hintEl = document.getElementById('hExpectedDateHint'); if(hintEl) hintEl.textContent='';
   setHealthType('Treatment');
   if(id){
     const r=dbFind('healthRecords',id); if(!r) return;
@@ -2725,7 +2809,9 @@ function openHealthModal(id) {
     if(rType==='Treatment'){if(r.diseaseName)document.getElementById('hDiseaseName').value=r.diseaseName;if(r.medicineName)document.getElementById('hMedicineName').value=r.medicineName;if(r.dosage)document.getElementById('hDosage').value=r.dosage;}
     if(rType==='Vaccination'){if(r.vaccineName)document.getElementById('hVaccineName').value=r.vaccineName;if(r.doseNo)document.getElementById('hDoseNo').value=r.doseNo;if(r.batchNo)document.getElementById('hBatchNo').value=r.batchNo;}
     if(rType==='Deworming'){if(r.dewormMed)document.getElementById('hDewormMed').value=r.dewormMed;if(r.dewormDose)document.getElementById('hDewormDose').value=r.dewormDose;}
-    if(rType==='Reproductive'){if(r.reproEvent)document.getElementById('hReproEvent').value=r.reproEvent;if(r.expectedDate)document.getElementById('hExpectedDate').value=r.expectedDate;if(r.lactationNo)document.getElementById('hLactationNo').value=r.lactationNo;}
+    if(rType==='Reproductive'){if(r.reproEvent){document.getElementById('hReproEvent').value=r.reproEvent;onReproEventChange();}if(r.expectedDate)document.getElementById('hExpectedDate').value=r.expectedDate;if(r.lactationNo)document.getElementById('hLactationNo').value=r.lactationNo;if(r.semenName){const sn=document.getElementById('hSemenName');if(sn)sn.value=r.semenName;}}
+    // Restore service by
+    if(r.serviceBy==='doctor'){document.getElementById('hServiceDoctor').checked=true;}else{document.getElementById('hServiceSelf').checked=true;}toggleDoctorFee();
     if(rType==='Disease'){const lk=getLookups();populateSel('hDiseaseNameD',['--Select--',...(lk.diseaseNames||[])],null,r.diseaseName||'');if(r.symptoms)document.getElementById('hSymptoms').value=r.symptoms;}
     if(rType==='Mortality'){if(r.causeOfDeath)document.getElementById('hCauseOfDeath').value=r.causeOfDeath;}
   }
@@ -2743,9 +2829,11 @@ function saveHealth() {
   if(recordType==='Vaccination'&&!document.getElementById('hVaccineName').value){toast('Please select Vaccine Name','error');return;}
   if(recordType==='Reproductive'&&!document.getElementById('hReproEvent').value){toast('Please select Reproductive Event','error');return;}
   if(recordType==='Mortality'&&!document.getElementById('hCauseOfDeath').value.trim()){toast('Please enter Cause of Death','error');return;}
+  const serviceBy = document.getElementById('hServiceDoctor').checked ? 'doctor' : 'self';
   const obj={tagNo,date,recordType,
-    doctor:document.getElementById('healthDoctor').value,
-    cost:Number(document.getElementById('healthCost').value)||0,
+    serviceBy,
+    doctor: serviceBy==='doctor' ? document.getElementById('healthDoctor').value : '',
+    cost:   serviceBy==='doctor' ? (Number(document.getElementById('healthCost').value)||0) : 0,
     nextDue:recordType==='Mortality'?'':document.getElementById('healthNextDue').value,
     description:document.getElementById('healthDesc').value,
     // Treatment
@@ -2761,6 +2849,7 @@ function saveHealth() {
     dewormDose:document.getElementById('hDewormDose').value,
     // Reproductive
     reproEvent:document.getElementById('hReproEvent').value,
+    semenName:document.getElementById('hSemenName').value,
     expectedDate:document.getElementById('hExpectedDate').value,
     lactationNo:document.getElementById('hLactationNo').value,
     // Disease
@@ -2782,7 +2871,7 @@ function getHealthDetail(r) {
   if(t==='Treatment') return [r.diseaseName&&r.diseaseName!=='--Select--'?r.diseaseName:'',r.medicineName&&r.medicineName!=='--Select--'?'Med: '+r.medicineName:'',r.dosage?'Dose: '+r.dosage:''].filter(Boolean).join(' | ')||r.description||'—';
   if(t==='Vaccination') return [r.vaccineName&&r.vaccineName!=='--Select--'?r.vaccineName:'',r.doseNo?'Dose: '+r.doseNo:'',r.batchNo?'Batch: '+r.batchNo:''].filter(Boolean).join(' | ')||r.description||'—';
   if(t==='Deworming') return [r.dewormMed&&r.dewormMed!=='--Select--'?r.dewormMed:'',r.dewormDose?r.dewormDose:''].filter(Boolean).join(' | ')||r.description||'—';
-  if(t==='Reproductive') return [r.reproEvent||'',r.expectedDate?'Expected: '+r.expectedDate:'',r.lactationNo?'Lac#'+r.lactationNo:''].filter(Boolean).join(' | ')||r.description||'—';
+  if(t==='Reproductive') return [r.reproEvent||'',r.semenName?'Semen: '+r.semenName:'',r.expectedDate?'Expected: '+r.expectedDate:'',r.lactationNo?'Lac#'+r.lactationNo:''].filter(Boolean).join(' | ')||r.description||'—';
   if(t==='Disease') return [r.diseaseName&&r.diseaseName!=='--Select--'?r.diseaseName:'',r.symptoms?r.symptoms:''].filter(Boolean).join(' | ')||r.description||'—';
   if(t==='Mortality') return r.causeOfDeath||r.description||'—';
   return r.description||r.eventType||'—';
