@@ -122,7 +122,16 @@
     <div class="section-title"><i class="fas fa-tachometer-alt" style="color:#2d5c3e"></i> Dashboard</div>
     <button class="btn-primary" onclick="refreshDashboard()"><i class="fas fa-sync-alt"></i> Refresh</button>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px;" id="statCards"></div>
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:20px;" id="statCards"></div>
+  <!-- Calving / Delivery Reminder Card -->
+  <div class="card" style="margin-bottom:20px;" id="calvingReminderCard">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-size:15px;font-weight:700;color:#7c3aed;"><i class="fas fa-baby" style="color:#8b5cf6"></i> Upcoming Calving / Delivery Reminders</div>
+      <span id="calvingCount" class="badge badge-purple">0 due</span>
+    </div>
+    <div id="calvingAlerts"><div style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">No upcoming calving reminders.</div></div>
+  </div>
+
   <div class="card" style="margin-bottom:20px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div style="font-size:15px;font-weight:700;color:#92400e;"><i class="fas fa-bell" style="color:#f59e0b"></i> Pending Stage Transitions</div>
@@ -830,7 +839,22 @@
         <label>Expected / Calving Date
           <span id="hExpectedDateHint" style="font-size:11px;color:#2d5c3e;font-weight:400;margin-left:6px;"></span>
         </label>
-        <input type="date" class="form-control" id="hExpectedDate">
+        <input type="date" class="form-control" id="hExpectedDate" onchange="autoSetReminderDate()">
+      </div>
+      <div class="form-group">
+        <label>Reminder / Alert Date
+          <span style="font-size:11px;color:#d97706;font-weight:400;margin-left:6px;">(shown on dashboard)</span>
+        </label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="date" class="form-control" id="hReminderDate" style="flex:1;">
+          <select class="form-control" id="hReminderLeadDays" onchange="autoSetReminderDate()" style="width:130px;" title="Auto-set reminder this many days before expected date">
+            <option value="7">7 days before</option>
+            <option value="14">14 days before</option>
+            <option value="30" selected>30 days before</option>
+            <option value="45">45 days before</option>
+            <option value="60">60 days before</option>
+          </select>
+        </div>
       </div>
       <div class="form-group" id="hSemenGroup" style="display:none;">
         <div class="lbl-row"><label>Semen / Bull / Buck Name</label><span class="manage-link" onclick="openQuickManage('semenNames','hSemenName',null)"><i class="fas fa-pencil-alt"></i> manage</span></div>
@@ -1673,6 +1697,11 @@ function refreshDashboard() {
   const todayMilk=dbGet('milkRecords').filter(r=>r.date===today).reduce((s,r)=>s+Number(r.qty||0),0);
   const thisMonth=today.substr(0,7);
   const monthExp=dbGet('expenses').filter(r=>r.date.startsWith(thisMonth)).reduce((s,r)=>s+Number(r.amount||0),0);
+  // Calving reminders: records where reminderDate <= today and expectedDate >= today
+  const calvingDue = dbGet('healthRecords').filter(r=>
+    r.recordType==='Reproductive' && r.expectedDate && r.expectedDate >= today &&
+    r.reminderDate && r.reminderDate <= today
+  );
   document.getElementById('statCards').innerHTML = `
     <div class="stat-card" style="border-color:#2d5c3e">
       <div style="font-size:28px;font-weight:800;color:#2d5c3e">${active}</div>
@@ -1694,12 +1723,18 @@ function refreshDashboard() {
       <div style="font-size:13px;color:#6b7280;margin-top:4px">Health Events Due</div>
       <div style="font-size:11px;color:#9ca3af;margin-top:2px">within next 14 days</div>
     </div>
+    <div class="stat-card" style="border-color:#8b5cf6;cursor:pointer;" onclick="document.getElementById('calvingReminderCard').scrollIntoView({behavior:'smooth'})">
+      <div style="font-size:28px;font-weight:800;color:#8b5cf6">${calvingDue.length}</div>
+      <div style="font-size:13px;color:#6b7280;margin-top:4px">Calving Reminders</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:2px">upcoming deliveries</div>
+    </div>
     <div class="stat-card" style="border-color:#d97706">
       <div style="font-size:22px;font-weight:800;color:#d97706">Rs ${monthExp.toLocaleString()}</div>
       <div style="font-size:13px;color:#6b7280;margin-top:4px">Expenses This Month</div>
       <div style="font-size:11px;color:#9ca3af;margin-top:2px">${animals.length} animals registered</div>
     </div>`;
   renderTransitionAlerts();
+  renderCalvingAlerts();
   renderStockAlerts();
   renderRecentTx();
 }
@@ -2737,8 +2772,66 @@ function autoFillCalvingDate() {
   const expectedStr = `${yyyy}-${mm}-${dd}`;
 
   const expectedEl = document.getElementById('hExpectedDate');
-  if (expectedEl && !expectedEl.value) expectedEl.value = expectedStr;
+  if (expectedEl && !expectedEl.value) { expectedEl.value = expectedStr; autoSetReminderDate(); }
   if (hint) hint.textContent = `(auto: +${days} days for ${animalType||'Cow'})`;
+}
+
+function autoSetReminderDate() {
+  const expectedVal = (document.getElementById('hExpectedDate')||{}).value || '';
+  if (!expectedVal) return;
+  const leadDays = Number((document.getElementById('hReminderLeadDays')||{}).value || 30);
+  const d = new Date(expectedVal);
+  d.setDate(d.getDate() - leadDays);
+  const yyyy = d.getFullYear();
+  const mm   = String(d.getMonth() + 1).padStart(2, '0');
+  const dd   = String(d.getDate()).padStart(2, '0');
+  const reminderEl = document.getElementById('hReminderDate');
+  if (reminderEl) reminderEl.value = `${yyyy}-${mm}-${dd}`;
+}
+
+function renderCalvingAlerts() {
+  const today = new Date().toISOString().split('T')[0];
+  const animals = dbGet('animals');
+  // Find reproductive records where reminderDate is active and expectedDate is in the future
+  const upcoming = dbGet('healthRecords').filter(r =>
+    r.recordType === 'Reproductive' &&
+    r.expectedDate && r.expectedDate >= today &&
+    r.reminderDate && r.reminderDate <= today
+  ).sort((a, b) => a.expectedDate.localeCompare(b.expectedDate));
+
+  document.getElementById('calvingCount').textContent = upcoming.length + ' due';
+
+  const container = document.getElementById('calvingAlerts');
+  if (!upcoming.length) {
+    container.innerHTML = '<div style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">No calving reminders active. Set a Reminder Date in Health → Reproductive records.</div>';
+    return;
+  }
+
+  const todayMs = new Date(today).getTime();
+  container.innerHTML = upcoming.map(r => {
+    const animal = animals.find(a => a.tagNo === r.tagNo) || {};
+    const expMs  = new Date(r.expectedDate).getTime();
+    const daysLeft = Math.ceil((expMs - todayMs) / 86400000);
+    const urgency = daysLeft <= 7  ? { bg:'#fee2e2', border:'#ef4444', color:'#991b1b', label:'Critical' }
+                  : daysLeft <= 14 ? { bg:'#fff7ed', border:'#f97316', color:'#92400e', label:'Soon' }
+                  :                  { bg:'#f5f3ff', border:'#8b5cf6', color:'#5b21b6', label:'Upcoming' };
+    return `<div style="background:${urgency.bg};border:1.5px solid ${urgency.border};border-radius:10px;padding:12px 16px;margin-bottom:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <div style="font-size:22px;">🐄</div>
+      <div style="flex:1;min-width:160px;">
+        <div style="font-weight:700;color:${urgency.color};font-size:14px;">Tag #${r.tagNo} &nbsp;<span style="font-weight:400;font-size:12px;">${animal.animalType||''} ${animal.breed||''}</span></div>
+        <div style="font-size:12px;color:#374151;margin-top:2px;">${r.reproEvent||'Reproductive'} ${r.semenName?'— Semen: '+r.semenName:''}</div>
+      </div>
+      <div style="text-align:center;min-width:110px;">
+        <div style="font-size:11px;color:#6b7280;">Expected Date</div>
+        <div style="font-weight:700;color:#1a3a2a;">${r.expectedDate}</div>
+      </div>
+      <div style="text-align:center;min-width:80px;">
+        <span style="background:${urgency.border};color:#fff;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700;">${daysLeft} day${daysLeft!==1?'s':''} left</span>
+        <div style="font-size:10px;color:#6b7280;margin-top:3px;">${urgency.label}</div>
+      </div>
+      <button class="btn-sm btn-edit" onclick="openHealthModal('${r.id}')" title="Open record"><i class="fas fa-edit"></i></button>
+    </div>`;
+  }).join('');
 }
 
 function toggleDoctorFee() {
@@ -2779,8 +2872,10 @@ function populateHealthAnimalFilter() {
 function clearHealthModalFields() {
   ['healthDate','healthCost','healthNextDue','healthDesc','hDosage','hBatchNo','hDoseNo','hDewormDose','hSymptoms','hCauseOfDeath'].forEach(f=>{const el=document.getElementById(f);if(el)el.value='';});
   const fd=document.getElementById('hExpectedDate'); if(fd) fd.value='';
+  const fr=document.getElementById('hReminderDate'); if(fr) fr.value='';
   const fl=document.getElementById('hLactationNo'); if(fl) fl.value='';
   const fs=document.getElementById('hSemenName'); if(fs) fs.value='';
+  const frl=document.getElementById('hReminderLeadDays'); if(frl) frl.value='30';
 }
 
 function openHealthModal(id) {
@@ -2809,7 +2904,7 @@ function openHealthModal(id) {
     if(rType==='Treatment'){if(r.diseaseName)document.getElementById('hDiseaseName').value=r.diseaseName;if(r.medicineName)document.getElementById('hMedicineName').value=r.medicineName;if(r.dosage)document.getElementById('hDosage').value=r.dosage;}
     if(rType==='Vaccination'){if(r.vaccineName)document.getElementById('hVaccineName').value=r.vaccineName;if(r.doseNo)document.getElementById('hDoseNo').value=r.doseNo;if(r.batchNo)document.getElementById('hBatchNo').value=r.batchNo;}
     if(rType==='Deworming'){if(r.dewormMed)document.getElementById('hDewormMed').value=r.dewormMed;if(r.dewormDose)document.getElementById('hDewormDose').value=r.dewormDose;}
-    if(rType==='Reproductive'){if(r.reproEvent){document.getElementById('hReproEvent').value=r.reproEvent;onReproEventChange();}if(r.expectedDate)document.getElementById('hExpectedDate').value=r.expectedDate;if(r.lactationNo)document.getElementById('hLactationNo').value=r.lactationNo;if(r.semenName){const sn=document.getElementById('hSemenName');if(sn)sn.value=r.semenName;}}
+    if(rType==='Reproductive'){if(r.reproEvent){document.getElementById('hReproEvent').value=r.reproEvent;onReproEventChange();}if(r.expectedDate)document.getElementById('hExpectedDate').value=r.expectedDate;if(r.reminderDate)document.getElementById('hReminderDate').value=r.reminderDate;if(r.lactationNo)document.getElementById('hLactationNo').value=r.lactationNo;if(r.semenName){const sn=document.getElementById('hSemenName');if(sn)sn.value=r.semenName;}}
     // Restore service by
     if(r.serviceBy==='doctor'){document.getElementById('hServiceDoctor').checked=true;}else{document.getElementById('hServiceSelf').checked=true;}toggleDoctorFee();
     if(rType==='Disease'){const lk=getLookups();populateSel('hDiseaseNameD',['--Select--',...(lk.diseaseNames||[])],null,r.diseaseName||'');if(r.symptoms)document.getElementById('hSymptoms').value=r.symptoms;}
@@ -2851,6 +2946,7 @@ function saveHealth() {
     reproEvent:document.getElementById('hReproEvent').value,
     semenName:document.getElementById('hSemenName').value,
     expectedDate:document.getElementById('hExpectedDate').value,
+    reminderDate:document.getElementById('hReminderDate').value,
     lactationNo:document.getElementById('hLactationNo').value,
     // Disease
     symptoms:document.getElementById('hSymptoms').value,
