@@ -10305,10 +10305,57 @@ function setSensitivity(id, sel){
   updateFwSuggestion(id); // refresh suggestion badge after manual change
 }
 
+// ── Part 2: System Recommendation Engine ─────────────────────────────────
+// Combines branch-specific history + Diligent Impact/Likelihood + Framework Materiality
+function _getObsRecord(obsId){
+  for(var i=0;i<DB.observations.length;i++){ if(DB.observations[i].id===obsId) return DB.observations[i]; }
+  return null;
+}
+
+function _getBranchHistory(obsId){
+  // Only ra_loadedReports matching the current branch (Part 2 scope)
+  var obs=_getObsRecord(obsId); if(!obs||!ra_loadedReports.length) return {obs:0,repeated:0,total:0};
+  var cat=obs.category||'';
+  var branchName=(document.getElementById('sess-branch')||{}).value||'';
+  var obs_sum=0,rep_sum=0,total_sum=0;
+  for(var i=0;i<ra_loadedReports.length;i++){
+    var rp=ra_loadedReports[i];
+    var rpBranch=rp.detectedBranch||rp.name||'';
+    if(branchName&&rpBranch&&rpBranch.toLowerCase().indexOf(branchName.toLowerCase())===-1
+       &&branchName.toLowerCase().indexOf(rpBranch.toLowerCase())===-1) continue;
+    if(rp.sess&&rp.sess.observations){
+      var ss=rp.sess;
+      for(var j=0;j<ss.observations.length;j++){
+        var o=ss.observations[j];
+        if(!ss.selIds||(o.id in ss.selIds)){
+          total_sum++;
+          if((o.category||'')===cat){
+            obs_sum++;
+            if((ss.obsTypeMap&&ss.obsTypeMap[o.id])==='Repeated'||o.type==='Repeated') rep_sum++;
+          }
+        }
+      }
+    } else if(rp.parsed){
+      var catD=rp.parsed[cat]||{obs:0,repeated:0};
+      obs_sum+=catD.obs||0; rep_sum+=catD.repeated||0;
+      for(var c in rp.parsed) total_sum+=(rp.parsed[c].obs||0);
+    }
+  }
+  return {obs:obs_sum,repeated:rep_sum,total:total_sum};
+}
+
+function _getDiligentScore(obsId){
+  var obs=_getObsRecord(obsId); if(!obs) return null;
+  return RA_DIL_WT[obs.category||'']||null;
+}
+
 function getSuggestedSens(obsId){
+  var d=getSuggestedSensDetail(obsId); return d?d.rating:null;
+}
+
+function getSuggestedSensDetail(obsId){
   var count=instCountMap[obsId]||0;
   var amount=instAmountMap[obsId]||0;
-  // Also auto-count table rows from the live observation textarea
   var obsEl=document.getElementById('oe-'+obsId);
   if(obsEl&&obsEl.value){
     var lines=obsEl.value.split('\n'),tblRows=0;
@@ -10320,23 +10367,53 @@ function getSuggestedSens(obsId){
     }
     if(tblRows>1){var dr=tblRows-1;if(dr>count)count=dr;}
   }
-  if(count>=15||amount>=100000) return'High';
-  if(count>=5 ||amount>=50000)  return'M to H';
-  if(count>=2 ||amount>=10000)  return'L to M';
-  if(count>=1 ||amount>0)       return'Low';
-  return null;
+  // Signal 1 — Materiality (max 40)
+  var instScore=count>=15?25:count>=5?18:count>=2?10:count>=1?5:0;
+  var amtScore=amount>=100000?15:amount>=50000?10:amount>=10000?5:amount>0?2:0;
+  var matScore=instScore+amtScore;
+  var matBasis=(count>0||amount>0)?((count>0?count+' instance'+(count!==1?'s':''):'')+
+    (count>0&&amount>0?', ':'')+
+    (amount>0?'Rs. '+amount.toLocaleString():'')):null;
+
+  // Signal 2 — Branch History (max 30, current branch only)
+  var hist=_getBranchHistory(obsId);
+  var histScore=0,histBasis=null;
+  if(hist.total>0){
+    histScore=Math.min(30,Math.round((hist.obs/Math.max(hist.total,1))*15+(hist.obs>0?(hist.repeated/hist.obs)*15:0)));
+    histBasis=hist.obs+' occurrence'+(hist.obs!==1?'s':'')+' in branch history'+(hist.repeated>0?', '+hist.repeated+' repeated':'');
+  }
+
+  // Signal 3 — Diligent (max 30)
+  var dilD=_getDiligentScore(obsId);
+  var dilScore=0,dilBasis=null;
+  if(dilD){
+    dilScore=Math.round(((dilD.avgImpact*0.6)+(dilD.avgLikelihood*0.4))/5*30);
+    var iLbl=['','Low','Low-Med','Medium','Med-High','High'][Math.round(dilD.avgImpact)]||dilD.avgImpact;
+    var lLbl=['','Low','Low-Med','Medium','Med-High','High'][Math.round(dilD.avgLikelihood)]||dilD.avgLikelihood;
+    dilBasis='Impact '+iLbl+', Likelihood '+lLbl+' ('+dilD.riskCount+' Diligent risks)';
+  }
+
+  var total=matScore+histScore+dilScore;
+  var rating=total>=70?'High':total>=45?'M to H':total>=20?'L to M':total>0?'Low':null;
+  return {rating:rating,score:total,
+    matScore:matScore,   matBasis:matBasis||'No materiality data',
+    histScore:histScore, histBasis:histBasis||'No branch history loaded',
+    dilScore:dilScore,   dilBasis:dilBasis||'No Diligent match for this category'};
 }
 
 function updateFwSuggestion(obsId){
-  var el=document.getElementById('fw-sug-'+obsId);
-  if(!el)return;
-  var sug=getSuggestedSens(obsId);
-  if(!sug){el.innerHTML='';return;}
-  var cur=sensitivityMap[obsId]||'';
+  var el=document.getElementById('fw-sug-'+obsId); if(!el)return;
+  var det=getSuggestedSensDetail(obsId);
+  if(!det||!det.rating){el.innerHTML='';return;}
+  var sug=det.rating,cur=sensitivityMap[obsId]||'';
   var bgMap={High:'#c0392b','M to H':'#e67e22','L to M':'#2980b9',Low:'#27ae60'};
   var c=bgMap[sug]||'#555';
   var already=(cur===sug);
-  el.innerHTML='<span style="font-size:10px;background:'+c+';color:#fff;border-radius:3px;padding:1px 6px;font-weight:700;margin-left:4px">Suggested: '+sug+'</span>'
+  var tip='System Score: '+det.score+'/100\n'+
+    'Branch History ('+det.histScore+'/30): '+det.histBasis+'\n'+
+    'Diligent       ('+det.dilScore+'/30): '+det.dilBasis+'\n'+
+    'Materiality    ('+det.matScore+'/40): '+det.matBasis;
+  el.innerHTML='<span title="'+tip.replace(/"/g,'&quot;').replace(/\n/g,'&#10;')+'" style="font-size:10px;background:'+c+';color:#fff;border-radius:3px;padding:1px 6px;font-weight:700;margin-left:4px;cursor:help">&#9432; System: '+sug+' ('+det.score+'/100)</span>'
     +(already
       ?'<span style="font-size:10px;color:'+c+';margin-left:4px;font-weight:700">&#10003; Applied</span>'
       :'<button onclick="applySuggestedSens(\''+obsId+'\',\''+sug+'\')" style="font-size:10px;padding:1px 7px;background:#1a3557;color:#fff;border:none;border-radius:3px;cursor:pointer;margin-left:3px;font-family:inherit">Apply</button>');
