@@ -18678,10 +18678,13 @@ function srrBuildTable(){
           +   (isReassigned ? ' <span style="font-size:9px;background:#1e5c3a;color:#fff;border-radius:3px;padding:1px 4px;margin-left:4px">Reassigned</span>' : '')
           +   (isFlagged    ? ' <span style="font-size:9px;background:#c0392b;color:#fff;border-radius:3px;padding:1px 4px;margin-left:4px">Flagged</span>' : '')
           + '</td>'
-          + '<td style="padding:7px 8px;font-size:10.5px;color:#555">'+_srrEsc((o.category||'').replace('Branch Imprest, Payments & Accounts','Fin. Mgmt').replace('Recruitment/Payroll/Employee Record','HR/Payroll'))+'</td>'
-          + '<td style="padding:7px 8px"><span style="font-size:10px;background:'+(o.type==='Repeated'?'#c0392b':'#1e5c3a')+';color:#fff;border-radius:3px;padding:1px 6px;font-weight:700">'+(o.type||'New')+'</span></td>'
+          + '<td style="padding:7px 8px;font-size:10.5px;color:#555">'
+          +   _srrEsc((o.category||'').replace('Branch Imprest, Payments & Accounts','Fin. Mgmt').replace('Recruitment/Payroll/Employee Record','HR/Payroll'))
+          +   ' <button onclick="srrChangeCat(\''+o.id+'\')" title="Change category" style="font-size:9px;padding:1px 5px;background:#f0f4f8;border:1px solid #b0c8e0;color:#1a3a5c;border-radius:3px;cursor:pointer;font-family:inherit;margin-left:3px">&#9998;</button>'
+          + '</td>'
           + '<td style="padding:7px 8px"><span style="font-size:10px;background:'+col+';color:#fff;border-radius:3px;padding:1px 5px;font-weight:700">'+_srrEsc(srrId||'—')+'</span></td>'
           + '<td style="padding:7px 8px;font-size:11px;color:#2a3a50">'+_srrEsc(srrName)+'</td>'
+          + (function(){ var rrId=srrDef?srrDef.rr:''; var rrName=srrDef?srrDef.rrName:''; return '<td style="padding:7px 8px"><span title="'+_srrEsc(rrName)+'" style="font-size:10px;background:#2c3e6a;color:#fff;border-radius:3px;padding:1px 5px;font-weight:700;cursor:help">'+_srrEsc(rrId||'—')+'</span></td>'; })()
           + '<td style="padding:7px 8px"><button class="srr-read-btn" data-obsid="'+o.id+'" style="font-size:10.5px;padding:3px 9px;background:#e8f4fb;border:1px solid #b0d4ec;color:#1a3a5c;border-radius:4px;cursor:pointer;font-weight:600;font-family:inherit">&#128196; Read</button></td>'
           + '</tr>';
   });
@@ -18855,6 +18858,49 @@ function srrToggleFlag(){
 }
 
 // ── Reassign ──
+function srrChangeCat(obsId){
+  var cats=['Financial Management','Cash & Bank','HR & Payroll','Student Records & Fee',
+    'Fixed Assets & Inventory','Library & Records','Science Laboratory','Safety & Security',
+    'General Administration','Branch Imprest, Payments & Accounts','Recruitment/Payroll/Employee Record'];
+  // Find current category
+  var obs=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
+  var o=null; for(var i=0;i<obs.length;i++){if(obs[i].id===obsId){o=obs[i];break;}}
+  if(!o) return;
+  var cur=o.category||'';
+
+  var el=document.createElement('div');
+  el.className='vh-bg'; el.id='srrCatModal';
+  el.innerHTML='<div class="vh-box" style="width:380px">'
+    +'<div class="vh-head"><h3>&#9998; Change Category</h3><button onclick="document.getElementById(\'srrCatModal\').remove()">&#10005;</button></div>'
+    +'<div class="vh-body">'
+    +'<div style="font-size:12px;color:#4a5a70;margin-bottom:10px">Observation: <strong>'+_srrEsc(o.title||obsId)+'</strong></div>'
+    +'<div style="font-size:11px;color:#888;margin-bottom:6px">Current category: <strong style="color:#1a3a5c">'+_srrEsc(cur||'—')+'</strong></div>'
+    +'<label style="font-size:11px;font-weight:700;color:#1a3a5c;display:block;margin-bottom:4px">Select New Category</label>'
+    +'<select id="srr-cat-new" style="width:100%;padding:7px 8px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:inherit;margin-bottom:14px">'
+    +cats.map(function(c){return '<option value="'+c+'"'+(c===cur?' selected':'')+'>'+c+'</option>';}).join('')
+    +'</select>'
+    +'<div style="display:flex;gap:10px">'
+    +'<button onclick="srrApplyCatChange(\''+obsId+'\')" style="flex:1;padding:9px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Apply</button>'
+    +'<button onclick="document.getElementById(\'srrCatModal\').remove()" style="padding:9px 18px;background:#e8edf5;color:#444;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>'
+    +'</div></div></div>';
+  document.body.appendChild(el);
+  el.addEventListener('click',function(e){if(e.target===el)el.remove();});
+}
+
+function srrApplyCatChange(obsId){
+  var sel=document.getElementById('srr-cat-new');
+  if(!sel) return;
+  var newCat=sel.value;
+  // Update in DB.observations and customs
+  var obs=(DB&&DB.observations?DB.observations:[]);
+  for(var i=0;i<obs.length;i++){if(obs[i].id===obsId){obs[i].category=newCat;break;}}
+  if(typeof customs!=='undefined'){for(var j=0;j<customs.length;j++){if(customs[j].id===obsId){customs[j].category=newCat;break;}}}
+  var modal=document.getElementById('srrCatModal');
+  if(modal) modal.remove();
+  srrBuildTable();
+  if(typeof toast==='function') toast('Category updated to: '+newCat);
+}
+
 function srrApplyReassign(isCustom){
   if(!srr_currentId) return;
   var obsId = srr_currentId;
@@ -21375,10 +21421,10 @@ function _w2rBuildHtml(d){
           <th style="padding:9px 10px;text-align:left;width:36px"></th>
           <th style="padding:9px 10px;text-align:left;width:80px">ID</th>
           <th style="padding:9px 10px;text-align:left">Observation Title</th>
-          <th style="padding:9px 10px;text-align:left;width:110px">Category</th>
-          <th style="padding:9px 10px;text-align:left;width:90px">Type</th>
+          <th style="padding:9px 10px;text-align:left;width:130px">Category</th>
           <th style="padding:9px 10px;text-align:left;width:130px">Linked SRR</th>
           <th style="padding:9px 10px;text-align:left;width:160px">Sub-Risk Name</th>
+          <th style="padding:9px 10px;text-align:left;width:110px">RR</th>
           <th style="padding:9px 10px;text-align:left;width:80px">Action</th>
         </tr>
       </thead>
