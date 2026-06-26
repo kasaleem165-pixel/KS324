@@ -251,21 +251,6 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 #genbtn-bar{flex-shrink:0;background:#fff;padding:10px 14px;border-bottom:2px solid var(--gold);box-shadow:0 2px 6px rgba(0,0,0,.10)}
 #genbtn{width:100%;padding:11px;background:var(--gold);color:#111;border:none;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(201,150,42,.3)}
 #genbtn:hover{background:var(--goldlt)}
-#dirty-popup{position:fixed;z-index:9999;pointer-events:auto;display:none;flex-direction:column;max-width:230px;filter:drop-shadow(0 4px 14px rgba(0,0,0,.22))}
-#dirty-popup.dp-show{display:flex}
-.dp-bubble{background:linear-gradient(135deg,#fffbe6 0%,#fff3c4 100%);border:2px solid #f0c040;border-radius:8px;padding:9px 12px 9px 10px;position:relative}
-.dp-arrow{width:0;height:0;align-self:flex-start;margin-left:14px;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:8px solid #f0c040;position:relative}
-.dp-arrow::after{content:'';position:absolute;top:2px;left:-7px;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:7px solid #fffbe6}
-.dp-arrow.dp-arr-down{border-bottom:none;border-top:8px solid #f0c040;margin-top:0;align-self:flex-start}
-.dp-arrow.dp-arr-down::after{top:-10px;border-top:7px solid #fffbe6;border-bottom:none}
-.dp-icon{font-size:15px;line-height:1;flex-shrink:0}
-.dp-row{display:flex;align-items:flex-start;gap:7px}
-.dp-text{font-family:'Inter',sans-serif;font-size:11.5px;color:#5a3e00;line-height:1.45;flex:1}
-.dp-text strong{color:#1a3a5c}
-.dp-close{position:absolute;top:5px;right:6px;background:none;border:none;font-size:11px;color:#a07000;cursor:pointer;line-height:1;padding:0}
-.dp-close:hover{color:#5a3e00}
-@keyframes dpFadeIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
-.dp-bubble{animation:dpFadeIn .18s ease}
 
 /* REPORT */
 #rp{background:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(26,58,92,.1);min-height:300px;padding:30px 34px}
@@ -11043,7 +11028,6 @@ function restoreSession(sess) {
   lockBrInfo();
   renderAnnexList();
   renderRpt();
-  captureLpBaseline();
 }
 
 function saveVersion(cb) {
@@ -11358,7 +11342,6 @@ function importSessionFile(e){
 // ============================================================
 // DIRTY-REPORT FLOATING POPUP
 // ============================================================
-var _reportDirty = false;
 var _lastSavedTs = 0;
 var _reportEverGenerated = false;  // dirty popup only active after first generate
 
@@ -11390,109 +11373,6 @@ function hasAnyData(){
   return false;
 }
 var _showAnalysis = false;
-var _dirtyPopupTimer = null;
-
-// Create the popup element once and append to body
-(function(){
-  var el = document.createElement('div');
-  el.id = 'dirty-popup';
-  el.innerHTML =
-    '<div class="dp-arrow" id="dp-arrow"></div>' +
-    '<div class="dp-bubble">' +
-      '<button class="dp-close" onclick="clearReportDirty()" title="Dismiss">&#10005;</button>' +
-      '<div class="dp-row">' +
-        '<span class="dp-icon">&#9888;&#65039;</span>' +
-        '<span class="dp-text">You have made changes.<br>Click <strong>&#9889; Generate</strong> to update the report.</span>' +
-      '</div>' +
-    '</div>';
-  document.body.appendChild(el);
-})();
-
-function markReportDirty(anchorEl){
-  if(!_reportEverGenerated) return;  // only active after report has been generated once
-  _reportDirty = true;
-  var popup = document.getElementById('dirty-popup');
-  if(!popup) return;
-
-  // Position near the changed field
-  if(anchorEl){
-    var r = anchorEl.getBoundingClientRect();
-    var arrow = document.getElementById('dp-arrow');
-    var popW = 234; // max-width
-    var spaceBelow = window.innerHeight - r.bottom;
-    var spaceAbove = r.top;
-
-    // Horizontal: align left edge with field, clamp to viewport
-    var left = r.left;
-    if(left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
-    if(left < 8) left = 8;
-    popup.style.left = left + 'px';
-    popup.style.maxWidth = popW + 'px';
-
-    if(spaceBelow >= 90 || spaceBelow >= spaceAbove){
-      // Show below the field
-      popup.style.top  = (r.bottom + 6) + 'px';
-      popup.style.bottom = '';
-      popup.style.flexDirection = 'column';
-      if(arrow){ arrow.className='dp-arrow'; }
-    } else {
-      // Show above the field
-      popup.style.top  = '';
-      popup.style.bottom = (window.innerHeight - r.top + 6) + 'px';
-      popup.style.flexDirection = 'column-reverse';
-      if(arrow){ arrow.className='dp-arrow dp-arr-down'; }
-    }
-  }
-
-  popup.classList.add('dp-show');
-
-  // Re-trigger bubble animation
-  var bubble = popup.querySelector('.dp-bubble');
-  if(bubble){ bubble.style.animation='none'; bubble.offsetHeight; bubble.style.animation=''; }
-
-  // Auto-dismiss after 6 s
-  if(_dirtyPopupTimer) clearTimeout(_dirtyPopupTimer);
-  _dirtyPopupTimer = setTimeout(function(){ clearReportDirty(); }, 6000);
-}
-
-function clearReportDirty(){
-  _reportDirty = false;
-  if(_dirtyPopupTimer){ clearTimeout(_dirtyPopupTimer); _dirtyPopupTimer=null; }
-  var popup = document.getElementById('dirty-popup');
-  if(popup) popup.classList.remove('dp-show');
-}
-
-// Snapshot of left-panel field values at the last baseline (session restore / report generated).
-// Fields that were blank at baseline do not trigger the dirty popup.
-var _lpBaseline = {};
-
-function captureLpBaseline(){
-  var lp = document.getElementById('LP');
-  if(!lp) return;
-  _lpBaseline = {};
-  var els = lp.querySelectorAll('input, select, textarea');
-  for(var i=0;i<els.length;i++){
-    var el=els[i]; var key=el.id||el.name;
-    if(key) _lpBaseline[key] = (el.value||'').trim();
-  }
-}
-
-// Listen for input/change on the left panel; position popup near changed field.
-(function(){
-  var lp = document.getElementById('LP');
-  if(!lp) return;
-  function handle(e){
-    var t = e.target;
-    if(t.closest && (t.closest('#ra-panel') || t.closest('#aws-panel'))) return;
-    if(t.className && t.className.indexOf('oedit') >= 0) return;
-    // Skip dirty popup if the field had no content in the saved baseline
-    var key=t.id||t.name;
-    if(key && (!_lpBaseline.hasOwnProperty(key) || _lpBaseline[key]==='')) return;
-    markReportDirty(t);
-  }
-  lp.addEventListener('input',  handle);
-  lp.addEventListener('change', handle);
-})();
 
 // ============================================================
 // PENDING SELECTION & GENERATE CONFIRM
@@ -11511,7 +11391,6 @@ function updateGenBtn(){
     if(rems) parts.push(rems+' removal'+(rems>1?'s':''));
     btn.textContent = '⚡ Generate Report — '+parts.join(', ')+' pending';
     btn.style.background='#c07000';
-    markReportDirty(btn);
   } else {
     btn.textContent = '⚡ Generate / Refresh Report';
     btn.style.background='';
@@ -11793,7 +11672,6 @@ function buildIntroHtml(vals, forPrint){
 }
 
 function renderRpt(){
-  clearReportDirty();
   var H=getHdrVals();
   var brcode=H.brcode, brname=H.brname, brregion=H.brregion, brcity=H.brcity,
       brhead=H.brhead, braddress=H.braddress, brautype=H.brautype,
@@ -12055,7 +11933,6 @@ function renderRpt(){
   syncAnnexTextFromDom();
   h+=buildAnnexHtml(false,obsNumMap);
   cont.innerHTML=h;
-  captureLpBaseline();
   renderStepGuide();
   // Initialize framework suggestion badges for all observations with saved values
   setTimeout(function(){
@@ -12224,7 +12101,6 @@ function doClear(){
   _brInfoHasData=false;
   _brInfoUnlocked=true;
   _reportEverGenerated=false;
-  clearReportDirty();
   setBrInfoDisabled(false);
   var ov=document.getElementById('brinfo-lock-overlay');
   var badge=document.getElementById('brinfo-lockbadge');
@@ -12246,7 +12122,6 @@ function doNewReport(){
   _brInfoHasData=false;
   _brInfoUnlocked=false; // force unlock path to run
   _reportEverGenerated=false;
-  clearReportDirty();
   // Clear all header/form fields
   var fields=['brcode','brname','brregion','brcity','brhead','braddress','brautype','rno','pb','rdt','rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk'];
   for(var fi=0;fi<fields.length;fi++){var el=document.getElementById(fields[fi]);if(el)el.value='';}
@@ -17412,7 +17287,7 @@ function loadDemoData(){
   // --- Clear existing (inline, no confirm prompt) ---
   selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={};
   responseLoaded=false; _brInfoHasData=false; _brInfoUnlocked=true;
-  _reportEverGenerated=false; clearReportDirty();
+  _reportEverGenerated=false;
   window.pendingSel={};
   setBrInfoDisabled(false);
   var _ov=document.getElementById('brinfo-lock-overlay'); if(_ov) _ov.style.display='none';
