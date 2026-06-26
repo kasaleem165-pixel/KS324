@@ -18891,6 +18891,13 @@ function srrApplyCatChange(obsId){
   var sel=document.getElementById('srr-cat-new');
   if(!sel) return;
   var newCat=sel.value;
+  // Find current category for confirmation
+  var allObs=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
+  var curO=null; for(var k=0;k<allObs.length;k++){if(allObs[k].id===obsId){curO=allObs[k];break;}}
+  var curCat=curO?curO.category||'—':'—';
+  if(newCat===curCat){ if(typeof toast==='function') toast('Category unchanged.'); document.getElementById('srrCatModal').remove(); return; }
+  var ok=confirm('Changing Audit Category for observation "'+_srrEsc(curO?curO.title||obsId:obsId)+'".\n\nFrom: '+curCat+'\nTo:   '+newCat+'\n\nThis affects how the observation is grouped in reports. Proceed?');
+  if(!ok) return;
   // Update in DB.observations and customs
   var obs=(DB&&DB.observations?DB.observations:[]);
   for(var i=0;i<obs.length;i++){if(obs[i].id===obsId){obs[i].category=newCat;break;}}
@@ -18928,6 +18935,13 @@ function srrApplyReassign(isCustom){
   for(var i=0;i<all.length;i++){ if(all[i].id===obsId){obs=all[i];break;} }
   var origSrr = _obsSrrCache[obsId] || (obs?_getObsSrr(obs):null);
 
+  // Check if RR will also change as a result of this SRR change
+  var prevDef = origSrr ? (SRR_DEF[origSrr]||{}) : {};
+  var newDef2 = SRR_DEF[r.srr_id] || {};
+  var prevRR  = prevDef.rr || (srr_reassigned[obsId]||{}).rr_id || '—';
+  var newRR   = r.rr_id || newDef2.rr || '—';
+  var rrWillChange = (!r.custom) && (newRR !== '—') && (prevRR !== newRR);
+
   srr_reassigned[obsId] = r;
   // Log to Audit Trail
   AT_log({ type:'srr', obsId:obsId, obsTitle:obs?obs.title:obsId,
@@ -18935,6 +18949,10 @@ function srrApplyReassign(isCustom){
 
   srrBuildTable();
   srrOpenDetail(obsId);
+
+  if(rrWillChange){
+    alert('Note: Because the SRR was changed, the Risk Register (RR) has also been updated automatically.\n\nPrevious RR: '+(prevDef.rrName||prevRR)+'\nNew RR: '+(newDef2.rrName||newRR)+'\n\nRR always follows SRR and cannot be changed independently.');
+  }
 }
 
 function srrUndoReassign(){
