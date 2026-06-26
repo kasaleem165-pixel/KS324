@@ -11894,25 +11894,30 @@ function renderRpt(){
       h+='<div class="oc '+tc+'" id="oc-'+o.id+'">';
       h+='<div class="och"><span class="onum">Obs. '+secPfx+'.'+num+'</span>';
       var priorRefDraft=lastRefMap[o.id]||'';
+      var _W=window._pfWaivers||{};
+      var _sensWaived=!!_W[o.id+'|Sensitivity'], _cosoWaived=!!_W[o.id+'|COSO'], _fiWaived=!!_W[o.id+'|Financial Impact'];
+      function _naBtn(field,active){var fk=field.replace(/\s/g,'_');return '<button id="na-'+fk+'-'+o.id+'" onclick="_naToggle(\''+o.id+'\',\''+field+'\')" title="'+(active?'Undo — re-enable this field':'Mark as Nil / Not Applicable — suppresses the alert')+'" style="padding:1px 7px;font-size:9px;font-weight:700;border-radius:8px;border:1px solid '+(active?'#27ae60':'#bbb')+';background:'+(active?'#27ae60':'#f5f5f5')+';color:'+(active?'#fff':'#777')+';cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0">'+(active?'&#10003; N/A':'Nil/N/A')+'</button>';}
       h+='<span class="otl">'+esc(o.title)
       +(tc==='repeated'?(priorRefDraft?'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fff8f0;color:#8a3000;border:1px solid #f0b080;margin-left:3px">Prior: '+esc(priorRefDraft)+'</span>':'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fde8e8;color:#9b1a1a;border:1px solid #f0a0a0;margin-left:3px" title="Prior Audit Reference required">&#9888; Prior Ref required</span>'):'')
-      +obsReadinessBadge(o)+'</span>';
-      h+='<select id="sens-sel-'+o.id+'" class="sens-sel '+sensClass+'" title="Sensitivity Level" onchange="setSensitivity(\''+o.id+'\',this)">';
-      h+='<option value="">Sensitivity</option>';
+      +'<span id="rbadge-'+o.id+'">'+obsReadinessBadge(o)+'</span>'+'</span>';
+      h+='<select id="sens-sel-'+o.id+'" class="sens-sel '+sensClass+'" title="Sensitivity Level" onchange="setSensitivity(\''+o.id+'\',this)"'+(curSens||_sensWaived?'':'')+(_sensWaived?' disabled style="opacity:.4"':'')+' >';
+      h+='<option value="">'+(_sensWaived?'N/A':'Sensitivity')+'</option>';
       h+='<option value="High"'+(curSens==='High'?' selected':'')+'>High</option>';
       h+='<option value="M to H"'+(curSens==='M to H'?' selected':'')+'>M to H</option>';
       h+='<option value="L to M"'+(curSens==='L to M'?' selected':'')+'>L to M</option>';
       h+='<option value="Low"'+(curSens==='Low'?' selected':'')+'>Low</option>';
       h+='</select>';
+      h+=_naBtn('Sensitivity',_sensWaived);
       h+='<span id="fw-sug-'+o.id+'"></span>';
-      h+='<select id="coso-sel-'+o.id+'" class="coso-sel '+cosoClass+'" title="COSO Component" onchange="setCoso(\''+o.id+'\',this)">';
-      h+='<option value="">COSO</option>';
+      h+='<select id="coso-sel-'+o.id+'" class="coso-sel '+cosoClass+'" title="COSO Component" onchange="setCoso(\''+o.id+'\',this)"'+(_cosoWaived?' disabled style="opacity:.4"':'')+' >';
+      h+='<option value="">'+(_cosoWaived?'N/A':'COSO')+'</option>';
       h+='<option value="CE"'+(curCoso==='CE'?' selected':'')+'>CE</option>';
       h+='<option value="RA"'+(curCoso==='RA'?' selected':'')+'>RA</option>';
       h+='<option value="CA"'+(curCoso==='CA'?' selected':'')+'>CA</option>';
       h+='<option value="IC"'+(curCoso==='IC'?' selected':'')+'>IC</option>';
       h+='<option value="M"'+(curCoso==='M'?' selected':'')+'>M</option>';
       h+='</select>';
+      h+=_naBtn('COSO',_cosoWaived);
       h+='<input type="checkbox" class="ocb-chk" id="ocbx-'+o.id+'" title="Select for removal" onchange="toggleRptSel(\''+o.id+'\',this.checked)">';
       h+='<button class="odl" title="Remove this observation" onclick="remObs(\''+o.id+'\')">&#10005;</button></div>';
       h+='<div class="ocb">';
@@ -11931,17 +11936,20 @@ function renderRpt(){
       var curInstAmt=instAmountMap[o.id]||'';
       var instSrc=instSourceMap[o.id]||'';
       var instLabel=instSrc?'<span style="font-size:9px;color:#1a6020;font-weight:700;margin-left:4px">('+esc(instSrc)+')</span>':'';
-      h+='<div style="display:flex;gap:8px;align-items:flex-end;margin:4px 0;padding:5px 8px;background:#f0f7e8;border:1px solid #b8d8a0;border-radius:6px">'
-        +'<div style="display:flex;gap:8px;flex:1">'
+      h+='<div style="display:flex;gap:8px;align-items:center;margin:4px 0;padding:5px 8px;background:'+(_fiWaived?'#f5f5f5':'#f0f7e8')+';border:1px solid '+(_fiWaived?'#ccc':'#b8d8a0')+';border-radius:6px">'
+        +'<div style="display:flex;gap:8px;flex:1;'+(_fiWaived?'opacity:.4;pointer-events:none':'')+'">'
         +'<div style="flex:1">'
           +'<div style="font-size:10px;color:#555;margin-bottom:2px">Instances'+instLabel+'</div>'
-          +'<input type="number" min="0" id="fw-inst-'+o.id+'" placeholder="e.g. 14" value="'+esc(curInstCount+'')+'" style="width:100%;padding:3px 7px;border:1px solid '+(instSrc?'#1a6020':'#b0c8a0')+';border-radius:4px;font-size:12px;font-family:inherit" oninput="instCountMap[\''+o.id+'\']=this.value?parseInt(this.value):0;instSourceMap[\''+o.id+'\']=\'manual\';updateFwSuggestion(\''+o.id+'\')">'
+          +'<input type="number" min="0" id="fw-inst-'+o.id+'" placeholder="e.g. 14" value="'+esc(curInstCount+'')+'" style="width:100%;padding:3px 7px;border:1px solid '+(instSrc?'#1a6020':'#b0c8a0')+';border-radius:4px;font-size:12px;font-family:inherit" oninput="instCountMap[\''+o.id+'\']=this.value?parseInt(this.value):0;instSourceMap[\''+o.id+'\']=\'manual\';updateFwSuggestion(\''+o.id+'\')"'
+          +(_fiWaived?' disabled':'')+' >'
         +'</div>'
         +'<div style="flex:1">'
           +'<div style="font-size:10px;color:#555;margin-bottom:2px">Financial Impact (Rs.)</div>'
-          +'<input type="number" min="0" id="fw-amt-'+o.id+'" placeholder="e.g. 250000" value="'+esc(curInstAmt+'')+'" style="width:100%;padding:3px 7px;border:1px solid #b0c8a0;border-radius:4px;font-size:12px;font-family:inherit" oninput="instAmountMap[\''+o.id+'\']=this.value?parseFloat(this.value):0;updateFwSuggestion(\''+o.id+'\')">'
+          +'<input type="number" min="0" id="fw-amt-'+o.id+'" placeholder="e.g. 250000" value="'+esc(curInstAmt+'')+'" style="width:100%;padding:3px 7px;border:1px solid #b0c8a0;border-radius:4px;font-size:12px;font-family:inherit" oninput="instAmountMap[\''+o.id+'\']=this.value?parseFloat(this.value):0;updateFwSuggestion(\''+o.id+'\')"'
+          +(_fiWaived?' disabled':'')+' >'
         +'</div>'
         +'</div>'
+        +_naBtn('Financial Impact',_fiWaived)
         +'</div>';
       // 3. Recommendation (editable)
       var recText=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
@@ -16359,6 +16367,49 @@ window._pfWaive = function(obsId, field){
   var ov=document.getElementById('_pfOv'); if(ov) ov.remove();
   showSaveDialog();
 };
+
+function _naToggle(obsId, field){
+  window._pfWaivers = window._pfWaivers || {};
+  var key = obsId+'|'+field;
+  if(window._pfWaivers[key]) delete window._pfWaivers[key];
+  else window._pfWaivers[key] = true;
+  var active = !!window._pfWaivers[key];
+  // Update readiness badge in-place
+  var badge = document.getElementById('rbadge-'+obsId);
+  if(badge){
+    var obsObj = null;
+    for(var i=0;i<DB.observations.length;i++){if(DB.observations[i].id===obsId){obsObj=DB.observations[i];break;}}
+    if(!obsObj) for(var j=0;j<customs.length;j++){if(customs[j].id===obsId){obsObj=customs[j];break;}}
+    if(obsObj) badge.innerHTML = obsReadinessBadge(obsObj);
+  }
+  // Update N/A button appearance
+  var fk = field.replace(/\s/g,'_');
+  var btn = document.getElementById('na-'+fk+'-'+obsId);
+  if(btn){
+    btn.style.background = active ? '#27ae60' : '#f5f5f5';
+    btn.style.color = active ? '#fff' : '#777';
+    btn.style.borderColor = active ? '#27ae60' : '#bbb';
+    btn.innerHTML = active ? '&#10003; N/A' : 'Nil/N/A';
+    btn.title = active ? 'Undo — re-enable this field' : 'Mark as Nil / Not Applicable — suppresses the alert';
+  }
+  // Disable/enable related inputs
+  if(field === 'Financial Impact'){
+    var fi = document.getElementById('fw-inst-'+obsId);
+    var fa = document.getElementById('fw-amt-'+obsId);
+    if(fi){
+      var fiWrap = fi.parentNode && fi.parentNode.parentNode;
+      if(fiWrap){ fiWrap.style.opacity = active ? '.4' : ''; fiWrap.style.pointerEvents = active ? 'none' : ''; }
+      fi.disabled = active;
+    }
+    if(fa) fa.disabled = active;
+  } else if(field === 'Sensitivity'){
+    var ss = document.getElementById('sens-sel-'+obsId);
+    if(ss){ ss.disabled = active; ss.style.opacity = active ? '.4' : '1'; }
+  } else if(field === 'COSO'){
+    var cs = document.getElementById('coso-sel-'+obsId);
+    if(cs){ cs.disabled = active; cs.style.opacity = active ? '.4' : '1'; }
+  }
+}
 
 window._pfNavToObs = function(obsId){
   // 1. Fully remove the overlay so nothing blocks the page
