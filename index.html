@@ -18180,6 +18180,17 @@ function ra_scoreCategory(catName,rpt1,rpt2){
     var dil3=dilD ? (dilD.avgImpact*0.6+dilD.avgLikelihood*0.4)/5*28 : (db.areaWt||0.10)*28*4;
     var sens3=hasSens ? rawSens*13 : (db.areaWt||0.10)*13;
     total=freq3+rec3+dil3+sens3;
+
+  } else if(mode==='mode5'){
+    // Mode 5 — Area Weight × Observation Sensitivity (Branch Risk Index)
+    // Per-area contribution = Area Weight × Avg Sensitivity × obs count
+    // Returned as a per-area sub-score; branch total is accumulated in ra_runAnalysis
+    var areaWt5 = db.areaWt || 0.10;
+    var avgSens5 = hasSens ? rawSens : 0;
+    // Per-area score = number of observations × (areaWt × avgSens) × 100
+    // Scale factor: multiply by 4 so a fully-loaded area (areaWt=0.25, sens=1.0, obs=all)
+    // produces a meaningful per-area contribution; branch total is the meaningful figure
+    total = d1.obs * areaWt5 * avgSens5 * 100;
   }
 
   return Math.min(100,Math.round(total));
@@ -19574,7 +19585,14 @@ var RA_MODES=[
      {name:'Specific branch\'s uploaded reports',yes:true},
      {name:'S&A all-branches historical databank',yes:true}
    ],
-   weights:'Frequency 30 + Repeat Rate 25 + Diligent 25 + Sensitivity 15 + Databank 5 = 100 pts'}
+   weights:'Frequency 30 + Repeat Rate 25 + Diligent 25 + Sensitivity 15 + Databank 5 = 100 pts'},
+  {value:'mode5', label:'Mode 5', title:'Area Weight × Sensitivity (Branch Risk Index)',
+   sources:[
+     {name:'Diligent Risk Register',yes:false},
+     {name:'Specific branch\'s uploaded reports',yes:true},
+     {name:'S&A all-branches historical databank',yes:false}
+   ],
+   weights:'Σ (Area Weight × Sensitivity Weight) per observation × 100 — branch-level total score for cross-branch comparison'}
 ];
 
 function ra_initModeButtons(){
@@ -19657,24 +19675,40 @@ function ra_runAnalysis(){
   if(parsedList.length===1){ rpt1=parsedList[0]; d1=allSources[0].date||''; }
   else { rpt1=parsedList[parsedList.length-1]; rpt2=parsedList[0]; d1=allSources[allSources.length-1].date||''; d2=allSources[0].date||''; }
   var catNames=Object.keys(RA_DB_CATS); var scores=[];
+  var mode5=ra_getScoreMode()==='mode5';
+  // Mode 5: compute branch-level index separately (sum of areaWt×avgSens×obs per area)
+  var m5BranchTotal=0, m5AreaItems=[];
   for(var si=0;si<catNames.length;si++){
     var sc=ra_scoreCategory(catNames[si],rpt1,rpt2);
-    var _d1=rpt1[catNames[si]]||{obs:0,repeated:0};
+    var _d1=rpt1[catNames[si]]||{obs:0,repeated:0,sensTotals:{}};
+    if(mode5){
+      var db5=RA_DB_CATS[catNames[si]]; var areaWt5=db5?db5.areaWt||0.10:0.10;
+      var rawSens5=0,hasSens5=false,sc5=0;
+      if(_d1.obs>0&&_d1.sensTotals){
+        var sw5=0;
+        for(var sk5 in _d1.sensTotals){sw5+=(RA_SENS_WT[sk5]||0)*_d1.sensTotals[sk5];sc5+=_d1.sensTotals[sk5];}
+        if(sc5>0){rawSens5=sw5/sc5;hasSens5=true;}
+      }
+      var contrib=hasSens5 ? _d1.obs*areaWt5*rawSens5 : 0;
+      m5BranchTotal+=contrib;
+      m5AreaItems.push({cat:catNames[si],obs:_d1.obs,areaWt:areaWt5,avgSens:rawSens5,hasSens:hasSens5,contrib:contrib});
+    }
     scores.push({cat:catNames[si],score:sc,level:ra_scoreToLevel(sc),d1:_d1,d2:rpt2?rpt2[catNames[si]]:null,fromReport:(_d1.obs>0)});
   }
   scores.sort(function(a,b){return b.score-a.score;});
   var overall=Math.round((scores[0].score*0.5)+(scores[1].score*0.3)+(scores[2].score*0.2));
+  if(mode5) overall=Math.min(100,Math.round(m5BranchTotal*100)); // Mode 5 overall = branch index scaled
   var nextDate=(document.getElementById('ra-next_date')||{}).value||'';
   var nextDays=parseInt((document.getElementById('ra-next_days')||{}).value||'3',10)||3;
   var nextTeam=parseInt((document.getElementById('ra-next_team')||{}).value||'2',10)||2;
-  ra_renderResults(branchName,scores,overall,d1,d2,autype,pb,rpt2!=null,nextDate,nextDays,nextTeam);
+  ra_renderResults(branchName,scores,overall,d1,d2,autype,pb,rpt2!=null,nextDate,nextDays,nextTeam,mode5?{total:m5BranchTotal,areas:m5AreaItems}:null);
   document.getElementById('ra-results-empty').style.display='none';
   document.getElementById('ra-results-content').style.display='block';
   document.getElementById('ra-RP').scrollTop=0;
   ra_toast('Risk assessment complete -- '+allSources.length+' report'+(allSources.length>1?'s':'')+' analysed.');
 }
 
-function ra_renderResults(branch,scores,overall,d1,d2,autype,pb,hasTrend,nextDate,nextDays,nextTeam){
+function ra_renderResults(branch,scores,overall,d1,d2,autype,pb,hasTrend,nextDate,nextDays,nextTeam,m5Data){
   var ol=ra_scoreToLevel(overall);
   var region=ra_currentBranch?ra_currentBranch.region+' Region, ':'';
   var city=ra_currentBranch?ra_currentBranch.city:'';
@@ -19703,6 +19737,81 @@ function ra_renderResults(branch,scores,overall,d1,d2,autype,pb,hasTrend,nextDat
   document.getElementById('ra-repeated-card').style.display=hasRep?'block':'none';
   if(hasRep) ra_renderRepeated(scores);
   ra_renderRecs(scores);
+  // Mode 5 — Branch Risk Index card
+  var m5card=document.getElementById('ra-m5-card');
+  if(m5card) m5card.style.display=m5Data?'block':'none';
+  if(m5Data) ra_renderM5Card(branch,m5Data,scores);
+}
+
+function ra_renderM5Card(branch,m5Data,scores){
+  var el=document.getElementById('ra-m5-card');
+  if(!el) return;
+  var idx=Math.round(m5Data.total*100*10)/10; // one decimal
+  var idxPct=Math.min(100,Math.round(m5Data.total*100));
+  var ol=ra_scoreToLevel(idxPct);
+  var fg=ra_levelColor(ol); var bg={critical:'#fde8e8',high:'#fff3e8',medium:'#fffbe0',low:'#e8f8e8'}[ol]||'#f5f8fd';
+  var bd={critical:'#f0a0a0',high:'#f0c080',medium:'#e0c030',low:'#80c880'}[ol]||'#c8d8ec';
+  // Per-area breakdown table — sorted by contribution descending
+  var sorted=m5Data.areas.slice().sort(function(a,b){return b.contrib-a.contrib;});
+  var totalObs=0; sorted.forEach(function(r){totalObs+=r.obs;});
+  var rows=sorted.map(function(r,i){
+    var sensLabel=!r.hasSens?'—':r.avgSens>=1.00?'High':r.avgSens>=0.64?'M to H':r.avgSens>=0.40?'L to M':'Low';
+    var sensCol=!r.hasSens?'#999':r.avgSens>=1.00?'#9b1a1a':r.avgSens>=0.64?'#b04400':r.avgSens>=0.40?'#806000':'#1a6020';
+    var contribPct=m5Data.total>0?Math.round(r.contrib/m5Data.total*100):0;
+    var barW=m5Data.total>0?Math.min(100,Math.round(r.contrib/m5Data.total*100)):0;
+    var rowBg=i%2===0?'#fff':'#f8fafc';
+    return '<tr style="background:'+rowBg+';border-bottom:1px solid #eaeff6">'
+      +'<td style="padding:7px 10px;font-size:12px;font-weight:600;color:#1a3a5c">'+ra_esc(r.cat)+'</td>'
+      +'<td style="padding:7px 10px;text-align:center;font-size:12px;color:#2a3a50">'+r.obs+'</td>'
+      +'<td style="padding:7px 10px;text-align:center;font-size:11.5px;font-weight:700;color:#2a3a50">'+(r.areaWt*100).toFixed(0)+'%</td>'
+      +'<td style="padding:7px 10px;text-align:center;font-size:11.5px;font-weight:700;color:'+sensCol+'">'+sensLabel+'</td>'
+      +'<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:800;color:#1a3a5c">'+(Math.round(r.contrib*1000)/10).toFixed(1)+'</td>'
+      +'<td style="padding:7px 10px;min-width:100px">'
+        +'<div style="display:flex;align-items:center;gap:6px">'
+          +'<div style="flex:1;height:8px;background:#e8edf4;border-radius:4px;overflow:hidden"><div style="height:100%;width:'+barW+'%;background:'+fg+';border-radius:4px;transition:width .4s"></div></div>'
+          +'<span style="font-size:10.5px;font-weight:700;color:#5a6a80;white-space:nowrap">'+contribPct+'%</span>'
+        +'</div>'
+      +'</td>'
+      +'</tr>';
+  }).join('');
+
+  el.innerHTML=
+    '<div style="background:#1a3a5c;color:#fff;padding:12px 16px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:12px">'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:800">&#128202; Mode 5 — Branch Risk Index</div>'
+      +'<div style="font-size:11px;color:#a0c0e0;margin-top:2px">Area Weight × Observation Sensitivity — for cross-branch comparison</div></div>'
+      +'<div style="text-align:center;background:'+bg+';border:2px solid '+bd+';border-radius:10px;padding:8px 18px">'
+        +'<div style="font-size:26px;font-weight:900;color:'+fg+'">'+idx.toFixed(1)+'</div>'
+        +'<div style="font-size:10px;font-weight:700;color:'+fg+';text-transform:uppercase;letter-spacing:.5px">Risk Index</div>'
+      +'</div>'
+    +'</div>'
+    +'<div style="padding:10px 16px;background:#f0f5fc;border-bottom:1px solid #c8d8ec;font-size:11.5px;color:#2a3a50;line-height:1.6">'
+      +'<strong>Formula:</strong> Σ (Area Weight × Avg Sensitivity) per observation × 100 &nbsp;|&nbsp; '
+      +'<strong>Branch:</strong> '+ra_esc(branch)+' &nbsp;|&nbsp; '
+      +'<strong>Total Observations:</strong> '+totalObs+' &nbsp;|&nbsp; '
+      +'<strong>Raw Sum:</strong> '+(Math.round(m5Data.total*1000)/10).toFixed(2)+' &nbsp;|&nbsp; '
+      +'<strong>Index (×100):</strong> <span style="font-weight:800;color:'+fg+'">'+idx.toFixed(1)+'</span>'
+    +'</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">'
+      +'<thead><tr style="background:#1a3a5c;color:#fff">'
+        +'<th style="padding:8px 10px;text-align:left;font-size:11px">Audit Area</th>'
+        +'<th style="padding:8px 10px;text-align:center;font-size:11px">Obs</th>'
+        +'<th style="padding:8px 10px;text-align:center;font-size:11px">Area Weight</th>'
+        +'<th style="padding:8px 10px;text-align:center;font-size:11px">Avg Sensitivity</th>'
+        +'<th style="padding:8px 10px;text-align:center;font-size:11px">Contribution</th>'
+        +'<th style="padding:8px 10px;text-align:left;font-size:11px">% of Total</th>'
+      +'</tr></thead>'
+      +'<tbody>'+rows+'</tbody>'
+      +'<tfoot><tr style="background:#e8edf4">'
+        +'<td style="padding:8px 10px;font-weight:800;font-size:12px;color:#1a3a5c">TOTAL</td>'
+        +'<td style="padding:8px 10px;text-align:center;font-weight:800;font-size:12px;color:#1a3a5c">'+totalObs+'</td>'
+        +'<td colspan="2"></td>'
+        +'<td style="padding:8px 10px;text-align:center;font-weight:900;font-size:13px;color:'+fg+'">'+(Math.round(m5Data.total*1000)/10).toFixed(2)+'</td>'
+        +'<td style="padding:8px 10px;font-weight:800;font-size:12px;color:'+fg+'">Index: '+idx.toFixed(1)+'</td>'
+      +'</tr></tfoot>'
+    +'</table></div>'
+    +'<div style="padding:10px 16px;background:#fffbe0;border-top:1px solid #e8d840;font-size:11px;color:#5a4a00">'
+      +'&#9432; <strong>How to read this index:</strong> A higher score means the branch has more observations concentrated in high-weight audit areas with serious (High) sensitivity ratings. Use this number to rank branches — not to replace the area-by-area risk analysis above. Areas with no sensitivity data (no JSON session loaded) contribute 0 to this index.'
+    +'</div>';
 }
 
 function ra_tile(cls,count,label){
@@ -21089,6 +21198,8 @@ function ra_methodologyHtml(){
           <div class="ra-card-title">&#9888; Persistent / Repeated Issues</div>
           <div id="ra-res-repeated"></div>
         </div>
+        <!-- Mode 5 Branch Risk Index -->
+        <div class="ra-card" id="ra-m5-card" style="display:none;padding:0;overflow:hidden;border-radius:8px"></div>
         <!-- Recommendations -->
         <div class="ra-card">
           <div class="ra-card-title">&#9989; Audit Planning Recommendations</div>
