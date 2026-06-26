@@ -14859,13 +14859,21 @@ function getObsReadiness(o){
 // Readiness badge HTML for use in observation card headers
 function obsReadinessBadge(o){
   var r=getObsReadiness(o);
-  if(r.blocking.length){
-    return '<span style="display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;background:#fde8e8;color:#9b1a1a;border:1px solid #f0a0a0;margin-left:4px" title="'+r.blocking.length+' blocking issue'+(r.blocking.length>1?'s':'')+' — click Finalize to see details">&#9888; '+r.blocking.length+' Fix Required</span>';
+  if(!r.blocking.length&&!r.advisory.length){
+    return '<span style="display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;background:#e4f7ea;color:#1a6030;border:1px solid #80c8a0;margin-left:4px">&#10003; Ready</span>';
   }
-  if(r.advisory.length){
-    return '<span style="display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;background:#fff8e0;color:#7a5000;border:1px solid #f0d060;margin-left:4px" title="'+r.advisory.length+' advisory item'+(r.advisory.length>1?'s':'')+' — recommended before finalizing">&#9432; '+r.advisory.length+' Advisory</span>';
+  var h='';
+  // Blocking chips — red, one per missing field
+  for(var i=0;i<r.blocking.length;i++){
+    var bf=r.blocking[i];
+    h+='<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 7px;border-radius:10px;font-size:9.5px;font-weight:700;background:#fde8e8;color:#9b1a1a;border:1px solid #f0a0a0;margin-left:3px;white-space:nowrap;cursor:help" title="MUST FIX: '+esc(bf.msg)+'">&#9888; '+esc(bf.field)+'</span>';
   }
-  return '<span style="display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;background:#e4f7ea;color:#1a6030;border:1px solid #80c8a0;margin-left:4px">&#10003; Ready</span>';
+  // Advisory chips — amber, one per missing field
+  for(var j=0;j<r.advisory.length;j++){
+    var af=r.advisory[j];
+    h+='<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 7px;border-radius:10px;font-size:9.5px;font-weight:700;background:#fff8e0;color:#7a5000;border:1px solid #f0d060;margin-left:3px;white-space:nowrap;cursor:help" title="ADVISORY: '+esc(af.msg)+'">&#9432; '+esc(af.field)+'</span>';
+  }
+  return h;
 }
 
 function finalizeReport(){
