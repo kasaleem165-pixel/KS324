@@ -10955,7 +10955,8 @@ function captureSession() {
     annexures: annexures.map(function(a){
       return {id:a.id,label:a.label,title:a.title,text:a.text||'',linkedObs:a.linkedObs||[],open:a.open,
               files:(a.files||[]).map(function(f){return {name:f.name,type:f.type,dataUrl:f.dataUrl};})};
-    })
+    }),
+    srrFiles: srr_files.map(function(f){return {name:f.name,type:f.type,dataUrl:f.dataUrl};})
   };
 }
 
@@ -11012,6 +11013,8 @@ function restoreSession(sess) {
             linkedObs:a.linkedObs||[],open:a.open||false,
             files:(a.files||[]).map(function(f){return {name:f.name,type:f.type,dataUrl:f.dataUrl};})};
   });
+  srr_files = (sess.srrFiles||[]).map(function(f){return {name:f.name,type:f.type,dataUrl:f.dataUrl};});
+  srrRenderFilesBar();
   // Restore intro sections
   var iSec = sess.introSections || {};
   for(var ii=0;ii<INTRO_SECTION_IDS.length;ii++){
@@ -18807,7 +18810,7 @@ function srrUndoReassign(){
 // ── Reset all ──
 function srrResetAll(){
   if(!confirm('Reset all flags and reassignments? This cannot be undone.')) return;
-  srr_flagged={};  srr_reassigned={};
+  srr_flagged={};  srr_reassigned={}; srr_files=[]; srrRenderFilesBar();
   srrBuildTable();
 }
 
@@ -18833,6 +18836,141 @@ function srrExport(){
   var url=URL.createObjectURL(blob);
   var a=document.createElement('a'); a.href=url; a.download='BSS_SRR_Mapping.csv'; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ── SRR File Upload ──────────────────────────────────────────────────────────
+var srr_files = []; // [{name, type, dataUrl}]
+
+function srrUploadClick(){
+  document.getElementById('srr-file-input').click();
+}
+
+function srrHandleFiles(fileList){
+  var remaining = fileList.length;
+  for(var i=0;i<fileList.length;i++){
+    (function(f){
+      var reader = new FileReader();
+      reader.onload = function(e){
+        srr_files.push({name:f.name, type:f.type, dataUrl:e.target.result});
+        remaining--;
+        if(remaining===0) srrRenderFilesBar();
+      };
+      reader.readAsDataURL(f);
+    })(fileList[i]);
+  }
+  // reset input so same file can be re-selected
+  document.getElementById('srr-file-input').value='';
+}
+
+function srrRenderFilesBar(){
+  var bar  = document.getElementById('srr-files-bar');
+  var list = document.getElementById('srr-files-list');
+  var badge= document.getElementById('srr-file-badge');
+  if(!bar||!list) return;
+  if(!srr_files.length){
+    bar.style.display='none';
+    if(badge) badge.style.display='none';
+    return;
+  }
+  if(badge){ badge.style.display='inline'; badge.textContent=srr_files.length; }
+  var h='';
+  for(var i=0;i<srr_files.length;i++){
+    var f=srr_files[i];
+    var isImg=f.type.indexOf('image')===0;
+    var isPdf=f.type==='application/pdf';
+    var icon=isImg?'&#128444;':isPdf?'&#128196;':'&#128452;';
+    h+='<span style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #c8d8ec;border-radius:5px;padding:2px 8px;font-size:11px;color:#1a3a5c">'
+      +icon+' '+_srrEsc(f.name)
+      +'<button onclick="srrRemoveFile('+i+')" title="Remove" style="background:none;border:none;color:#c03020;cursor:pointer;font-size:10px;padding:0 0 0 4px;line-height:1">&#10005;</button>'
+      +'</span>';
+  }
+  list.innerHTML=h;
+  bar.style.display='flex';
+}
+
+function srrRemoveFile(idx){
+  srr_files.splice(idx,1);
+  srrRenderFilesBar();
+}
+
+function srrClearFiles(){
+  srr_files=[];
+  srrRenderFilesBar();
+}
+
+// ── SRR Submit ───────────────────────────────────────────────────────────────
+function srrShowSubmit(){
+  var all=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
+  if(!all.length){ _srrToast('No observations to submit.'); return; }
+
+  var H=getHdrVals?getHdrVals():{};
+  var brName = (H.brname||H.brcode||'Branch');
+  var today  = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  var flagCount=Object.keys(srr_flagged).length;
+  var reassCount=Object.keys(srr_reassigned).length;
+
+  // Build summary table
+  var rows='';
+  all.forEach(function(o,idx){
+    var ra=srr_reassigned[o.id];
+    var srrId=(ra||{}).srr_id||_obsSrrCache[o.id]||_getObsSrr(o);
+    var srrDef=srrId?SRR_DEF[srrId]:null;
+    var srrName=ra?ra.srr_name:(srrDef?srrDef.name:'—');
+    var rrName=ra?ra.rr_name:(srrDef?srrDef.rrName:'—');
+    var col=ra?(ra.col||'#555'):(srrDef?srrDef.col:'#999');
+    var flagged=!!srr_flagged[o.id];
+    var reassigned=!!ra;
+    rows+='<tr style="background:'+(idx%2===0?'#fff':'#f8fafc')+';border-bottom:1px solid #eee">'
+      +'<td style="padding:6px 8px;font-size:10px;color:#888">'+_srrEsc(o.id)+'</td>'
+      +'<td style="padding:6px 8px;font-size:11px;font-weight:600">'+_srrEsc(o.title||'')+'</td>'
+      +'<td style="padding:6px 8px"><span style="background:'+col+';color:#fff;border-radius:3px;padding:1px 6px;font-size:9.5px;font-weight:700">'+_srrEsc(srrId||'—')+'</span></td>'
+      +'<td style="padding:6px 8px;font-size:10.5px">'+_srrEsc(srrName)+'</td>'
+      +'<td style="padding:6px 8px;font-size:10.5px;color:#555">'+_srrEsc(rrName)+'</td>'
+      +'<td style="padding:6px 8px;text-align:center">'+(flagged?'<span style="background:#c0392b;color:#fff;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:700">Flagged</span>':'')+''+(reassigned?'<span style="background:#1e5c3a;color:#fff;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:700;margin-left:2px">Reassigned</span>':'')+'</td>'
+      +(ra&&ra.note?'<td style="padding:6px 8px;font-size:10px;color:#555;font-style:italic">'+_srrEsc(ra.note)+'</td>':'<td></td>')
+      +'</tr>';
+  });
+
+  // File list for submission record
+  var fileList=srr_files.length
+    ? srr_files.map(function(f){return '<li style="font-size:11px">'+_srrEsc(f.name)+'</li>';}).join('')
+    : '<li style="font-size:11px;color:#888">No files attached</li>';
+
+  // Build HTML report
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    +'<title>SRR Submission — '+_srrEsc(brName)+'</title>'
+    +'<style>body{font-family:Arial,sans-serif;margin:0;padding:20px;background:#f5f8fc;color:#1a2d44}'
+    +'.hdr{background:#1a3a5c;color:#fff;padding:16px 20px;border-radius:8px 8px 0 0}'
+    +'.hdr h1{margin:0;font-size:16px} .hdr p{margin:4px 0 0;font-size:11px;opacity:.8}'
+    +'.stats{display:flex;gap:16px;background:#fff;padding:12px 20px;border-bottom:1px solid #dde6f0}'
+    +'.stat{text-align:center} .stat b{display:block;font-size:18px;color:#1a3a5c}'
+    +'.stat span{font-size:10px;color:#888} table{width:100%;border-collapse:collapse}'
+    +'th{background:#1a3a5c;color:#fff;padding:8px;text-align:left;font-size:10.5px}'
+    +'.files{background:#fff;border:1px solid #dde6f0;border-radius:6px;padding:14px;margin-top:16px}'
+    +'.files h3{margin:0 0 8px;font-size:12px;color:#1a3a5c}'
+    +'</style></head><body>'
+    +'<div class="hdr"><h1>&#128279; SRR Mapping Submission</h1>'
+    +'<p>Branch: <strong>'+_srrEsc(brName)+'</strong> &nbsp;|&nbsp; Date: '+today+'</p></div>'
+    +'<div class="stats">'
+    +'<div class="stat"><b>'+all.length+'</b><span>Total Obs.</span></div>'
+    +'<div class="stat"><b style="color:#c0392b">'+flagCount+'</b><span>Flagged</span></div>'
+    +'<div class="stat"><b style="color:#1e5c3a">'+reassCount+'</b><span>Reassigned</span></div>'
+    +'<div class="stat"><b style="color:#c07000">'+srr_files.length+'</b><span>Files Attached</span></div>'
+    +'</div>'
+    +'<div style="background:#fff;padding:0 0 16px;border-radius:0 0 8px 8px">'
+    +'<table><thead><tr><th>Obs. ID</th><th>Title</th><th>SRR ID</th><th>Sub-Risk</th><th>Parent Risk</th><th>Status</th><th>Note</th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table></div>'
+    +'<div class="files"><h3>&#128206; Attached Supporting Files</h3><ul>'+fileList+'</ul></div>'
+    +'</body></html>';
+
+  var blob=new Blob([html],{type:'text/html'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download='SRR_Submission_'+brName.replace(/\s+/g,'_')+'_'+today.replace(/\s+/g,'-')+'.html';
+  a.click();
+  URL.revokeObjectURL(url);
+  _srrToast('SRR submission report downloaded. Share this file along with attached documents.');
 }
 
 function _srrEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -20773,7 +20911,17 @@ function _w2rBuildHtml(d){
     </select>
     <button onclick="srrResetAll()" style="padding:5px 11px;background:#8b1a1a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit">&#8635; Reset All</button>
     <button onclick="srrExport()" style="padding:5px 11px;background:#1e5c3a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit">&#11123; Export CSV</button>
+    <div style="width:1px;height:24px;background:#dde6f0;margin:0 4px;flex-shrink:0"></div>
+    <button onclick="srrUploadClick()" style="padding:5px 11px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px">&#128206; Upload Files <span id="srr-file-badge" style="display:none;background:#f0c040;color:#1a2a38;border-radius:8px;padding:0 6px;font-size:10px;font-weight:800;margin-left:2px">0</span></button>
+    <input type="file" id="srr-file-input" multiple style="display:none" onchange="srrHandleFiles(this.files)">
+    <button onclick="srrShowSubmit()" style="padding:5px 14px;background:#c07000;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#9993; Submit SRR Map</button>
     <span style="font-size:11px;color:#888;margin-left:4px" id="srr-count-lbl"></span>
+  </div>
+  <!-- Uploaded files bar -->
+  <div id="srr-files-bar" style="display:none;background:#f0f5fb;border-bottom:1px solid #c8d8ec;padding:6px 16px;display:none;align-items:center;gap:8px;flex-wrap:wrap">
+    <span style="font-size:11px;font-weight:700;color:#1a3a5c;flex-shrink:0">&#128206; Attached Files:</span>
+    <div id="srr-files-list" style="display:flex;gap:6px;flex-wrap:wrap;flex:1"></div>
+    <button onclick="srrClearFiles()" style="font-size:10px;padding:2px 8px;background:#fde8e8;color:#8b1a1a;border:1px solid #f0a0a0;border-radius:4px;cursor:pointer;font-family:inherit;flex-shrink:0">&#10005; Clear All</button>
   </div>
   <!-- Stats bar -->
   <div style="background:#fff;border-bottom:1px solid #dde6f0;padding:6px 16px;display:flex;gap:16px">
