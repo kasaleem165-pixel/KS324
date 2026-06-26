@@ -19059,20 +19059,44 @@ function srrImportSession(input){
     // Collect changes
     var changes = [];
 
-    // SRR reassignments
+    // SRR reassignments — also detect resulting RR change
     Object.keys(impSrr).forEach(function(obsId){
       var cur = curObs[obsId];
       var newR = impSrr[obsId];
-      var curSrr = (srr_reassigned[obsId]||{}).srr_id || _obsSrrCache[obsId] || (cur ? _getObsSrr(cur) : '—');
-      if(newR.srr_id && newR.srr_id !== curSrr){
+      var curSrr = (srr_reassigned[obsId]||{}).srr_id || _obsSrrCache[obsId] || (cur ? _getObsSrr(cur) : '');
+      var newSrr = newR.srr_id || '';
+      if(!newSrr || newSrr === curSrr) return;
+
+      var curDef = curSrr ? (SRR_DEF[curSrr]||{}) : {};
+      var newDef = SRR_DEF[newSrr] || {};
+      var curRR  = curDef.rr || '—';
+      var newRR  = newDef.rr || '—';
+      var rrChanged = (curRR !== newRR && newRR !== '—');
+
+      // SRR change row
+      changes.push({
+        obsId: obsId,
+        title: cur ? (cur.title||obsId) : obsId,
+        type: 'SRR',
+        from: curSrr || '—',
+        fromName: curDef.name || '',
+        to: newSrr,
+        toName: newDef.name || newR.srr_name || '',
+        data: newR
+      });
+
+      // RR change row (only if parent RR also changed as a result)
+      if(rrChanged){
         changes.push({
           obsId: obsId,
           title: cur ? (cur.title||obsId) : obsId,
-          type: 'SRR',
-          from: curSrr || '—',
-          to: newR.srr_id,
-          toName: newR.srr_name || (SRR_DEF[newR.srr_id]?SRR_DEF[newR.srr_id].name:''),
-          data: newR
+          type: 'RR',
+          from: curRR,
+          fromName: curDef.rrName || '',
+          to: newRR,
+          toName: newDef.rrName || '',
+          data: newR,
+          derived: true  // driven by SRR change — no independent override
         });
       }
     });
@@ -19086,6 +19110,7 @@ function srrImportSession(input){
           title: cur.title || impO.id,
           type: 'Category',
           from: cur.category || '—',
+          fromName: '',
           to: impO.category,
           toName: '',
           data: impO
@@ -19094,7 +19119,7 @@ function srrImportSession(input){
     });
 
     if(!changes.length){
-      alert('No SRR or Category changes found in this session file that differ from the current data.');
+      alert('No SRR, RR or Category changes found in this session file that differ from the current data.');
       return;
     }
 
@@ -19114,29 +19139,38 @@ function srrShowImportReview(changes){
     .map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
 
   var rows = changes.map(function(c, i){
-    var typeCol = c.type==='SRR' ? '#4a1a7a' : '#1a5a3a';
-    var toLabel = c.type==='SRR'
-      ? '<strong>'+_srrEsc(c.to)+'</strong><span style="color:#666;font-size:10px;margin-left:4px">'+_srrEsc(c.toName)+'</span>'
-      : '<strong>'+_srrEsc(c.to)+'</strong>';
+    var typeCol = c.type==='SRR' ? '#4a1a7a' : c.type==='RR' ? '#1a4a7a' : '#1a5a3a';
+    var fromLabel = _srrEsc(c.from) + (c.fromName ? '<span style="color:#aaa;font-size:10px;margin-left:4px">'+_srrEsc(c.fromName)+'</span>' : '');
+    var toLabel   = '<strong>'+_srrEsc(c.to)+'</strong>'+(c.toName ? '<span style="color:#666;font-size:10px;margin-left:4px">'+_srrEsc(c.toName)+'</span>' : '');
 
-    // HO override dropdown
-    var overrideCell = c.type==='SRR'
-      ? '<select class="srr-imp-override" data-idx="'+i+'" data-type="SRR" style="width:100%;padding:4px 6px;border:1px solid #c8b0e0;border-radius:4px;font-size:10.5px;font-family:inherit;background:#fff">'
+    // HO override — RR rows are derived from SRR change, no independent override
+    var overrideCell;
+    if(c.derived){
+      overrideCell = '<span style="font-size:10px;color:#888;font-style:italic">Auto-derived from SRR</span>';
+    } else if(c.type==='SRR'){
+      overrideCell = '<select class="srr-imp-override" data-idx="'+i+'" data-type="SRR" style="width:100%;padding:4px 6px;border:1px solid #c8b0e0;border-radius:4px;font-size:10.5px;font-family:inherit;background:#fff">'
         +'<option value="">— Use auditor\'s choice —</option>'
         +srrOpts.replace('value="'+c.to+'"','value="'+c.to+'" selected')
-        +'</select>'
-      : '<select class="srr-imp-override" data-idx="'+i+'" data-type="Category" style="width:100%;padding:4px 6px;border:1px solid #c8b0e0;border-radius:4px;font-size:10.5px;font-family:inherit;background:#fff">'
+        +'</select>';
+    } else {
+      overrideCell = '<select class="srr-imp-override" data-idx="'+i+'" data-type="Category" style="width:100%;padding:4px 6px;border:1px solid #c8b0e0;border-radius:4px;font-size:10.5px;font-family:inherit;background:#fff">'
         +'<option value="">— Use auditor\'s choice —</option>'
         +catOpts.replace('value="'+c.to+'"','value="'+c.to+'" selected')
         +'</select>';
+    }
 
-    return '<tr style="background:'+(i%2===0?'#fff':'#f8fafc')+';border-bottom:1px solid #eaeff6" id="srr-imp-row-'+i+'">'
-      +'<td style="padding:7px 10px;text-align:center"><input type="checkbox" class="srr-imp-chk" data-idx="'+i+'" checked style="width:15px;height:15px;cursor:pointer;accent-color:#4a1a7a"></td>'
+    var rowBg = c.type==='RR' ? (i%2===0?'#f0f4f8':'#e8eef8') : (i%2===0?'#fff':'#f8fafc');
+    var chkCell = c.derived
+      ? '<span style="font-size:10px;color:#aaa" title="Applied automatically with SRR change">&#8627;</span>'
+      : '<input type="checkbox" class="srr-imp-chk" data-idx="'+i+'" checked style="width:15px;height:15px;cursor:pointer;accent-color:#4a1a7a">';
+
+    return '<tr style="background:'+rowBg+';border-bottom:1px solid #eaeff6" id="srr-imp-row-'+i+'">'
+      +'<td style="padding:7px 10px;text-align:center">'+chkCell+'</td>'
       +'<td style="padding:7px 10px;font-size:10.5px;color:#888;font-weight:600;white-space:nowrap">'+_srrEsc(c.obsId)+'</td>'
       +'<td style="padding:7px 10px;font-size:11.5px;font-weight:600;color:#1a3a5c">'+_srrEsc(c.title)+'</td>'
       +'<td style="padding:7px 10px;text-align:center"><span style="font-size:10px;font-weight:800;color:#fff;background:'+typeCol+';border-radius:3px;padding:2px 7px;white-space:nowrap">'+c.type+'</span></td>'
-      +'<td style="padding:7px 10px;font-size:11px;color:#888;text-decoration:line-through;white-space:nowrap">'+_srrEsc(c.from)+'</td>'
-      +'<td style="padding:7px 10px;font-size:11px;color:#1a5c2a;white-space:nowrap">&#8594; '+toLabel+'</td>'
+      +'<td style="padding:7px 10px;font-size:11px;color:#888;text-decoration:line-through">'+fromLabel+'</td>'
+      +'<td style="padding:7px 10px;font-size:11px;color:#1a5c2a">&#8594; '+toLabel+'</td>'
       +'<td style="padding:6px 8px;min-width:180px">'+overrideCell+'</td>'
       +'</tr>';
   }).join('');
