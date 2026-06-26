@@ -10098,7 +10098,7 @@ function renderList(obs, toks, showScore) {
         inner += '</div>';
         if(curType==='Repeated'){
           inner += '<div id="lrx-'+o.id+'" style="margin-top:4px;display:flex;align-items:center;gap:5px" onclick="event.stopPropagation()">';
-          inner += '<span style="font-size:10px;font-weight:700;color:#d06020;white-space:nowrap">Prior Ref:</span>';
+          inner += '<span style="font-size:10px;font-weight:700;color:#d06020;white-space:nowrap">LARR:</span>';
           inner += '<input type="text" id="lr-'+o.id+'" placeholder="e.g. Report No. SAB-2024-07" value="'+(lastRefMap[o.id]||'')+'" style="flex:1;font-size:11px;padding:3px 8px;border:1px solid #f0b080;border-radius:6px;font-family:inherit;color:#5a2000;background:#fff8f2" onclick="event.stopPropagation()" oninput="setLastRef(\''+o.id+'\',this.value)">';
           inner += '</div>';
         }
@@ -10179,7 +10179,7 @@ function injectTypePill(id, div){
     lrRow.id='lrx-'+id;
     lrRow.style.cssText='margin-top:4px;display:flex;align-items:center;gap:5px';
     lrRow.onclick=function(e){e.stopPropagation();};
-    lrRow.innerHTML='<span style="font-size:10px;font-weight:700;color:#d06020;white-space:nowrap">Prior Ref:</span>'
+    lrRow.innerHTML='<span style="font-size:10px;font-weight:700;color:#d06020;white-space:nowrap">LARR:</span>'
       +'<input type="text" id="lr-'+id+'" placeholder="e.g. Report No. SAB-2024-07" value="'+(lastRefMap[id]||'')+'" style="flex:1;font-size:11px;padding:3px 8px;border:1px solid #f0b080;border-radius:6px;font-family:inherit;color:#5a2000;background:#fff8f2" onclick="event.stopPropagation()" oninput="setLastRef(\''+id+'\',this.value)">';
     div.appendChild(lrRow);
   }
@@ -10296,7 +10296,7 @@ function setObsType(id, val) {
       newRow.id='lrx-'+id;
       newRow.style.cssText='margin-top:4px;display:flex;align-items:center;gap:5px';
       newRow.onclick=function(e){e.stopPropagation();};
-      newRow.innerHTML='<span style="font-size:10px;font-weight:700;color:#d06020;white-space:nowrap">Prior Ref:</span>'
+      newRow.innerHTML='<span style="font-size:10px;font-weight:700;color:#d06020;white-space:nowrap">LARR:</span>'
         +'<input type="text" id="lr-'+id+'" placeholder="e.g. Report No. SAB-2024-07" value="'+(lastRefMap[id]||'')+'" style="flex:1;font-size:11px;padding:3px 8px;border:1px solid #f0b080;border-radius:6px;font-family:inherit;color:#5a2000;background:#fff8f2" onclick="event.stopPropagation()" oninput="setLastRef(\''+id+'\',this.value)">';
       var axRow=document.getElementById('ax-'+id);
       if(axRow&&axRow.parentNode) axRow.parentNode.insertBefore(newRow, axRow.nextSibling);
@@ -10569,15 +10569,20 @@ function getMissingMateriality(allObs, labMapObj, obsTextFn){
 
 // ── Workflow Step Guide ───────────────────────────────────────────────────
 var _stepGuideVisible=true;
+// Manual-toggle state for post-finalization steps (persisted in session save/restore)
+var _wfSentAuditee=false, _wfReceivedBack=false, _wfSentRO=false;
 var STEPS=[
-  {n:1, icon:'&#127968;', label:'Branch Setup',        hint:'Select a branch from the left panel and fill in the Report No., Audit Visit dates, and other header fields at the top of the right panel.'},
-  {n:2, icon:'&#128221;', label:'Pick Observations',   hint:'Tick observations from the left panel databank list. Use category filters to quickly find relevant observations for this branch.'},
-  {n:3, icon:'&#9999;',   label:'Enter Details',        hint:'For each selected observation: set Sensitivity level, enter Framework Materiality (instances / financial impact), and verify observation text and recommendation.'},
-  {n:4, icon:'&#128196;', label:'Attach Annexures',     hint:'Attach supporting evidence files or add text content to Annexures. Link each annexure to its relevant observation using the Annexure panel at the bottom.'},
-  {n:5, icon:'&#128229;', label:'Import Responses',     hint:'Once the auditee returns the filled response file, click "Load Resp" in the toolbar to import their responses automatically into each observation.'},
-  {n:6, icon:'&#128270;', label:'Preview & Review',     hint:'Click "Generate / Refresh Report" to preview the full report. Review the synopsis, KPI tiles, and observation cards for accuracy before finalizing.'},
-  {n:7, icon:'&#128190;', label:'Sign-off & Save',      hint:'Click the Finalize button. The system will run a Framework Materiality quality check. Resolve any alerts, then save in your preferred format (HTML, Word, PDF).'},
-  {n:8, icon:'&#128203;', label:'Official Issuance',    hint:'Click "Issue Rpt" to download the final interactive HTML report for official issuance — complete with synopsis, KPI dashboard, risk framework, and all observation cards.'}
+  {n:1,  icon:'&#127968;', label:'Branch Setup',           hint:'Select a branch from the left panel and fill in the Report No., Audit Visit dates, and other header fields at the top of the right panel.'},
+  {n:2,  icon:'&#128221;', label:'Pick Observations',      hint:'Tick observations from the left panel databank list. Use category filters to quickly find relevant observations for this branch.'},
+  {n:3,  icon:'&#9999;',   label:'Enter Details',           hint:'For each selected observation: set Sensitivity level, enter instance count / financial impact, and verify observation text and recommendation.'},
+  {n:4,  icon:'&#128196;', label:'Attach Annexures',        hint:'Attach supporting evidence files or add text content to Annexures. Link each annexure to its relevant observation using the Annexure panel at the bottom.'},
+  {n:5,  icon:'&#128229;', label:'Import Responses',        hint:'Once the auditee returns the filled response file, click "Load Resp" in the toolbar to import their responses automatically into each observation.'},
+  {n:6,  icon:'&#128270;', label:'Preview & Review',        hint:'Click "Generate / Refresh Report" to preview the full report. Review the synopsis, KPI tiles, and observation cards for accuracy before finalizing.'},
+  {n:7,  icon:'&#128190;', label:'Sign-off & Save',         hint:'Click the Finalize button. The system will run a quality check. Resolve any alerts, then save in your preferred format (HTML, Word, PDF).'},
+  {n:8,  icon:'&#128231;', label:'Send Draft to Auditee',   hint:'Send the draft audit report to the auditee for their review and response. Click the tick on this step once you have dispatched the draft.', manual:true, stateVar:'_wfSentAuditee'},
+  {n:9,  icon:'&#128260;', label:'Receive / Amend',         hint:'Receive the auditee response or amendment request. Make necessary amendments to the report, re-generate and re-finalize as needed. Click the tick once amendments are complete.', manual:true, stateVar:'_wfReceivedBack'},
+  {n:10, icon:'&#128104;', label:'Send to RO',              hint:'Submit the finalised report to the Reporting Officer (RO) for review and approval before official issuance. Click the tick once submitted.', manual:true, stateVar:'_wfSentRO'},
+  {n:11, icon:'&#128203;', label:'Official Issuance',       hint:'Click "Issue Rpt" to download the final interactive HTML report for official issuance — complete with synopsis, KPI dashboard, risk framework, and all observation cards.'}
 ];
 function getStepStatus(){
   var H=getHdrVals();
@@ -10593,15 +10598,24 @@ function getStepStatus(){
   // Each step: 'done'|'active'|'pending'
   function st(done,prevDone){return done?'done':prevDone?'active':'pending';}
   return[
-    st(hasBranch, true),
-    st(hasSel,    hasBranch),
-    st(hasDetails,hasSel),
-    st(hasAnx,    hasDetails),       // skippable — show as active if details done
-    st(hasResp,   hasDetails),       // skippable
-    st(hasGen,    hasDetails),
-    st(hasFinal,  hasGen),
-    st(false,     hasFinal)          // Issue Rpt — never auto-marked done
+    st(hasBranch,       true),
+    st(hasSel,          hasBranch),
+    st(hasDetails,      hasSel),
+    st(hasAnx,          hasDetails),        // optional
+    st(hasResp,         hasDetails),        // optional
+    st(hasGen,          hasDetails),
+    st(hasFinal,        hasGen),
+    st(_wfSentAuditee,  hasFinal),          // manual toggle
+    st(_wfReceivedBack, _wfSentAuditee),    // manual toggle
+    st(_wfSentRO,       _wfReceivedBack),   // manual toggle
+    st(false,           _wfSentRO)          // Issue Rpt — never auto-marked done
   ];
+}
+function toggleWfStep(stateVar){
+  if(stateVar==='_wfSentAuditee') _wfSentAuditee=!_wfSentAuditee;
+  else if(stateVar==='_wfReceivedBack') _wfReceivedBack=!_wfReceivedBack;
+  else if(stateVar==='_wfSentRO') _wfSentRO=!_wfSentRO;
+  renderStepGuide();
 }
 function renderStepGuide(){
   var pills=document.getElementById('step-pills');
@@ -10624,9 +10638,17 @@ function renderStepGuide(){
       :st==='skip'
       ?'<span style="border:1.5px dashed #5a4010;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#7a5c20;flex-shrink:0">&#8213;</span>'
       :'<span style="border:1.5px solid '+(st==='active'?'#60aadd':'#2a4a6a')+';border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:'+(st==='active'?'#90c8f0':'#3a5a7a')+';flex-shrink:0">'+s.n+'</span>';
+    // Manual steps get a clickable tick button when active or done
+    var manualBtn='';
+    if(s.manual){
+      var mbActive=(st==='active'||st==='done');
+      var mbDone=(st==='done');
+      manualBtn='<button onclick="event.stopPropagation();toggleWfStep(\''+s.stateVar+'\')" title="'+(mbDone?'Undo — mark as not yet done':'Mark this step as done')+'" style="margin-left:4px;padding:0 5px;font-size:9px;font-weight:800;border-radius:8px;border:1px solid '+(mbDone?'#27ae60':'#4a8ab0')+';background:'+(mbDone?'#27ae60':mbActive?'#1e5a80':'#12283a')+';color:'+(mbDone?'#fff':mbActive?'#a0d4f0':'#2a4a6a')+';cursor:'+(mbActive||mbDone?'pointer':'default')+';line-height:16px">'+(mbDone?'&#10003; Done':'&#9633; Mark Done')+'</button>';
+    }
     h+='<div onclick="showStepHint('+i+')" onmouseenter="showStepHint('+i+')" onmouseleave="scheduleHideHint()" title="'+s.hint.replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;gap:4px;background:'+bg+';color:'+col+';border:'+bdr+';border-radius:20px;padding:2px 10px 2px 5px;font-size:10.5px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .2s">'
       +tickBox+' '+s.label
       +(st==='skip'?'<span style="font-size:8px;font-style:italic;opacity:.8;margin-left:2px;color:#806828">(optional — skipped)</span>':'')
+      +manualBtn
       +'</div>';
     if(i<STEPS.length-1) h+='<span style="color:#2a4a6a;font-size:10px;flex-shrink:0">&#8250;</span>';
   }
@@ -10955,6 +10977,7 @@ function captureSession() {
     respAmendments: respAmendments,
     customs  : customs,
     responseLoaded: responseLoaded,
+    wfSentAuditee: _wfSentAuditee, wfReceivedBack: _wfReceivedBack, wfSentRO: _wfSentRO,
     introSections: getIntroSectionVals(),
     annexures: annexures.map(function(a){
       return {id:a.id,label:a.label,title:a.title,text:a.text||'',linkedObs:a.linkedObs||[],open:a.open,
@@ -11006,6 +11029,9 @@ function restoreSession(sess) {
   respAmendments  = sess.respAmendments  || {};
   // Restore responseLoaded — also infer it if assessMap or respMap has entries
   responseLoaded = sess.responseLoaded || Object.keys(assessMap).length>0 || Object.keys(sess.respMap||{}).length>0;
+  _wfSentAuditee  = sess.wfSentAuditee  || false;
+  _wfReceivedBack = sess.wfReceivedBack || false;
+  _wfSentRO       = sess.wfSentRO       || false;
   customs   = sess.customs   || [];
   // Restore annexures (files are preserved as dataUrls if they were saved)
   annexures = (sess.annexures||[]).map(function(a){
@@ -11953,11 +11979,11 @@ function renderRpt(){
       var recText=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
       h+='<div class="osl">Recommendation</div>';
       h+='<textarea class="oedit" id="re-'+o.id+'" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].recommendation=this.value;WC_detect(\''+o.id+'\')">'+esc(recText)+'</textarea>';
-      // 3b. Prior Audit Report Reference (editable, repeated obs only)
+      // 3b. Last Audit Report Reference (LARR) (editable, repeated obs only)
       if(tc==='repeated'){
         var curLrRef=lastRefMap[o.id]||'';
         h+='<div style="margin:2px 0 6px;padding:6px 9px;background:#fff8f2;border:1px solid #f0c090;border-radius:6px">';
-        h+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#8a3000;margin-bottom:4px">&#128196; Prior Audit Report Reference</div>';
+        h+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#8a3000;margin-bottom:4px">&#128196; Last Audit Report Reference (LARR)</div>';
         h+='<input type="text" id="lr-rpt-'+o.id+'" value="'+esc(curLrRef)+'" placeholder="e.g. Report No. SAB-2024-07" style="width:100%;box-sizing:border-box;font-size:12px;padding:4px 8px;border:1px solid #e0a060;border-radius:4px;font-family:inherit;color:#2a3a50;background:#fff" oninput="setLastRef(\''+o.id+'\',this.value)">';
         h+='</div>';
       }
@@ -12254,7 +12280,7 @@ function doClear(){
   if(!confirm('Clear all selections?'))return;
   selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={};
   for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
-  responseLoaded=false;
+  responseLoaded=false; _wfSentAuditee=false; _wfReceivedBack=false; _wfSentRO=false;
   _brInfoHasData=false;
   _brInfoUnlocked=true;
   _reportEverGenerated=false;
@@ -12276,7 +12302,7 @@ function doClear(){
 function doNewReport(){
   if(!confirm('Start a new blank report? All current data will be cleared.'))return;
   selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={};
-  responseLoaded=false;
+  responseLoaded=false; _wfSentAuditee=false; _wfReceivedBack=false; _wfSentRO=false;
   _brInfoHasData=false;
   _brInfoUnlocked=false; // force unlock path to run
   _reportEverGenerated=false;
@@ -14831,9 +14857,9 @@ function getObsReadiness(o){
   if(!recText||recText.trim().length<10)
     blocking.push({field:'Recommendation',msg:'Recommendation text is missing or too short',waivable:false});
 
-  // 3. Prior Audit Reference — blocking for Repeated observations only (not waivable)
+  // 3. Last Audit Report Ref (LARR)erence — blocking for Repeated observations only (not waivable)
   if(obsType==='repeated'&&!lastRefMap[id])
-    blocking.push({field:'Prior Audit Ref',msg:'Prior Audit Report Reference is required for Repeated observations',waivable:false});
+    blocking.push({field:'Last Audit Report Ref (LARR)',msg:'Last Audit Report Reference (LARR) is required for Repeated observations',waivable:false});
 
   // 4. Sensitivity rating (blocking — mandatory, not waivable)
   if(!sensitivityMap[id])
@@ -14885,7 +14911,7 @@ function finalizeReport(){
   var missingRef=_checkPriorRefs(all);
   if(missingRef.length){
     var names=missingRef.map(function(o,i){return (i+1)+'. '+o.title;}).join('\n');
-    alert('Cannot finalize — Prior Audit Reference is missing for '+missingRef.length+' repeated observation'+(missingRef.length>1?'s':'')+':\n\n'+names+'\n\nPlease enter the prior audit report reference number for each repeated observation in the selection list.');
+    alert('Cannot finalize — Last Audit Report Ref (LARR)erence is missing for '+missingRef.length+' repeated observation'+(missingRef.length>1?'s':'')+':\n\n'+names+'\n\nPlease enter the prior audit report reference number for each repeated observation in the selection list.');
     return;
   }
 
@@ -14960,12 +14986,12 @@ function finalizeReport(){
     if(refTxt){
       h+='<div style="margin-top:10px;padding:7px 12px;background:#fff8f0;border:1px solid #c07030;border-left:4px solid #b84000;border-radius:0 4px 4px 0;font-size:12px;font-style:italic;color:#6a2000;font-weight:600">'+esc(refTxt)+'</div>';
     }
-    // Prior Audit Report Reference (repeated observations only)
+    // Last Audit Report Reference (LARR) (repeated observations only)
     var finLrRef=lastRefMap[o.id]||'';
     var finObsType=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
     if(finObsType==='repeated'&&finLrRef){
       h+='<div style="margin-top:9px;padding:6px 12px;background:#fff8f0;border:1px solid #e0a060;border-left:4px solid #c06020;border-radius:0 5px 5px 0;font-size:12px;color:#1e2d40">'
-        +'<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#c06020">&#8635; Prior Audit Report Reference:</span>'
+        +'<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#c06020">&#8635; Last Audit Report Reference (LARR):</span>'
         +' <strong>'+esc(finLrRef)+'</strong></div>';
     }
     // Risk-Based Framework panel (hidden by default; shown by toggleFramework())
@@ -15260,7 +15286,7 @@ function generateIssuedReport(){
   var missingRef=_checkPriorRefs(all);
   if(missingRef.length){
     var names=missingRef.map(function(o,i){return (i+1)+'. '+o.title;}).join('\n');
-    alert('Cannot generate Issued Report — Prior Audit Reference is missing for '+missingRef.length+' repeated observation'+(missingRef.length>1?'s':'')+':\n\n'+names+'\n\nPlease enter the prior audit report reference number for each repeated observation in the selection list.');
+    alert('Cannot generate Issued Report — Last Audit Report Ref (LARR)erence is missing for '+missingRef.length+' repeated observation'+(missingRef.length>1?'s':'')+':\n\n'+names+'\n\nPlease enter the prior audit report reference number for each repeated observation in the selection list.');
     return;
   }
 
@@ -15419,7 +15445,7 @@ function generateIssuedReport(){
     var synType=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
     return '<tr id="syn-row-'+id+'">'
       +'<td style="white-space:nowrap">'+lbl+'</td>'
-      +'<td>'+e(o.title)+(o.category?'<br><span class="cat">'+e(o.category)+'</span>':'')+(synType==='repeated'&&priorRef?'<br><span style="display:inline-block;margin-top:2px;font-size:.67rem;font-weight:700;background:#fff0e6;color:#b04800;border:1px solid #f0b080;border-radius:4px;padding:0 5px">Prior Ref: '+e(priorRef)+'</span>':'')+'</td>'
+      +'<td>'+e(o.title)+(o.category?'<br><span class="cat">'+e(o.category)+'</span>':'')+(synType==='repeated'&&priorRef?'<br><span style="display:inline-block;margin-top:2px;font-size:.67rem;font-weight:700;background:#fff0e6;color:#b04800;border:1px solid #f0b080;border-radius:4px;padding:0 5px">LARR: '+e(priorRef)+'</span>':'')+'</td>'
       +'<td>'+rk+'</td>'
       +'<td>'+resChip(adjResidual)+'</td>'
       +'<td>'+matChip+'</td>'
@@ -16426,7 +16452,7 @@ window._pfNavToObs = function(obsId){
       var _fmap={
         'Observation':     ['oe-'+obsId],
         'Recommendation':  ['re-'+obsId],
-        'Prior Audit Ref': ['lr-rpt-'+obsId],
+        'Last Audit Report Ref (LARR)': ['lr-rpt-'+obsId],
         'Report Reference':['lr-rpt-'+obsId],
         'Sensitivity':     ['sens-sel-'+obsId],
         'COSO':            ['coso-sel-'+obsId],
