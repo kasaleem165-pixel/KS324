@@ -11895,29 +11895,27 @@ function renderRpt(){
       h+='<div class="och"><span class="onum">Obs. '+secPfx+'.'+num+'</span>';
       var priorRefDraft=lastRefMap[o.id]||'';
       var _W=window._pfWaivers||{};
-      var _sensWaived=!!_W[o.id+'|Sensitivity'], _cosoWaived=!!_W[o.id+'|COSO'], _fiWaived=!!_W[o.id+'|Financial Impact'];
+      var _fiWaived=!!_W[o.id+'|Financial Impact'];
       function _naBtn(field,active){var fk=field.replace(/\s/g,'_');return '<button id="na-'+fk+'-'+o.id+'" onclick="_naToggle(\''+o.id+'\',\''+field+'\')" title="'+(active?'Undo — re-enable this field':'Mark as Nil / Not Applicable — suppresses the alert')+'" style="padding:1px 7px;font-size:9px;font-weight:700;border-radius:8px;border:1px solid '+(active?'#27ae60':'#bbb')+';background:'+(active?'#27ae60':'#f5f5f5')+';color:'+(active?'#fff':'#777')+';cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0">'+(active?'&#10003; N/A':'Nil/N/A')+'</button>';}
       h+='<span class="otl">'+esc(o.title)
       +(tc==='repeated'?(priorRefDraft?'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fff8f0;color:#8a3000;border:1px solid #f0b080;margin-left:3px">Prior: '+esc(priorRefDraft)+'</span>':'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fde8e8;color:#9b1a1a;border:1px solid #f0a0a0;margin-left:3px" title="Prior Audit Reference required">&#9888; Prior Ref required</span>'):'')
       +'<span id="rbadge-'+o.id+'">'+obsReadinessBadge(o)+'</span>'+'</span>';
-      h+='<select id="sens-sel-'+o.id+'" class="sens-sel '+sensClass+'" title="Sensitivity Level" onchange="setSensitivity(\''+o.id+'\',this)"'+(curSens||_sensWaived?'':'')+(_sensWaived?' disabled style="opacity:.4"':'')+' >';
-      h+='<option value="">'+(_sensWaived?'N/A':'Sensitivity')+'</option>';
+      h+='<select id="sens-sel-'+o.id+'" class="sens-sel '+sensClass+'" title="Sensitivity Level" onchange="setSensitivity(\''+o.id+'\',this)">';
+      h+='<option value="">Sensitivity</option>';
       h+='<option value="High"'+(curSens==='High'?' selected':'')+'>High</option>';
       h+='<option value="M to H"'+(curSens==='M to H'?' selected':'')+'>M to H</option>';
       h+='<option value="L to M"'+(curSens==='L to M'?' selected':'')+'>L to M</option>';
       h+='<option value="Low"'+(curSens==='Low'?' selected':'')+'>Low</option>';
       h+='</select>';
-      h+=_naBtn('Sensitivity',_sensWaived);
       h+='<span id="fw-sug-'+o.id+'"></span>';
-      h+='<select id="coso-sel-'+o.id+'" class="coso-sel '+cosoClass+'" title="COSO Component" onchange="setCoso(\''+o.id+'\',this)"'+(_cosoWaived?' disabled style="opacity:.4"':'')+' >';
-      h+='<option value="">'+(_cosoWaived?'N/A':'COSO')+'</option>';
+      h+='<select id="coso-sel-'+o.id+'" class="coso-sel '+cosoClass+'" title="COSO Component" onchange="setCoso(\''+o.id+'\',this)">';
+      h+='<option value="">COSO</option>';
       h+='<option value="CE"'+(curCoso==='CE'?' selected':'')+'>CE</option>';
       h+='<option value="RA"'+(curCoso==='RA'?' selected':'')+'>RA</option>';
       h+='<option value="CA"'+(curCoso==='CA'?' selected':'')+'>CA</option>';
       h+='<option value="IC"'+(curCoso==='IC'?' selected':'')+'>IC</option>';
       h+='<option value="M"'+(curCoso==='M'?' selected':'')+'>M</option>';
       h+='</select>';
-      h+=_naBtn('COSO',_cosoWaived);
       h+='<input type="checkbox" class="ocb-chk" id="ocbx-'+o.id+'" title="Select for removal" onchange="toggleRptSel(\''+o.id+'\',this.checked)">';
       h+='<button class="odl" title="Remove this observation" onclick="remObs(\''+o.id+'\')">&#10005;</button></div>';
       h+='<div class="ocb">';
@@ -14837,13 +14835,13 @@ function getObsReadiness(o){
   if(obsType==='repeated'&&!lastRefMap[id])
     blocking.push({field:'Prior Audit Ref',msg:'Prior Audit Report Reference is required for Repeated observations',waivable:false});
 
-  // 4. Sensitivity rating (advisory — waivable)
-  if(!sensitivityMap[id]&&!waived('Sensitivity'))
-    advisory.push({field:'Sensitivity',msg:'Risk sensitivity level (High / M to H / L to M / Low) not set',waivable:true});
+  // 4. Sensitivity rating (blocking — mandatory, not waivable)
+  if(!sensitivityMap[id])
+    blocking.push({field:'Sensitivity',msg:'Risk sensitivity level (High / M to H / L to M / Low) must be selected',waivable:false});
 
-  // 5. COSO component (advisory — waivable)
-  if(!cosoMap[id]&&!waived('COSO'))
-    advisory.push({field:'COSO',msg:'COSO framework component not mapped (CE / RA / CA / IC / M)',waivable:true});
+  // 5. COSO component (blocking — mandatory, not waivable)
+  if(!cosoMap[id])
+    blocking.push({field:'COSO',msg:'COSO framework component must be mapped (CE / RA / CA / IC / M)',waivable:false});
 
   // 6. Financial Impact / Instance count (waivable)
   var hasInstCount=(instCountMap[id]&&instCountMap[id]>0);
@@ -16402,12 +16400,6 @@ function _naToggle(obsId, field){
       fi.disabled = active;
     }
     if(fa) fa.disabled = active;
-  } else if(field === 'Sensitivity'){
-    var ss = document.getElementById('sens-sel-'+obsId);
-    if(ss){ ss.disabled = active; ss.style.opacity = active ? '.4' : '1'; }
-  } else if(field === 'COSO'){
-    var cs = document.getElementById('coso-sel-'+obsId);
-    if(cs){ cs.disabled = active; cs.style.opacity = active ? '.4' : '1'; }
   }
 }
 
