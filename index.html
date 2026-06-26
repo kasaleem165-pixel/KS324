@@ -10598,15 +10598,15 @@ var _wfSentAuditee=false, _wfReceivedBack=false, _wfSentRO=false;
 var STEPS=[
   {n:1,  icon:'&#127968;', label:'Branch Setup',           hint:'Select a branch from the left panel and fill in the Report No., Audit Visit dates, and other header fields at the top of the right panel.'},
   {n:2,  icon:'&#128221;', label:'Pick Observations',      hint:'Tick observations from the left panel databank list. Use category filters to quickly find relevant observations for this branch.'},
-  {n:3,  icon:'&#9999;',   label:'Enter Details',           hint:'For each selected observation: set Sensitivity level, enter instance count / financial impact, and verify observation text and recommendation.'},
-  {n:4,  icon:'&#128196;', label:'Attach Annexures',        hint:'Attach supporting evidence files or add text content to Annexures. Link each annexure to its relevant observation using the Annexure panel at the bottom.'},
-  {n:5,  icon:'&#128229;', label:'Import Responses',        hint:'Once the auditee returns the filled response file, click "Load Resp" in the toolbar to import their responses automatically into each observation.'},
-  {n:6,  icon:'&#128270;', label:'Preview & Review',        hint:'Click "Generate / Refresh Report" to preview the full report. Review the synopsis, KPI tiles, and observation cards for accuracy before finalizing.'},
-  {n:7,  icon:'&#128190;', label:'Sign-off & Save',         hint:'Click the Finalize button. The system will run a quality check. Resolve any alerts, then save in your preferred format (HTML, Word, PDF).'},
-  {n:8,  icon:'&#128231;', label:'Send Draft to Auditee',   hint:'Send the draft audit report to the auditee for their review and response. Click the tick on this step once you have dispatched the draft.', manual:true, stateVar:'_wfSentAuditee'},
-  {n:9,  icon:'&#128260;', label:'Receive / Amend',         hint:'Receive the auditee response or amendment request. Make necessary amendments to the report, re-generate and re-finalize as needed. Click the tick once amendments are complete.', manual:true, stateVar:'_wfReceivedBack'},
-  {n:10, icon:'&#128104;', label:'Send to RO',              hint:'Submit the finalised report to the Reporting Officer (RO) for review and approval before official issuance. Click the tick once submitted.', manual:true, stateVar:'_wfSentRO'},
-  {n:11, icon:'&#128203;', label:'Official Issuance',       hint:'Click "Issue Rpt" to download the final interactive HTML report for official issuance — complete with synopsis, KPI dashboard, risk framework, and all observation cards.'}
+  {n:3,  icon:'&#9999;',   label:'Enter Details',          hint:'For each selected observation: set Sensitivity level, enter instance count / financial impact, and verify observation text and recommendation.'},
+  {n:4,  icon:'&#128196;', label:'Attach Annexures',       hint:'(Optional) Attach supporting evidence files or add text content to Annexures. Link each annexure to its relevant observation using the Annexure panel at the bottom.'},
+  {n:5,  icon:'&#128270;', label:'Preview & Review',       hint:'Click "Generate / Refresh Report" to preview the full report. Review the synopsis, KPI tiles, and observation cards for accuracy before finalizing.'},
+  {n:6,  icon:'&#128190;', label:'Sign-off & Save',        hint:'Click the Finalize button. The system will run a quality check. Resolve any alerts, then save in your preferred format (HTML, Word, PDF).'},
+  {n:7,  icon:'&#128231;', label:'Send Draft to Auditee',  hint:'Send the draft audit report to the auditee for their review and response. Click the tick on this step once you have dispatched the draft.', manual:true, stateVar:'_wfSentAuditee'},
+  {n:8,  icon:'&#128229;', label:'Import Responses',       hint:'(Optional) Once the auditee returns the filled response file, click "Load Resp" in the toolbar to import their responses automatically into each observation.'},
+  {n:9,  icon:'&#128260;', label:'Receive / Amend',        hint:'Receive the auditee response or amendment request. Make necessary amendments to the report, re-generate and re-finalize as needed. Click the tick once amendments are complete.', manual:true, stateVar:'_wfReceivedBack'},
+  {n:10, icon:'&#128104;', label:'Send to RO',             hint:'Submit the finalised report to the Reporting Officer (RO) for review and approval before official issuance. Click the tick once submitted.', manual:true, stateVar:'_wfSentRO'},
+  {n:11, icon:'&#128203;', label:'Official Issuance',      hint:'Click "Issue Rpt" to download the final interactive HTML report for official issuance — complete with synopsis, KPI dashboard, risk framework, and all observation cards.'}
 ];
 function getStepStatus(){
   var H=getHdrVals();
@@ -10622,17 +10622,17 @@ function getStepStatus(){
   // Each step: 'done'|'active'|'pending'
   function st(done,prevDone){return done?'done':prevDone?'active':'pending';}
   return[
-    st(hasBranch,       true),
-    st(hasSel,          hasBranch),
-    st(hasDetails,      hasSel),
-    st(hasAnx,          hasDetails),        // optional
-    st(hasResp,         hasDetails),        // optional
-    st(hasGen,          hasDetails),
-    st(hasFinal,        hasGen),
-    st(_wfSentAuditee,  hasFinal),          // manual toggle
-    st(_wfReceivedBack, _wfSentAuditee),    // manual toggle
-    st(_wfSentRO,       _wfReceivedBack),   // manual toggle
-    st(false,           _wfSentRO)          // Issue Rpt — never auto-marked done
+    st(hasBranch,       true),              // 1. Branch Setup
+    st(hasSel,          hasBranch),         // 2. Pick Observations
+    st(hasDetails,      hasSel),            // 3. Enter Details
+    st(hasAnx,          hasDetails),        // 4. Attach Annexures (optional)
+    st(hasGen,          hasDetails),        // 5. Preview & Review
+    st(hasFinal,        hasGen),            // 6. Sign-off & Save
+    st(_wfSentAuditee,  hasFinal),          // 7. Send Draft to Auditee (manual)
+    st(hasResp,         _wfSentAuditee),    // 8. Import Responses (optional, after sending draft)
+    st(_wfReceivedBack, _wfSentAuditee),    // 9. Receive / Amend (manual)
+    st(_wfSentRO,       _wfReceivedBack),   // 10. Send to RO (manual)
+    st(false,           _wfSentRO)          // 11. Official Issuance — never auto-marked done
   ];
 }
 function toggleWfStep(stateVar){
@@ -10650,28 +10650,41 @@ function renderStepGuide(){
   for(var i=0;i<STEPS.length;i++){
     var s=STEPS[i], st=statuses[i];
     // Optional steps: if a later mandatory step is active/done, mark optional as skippable
-    var optional=(i===3||i===4);
-    var isSkipped=optional&&st==='active'&&(statuses[5]==='active'||statuses[5]==='done');
+    var optional=(i===3||i===7);  // Annexures (4) and Import Responses (8) are optional
+    var isSkipped=optional&&st==='active'&&(statuses[4]==='active'||statuses[4]==='done');
     if(isSkipped)st='skip';
-    var bg=st==='done'?'#1a4a6a':st==='active'?'#2a6090':st==='skip'?'#231d08':'#1a2a38';
-    var col=st==='done'?'#a8d8f0':st==='active'?'#ffffff':st==='skip'?'#9a7c30':'#3a5a7a';
-    var bdr=st==='active'?'2px solid #60aadd':st==='skip'?'2px dashed #5a4010':'2px solid transparent';
-    // tick icon only for done; skip gets a dash; circle for all other incomplete states
-    var tickBox=st==='done'
-      ?'<span style="background:#27ae60;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff;flex-shrink:0">&#10003;</span>'
-      :st==='skip'
-      ?'<span style="border:1.5px dashed #5a4010;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#7a5c20;flex-shrink:0">&#8213;</span>'
-      :'<span style="border:1.5px solid '+(st==='active'?'#60aadd':'#2a4a6a')+';border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:'+(st==='active'?'#90c8f0':'#3a5a7a')+';flex-shrink:0">'+s.n+'</span>';
+    // Colours: done=green tint, active=bright blue, skip=amber, pending=readable grey-blue
+    var bg  = st==='done'  ? '#0f3d20'
+            : st==='active'? '#0f3060'
+            : st==='skip'  ? '#2a200a'
+            :                '#243040';          // pending — darker but still readable
+    var col = st==='done'  ? '#6de08a'
+            : st==='active'? '#ffffff'
+            : st==='skip'  ? '#d4a830'
+            :                '#c8d8ea';          // pending — light enough to read clearly
+    var bdr = st==='done'  ? '2px solid #27ae60'
+            : st==='active'? '2px solid #60aadd'
+            : st==='skip'  ? '2px dashed #7a5a10'
+            :                '2px solid #3a5570'; // pending — visible border
+
+    // Indicator circle: ✓ for done, number for all others (active/pending/skip)
+    var tickBox = st==='done'
+      ? '<span style="background:#27ae60;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff;flex-shrink:0">&#10003;</span>'
+      : st==='skip'
+      ? '<span style="border:1.5px dashed #7a5a10;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#d4a830;flex-shrink:0">'+s.n+'</span>'
+      : '<span style="border:1.5px solid '+(st==='active'?'#60aadd':'#5a7a9a')+';border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:'+(st==='active'?'#fff':'#c8d8ea')+';flex-shrink:0">'+s.n+'</span>';
+
     // Manual steps get a clickable tick button when active or done
     var manualBtn='';
     if(s.manual){
       var mbActive=(st==='active'||st==='done');
       var mbDone=(st==='done');
-      manualBtn='<button onclick="event.stopPropagation();toggleWfStep(\''+s.stateVar+'\')" title="'+(mbDone?'Undo — mark as not yet done':'Mark this step as done')+'" style="margin-left:4px;padding:0 5px;font-size:9px;font-weight:800;border-radius:8px;border:1px solid '+(mbDone?'#27ae60':'#4a8ab0')+';background:'+(mbDone?'#27ae60':mbActive?'#1e5a80':'#12283a')+';color:'+(mbDone?'#fff':mbActive?'#a0d4f0':'#2a4a6a')+';cursor:'+(mbActive||mbDone?'pointer':'default')+';line-height:16px">'+(mbDone?'&#10003; Done':'&#9633; Mark Done')+'</button>';
+      manualBtn='<button onclick="event.stopPropagation();toggleWfStep(\''+s.stateVar+'\')" title="'+(mbDone?'Undo — mark as not yet done':'Mark this step as done')+'" style="margin-left:4px;padding:0 6px;font-size:9px;font-weight:800;border-radius:8px;border:1px solid '+(mbDone?'#27ae60':'#4a8ab0')+';background:'+(mbDone?'#27ae60':mbActive?'#1e5a80':'#1a3050')+';color:'+(mbDone?'#fff':mbActive?'#a0d4f0':'#8ab0cc')+';cursor:'+(mbActive||mbDone?'pointer':'default')+';line-height:17px">'+(mbDone?'&#10003; Done':'&#9633; Mark Done')+'</button>';
     }
     h+='<div onclick="showStepHint('+i+')" onmouseenter="showStepHint('+i+')" onmouseleave="scheduleHideHint()" title="'+s.hint.replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;gap:3px;background:'+bg+';color:'+col+';border:'+bdr+';border-radius:20px;padding:2px 8px 2px 4px;font-size:9.5px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .2s">'
       +tickBox+' '+s.label
-      +(st==='skip'?'<span style="font-size:8px;font-style:italic;opacity:.8;margin-left:2px;color:#806828">(optional — skipped)</span>':'')
+      +(st==='skip'?'<span style="font-size:8px;font-style:italic;opacity:.9;margin-left:2px;color:#d4a830">(optional)</span>':'')
+      +(st==='pending'&&!s.manual?'<span style="font-size:7.5px;opacity:.7;margin-left:2px;color:#8ab0cc">pending</span>':'')
       +manualBtn
       +'</div>';
     if(i<STEPS.length-1) h+='<span style="color:#2a4a6a;font-size:9px;flex-shrink:0">&#8250;</span>';
@@ -10685,8 +10698,10 @@ function showStepHint(idx){
   clearTimeout(_hintHideTimer);
   var s=STEPS[idx];
   var statuses=getStepStatus();
-  var stLabel=['','&#10003; Done','&#9654; Active — do this now','Pending','Optional'][
-    statuses[idx]==='done'?1:statuses[idx]==='active'?2:statuses[idx]==='skip'?4:3];
+  var stLabel = statuses[idx]==='done'  ? '&#10003; Completed'
+              : statuses[idx]==='active' ? '&#9654; Active — do this now'
+              : statuses[idx]==='skip'   ? '&#8213; Optional — skipped'
+              :                            '&#9633; Pending';
   hint.innerHTML='<strong>Step '+s.n+': '+s.icon+' '+s.label+'</strong> <span style="margin-left:6px;font-size:10px;opacity:.8">'+stLabel+'</span>'
     +' &mdash; '+s.hint;
   hint.style.display='block';
