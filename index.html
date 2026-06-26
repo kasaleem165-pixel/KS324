@@ -14603,12 +14603,13 @@ function getFw(o){
   var mx=FW_MX[sensitivityMap[o.id]||'L to M']||FW_MX['L to M'];
   return{rr:FW_RR[key],ca:FW_CA[key],mx:mx,key:key};
 }
-function fwChip(label,val){
+function fwChip(label,val,extra){
   var c='#7f8c8d';
   if(val==='High')c='#c0392b'; else if(val==='Medium-High')c='#e67e22';
   else if(val==='Medium')c='#2980b9'; else if(val==='Low-Medium')c='#2e86ab';
   else if(val==='Low')c='#27ae60';
-  return '<span style="font-size:.67rem;color:#999;text-transform:uppercase;letter-spacing:.4px">'+label+'</span> <span style="display:inline-block;background:'+c+';color:#fff;border-radius:20px;padding:.1rem .6rem;font-size:.7rem;font-weight:700;margin:.1rem .2rem .1rem 0">'+val+'</span> ';
+  return '<tr><td style="padding:3px 10px 3px 0;font-size:.64rem;color:#666;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;vertical-align:middle">'+label+'</td>'
+    +'<td style="padding:3px 0;vertical-align:middle"><span style="display:inline-block;background:'+c+';color:#fff;border-radius:20px;padding:.1rem .6rem;font-size:.7rem;font-weight:700">'+val+'</span>'+(extra||'')+'</td></tr>';
 }
 function upliftRisk(base, steps){
   var idx=FW_RISK_TIERS.indexOf(base); if(idx===-1)idx=2;
@@ -14818,7 +14819,7 @@ function finalizeReport(){
     var adjResidual=inst.uplift>0?upliftRisk(fw.mx.residual,inst.uplift):fw.mx.residual;
     var wasUplifted=(adjInherent!==fw.mx.inherent);
     var instBadgeColor=inst.label==='Systemic / Pervasive'?'#c0392b':inst.label==='Significant'?'#e67e22':inst.label==='Isolated / Limited'?'#2980b9':'#95a5a6';
-    function fwChipF(lbl,val){var c='#7f8c8d';if(val==='High')c='#c0392b';else if(val==='Medium-High')c='#e67e22';else if(val==='Medium')c='#2980b9';else if(val==='Low-Medium')c='#2e86ab';else if(val==='Low')c='#27ae60';return'<span style="font-size:.63rem;color:#999;text-transform:uppercase;letter-spacing:.4px">'+lbl+'</span> <span style="display:inline-block;background:'+c+';color:#fff;border-radius:20px;padding:.1rem .6rem;font-size:.7rem;font-weight:700;margin:.1rem .2rem .1rem 0">'+val+'</span> ';}
+    function fwChipF(lbl,val,extra){var c='#7f8c8d';if(val==='High')c='#c0392b';else if(val==='Medium-High')c='#e67e22';else if(val==='Medium')c='#2980b9';else if(val==='Low-Medium')c='#2e86ab';else if(val==='Low')c='#27ae60';return'<tr><td style="padding:3px 8px 3px 0;font-size:9.5px;color:#666;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;vertical-align:middle">'+lbl+'</td><td style="padding:3px 0;vertical-align:middle"><span style="display:inline-block;background:'+c+';color:#fff;border-radius:20px;padding:1px 10px;font-size:10px;font-weight:700">'+val+'</span>'+(extra||'')+'</td></tr>';}
     // Diligent risk register coverage bar
     var dlgHtml='';
     if(fw.rr.diligentId){
@@ -14872,10 +14873,14 @@ function finalizeReport(){
       // Column 2: Risk Matrix
       +'<div style="padding:11px 13px;border-right:1px solid #d0e4f0;background:#fafcff">'
         +'<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#8e44ad;margin-bottom:5px;border-bottom:2px solid #8e44ad;padding-bottom:3px">&#9656; Risk Matrix</div>'
-        +'<div style="margin-bottom:5px">'+fwChipF('Likelihood',fw.mx.likelihood)+fwChipF('Impact',fw.mx.impact)+'</div>'
-        +'<div style="margin-bottom:4px">'+fwChipF('Inherent Risk',adjInherent)+(wasUplifted?'<span style="color:#c0392b;font-size:10px;font-weight:700">&uarr; uplifted</span>':'')+'</div>'
-        +'<div style="margin-bottom:4px">'+fwChipF('Residual Risk',adjResidual)+'</div>'
-        +'<div style="margin-bottom:8px">'+fwChipF('Risk Appetite',fw.mx.appetite)+'</div>'
+        +'<table style="width:100%;border-collapse:collapse;margin-bottom:8px">'
+        +fwChipF('Likelihood',fw.mx.likelihood)
+        +fwChipF('Impact',fw.mx.impact)
+        +'<tr><td colspan="2" style="padding:2px 0"><hr style="border:none;border-top:1px solid #e0e8f0;margin:2px 0"></td></tr>'
+        +fwChipF('Inherent Risk',adjInherent,(wasUplifted?'<span style="color:#c0392b;font-size:9px;font-weight:700;margin-left:4px">&uarr; uplifted</span>':''))
+        +fwChipF('Residual Risk',adjResidual)
+        +fwChipF('Risk Appetite',fw.mx.appetite)
+        +'</table>'
         +instBox
       +'</div>'
       // Column 3: Control Activity & Conclusion
@@ -15224,7 +15229,7 @@ function generateIssuedReport(){
       +(inst.sources.length?'<div style="color:#777;font-size:.7rem;margin-top:.15rem">Sources: '+inst.sources.join(' &bull; ')+'</div>':'')
       +'<div style="margin-top:.25rem">Materiality: <span style="display:inline-block;background:'+instBadgeColor+';color:#fff;border-radius:20px;padding:.08rem .55rem;font-size:.68rem;font-weight:700">'+inst.label+'</span>'
       +(wasUplifted?' <span style="color:#c0392b;font-size:.68rem;font-weight:700">&uarr; Risk uplifted</span>':'')+'</div></div>';
-    function fwC(lbl2,val){var c='#7f8c8d';if(val==='High')c='#c0392b';else if(val==='Medium-High')c='#e67e22';else if(val==='Medium')c='#2980b9';else if(val==='Low-Medium')c='#2e86ab';else if(val==='Low')c='#27ae60';return'<span style="font-size:.62rem;color:#999;text-transform:uppercase;letter-spacing:.4px">'+lbl2+'</span> <span style="display:inline-block;background:'+c+';color:#fff;border-radius:20px;padding:.08rem .55rem;font-size:.68rem;font-weight:700;margin:.08rem .15rem .08rem 0">'+val+'</span> ';}
+    function fwC(lbl2,val){var c='#7f8c8d';if(val==='High')c='#c0392b';else if(val==='Medium-High')c='#e67e22';else if(val==='Medium')c='#2980b9';else if(val==='Low-Medium')c='#2e86ab';else if(val==='Low')c='#27ae60';return'<tr><td style="padding:2px 8px 2px 0;font-size:.62rem;color:#666;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;vertical-align:middle">'+lbl2+'</td><td style="padding:2px 0;vertical-align:middle"><span style="display:inline-block;background:'+c+';color:#fff;border-radius:20px;padding:.08rem .55rem;font-size:.68rem;font-weight:700">'+val+'</span></td></tr>';}
     iboxes+='<div style="margin-top:.8rem;border:1px solid #b8d4ec;border-radius:8px;overflow:hidden">'
       +'<div style="background:#1a3557;color:#fff;padding:.38rem .8rem;font-size:.74rem;font-weight:700;letter-spacing:.5px">&#128203; Risk-Based Audit Framework</div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;font-size:.81rem">'
@@ -15233,8 +15238,14 @@ function generateIssuedReport(){
         +'<span style="background:#1a3557;color:#fff;border-radius:4px;padding:.1rem .45rem;font-size:.68rem;font-weight:700;margin-bottom:.35rem;display:inline-block">'+e(fw.rr.id)+'</span>'
         +'<div style="font-weight:700;color:#c0392b;font-size:.84rem;margin-bottom:.3rem">'+e(fw.rr.name)+'</div>'
         +'<div style="color:#555;font-size:.77rem;margin-bottom:.45rem">'+e(fw.rr.desc)+'</div>'
-        +fwC('Auditor Risk',sk||'—')+fwC('Residual Risk',adjResidual)+'<br>'
+        +'<table style="width:100%;border-collapse:collapse;margin:.3rem 0">'
+        +fwC('Likelihood',fw.mx.likelihood)
+        +fwC('Impact',fw.mx.impact)
+        +'<tr><td colspan="2" style="padding:1px 0"><hr style="border:none;border-top:1px solid #e0e8f0;margin:2px 0"></td></tr>'
+        +fwC('Inherent Risk',adjInherent)
+        +fwC('Residual Risk',adjResidual)
         +fwC('Risk Appetite',fw.mx.appetite)
+        +'</table>'
         +instBox
         +'<div style="margin-top:.45rem;font-size:.72rem;color:#666;border-top:1px solid #dde8f0;padding-top:.35rem"><em>Control Objective:</em> '+e(fw.rr.obj)+'</div>'
       +'</div>'
@@ -15334,13 +15345,14 @@ function generateIssuedReport(){
         +'<div style="display:inline-block;background:#1a3557;color:#fff;border-radius:5px;padding:.15rem .55rem;font-size:.72rem;font-weight:700;margin-bottom:.4rem">'+e(fw.rr.id)+'</div>'
         +'<div style="font-weight:700;color:#c0392b;font-size:.87rem;margin-bottom:.35rem">'+e(fw.rr.name)+'</div>'
         +'<div style="color:#555;font-size:.79rem;margin-bottom:.5rem">'+e(fw.rr.desc)+'</div>'
+        +'<table style="width:100%;border-collapse:collapse;margin:.35rem 0">'
         +fwChip('Likelihood',fw.mx.likelihood)
         +fwChip('Impact',fw.mx.impact)
-        +'<br>'
-        +fwChip('Inherent Risk',adjInherent)
-        +(wasUplifted?'<span style="font-size:.67rem;color:#c0392b;font-weight:700">&uarr; uplifted</span> ':'')
+        +'<tr><td colspan="2" style="padding:1px 0"><hr style="border:none;border-top:1px solid #e0e8f0;margin:2px 0"></td></tr>'
+        +fwChip('Inherent Risk',adjInherent,(wasUplifted?'<span style="font-size:.65rem;color:#c0392b;font-weight:700;margin-left:5px">&uarr; uplifted</span>':''))
         +fwChip('Residual Risk',adjResidual)
         +fwChip('Risk Appetite',fw.mx.appetite)
+        +'</table>'
         +instBox
         +'<div style="margin-top:.5rem;font-size:.74rem;color:#666;border-top:1px solid #dde8f0;padding-top:.4rem"><em>Control Objective:</em> '+e(fw.rr.obj)+'</div>'
       +'</div>'
