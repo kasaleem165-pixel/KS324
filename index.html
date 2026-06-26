@@ -390,17 +390,21 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 }
 
 /* ===== SPLASH SCREEN ===== */
-#splash{position:fixed;top:0;left:0;width:100%;height:100%;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f2540 0%,#1a3a5c 60%,#2a5080 100%);transition:opacity .6s ease,visibility .6s ease}
+#splash{position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(160deg,#07152a 0%,#0f2540 40%,#1a3a5c 75%,#1e4a72 100%);transition:opacity .7s ease,visibility .7s ease}
 #splash.hidden{opacity:0;visibility:hidden;pointer-events:none}
-.splash-logo{font-size:64px;margin-bottom:20px;animation:splashPulse 1.5s ease-in-out infinite alternate}
-.splash-title{font-family:'Merriweather',serif;font-size:28px;font-weight:700;color:#f0c040;letter-spacing:1px;margin-bottom:8px;text-align:center}
-.splash-sub{font-size:14px;color:#aac4e0;margin-bottom:36px;text-align:center;letter-spacing:.5px}
-.splash-bar-wrap{width:260px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;overflow:hidden}
-.splash-bar-fill{height:4px;background:linear-gradient(90deg,#c9962a,#f0c040);border-radius:2px;width:0%;animation:splashLoad 2.2s ease-out forwards}
-.splash-skip{margin-top:28px;font-size:11px;color:rgba(255,255,255,.4);cursor:pointer;letter-spacing:.5px}
-.splash-skip:hover{color:rgba(255,255,255,.8)}
-@keyframes splashPulse{from{transform:scale(1)}to{transform:scale(1.08)}}
-@keyframes splashLoad{0%{width:0%}60%{width:75%}90%{width:92%}100%{width:100%}}
+.splash-brand{font-size:10px;font-weight:800;letter-spacing:4px;color:#c9962a;text-transform:uppercase;margin-bottom:22px;opacity:.9}
+.splash-logo{font-size:56px;margin-bottom:18px;animation:splashPulse 2s ease-in-out infinite alternate;filter:drop-shadow(0 0 18px rgba(201,150,42,.55))}
+.splash-title{font-family:'Merriweather',serif;font-size:30px;font-weight:700;color:#f0c040;letter-spacing:1px;margin-bottom:6px;text-align:center;text-shadow:0 2px 16px rgba(240,192,64,.35)}
+.splash-sub{font-size:13px;color:#8ab0cc;margin-bottom:10px;text-align:center;letter-spacing:.6px}
+.splash-divider{width:60px;height:2px;background:linear-gradient(90deg,transparent,#c9962a,transparent);margin:18px auto 28px}
+.splash-bar-wrap{width:300px;height:5px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;box-shadow:0 0 12px rgba(0,0,0,.4)}
+.splash-bar-fill{height:5px;background:linear-gradient(90deg,#8a6010,#c9962a,#f0c040,#c9962a);background-size:200% 100%;border-radius:3px;width:0%;animation:splashLoad 2.8s cubic-bezier(.4,0,.2,1) forwards,splashShimmer 1.5s linear infinite}
+.splash-pct{margin-top:10px;font-size:11px;font-weight:700;color:#c9962a;letter-spacing:1px;min-height:16px}
+.splash-skip{margin-top:32px;font-size:10.5px;color:rgba(255,255,255,.3);cursor:pointer;letter-spacing:.6px;transition:color .2s}
+.splash-skip:hover{color:rgba(255,255,255,.75)}
+@keyframes splashPulse{from{transform:scale(1);filter:drop-shadow(0 0 12px rgba(201,150,42,.4))}to{transform:scale(1.07);filter:drop-shadow(0 0 24px rgba(201,150,42,.75))}}
+@keyframes splashLoad{0%{width:0%}50%{width:65%}80%{width:88%}100%{width:100%}}
+@keyframes splashShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
 /* ===== VISUAL POLISH ===== */
 #toolbar{background:linear-gradient(90deg,#0d1f35 0%,#1a3a5c 100%);border-bottom:2px solid #c9962a;flex-wrap:wrap;gap:4px 0}
@@ -9068,11 +9072,14 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
 
 <!-- ===== SPLASH SCREEN ===== -->
 <div id="splash" onclick="dismissSplash()">
+  <div class="splash-brand">Beaconhouse Group</div>
   <div class="splash-logo">&#128202;</div>
   <div class="splash-title">Systems &amp; Audit</div>
-  <div class="splash-sub">Integrated Audit Management &amp; Report Builder</div>
-  <div class="splash-bar-wrap"><div class="splash-bar-fill"></div></div>
-  <div class="splash-skip">Click anywhere to continue</div>
+  <div class="splash-sub">Audit Report Management System</div>
+  <div class="splash-divider"></div>
+  <div class="splash-bar-wrap"><div class="splash-bar-fill" id="splash-bar"></div></div>
+  <div class="splash-pct" id="splash-pct">Initialising&hellip;</div>
+  <div class="splash-skip">Click anywhere to skip</div>
 </div>
 
 <div id="toolbar">
@@ -17321,7 +17328,23 @@ function awsSyncFromReport(){
 (function(){
   var sp = document.getElementById('splash');
   if(!sp) return;
-  setTimeout(function(){ dismissSplash(); }, 2800);
+  // Animate percentage counter in sync with the CSS bar animation (2.8s)
+  var pct = document.getElementById('splash-pct');
+  var labels = [[0,'Initialising…'],[30,'Loading databank…'],[60,'Building interface…'],[85,'Almost ready…'],[100,'Ready']];
+  var start = Date.now(), dur = 2800;
+  var li = 0;
+  function tick(){
+    var elapsed = Date.now() - start;
+    var p = Math.min(100, Math.round(elapsed / dur * 100));
+    if(pct){
+      // update label at key thresholds
+      if(li < labels.length - 1 && p >= labels[li+1][0]) li++;
+      pct.textContent = labels[li][1] + (p < 100 ? ' ' + p + '%' : '');
+    }
+    if(p < 100){ requestAnimationFrame(tick); }
+    else { setTimeout(dismissSplash, 400); }
+  }
+  requestAnimationFrame(tick);
 })();
 
 function dismissSplash(){
