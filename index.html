@@ -17486,6 +17486,7 @@ function toggleRAPanel(){
     _setPanelBack('Risk Assessment');
     setRptBtnsDisabled(true);
     ra_initBranches();
+    ra_initModeButtons();
   }
 }
 
@@ -18097,11 +18098,11 @@ function ra_countRepeatedInText(text){
   return repCounts;
 }
 
-// ── Scoring mode: 'original' | 'mode1' | 'mode2' | 'mode3'
-var RA_SCORE_MODE = 'original';
+// ── Scoring mode: 'mode1' | 'mode2' | 'mode3' | 'mode4'  (mode4 = original/default)
+var RA_SCORE_MODE = 'mode4';
 function ra_getScoreMode(){
   var el=document.querySelector('input[name="ra-score-mode"]:checked');
-  return el ? el.value : 'original';
+  return el ? el.value : 'mode4';
 }
 
 function ra_scoreCategory(catName,rpt1,rpt2){
@@ -18129,8 +18130,8 @@ function ra_scoreCategory(catName,rpt1,rpt2){
 
   var total=0;
 
-  if(mode==='original'){
-    // Original: Freq(30)+Repeat(25)+Diligent(25)+Sens(15)+DB(5) = 100
+  if(mode==='mode4'){
+    // Mode 4 (Original): Freq(30)+Repeat(25)+Diligent(25)+Sens(15)+DB(5) = 100
     var areaComp=dilScore;
     var sensComp=hasSens ? rawSens*15 : (db.areaWt||0.10)*15;
     total=freq+rec+areaComp+sensComp+dbs;
@@ -19180,6 +19181,89 @@ function ra_scoreToLevel(score){ return score>=75?'critical':score>=50?'high':sc
 function ra_levelLabel(level){ return {critical:'Critical',high:'High',medium:'Medium',low:'Low'}[level]||level; }
 function ra_levelColor(level){ return {critical:'#c03030',high:'#d07020',medium:'#c0a000',low:'#40a040'}[level]||'#999'; }
 function ra_levelBarColor(level){ return {critical:'#e05050',high:'#e08030',medium:'#d0b020',low:'#50b050'}[level]||'#999'; }
+
+// ── Mode definitions for radio buttons ──────────────────────────────────────
+var RA_MODES=[
+  {value:'mode1', label:'Mode 1', title:'Diligent Data Only',
+   sources:[
+     {name:'Diligent Risk Register',yes:true},
+     {name:'Specific branch\'s uploaded reports',yes:false},
+     {name:'S&A all-branches historical databank',yes:false}
+   ],
+   weights:'Diligent Area Weight only → scaled to 100 pts'},
+  {value:'mode2', label:'Mode 2', title:'Branch History + Databank',
+   sources:[
+     {name:'Diligent Risk Register',yes:false},
+     {name:'Specific branch\'s uploaded reports',yes:true},
+     {name:'S&A all-branches historical databank',yes:true}
+   ],
+   weights:'Frequency 35 + Repeat Rate 30 + Sensitivity 20 + Databank 15 = 100 pts'},
+  {value:'mode3', label:'Mode 3', title:'Diligent + Specific Branch Only',
+   sources:[
+     {name:'Diligent Risk Register',yes:true},
+     {name:'Specific branch\'s uploaded reports',yes:true},
+     {name:'S&A all-branches historical databank',yes:false}
+   ],
+   weights:'Frequency 32 + Repeat Rate 27 + Diligent 28 + Sensitivity 13 = 100 pts'},
+  {value:'mode4', label:'Mode 4', title:'All Sources Combined (Default)',
+   sources:[
+     {name:'Diligent Risk Register',yes:true},
+     {name:'Specific branch\'s uploaded reports',yes:true},
+     {name:'S&A all-branches historical databank',yes:true}
+   ],
+   weights:'Frequency 30 + Repeat Rate 25 + Diligent 25 + Sensitivity 15 + Databank 5 = 100 pts'}
+];
+
+function ra_initModeButtons(){
+  var wrap=document.getElementById('ra-mode-btns');
+  if(!wrap) return;
+  wrap.innerHTML='';
+  RA_MODES.forEach(function(m){
+    var row=document.createElement('label');
+    row.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;padding:7px 10px;border-radius:6px;border:1px solid #c8d8ec;background:#fff;transition:.15s;font-family:inherit';
+    row.innerHTML=
+      '<input type="radio" name="ra-score-mode" value="'+m.value+'"'+(m.value==='mode4'?' checked':'')+' style="accent-color:#1a3a5c;width:14px;height:14px;flex-shrink:0">'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:12px;font-weight:800;color:#1a3a5c">'+m.label+' <span style="font-weight:400;color:#5a6a80;font-size:11px">— '+m.title+'</span></div>'+
+      '</div>'+
+      '<span style="font-size:10px;color:#c9962a;font-weight:700;white-space:nowrap">&#9432;</span>';
+    row.addEventListener('mouseenter',function(){ ra_showModeTable(m); row.style.background='#e8f0fb'; row.style.borderColor='#1a3a5c'; });
+    row.addEventListener('mouseleave',function(){ ra_hideModeTable(); row.style.background='#fff'; row.style.borderColor='#c8d8ec'; });
+    row.addEventListener('click',function(){
+      ra_showModeTable(m);
+      // Re-run if results already visible
+      setTimeout(function(){
+        if(document.getElementById('ra-results-content')&&document.getElementById('ra-results-content').style.display!=='none') ra_runAnalysis();
+      },50);
+    });
+    wrap.appendChild(row);
+  });
+}
+
+function ra_showModeTable(m){
+  var el=document.getElementById('ra-mode-table');
+  if(!el) return;
+  var rows=m.sources.map(function(s,i){
+    var bg=i%2===0?'#f5f8fd':'#fff';
+    var icon=s.yes?'<span style="color:#1a7a4a;font-weight:800">&#10004; Yes</span>':'<span style="color:#c0392b;font-weight:800">&#10008; No</span>';
+    return '<tr style="background:'+bg+'"><td style="padding:6px 10px;border-bottom:1px solid #eaeff6;color:#2a3a50">'+s.name+'</td><td style="padding:6px 10px;border-bottom:1px solid #eaeff6;text-align:center;white-space:nowrap">'+icon+'</td></tr>';
+  }).join('');
+  el.innerHTML=
+    '<div style="background:#1a3a5c;color:#fff;padding:7px 10px;font-weight:800;font-size:11.5px">'+m.label+' — '+m.title+'</div>'+
+    '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+      '<thead><tr>'+
+        '<th style="background:#2a5080;color:#fff;padding:5px 10px;text-align:left">Source</th>'+
+        '<th style="background:#2a5080;color:#fff;padding:5px 10px;text-align:center">Included?</th>'+
+      '</tr></thead><tbody>'+rows+'</tbody>'+
+    '</table>'+
+    '<div style="padding:6px 10px;font-size:10.5px;color:#5a6a80;background:#f5f8fd;border-top:1px solid #eaeff6">&#9432; '+m.weights+'</div>';
+  el.style.display='block';
+}
+
+function ra_hideModeTable(){
+  var el=document.getElementById('ra-mode-table');
+  if(el) el.style.display='none';
+}
 
 function ra_runAnalysis(){
   var brEl=document.getElementById('ra-sel_branch'); var branchName=brEl?brEl.value.trim():'Unknown Branch'; if(!branchName) branchName='Unknown Branch';
@@ -20481,6 +20565,14 @@ function ra_methodologyHtml(){
           </select>
         </div>
       </div>
+      <!-- Scoring Mode Selector -->
+      <div class="ra-sec" style="background:#f0f4fa;border-top:2px solid #c8d8ec">
+        <div class="ra-sh">&#9881; Scoring Mode</div>
+        <div style="display:flex;flex-direction:column;gap:6px" id="ra-mode-btns">
+        </div>
+        <div id="ra-mode-table" style="margin-top:10px;display:none;background:#fff;border:1px solid #c8d8ec;border-radius:6px;overflow:hidden;font-size:11px"></div>
+      </div>
+
       <div style="padding:14px 16px">
         <button class="ra-btn-gold" onclick="ra_runAnalysis()" style="background:linear-gradient(135deg,#1a7a4a,#23a060);color:#fff">&#128203; Generate Risk-Based Audit Plan</button>
         <div class="ra-hint" style="text-align:center;margin-top:8px">Analyses previous report data to build a risk-prioritized audit program for the upcoming visit</div>
