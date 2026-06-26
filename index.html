@@ -18097,36 +18097,68 @@ function ra_countRepeatedInText(text){
   return repCounts;
 }
 
+// ── Scoring mode: 'original' | 'mode1' | 'mode2' | 'mode3'
+var RA_SCORE_MODE = 'original';
+function ra_getScoreMode(){
+  var el=document.querySelector('input[name="ra-score-mode"]:checked');
+  return el ? el.value : 'original';
+}
+
 function ra_scoreCategory(catName,rpt1,rpt2){
+  var mode=ra_getScoreMode();
   var d1=rpt1[catName]||{obs:0,repeated:0}; var d2=rpt2?(rpt2[catName]||{obs:0,repeated:0}):null;
   var db=RA_DB_CATS[catName]; var tot=0;
   for(var c in rpt1) tot+=rpt1[c].obs||0; if(tot<1) tot=1;
 
-  // Component 1 — Observation Frequency (max 30): share of total obs in this category
-  var freq=(d1.obs/tot)*30;
-
-  // Component 2 — Repeat Rate (max 25): proportion of repeated obs + trend bonus
-  var rec=0; if(d1.obs>0) rec=(d1.repeated/d1.obs)*25; if(d2&&d2.obs>0&&d1.obs>0) rec=Math.min(25,rec+8);
-
-  // Component 3 — Area Weight (max 25): Diligent Impact×0.6 + Likelihood×0.4, fallback to static
   var dilD=RA_DIL_WT[catName];
-  var areaComp=dilD ? dilD.areaWtScore : (db.areaWt||0.10)*100;
+  var dilScore = dilD ? dilD.areaWtScore : (db.areaWt||0.10)*100;
 
-  // Component 4 — Sensitivity Weight (max 15): avg sensitivity of obs loaded from report
-  var sensComp=0;
+  // Frequency
+  var freq=(d1.obs/tot)*30;
+  // Repeat rate
+  var rec=0; if(d1.obs>0) rec=(d1.repeated/d1.obs)*25; if(d2&&d2.obs>0&&d1.obs>0) rec=Math.min(25,rec+8);
+  // Sensitivity
+  var rawSens=0,hasSens=false;
   if(d1.obs>0&&d1.sensTotals){
     var sw=0,sc=0;
     for(var sk in d1.sensTotals){sw+=(RA_SENS_WT[sk]||0)*d1.sensTotals[sk];sc+=d1.sensTotals[sk];}
-    if(sc>0) sensComp=(sw/sc)*15;
-  } else {
-    // No sensitivity data — use area weight as fallback
-    sensComp=areaWt*15;
+    if(sc>0){rawSens=sw/sc;hasSens=true;}
   }
-
-  // Component 5 — Databank Baseline (max 5): historical S&A prevalence
+  // Databank baseline
   var dbs=Math.min(5,(db.count/108)*db.weight*1.5);
 
-  return Math.min(100,Math.round(freq+rec+areaComp+sensComp+dbs));
+  var total=0;
+
+  if(mode==='original'){
+    // Original: Freq(30)+Repeat(25)+Diligent(25)+Sens(15)+DB(5) = 100
+    var areaComp=dilScore;
+    var sensComp=hasSens ? rawSens*15 : (db.areaWt||0.10)*15;
+    total=freq+rec+areaComp+sensComp+dbs;
+
+  } else if(mode==='mode1'){
+    // Mode 1 — Diligent Only: scale dilScore (max 25) → 100
+    total=(dilScore/25)*100;
+
+  } else if(mode==='mode2'){
+    // Mode 2 — Branch History + Databank (no Diligent)
+    // Freq(35)+Repeat(30)+Sens(20)+DB(15) = 100
+    var freq2=(d1.obs/tot)*35;
+    var rec2=0; if(d1.obs>0) rec2=(d1.repeated/d1.obs)*30; if(d2&&d2.obs>0&&d1.obs>0) rec2=Math.min(30,rec2+8);
+    var sens2=hasSens ? rawSens*20 : (db.areaWt||0.10)*20;
+    var dbs2=Math.min(15,(db.count/108)*db.weight*15/5);
+    total=freq2+rec2+sens2+dbs2;
+
+  } else if(mode==='mode3'){
+    // Mode 3 — Diligent + Specific Branch Only (no databank baseline)
+    // Freq(32)+Repeat(27)+Diligent(28)+Sens(13) = 100
+    var freq3=(d1.obs/tot)*32;
+    var rec3=0; if(d1.obs>0) rec3=(d1.repeated/d1.obs)*27; if(d2&&d2.obs>0&&d1.obs>0) rec3=Math.min(27,rec3+8);
+    var dil3=dilD ? (dilD.avgImpact*0.6+dilD.avgLikelihood*0.4)/5*28 : (db.areaWt||0.10)*28*4;
+    var sens3=hasSens ? rawSens*13 : (db.areaWt||0.10)*13;
+    total=freq3+rec3+dil3+sens3;
+  }
+
+  return Math.min(100,Math.round(total));
 }
 
 
