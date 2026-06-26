@@ -17829,9 +17829,9 @@ function ra_handleFilePick(input){
       } else if(ext==='docx'||ext==='doc'){
         var r2=new FileReader();
         r2.onload=function(e){
-          ra_parseDocxFile(e.target.result,function(text){
+          ra_parseDocxFile(e.target.result,function(text,docxSens){
             var sb2=(document.getElementById('ra-sel_branch')||{}).value||'';
-            ra_addLoadedReport(file.name,'',null,text||'',ra_detectBranchInText(text,sb2),false);
+            ra_addLoadedReport(file.name,'',null,text||'',ra_detectBranchInText(text,sb2),false,docxSens||null);
             if(!text) ra_toast('Warning: could not extract text from '+file.name);
           });
         };
@@ -17856,7 +17856,7 @@ function ra_handleFilePick(input){
   input.value='';
 }
 
-function ra_addLoadedReport(name,date,sess,text,detectedBranch,isCertain){
+function ra_addLoadedReport(name,date,sess,text,detectedBranch,isCertain,docxSens){
   for(var i=0;i<ra_loadedReports.length;i++){
     if(ra_loadedReports[i].name===name){ ra_toast(name+' is already loaded.'); return; }
   }
@@ -17873,7 +17873,7 @@ function ra_addLoadedReport(name,date,sess,text,detectedBranch,isCertain){
       if(!proceed) return;
     }
   }
-  ra_loadedReports.push({name:name,date:date,sess:sess,text:text,detectedBranch:detectedBranch||''});
+  ra_loadedReports.push({name:name,date:date,sess:sess,text:text,detectedBranch:detectedBranch||'',docxSens:docxSens||null});
   ra_renderLoadedFilesList();
   ra_toast('Loaded: '+name+(detectedBranch?' ('+detectedBranch+')':''));
 }
@@ -17898,6 +17898,8 @@ function ra_renderLoadedFilesList(){
     h+='<span style="font-size:14px;flex-shrink:0">'+icon+'</span>';
     h+='<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:700;color:#1a3a5c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+ra_esc(rp.name)+'</div>';
     if(rp.detectedBranch) h+='<div style="font-size:10px;color:#1a7040;font-weight:600;margin-top:1px">&#10003; '+ra_esc(rp.detectedBranch)+'</div>';
+    if(rp.docxSens){ var dsAreas=Object.keys(rp.docxSens).length; h+='<div style="font-size:10px;color:#6040b0;font-weight:600;margin-top:1px">&#128270; Sensitivity data read ('+dsAreas+' area'+(dsAreas!==1?'s':'')+')</div>'; }
+    else if((rp.name.indexOf('.docx')!==-1||rp.name.indexOf('.doc')!==-1)&&!rp.sess){ h+='<div style="font-size:10px;color:#a06020;margin-top:1px">&#9888; No sensitivity table found — using area weight fallback</div>'; }
     h+='<div style="display:flex;align-items:center;gap:6px;margin-top:3px"><input type="date" value="'+ra_esc(rp.date||'')+'" style="padding:2px 5px;font-size:10px;width:130px;border:1px solid #c8d8ec;border-radius:3px" onchange="ra_loadedReports['+i+'].date=this.value">';
     h+='<span style="font-size:10px;color:#9a9a9a">'+wc+' words</span></div></div>';
     h+='<button onclick="ra_removeLoadedReport('+i+')" title="Remove" style="padding:3px 7px;font-size:11px;border:1px solid #f0a0a0;border-radius:4px;background:#f5f8fd;color:#c03030;cursor:pointer;font-weight:600;flex-shrink:0">&#10005;</button>';
@@ -17916,6 +17918,94 @@ function ra_buildTextFromSession(sess){
     if(sess.formData.brname) lines.unshift('Branch: '+sess.formData.brname);
   }
   return lines.join('\n');
+}
+
+// Extract sensitivity per observation from docx XML — returns {catKey: {High:n, 'M to H':n, ...}}
+function ra_extractDocxSens(xml){
+  // Normalise namespace prefixes away so we can match <w:tr>, <w:tc>, <w:t> simply
+  // Strategy: parse all <w:tr> table rows; within each row collect <w:tc> cell text blocks
+  var result={};
+  var SENS_VALS={'high':['high'],'m to h':['medium to high','m to h','mth'],'l to m':['low to medium','l to m','ltm'],'low':['low']};
+  var SENS_NORM={'high':'High','m to h':'M to H','l to m':'L to M','low':'Low'};
+
+  // Pull all table rows
+  var rows=[];
+  var rowRe=/<w:tr[\s>][\s\S]*?<\/w:tr>/gi;
+  var rm;
+  while((rm=rowRe.exec(xml))!==null) rows.push(rm[0]);
+
+  // For each row, extract cell texts
+  function cellTexts(rowXml){
+    var cells=[]; var tcRe=/<w:tc[\s>][\s\S]*?<\/w:tc>/gi; var tm;
+    while((tm=tcRe.exec(rowXml))!==null){
+      var tRe=/<w:t[^>]*>([\s\S]*?)<\/w:t>/gi; var tv; var parts=[];
+      while((tv=tRe.exec(tm[0]))!==null) parts.push(tv[1]);
+      cells.push(parts.join('').trim());
+    }
+    return cells;
+  }
+
+  // Fuzzy match area heading to RA_DB_CATS key
+  function matchArea(txt){
+    var low=txt.toLowerCase().replace(/['']/g,"'").replace(/[^a-z0-9 &]/g,' ').replace(/\s+/g,' ').trim();
+    var keys=Object.keys(RA_CAT_KEYWORDS);
+    for(var i=0;i<keys.length;i++){
+      var kws=RA_CAT_KEYWORDS[keys[i]];
+      for(var k=0;k<kws.length;k++){ if(low.indexOf(kws[k])!==-1) return keys[i]; }
+    }
+    return null;
+  }
+
+  // Normalise sensitivity string
+  function normSens(s){
+    var low=s.toLowerCase().replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
+    for(var sv in SENS_VALS){
+      var alts=SENS_VALS[sv];
+      for(var ai=0;ai<alts.length;ai++){ if(low===alts[ai]||low.indexOf(alts[ai])!==-1) return SENS_NORM[sv]; }
+    }
+    return null;
+  }
+
+  var obsRefRe=/^\d+\.\d+$/;
+  var currentCat=null;
+  var inObsSection=false;
+
+  for(var ri=0;ri<rows.length;ri++){
+    var cells=cellTexts(rows[ri]);
+    if(!cells.length) continue;
+    var first=cells[0];
+
+    // Detect header row of Observations Summary table
+    if(!inObsSection){
+      var joined=cells.join(' ').toLowerCase();
+      if(joined.indexOf('risk sensitivity')!==-1&&joined.indexOf('observation')!==-1){ inObsSection=true; continue; }
+      continue;
+    }
+
+    // End detection — if we hit "Follow Up" or similar section break
+    if(cells.length===1&&/follow\s*up/i.test(first)){ break; }
+
+    // Area heading row — one cell with no obs ref and no sensitivity
+    if(cells.length<=2&&!obsRefRe.test(first)){
+      var area=matchArea(first);
+      if(area) currentCat=area;
+      continue;
+    }
+
+    // Observation row — find obs ref and sensitivity
+    if(!currentCat) continue;
+    var sensVal=null;
+    // Sensitivity is usually the last or second-last cell
+    for(var ci=cells.length-1;ci>=0;ci--){
+      var ns=normSens(cells[ci]);
+      if(ns){ sensVal=ns; break; }
+    }
+    if(sensVal){
+      if(!result[currentCat]) result[currentCat]={};
+      result[currentCat][sensVal]=(result[currentCat][sensVal]||0)+1;
+    }
+  }
+  return Object.keys(result).length?result:null;
 }
 
 function ra_parseDocxFile(arrayBuffer,callback){
@@ -17948,7 +18038,8 @@ function ra_parseDocxFile(arrayBuffer,callback){
         var dataStart=localOffset+30+lhFnLen+lhExtraLen;
         var compData=arrayBuffer.slice(dataStart,dataStart+compSize);
         if(comprMethod===0){
-          callback(ra_xmlToText(new TextDecoder().decode(compData)));
+          var xmlStr=new TextDecoder().decode(compData);
+          callback(ra_xmlToText(xmlStr),ra_extractDocxSens(xmlStr));
         } else if(comprMethod===8){
           var ds=new DecompressionStream('deflate-raw');
           var writer=ds.writable.getWriter();
@@ -17961,11 +18052,12 @@ function ra_parseDocxFile(arrayBuffer,callback){
               if(res.done){
                 var combined=new Uint8Array(ra_totalLen); var off=0;
                 for(var k=0;k<ra_chunks.length;k++){ combined.set(ra_chunks[k],off); off+=ra_chunks[k].length; }
-                callback(ra_xmlToText(new TextDecoder().decode(combined)));
+                var xmlStr2=new TextDecoder().decode(combined);
+                callback(ra_xmlToText(xmlStr2),ra_extractDocxSens(xmlStr2));
               } else { ra_chunks.push(res.value); ra_totalLen+=res.value.length; ra_pump(); }
-            }).catch(function(){ callback(''); });
+            }).catch(function(){ callback('',''); });
           })();
-        } else { callback(''); }
+        } else { callback('',null); }
         return;
       }
       pos+=46+fnLen+extraLen+commentLen;
@@ -18049,7 +18141,7 @@ function ra_parseXlsxFile(arrayBuffer,callback){
   });
 }
 
-function ra_parseReport(text,sess){
+function ra_parseReport(text,sess,docxSens){
   var result={}; var catNames=Object.keys(RA_DB_CATS);
   for(var i=0;i<catNames.length;i++) result[catNames[i]]={obs:0,repeated:0,new:0,sensTotals:{}};
   if(sess){
@@ -18082,6 +18174,12 @@ function ra_parseReport(text,sess){
   } else if(text&&text.trim()){
     var tCats2=ra_parseTextCategories(text); var repLines=ra_countRepeatedInText(text);
     for(var c3 in tCats2){ if(result[c3]){ result[c3].obs=tCats2[c3]; result[c3].repeated=repLines[c3]||0; result[c3].new=Math.max(0,result[c3].obs-result[c3].repeated); } }
+    // Inject sensitivity totals extracted from Word Observations Summary table
+    if(docxSens){
+      for(var ds in docxSens){
+        if(result[ds]){ result[ds].sensTotals=docxSens[ds]; }
+      }
+    }
   }
   return result;
 }
@@ -19667,10 +19765,10 @@ function ra_runAnalysis(){
     }
   }
   var allSources=[];
-  for(var li=0;li<ra_loadedReports.length;li++) allSources.push({text:ra_loadedReports[li].text,sess:ra_loadedReports[li].sess,date:ra_loadedReports[li].date});
-  if(pasteText) allSources.push({text:pasteText,sess:null,date:''});
+  for(var li=0;li<ra_loadedReports.length;li++) allSources.push({text:ra_loadedReports[li].text,sess:ra_loadedReports[li].sess,date:ra_loadedReports[li].date,docxSens:ra_loadedReports[li].docxSens||null});
+  if(pasteText) allSources.push({text:pasteText,sess:null,date:'',docxSens:null});
   var parsedList=[];
-  for(var pi=0;pi<allSources.length;pi++) parsedList.push(ra_parseReport(allSources[pi].text,allSources[pi].sess));
+  for(var pi=0;pi<allSources.length;pi++) parsedList.push(ra_parseReport(allSources[pi].text,allSources[pi].sess,allSources[pi].docxSens));
   var rpt1,rpt2=null,d1='',d2='';
   if(parsedList.length===1){ rpt1=parsedList[0]; d1=allSources[0].date||''; }
   else { rpt1=parsedList[parsedList.length-1]; rpt2=parsedList[0]; d1=allSources[allSources.length-1].date||''; d2=allSources[0].date||''; }
