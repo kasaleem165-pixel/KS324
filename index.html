@@ -9784,6 +9784,13 @@ function _hoActivateBtns(){
   if(cmp){  cmp.style.opacity='1';  cmp.style.filter='none';  cmp.innerHTML='&#128269; Compare'; }
   if(demo){ demo.style.opacity='1'; demo.style.filter='none'; demo.innerHTML='&#127919; Demo'; demo.onclick=function(){ loadDemoData(); }; }
   if(chpw){ chpw.disabled=false; chpw.style.opacity='1'; chpw.style.filter='none'; chpw.style.cursor='pointer'; chpw.style.background='#1a3a5c'; chpw.style.borderColor='#c9962a'; chpw.setAttribute('data-tip-title','Change Password (HO)'); chpw.setAttribute('data-tip','Change the User or Head Office login password. Available to authenticated HO users only.'); chpw.innerHTML='&#128272; Change PW'; }
+  // Risk Mapping Editor — HO-only buttons
+  var srrReset  = document.getElementById('srr-reset-btn');
+  var srrSubmit = document.getElementById('srr-submit-btn');
+  var srrImport = document.getElementById('srr-import-btn');
+  if(srrReset){  srrReset.disabled=false;  srrReset.style.opacity='1';  srrReset.style.cursor='pointer';  srrReset.style.filter='none';  srrReset.title='Reset all risk mappings to default';  srrReset.innerHTML='&#8635; Reset All'; }
+  if(srrSubmit){ srrSubmit.disabled=false; srrSubmit.style.opacity='1'; srrSubmit.style.cursor='pointer'; srrSubmit.style.filter='none'; srrSubmit.title='Submit Risk Map to HO';              srrSubmit.innerHTML='&#9993; Submit Risk Map'; }
+  if(srrImport){ srrImport.disabled=false; srrImport.style.opacity='1'; srrImport.style.cursor='pointer'; srrImport.style.filter='none'; srrImport.title='Import Risk Map Updates from session file'; srrImport.innerHTML='&#128229; Import Risk Map Updates'; }
 }
 
 function showDemoAuth(){
@@ -18910,6 +18917,7 @@ function srrApplyCatChange(obsId){
 
 function srrApplyReassign(isCustom){
   if(!srr_currentId) return;
+  // Risk mapping changes are available to all authenticated users; HO lock is on bulk/destructive actions only.
   var obsId = srr_currentId;
   var r;
   if(!isCustom){
@@ -18964,6 +18972,7 @@ function srrUndoReassign(){
 
 // ── Reset all ──
 function srrResetAll(){
+  if(!window._hoAuthed){ alert('This action requires HO authentication.'); return; }
   if(!confirm('Reset all flags and reassignments? This cannot be undone.')) return;
   srr_flagged={};  srr_reassigned={}; srr_files=[]; srrRenderFilesBar();
   srrBuildTable();
@@ -19055,6 +19064,7 @@ function srrClearFiles(){
 
 // ── SRR Import from Session File ─────────────────────────────────────────────
 function srrImportSession(input){
+  if(!window._hoAuthed){ alert('This action requires HO authentication.'); input.value=''; return; }
   var file = input.files && input.files[0];
   if(!file) return;
   input.value = '';
@@ -19327,6 +19337,7 @@ function srrApplyImport(changes){
 
 // ── SRR Submit ───────────────────────────────────────────────────────────────
 function srrShowSubmit(){
+  if(!window._hoAuthed){ alert('This action requires HO authentication.'); return; }
   var all=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
   if(!all.length){ _srrToast('No observations to submit.'); return; }
 
@@ -21680,14 +21691,14 @@ function _w2rBuildHtml(d){
       <option value="flagged">Flagged only</option>
       <option value="reassigned">Reassigned only</option>
     </select>
-    <button onclick="srrResetAll()" style="padding:5px 11px;background:#8b1a1a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit">&#8635; Reset All</button>
+    <button id="srr-reset-btn" onclick="if(window._hoAuthed)srrResetAll();else alert('This action requires HO authentication.')" disabled style="padding:5px 11px;background:#8b1a1a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:not-allowed;font-family:inherit;opacity:.4" title="&#128274; HO access required">&#128274; Reset All</button>
     <button onclick="srrExport()" style="padding:5px 11px;background:#1e5c3a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit">&#11123; Export CSV</button>
     <div style="width:1px;height:24px;background:#dde6f0;margin:0 4px;flex-shrink:0"></div>
     <button onclick="srrUploadClick()" style="padding:5px 11px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px">&#128206; Upload Files <span id="srr-file-badge" style="display:none;background:#f0c040;color:#1a2a38;border-radius:8px;padding:0 6px;font-size:10px;font-weight:800;margin-left:2px">0</span></button>
     <input type="file" id="srr-file-input" multiple style="display:none" onchange="srrHandleFiles(this.files)">
-    <button onclick="srrShowSubmit()" style="padding:5px 14px;background:#c07000;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#9993; Submit Risk Map</button>
+    <button id="srr-submit-btn" onclick="if(window._hoAuthed)srrShowSubmit();else alert('This action requires HO authentication.')" disabled style="padding:5px 14px;background:#c07000;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:inherit;opacity:.4" title="&#128274; HO access required">&#128274; Submit Risk Map</button>
     <div style="width:1px;height:24px;background:#dde6f0;margin:0 4px;flex-shrink:0"></div>
-    <button onclick="document.getElementById('srr-import-input').click()" style="padding:5px 11px;background:#4a1a7a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Import Risk Map Updates</button>
+    <button id="srr-import-btn" onclick="if(window._hoAuthed)document.getElementById('srr-import-input').click();else alert('This action requires HO authentication.')" disabled style="padding:5px 11px;background:#4a1a7a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:inherit;opacity:.4" title="&#128274; HO access required">&#128274; Import Risk Map Updates</button>
     <input type="file" id="srr-import-input" accept=".json" style="display:none" onchange="srrImportSession(this)">
     <span style="font-size:11px;color:#888;margin-left:4px" id="srr-count-lbl"></span>
   </div>
