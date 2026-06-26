@@ -19035,6 +19035,169 @@ function srrClearFiles(){
   srrRenderFilesBar();
 }
 
+// ── SRR Import from Session File ─────────────────────────────────────────────
+function srrImportSession(input){
+  var file = input.files && input.files[0];
+  if(!file) return;
+  input.value = '';
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var sess;
+    try{ sess = JSON.parse(e.target.result); }
+    catch(err){ alert('Could not read the session file. Please ensure it is a valid JSON session file.'); return; }
+
+    // Extract SRR reassignments and category changes from session
+    var impSrr  = sess.srr_reassigned || {};
+    var impObs  = (sess.DB && sess.DB.observations ? sess.DB.observations : [])
+                   .concat(sess.customs || []);
+
+    // Build current obs lookup
+    var curObs = {};
+    var allObs = (DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
+    allObs.forEach(function(o){ curObs[o.id] = o; });
+
+    // Collect changes
+    var changes = [];
+
+    // SRR reassignments
+    Object.keys(impSrr).forEach(function(obsId){
+      var cur = curObs[obsId];
+      var newR = impSrr[obsId];
+      var curSrr = (srr_reassigned[obsId]||{}).srr_id || _obsSrrCache[obsId] || (cur ? _getObsSrr(cur) : '—');
+      if(newR.srr_id && newR.srr_id !== curSrr){
+        changes.push({
+          obsId: obsId,
+          title: cur ? (cur.title||obsId) : obsId,
+          type: 'SRR',
+          from: curSrr || '—',
+          to: newR.srr_id,
+          toName: newR.srr_name || (SRR_DEF[newR.srr_id]?SRR_DEF[newR.srr_id].name:''),
+          data: newR
+        });
+      }
+    });
+
+    // Category changes
+    impObs.forEach(function(impO){
+      var cur = curObs[impO.id];
+      if(cur && impO.category && impO.category !== cur.category){
+        changes.push({
+          obsId: impO.id,
+          title: cur.title || impO.id,
+          type: 'Category',
+          from: cur.category || '—',
+          to: impO.category,
+          toName: '',
+          data: impO
+        });
+      }
+    });
+
+    if(!changes.length){
+      alert('No SRR or Category changes found in this session file that differ from the current data.');
+      return;
+    }
+
+    srrShowImportReview(changes);
+  };
+  reader.readAsText(file);
+}
+
+function srrShowImportReview(changes){
+  var rows = changes.map(function(c, i){
+    var typeCol = c.type==='SRR' ? '#4a1a7a' : '#1a5a3a';
+    var toLabel = c.type==='SRR'
+      ? '<strong>'+_srrEsc(c.to)+'</strong><span style="color:#666;font-size:10px;margin-left:4px">'+_srrEsc(c.toName)+'</span>'
+      : '<strong>'+_srrEsc(c.to)+'</strong>';
+    return '<tr style="background:'+(i%2===0?'#fff':'#f8fafc')+';border-bottom:1px solid #eaeff6">'
+      +'<td style="padding:7px 10px;text-align:center"><input type="checkbox" class="srr-imp-chk" data-idx="'+i+'" checked style="width:15px;height:15px;cursor:pointer;accent-color:#4a1a7a"></td>'
+      +'<td style="padding:7px 10px;font-size:10.5px;color:#888;font-weight:600">'+_srrEsc(c.obsId)+'</td>'
+      +'<td style="padding:7px 10px;font-size:11.5px;font-weight:600;color:#1a3a5c;max-width:200px">'+_srrEsc(c.title)+'</td>'
+      +'<td style="padding:7px 10px;text-align:center"><span style="font-size:10px;font-weight:800;color:#fff;background:'+typeCol+';border-radius:3px;padding:2px 7px">'+c.type+'</span></td>'
+      +'<td style="padding:7px 10px;font-size:11px;color:#888;text-decoration:line-through">'+_srrEsc(c.from)+'</td>'
+      +'<td style="padding:7px 10px;font-size:11px;color:#1a5c2a">&#8594; '+toLabel+'</td>'
+      +'</tr>';
+  }).join('');
+
+  var el = document.createElement('div');
+  el.className = 'vh-bg'; el.id = 'srrImportModal';
+  el.style.zIndex = '999999';
+  el.innerHTML =
+    '<div class="vh-box" style="width:820px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column">'
+    +'<div class="vh-head" style="background:#4a1a7a">'
+    +'<h3 style="color:#fff">&#128229; Import SRR Updates — Review Changes</h3>'
+    +'<button onclick="document.getElementById(\'srrImportModal\').remove()" style="color:#fff;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);border-radius:4px;width:26px;height:26px;font-size:14px;cursor:pointer">&#10005;</button>'
+    +'</div>'
+    +'<div style="padding:12px 16px;background:#f5f0fc;border-bottom:1px solid #d8c8ec;display:flex;align-items:center;gap:12px;flex-shrink:0">'
+    +'<span style="font-size:12px;color:#4a1a7a">&#9432; Review each change below. <strong>Tick</strong> the ones you want to apply. <strong>Untick</strong> any you want to keep in original form.</span>'
+    +'<label style="margin-left:auto;font-size:11px;color:#4a1a7a;font-weight:700;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px">'
+    +'<input type="checkbox" id="srr-imp-all" checked onchange="document.querySelectorAll(\'.srr-imp-chk\').forEach(function(c){c.checked=document.getElementById(\'srr-imp-all\').checked})" style="accent-color:#4a1a7a"> Select All</label>'
+    +'</div>'
+    +'<div style="overflow-y:auto;flex:1">'
+    +'<table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<thead><tr style="background:#1a3a5c;color:#fff;position:sticky;top:0">'
+    +'<th style="padding:8px 10px;width:36px">&#10003;</th>'
+    +'<th style="padding:8px 10px;text-align:left;width:80px">Obs ID</th>'
+    +'<th style="padding:8px 10px;text-align:left">Observation Title</th>'
+    +'<th style="padding:8px 10px;text-align:center;width:80px">Type</th>'
+    +'<th style="padding:8px 10px;text-align:left;width:140px">Current Value</th>'
+    +'<th style="padding:8px 10px;text-align:left">New Value</th>'
+    +'</tr></thead>'
+    +'<tbody>'+rows+'</tbody>'
+    +'</table>'
+    +'</div>'
+    +'<div style="padding:14px 16px;border-top:1px solid #d8c8ec;display:flex;gap:10px;align-items:center;flex-shrink:0;background:#fafbfc">'
+    +'<span style="font-size:11px;color:#666;flex:1"><strong id="srr-imp-sel-count">'+changes.length+'</strong> of '+changes.length+' changes selected</span>'
+    +'<button onclick="srrApplyImport('+JSON.stringify(changes).replace(/</g,'\\u003c')+')" style="padding:9px 24px;background:#4a1a7a;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Apply Selected to Databank</button>'
+    +'<button onclick="document.getElementById(\'srrImportModal\').remove()" style="padding:9px 18px;background:#e8edf5;color:#444;border:none;border-radius:5px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">&#10005; Cancel — Keep Original</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(el);
+  el.addEventListener('click', function(e){ if(e.target===el) el.remove(); });
+
+  // Live counter
+  el.addEventListener('change', function(){
+    var total = el.querySelectorAll('.srr-imp-chk').length;
+    var sel   = el.querySelectorAll('.srr-imp-chk:checked').length;
+    var cEl   = document.getElementById('srr-imp-sel-count');
+    if(cEl) cEl.textContent = sel;
+    var allChk = document.getElementById('srr-imp-all');
+    if(allChk) allChk.checked = (sel === total);
+  });
+}
+
+function srrApplyImport(changes){
+  var modal = document.getElementById('srrImportModal');
+  var checked = modal ? modal.querySelectorAll('.srr-imp-chk:checked') : [];
+  var selected = [];
+  checked.forEach(function(cb){ selected.push(parseInt(cb.dataset.idx,10)); });
+
+  if(!selected.length){ alert('No changes selected. Nothing was applied.'); return; }
+
+  var appliedSrr=0, appliedCat=0;
+  var allObs = (DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
+  var curObs = {}; allObs.forEach(function(o){ curObs[o.id]=o; });
+
+  selected.forEach(function(idx){
+    var c = changes[idx];
+    if(!c) return;
+    if(c.type==='SRR'){
+      srr_reassigned[c.obsId] = c.data;
+      appliedSrr++;
+    } else if(c.type==='Category'){
+      var o = curObs[c.obsId];
+      if(o){ o.category = c.to; appliedCat++; }
+      if(typeof customs!=='undefined'){
+        for(var j=0;j<customs.length;j++){if(customs[j].id===c.obsId){customs[j].category=c.to;break;}}
+      }
+    }
+  });
+
+  if(modal) modal.remove();
+  srrBuildTable();
+  if(typeof toast==='function') toast('Applied: '+appliedSrr+' SRR update'+(appliedSrr!==1?'s':'')+', '+appliedCat+' category change'+(appliedCat!==1?'s':'')+'.');
+}
+
 // ── SRR Submit ───────────────────────────────────────────────────────────────
 function srrShowSubmit(){
   var all=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
@@ -21396,6 +21559,9 @@ function _w2rBuildHtml(d){
     <button onclick="srrUploadClick()" style="padding:5px 11px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px">&#128206; Upload Files <span id="srr-file-badge" style="display:none;background:#f0c040;color:#1a2a38;border-radius:8px;padding:0 6px;font-size:10px;font-weight:800;margin-left:2px">0</span></button>
     <input type="file" id="srr-file-input" multiple style="display:none" onchange="srrHandleFiles(this.files)">
     <button onclick="srrShowSubmit()" style="padding:5px 14px;background:#c07000;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#9993; Submit SRR Map</button>
+    <div style="width:1px;height:24px;background:#dde6f0;margin:0 4px;flex-shrink:0"></div>
+    <button onclick="document.getElementById('srr-import-input').click()" style="padding:5px 11px;background:#4a1a7a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Import SRR Updates</button>
+    <input type="file" id="srr-import-input" accept=".json" style="display:none" onchange="srrImportSession(this)">
     <span style="font-size:11px;color:#888;margin-left:4px" id="srr-count-lbl"></span>
   </div>
   <!-- Uploaded files bar -->
