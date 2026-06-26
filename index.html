@@ -19231,12 +19231,41 @@ function srrApplyImport(changes){
 
   if(!selected.length){ alert('No changes selected. Nothing was applied.'); return; }
 
+  // Build set of obsIds whose SRR change IS selected
+  var srrSelectedObs = {};
+  selected.forEach(function(idx){
+    var c = changes[idx];
+    if(c && c.type==='SRR') srrSelectedObs[c.obsId] = true;
+  });
+
+  // Validation 1: block if any derived RR change lacks a paired SRR change
+  var rrWithoutSrr = [];
+  changes.forEach(function(c){
+    if(c.derived && c.type==='RR' && !srrSelectedObs[c.obsId]){
+      rrWithoutSrr.push(c.obsId+' — '+c.title);
+    }
+  });
+  if(rrWithoutSrr.length){
+    alert('Cannot apply RR change without the corresponding SRR change.\n\nPlease also tick the SRR row(s) for:\n• '+rrWithoutSrr.join('\n• '));
+    return;
+  }
+
   // Read HO overrides from dropdowns
   var overrides = {};
   if(modal){
     modal.querySelectorAll('.srr-imp-override').forEach(function(sel){
       if(sel.value) overrides[parseInt(sel.dataset.idx,10)] = {type:sel.dataset.type, value:sel.value};
     });
+  }
+
+  // Validation 2: confirm category changes before applying
+  var catSelected = selected.filter(function(idx){ return changes[idx] && changes[idx].type==='Category'; });
+  if(catSelected.length){
+    var catList = catSelected.map(function(idx){
+      var c=changes[idx]; return '• '+c.obsId+': '+c.from+' → '+((overrides[idx]&&overrides[idx].value)||c.to);
+    }).join('\n');
+    var ok = confirm('You are about to change the Audit Category for '+catSelected.length+' observation'+(catSelected.length!==1?'s':'')+'. This affects how the observation is grouped in reports.\n\n'+catList+'\n\nProceed?');
+    if(!ok) return;
   }
 
   var appliedSrr=0, appliedCat=0, hoOverrideCount=0;
@@ -19246,7 +19275,7 @@ function srrApplyImport(changes){
   selected.forEach(function(idx){
     var c = changes[idx];
     if(!c) return;
-    var ov = overrides[idx]; // HO override for this row
+    var ov = overrides[idx];
 
     if(c.type==='SRR'){
       var finalSrrId = (ov && ov.value) ? ov.value : c.to;
