@@ -12247,7 +12247,7 @@ function doCopy(){
 
 function doClear(){
   if(!confirm('Clear all selections?'))return;
-  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={};
   for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
   responseLoaded=false;
   _brInfoHasData=false;
@@ -12270,7 +12270,7 @@ function doClear(){
 
 function doNewReport(){
   if(!confirm('Start a new blank report? All current data will be cleared.'))return;
-  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={};
   responseLoaded=false;
   _brInfoHasData=false;
   _brInfoUnlocked=false; // force unlock path to run
@@ -14814,42 +14814,44 @@ function getObsReadiness(o){
   var obsText=(obsEdits[id]&&obsEdits[id].observation!=null)?obsEdits[id].observation:(o.observation||'');
   var recText=(obsEdits[id]&&obsEdits[id].recommendation!=null)?obsEdits[id].recommendation:(o.recommendation||'');
   var blocking=[], advisory=[];
+  // Helper: check if this field has been marked N/A for this obs
+  var W=window._pfWaivers||{};
+  function waived(field){ return !!W[id+'|'+field]; }
 
-  // 1. Observation text present (blocking)
+  // 1. Observation text present (blocking — not waivable)
   if(!obsText||obsText.trim().length<10)
-    blocking.push({field:'Observation',msg:'Observation text is missing or too short'});
+    blocking.push({field:'Observation',msg:'Observation text is missing or too short',waivable:false});
 
-  // 2. Recommendation text present (blocking)
+  // 2. Recommendation text present (blocking — not waivable)
   if(!recText||recText.trim().length<10)
-    blocking.push({field:'Recommendation',msg:'Recommendation text is missing or too short'});
+    blocking.push({field:'Recommendation',msg:'Recommendation text is missing or too short',waivable:false});
 
+  // 3. Prior Audit Reference — blocking for Repeated observations only (not waivable)
+  if(obsType==='repeated'&&!lastRefMap[id])
+    blocking.push({field:'Prior Audit Ref',msg:'Prior Audit Report Reference is required for Repeated observations',waivable:false});
 
-  // 4. Sensitivity rating (advisory)
-  if(!sensitivityMap[id])
-    advisory.push({field:'Sensitivity',msg:'Risk sensitivity level (High / M to H / L to M / Low) not set'});
+  // 4. Sensitivity rating (advisory — waivable)
+  if(!sensitivityMap[id]&&!waived('Sensitivity'))
+    advisory.push({field:'Sensitivity',msg:'Risk sensitivity level (High / M to H / L to M / Low) not set',waivable:true});
 
-  // 5. COSO component (advisory)
-  if(!cosoMap[id])
-    advisory.push({field:'COSO',msg:'COSO framework component not mapped (CE / RA / CA / IC / M)'});
+  // 5. COSO component (advisory — waivable)
+  if(!cosoMap[id]&&!waived('COSO'))
+    advisory.push({field:'COSO',msg:'COSO framework component not mapped (CE / RA / CA / IC / M)',waivable:true});
 
-  // 6. Financial Impact / Instance count (advisory — especially for High/M-to-H)
+  // 6. Financial Impact / Instance count (waivable)
   var hasInstCount=(instCountMap[id]&&instCountMap[id]>0);
   var hasInstAmt=(instAmountMap[id]&&instAmountMap[id]>0);
   var hasInlineTable=(function(){var ls=obsText.split('\n'),r=0;for(var li=0;li<ls.length;li++){var ln=ls[li].trim();if(ln.indexOf('|')===-1||/^\|[\s\-:|]+\|?\s*$/.test(ln))continue;r++;}return r>1;}());
-  if(!hasInstCount&&!hasInstAmt&&!hasInlineTable){
+  if(!hasInstCount&&!hasInstAmt&&!hasInlineTable&&!waived('Financial Impact')){
     var sens=sensitivityMap[id]||'';
     var sev=(sens==='High'||sens==='M to H')?'blocking':'advisory';
     if(sev==='blocking')
-      blocking.push({field:'Financial Impact',msg:'No instance count or financial impact entered — required for High / Medium-High sensitivity observations'});
+      blocking.push({field:'Financial Impact',msg:'No instance count or financial impact entered — required for High / Medium-High sensitivity observations',waivable:true});
     else
-      advisory.push({field:'Financial Impact',msg:'Instance count and financial impact not quantified (enter values or include an inline table in the observation text)'});
+      advisory.push({field:'Financial Impact',msg:'Instance count and financial impact not quantified (enter values or include an inline table in the observation text)',waivable:true});
   }
 
-  // 3. Prior Audit Reference — blocking for Repeated observations only
-  if(obsType==='repeated'&&!lastRefMap[id])
-    blocking.push({field:'Prior Audit Ref',msg:'Prior Audit Report Reference is required for Repeated observations'});
-
-  var total=2+3+(obsType==='repeated'?1:0); // obs+rec+sensitivity+coso+financial (+prior ref if repeated)
+  var total=2+3+(obsType==='repeated'?1:0);
   var passed=total-blocking.length-advisory.length;
   return{blocking:blocking,advisory:advisory,score:passed,total:total,obsType:obsType};
 }
@@ -16343,6 +16345,14 @@ function generateIssuedReport(){
 }
 
 // ── Global helpers for pre-flight navigation (must be global for onclick strings) ──
+window._pfWaivers = window._pfWaivers || {};
+window._pfWaive = function(obsId, field){
+  window._pfWaivers = window._pfWaivers || {};
+  window._pfWaivers[obsId+'|'+field] = true;
+  var ov=document.getElementById('_pfOv'); if(ov) ov.remove();
+  showSaveDialog();
+};
+
 window._pfNavToObs = function(obsId){
   // 1. Fully remove the overlay so nothing blocks the page
   var ov=document.getElementById('_pfOv'); if(ov) ov.remove();
@@ -16393,11 +16403,12 @@ window._pfNavToObs = function(obsId){
           +';border-radius:4px;padding:1px 6px;margin-bottom:3px;display:inline-block;letter-spacing:.3px';
         badge.textContent=(isBlocking?'⚠ ':'ℹ ')+fieldLabel+' required';
         fel.parentNode.insertBefore(badge,fel);
-        // Remove after 8s
-        setTimeout(function(){
+        // Remove after 45s or when floating bar is clicked (whichever comes first)
+        var _hlTimer=setTimeout(function(){
           fel.style.outline=''; fel.style.outlineOffset='';
           if(badge.parentNode) badge.parentNode.removeChild(badge);
-        },8000);
+        },45000);
+        fel._pfHlClear=function(){ clearTimeout(_hlTimer); fel.style.outline=''; fel.style.outlineOffset=''; if(badge.parentNode) badge.parentNode.removeChild(badge); };
       }
       for(var _bi=0;_bi<_r.blocking.length;_bi++){
         var _bids=_fmap[_r.blocking[_bi].field]||[];
@@ -16412,8 +16423,21 @@ window._pfNavToObs = function(obsId){
 
   },150); // end scroll-settle timeout
 
-  // 5. Show / refresh the floating resume bar immediately
+  // 5. Show / refresh the floating resume bar, then update it to "done editing?" mode
   window._pfRefreshFloat();
+  setTimeout(function(){
+    var fb=document.getElementById('_pfFloat');
+    if(!fb) return;
+    var lbl=document.getElementById('_pfFloatCount');
+    if(lbl) lbl.innerHTML='<span style="color:#ffe080;font-weight:800">&#9998; Fill highlighted fields above</span><br><span style="opacity:.85">then click here to re-check &amp; continue &#8593;</span>';
+    fb.style.animation='pfPulse 1.2s ease-in-out infinite';
+    if(!document.getElementById('_pfPulseStyle')){
+      var st=document.createElement('style');
+      st.id='_pfPulseStyle';
+      st.textContent='@keyframes pfPulse{0%,100%{box-shadow:0 4px 24px rgba(0,0,0,.45)}50%{box-shadow:0 4px 32px rgba(240,192,64,.7),0 0 0 4px rgba(240,192,64,.25)}}';
+      document.head.appendChild(st);
+    }
+  },200);
 };
 
 window._pfRefreshFloat = function(){
@@ -16435,7 +16459,12 @@ window._pfRefreshFloat = function(){
         +'<div id="_pfFloatCount" style="font-size:10.5px;color:rgba(255,255,255,.85);margin-top:2px"></div>'
       +'</div>'
       +'<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.7);white-space:nowrap">&#9650; Resume</div>';
-    fb.onclick=function(){ fb.remove(); showSaveDialog(); };
+    fb.onclick=function(){
+      // Clear any lingering field highlights before re-opening checklist
+      document.querySelectorAll('._pf-hl-badge').forEach(function(b){if(b.parentNode)b.parentNode.removeChild(b);});
+      document.querySelectorAll('[id]').forEach(function(el){if(el._pfHlClear){el._pfHlClear();delete el._pfHlClear;}});
+      fb.remove(); showSaveDialog();
+    };
     document.body.appendChild(fb);
   }
   var lbl=document.getElementById('_pfFloatCount');
@@ -16532,17 +16561,21 @@ function showSaveDialog(){
         // Issue detail rows
         _pfRows+='<div style="padding:5px 10px 3px">';
         for(var _bki=0;_bki<_pfItem.r.blocking.length;_bki++){
+          var _bf=_pfItem.r.blocking[_bki];
           _pfRows+='<div style="display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid #fde8e8">'
-            +'<span style="color:#c0392b;font-size:13px;line-height:1;margin-top:1px">&#9888;</span>'
-            +'<span style="color:#c0392b;font-weight:700;font-size:11px;white-space:nowrap;min-width:120px;padding-top:1px">'+esc(_pfItem.r.blocking[_bki].field)+'</span>'
-            +'<span style="color:#5a2020;font-size:11px;line-height:1.45">'+esc(_pfItem.r.blocking[_bki].msg)+'</span>'
+            +'<span style="color:#c0392b;font-size:13px;line-height:1;margin-top:1px;flex-shrink:0">&#9888;</span>'
+            +'<span style="color:#c0392b;font-weight:700;font-size:11px;white-space:nowrap;min-width:110px;padding-top:1px;flex-shrink:0">'+esc(_bf.field)+'</span>'
+            +'<span style="color:#5a2020;font-size:11px;line-height:1.45;flex:1">'+esc(_bf.msg)+'</span>'
+            +(_bf.waivable?'<button onclick="_pfWaive(\''+_pfItem.o.id+'\',\''+_bf.field+'\')" title="Mark as Not Applicable — skip this check for this observation" style="flex-shrink:0;margin-left:6px;padding:2px 8px;font-size:10px;font-weight:700;background:#f0f0f0;color:#555;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-family:inherit;white-space:nowrap">N/A</button>':'')
             +'</div>';
         }
         for(var _adi=0;_adi<_pfItem.r.advisory.length;_adi++){
+          var _af=_pfItem.r.advisory[_adi];
           _pfRows+='<div style="display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid #f8f0d0">'
-            +'<span style="color:#c08000;font-size:13px;line-height:1;margin-top:1px">&#9432;</span>'
-            +'<span style="color:#9a6000;font-weight:700;font-size:11px;white-space:nowrap;min-width:120px;padding-top:1px">'+esc(_pfItem.r.advisory[_adi].field)+'</span>'
-            +'<span style="color:#5a4010;font-size:11px;line-height:1.45">'+esc(_pfItem.r.advisory[_adi].msg)+'</span>'
+            +'<span style="color:#c08000;font-size:13px;line-height:1;margin-top:1px;flex-shrink:0">&#9432;</span>'
+            +'<span style="color:#9a6000;font-weight:700;font-size:11px;white-space:nowrap;min-width:110px;padding-top:1px;flex-shrink:0">'+esc(_af.field)+'</span>'
+            +'<span style="color:#5a4010;font-size:11px;line-height:1.45;flex:1">'+esc(_af.msg)+'</span>'
+            +(_af.waivable?'<button onclick="_pfWaive(\''+_pfItem.o.id+'\',\''+_af.field+'\')" title="Mark as Not Applicable — skip this check for this observation" style="flex-shrink:0;margin-left:6px;padding:2px 8px;font-size:10px;font-weight:700;background:#f0f0f0;color:#555;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-family:inherit;white-space:nowrap">N/A</button>':'')
             +'</div>';
         }
         _pfRows+='</div></div>';
@@ -16565,9 +16598,10 @@ function showSaveDialog(){
           +'<div style="flex:1;padding:9px 14px;background:#f0f8f0;border-right:1px solid #c8e8d0;text-align:center"><div style="font-size:22px;font-weight:800;color:#1a6030">'+(_pfAll.length-_pfIssues.length)+'</div><div style="font-size:10px;color:#1a6030;font-weight:700;text-transform:uppercase;letter-spacing:.5px">&#10003; Ready</div></div>'
           +'<div style="flex:1;padding:9px 14px;background:#f5f7fa;text-align:center"><div style="font-size:22px;font-weight:800;color:#1a3557">'+_pfAll.length+'</div><div style="font-size:10px;color:#1a3557;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Total Obs.</div></div>'
         +'</div>'
-        +'<div style="display:flex;gap:14px;padding:6px 16px;background:#f8fafc;border-bottom:1px solid #eee;font-size:10.5px;color:#555;flex-shrink:0">'
-          +'<span><span style="color:#c0392b;font-weight:700">&#9888; Must Fix</span> — Blocking: cannot finalize until resolved</span>'
-          +'<span><span style="color:#c08000;font-weight:700">&#9432; Advisory</span> — Recommended: can still finalize</span>'
+        +'<div style="display:flex;flex-wrap:wrap;gap:10px;padding:6px 16px;background:#f8fafc;border-bottom:1px solid #eee;font-size:10.5px;color:#555;flex-shrink:0">'
+          +'<span><span style="color:#c0392b;font-weight:700">&#9888; Must Fix</span> — Cannot finalize until resolved</span>'
+          +'<span><span style="color:#c08000;font-weight:700">&#9432; Advisory</span> — Recommended but can finalize</span>'
+          +'<span><span style="font-weight:700;background:#f0f0f0;border:1px solid #ccc;border-radius:3px;padding:0 5px;color:#555">N/A</span> — Click to skip a check that does not apply</span>'
         +'</div>'
         +'<div style="padding:14px 16px;overflow-y:auto;flex:1">'+_pfRows+'</div>'
         +'<div style="padding:11px 16px;border-top:1px solid #eee;display:flex;gap:8px;flex-shrink:0;background:#f8fafc;border-radius:0 0 12px 12px;align-items:center">'
@@ -17365,7 +17399,7 @@ function loadDemoData(){
   var hasData = Object.keys(selIds).length > 0;
 
   // --- Clear existing (inline, no confirm prompt) ---
-  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[];
+  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={};
   responseLoaded=false; _brInfoHasData=false; _brInfoUnlocked=true;
   _reportEverGenerated=false; clearReportDirty();
   window.pendingSel={};
