@@ -9124,7 +9124,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       <div class="tb-dd-menu">
         <button class="tb-dd-item" id="aws-tab-btn" onclick="toggleAWSPanel();tbDDClose()"><span class="di">&#128203;</span> Work Status</button>
         <button class="tb-dd-item" id="ra-tab-btn"  onclick="toggleRAPanel();tbDDClose()"><span class="di">&#128202;</span> Risk Assessment</button>
-        <button class="tb-dd-item" id="srr-tab-btn" onclick="toggleSRRPanel();tbDDClose()"><span class="di">&#128279;</span> SRR Mapping</button>
+        <button class="tb-dd-item" id="srr-tab-btn" onclick="toggleSRRPanel();tbDDClose()"><span class="di">&#128279;</span> Risk Mapping Editor</button>
         <button class="tb-dd-item" id="analysis-btn" onclick="toggleAnalysis();tbDDClose()"><span class="di">&#128200;</span> Sensitivity &amp; COSO Analysis</button>
       </div>
     </div>
@@ -9193,7 +9193,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       <option value="">All Events</option>
       <option value="sensitivity">Sensitivity Overrides</option>
       <option value="coso">COSO Changes</option>
-      <option value="srr">SRR Reassignments</option>
+      <option value="srr">Risk Mapping Changes</option>
     </select>
     <span style="font-size:10px;color:#888;flex:1" id="at-summary-lbl"></span>
   </div>
@@ -18599,7 +18599,7 @@ function showToast(msg, duration){
 var _origDoClear = typeof doClear === 'function' ? doClear : null;
 
 /* ══════════════════════════════════════════════════════════
-   SRR MAPPING PANEL — JavaScript
+   RISK MAPPING EDITOR PANEL — JavaScript
    ══════════════════════════════════════════════════════════ */
 var srr_flagged    = {};  // obsId → true
 var srr_reassigned = {};  // obsId → {srr_id,srr_name,rr_id,rr_name,col,note,custom}
@@ -18617,7 +18617,7 @@ function toggleSRRPanel(){
   if(showing){
     panel.style.display = 'none';
     main.style.display  = '';
-    if(btn){ btn.textContent='\u{1F517} SRR Map'; _setPanelBack(null); }
+    if(btn){ btn.textContent='\u{1F5FA} Risk Map Editor'; _setPanelBack(null); }
     setRptBtnsDisabled(false);
   } else {
     if(awsPanel) awsPanel.style.display = 'none';
@@ -18630,7 +18630,7 @@ function toggleSRRPanel(){
     panel.style.display = 'block';
     panel.classList.add('panel-fadein');
     setTimeout(function(){ panel.classList.remove('panel-fadein'); }, 300);
-    if(btn){ btn.textContent='\u{1F517} SRR Map'; _setPanelBack('SRR Mapping'); }
+    if(btn){ btn.textContent='\u{1F5FA} Risk Map Editor'; _setPanelBack('Risk Mapping Editor'); }
     setRptBtnsDisabled(true);
     srrBuildTable();
   }
@@ -18951,7 +18951,7 @@ function srrApplyReassign(isCustom){
   srrOpenDetail(obsId);
 
   if(rrWillChange){
-    alert('Note: Because the SRR was changed, the Risk Register (RR) has also been updated automatically.\n\nPrevious RR: '+(prevDef.rrName||prevRR)+'\nNew RR: '+(newDef2.rrName||newRR)+'\n\nRR always follows SRR and cannot be changed independently.');
+    alert('Note: Because the Sub-Risk (SRR) was changed in the Risk Mapping Editor, the Risk Register (RR) has also been updated automatically.\n\nPrevious RR: '+(prevDef.rrName||prevRR)+'\nNew RR: '+(newDef2.rrName||newRR)+'\n\nRR always follows SRR and cannot be changed independently — edit the SRR in the Risk Mapping Editor to change both together.');
   }
 }
 
@@ -19179,7 +19179,7 @@ function srrShowImportReview(changes){
 
     var rowBg = c.type==='RR' ? (i%2===0?'#f0f4f8':'#e8eef8') : (i%2===0?'#fff':'#f8fafc');
     var chkCell = c.derived
-      ? '<span style="font-size:10px;color:#aaa" title="Applied automatically with SRR change">&#8627;</span>'
+      ? '<span style="font-size:10px;color:#aaa" title="Applied automatically when the sub-risk mapping changes">&#8627;</span>'
       : '<input type="checkbox" class="srr-imp-chk" data-idx="'+i+'" checked style="width:15px;height:15px;cursor:pointer;accent-color:#4a1a7a">';
 
     return '<tr style="background:'+rowBg+';border-bottom:1px solid #eaeff6" id="srr-imp-row-'+i+'">'
@@ -19199,7 +19199,7 @@ function srrShowImportReview(changes){
   el.innerHTML =
     '<div class="vh-box" style="width:960px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column">'
     +'<div class="vh-head" style="background:#4a1a7a">'
-    +'<h3 style="color:#fff">&#128229; Import SRR Updates — HO Review &amp; Override</h3>'
+    +'<h3 style="color:#fff">&#128229; Import Risk Map Updates — HO Review &amp; Override</h3>'
     +'<button onclick="document.getElementById(\'srrImportModal\').remove()" style="color:#fff;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);border-radius:4px;width:26px;height:26px;font-size:14px;cursor:pointer">&#10005;</button>'
     +'</div>'
     +'<div style="padding:10px 16px;background:#f5f0fc;border-bottom:1px solid #d8c8ec;display:flex;align-items:center;gap:12px;flex-shrink:0;flex-wrap:wrap">'
@@ -19264,7 +19264,7 @@ function srrApplyImport(changes){
     }
   });
   if(rrWithoutSrr.length){
-    alert('Cannot apply RR change without the corresponding SRR change.\n\nPlease also tick the SRR row(s) for:\n• '+rrWithoutSrr.join('\n• '));
+    alert('Cannot apply an RR change without the corresponding SRR change. In the Risk Mapping Editor, RR is always derived from SRR.\n\nPlease also tick the SRR row(s) for:\n• '+rrWithoutSrr.join('\n• '));
     return;
   }
 
@@ -19320,7 +19320,7 @@ function srrApplyImport(changes){
 
   if(modal) modal.remove();
   srrBuildTable();
-  var msg = 'Applied: '+appliedSrr+' SRR update'+(appliedSrr!==1?'s':'')+', '+appliedCat+' category change'+(appliedCat!==1?'s':'');
+  var msg = 'Risk Mapping Editor: '+appliedSrr+' sub-risk mapping'+(appliedSrr!==1?'s':'')+' updated, '+appliedCat+' category change'+(appliedCat!==1?'s':'')+' applied';
   if(hoOverrideCount) msg += ' ('+hoOverrideCount+' HO override'+(hoOverrideCount!==1?'s':'')+')';
   if(typeof toast==='function') toast(msg+'.');
 }
@@ -19376,7 +19376,7 @@ function srrShowSubmit(){
     +'.files{background:#fff;border:1px solid #dde6f0;border-radius:6px;padding:14px;margin-top:16px}'
     +'.files h3{margin:0 0 8px;font-size:12px;color:#1a3a5c}'
     +'</style></head><body>'
-    +'<div class="hdr"><h1>&#128279; SRR Mapping Submission</h1>'
+    +'<div class="hdr"><h1>&#128279; Risk Mapping Editor Submission</h1>'
     +'<p>Branch: <strong>'+_srrEsc(brName)+'</strong> &nbsp;|&nbsp; Date: '+today+'</p></div>'
     +'<div class="stats">'
     +'<div class="stat"><b>'+all.length+'</b><span>Total Obs.</span></div>'
@@ -19455,7 +19455,7 @@ function AT_render(){
   var html = '';
   filtered.forEach(function(e, i){
     var dt = e.ts ? new Date(e.ts).toLocaleString() : '—';
-    var typeLabel = {sensitivity:'Sensitivity Override', coso:'COSO Change', srr:'SRR Reassignment'}[e.type]||e.type;
+    var typeLabel = {sensitivity:'Sensitivity Override', coso:'COSO Change', srr:'Risk Mapping Change'}[e.type]||e.type;
     var typeCol   = {sensitivity:'#c0392b',              coso:'#2980b9',    srr:'#8e44ad'}[e.type]||'#555';
     var detail = '';
     if(e.type==='sensitivity'){
@@ -20681,10 +20681,10 @@ function ra_methodologyHtml(){
 
     // Layer 2
     +'<div style="background:#f5fdf8;border:1px solid #b0d8c0;border-radius:8px;padding:14px 18px;margin-bottom:14px">'
-    +'<div style="font-weight:800;color:#1a6030;font-size:12px;margin-bottom:8px">&#9313; Sub-Risk Linkage (41 Specific Sub-Risks under 14 Main Areas)</div>'
-    +'<p style="font-size:12px;color:#2a3a50;line-height:1.8;margin:0 0 8px">Each observation is further linked to a <strong>Sub-Risk (SRR)</strong> — one of 41 specific sub-risks defined under the 14 main risk areas. The system matches the observation\'s title keywords to the most relevant sub-risk, and each sub-risk carries a specific <strong>Control Activity (SCA)</strong>.</p>'
+    +'<div style="font-weight:800;color:#1a6030;font-size:12px;margin-bottom:8px">&#9313; Sub-Risk Linkage — Risk Mapping Editor (41 Specific Sub-Risks under 14 Main Areas)</div>'
+    +'<p style="font-size:12px;color:#2a3a50;line-height:1.8;margin:0 0 8px">Each observation is further linked to a <strong>Sub-Risk (SRR)</strong> — one of 41 specific sub-risks defined under the 14 main risk areas. The system matches the observation\'s title keywords to the most relevant sub-risk, and each sub-risk carries a specific <strong>Control Activity (SCA)</strong>. You can review and correct these mappings at any time using the <strong>Risk Mapping Editor</strong> panel.</p>'
     +'<div style="font-size:11.5px;color:#2a4060;line-height:1.7">Example: An observation about payroll discrepancies maps to <em>SRR-HR-02 (Payroll &amp; Compensation Risk)</em> under <em>RR-HR-01</em>, linked to <em>SCA-HR-02 (Payroll Processing &amp; Verification Control)</em>. This linkage is visible in the Workload tab as the coloured risk badge.</div>'
-    +'<div style="margin-top:8px;font-size:11px;color:#5a6a80;background:#eef8f2;border-radius:4px;padding:6px 10px">&#9432; Sub-risk matching is keyword-based and automatic. HO users can override the assigned sub-risk when validating new observations via the HO Validation panel.</div>'
+    +'<div style="margin-top:8px;font-size:11px;color:#5a6a80;background:#eef8f2;border-radius:4px;padding:6px 10px">&#9432; Sub-risk matching is keyword-based and automatic. Use the <strong>Risk Mapping Editor</strong> (Build tab) to review, flag mismatches, and reassign where needed. HO users can also import bulk updates via the Import Risk Map Updates button.</div>'
     +'</div>'
 
     // Layer 3
@@ -21651,12 +21651,12 @@ function _w2rBuildHtml(d){
 </script>
 
 <!-- ══════════════════════════════════════════════════════════
-     SRR MAPPING PANEL
+     RISK MAPPING EDITOR PANEL
      ══════════════════════════════════════════════════════════ -->
 <div id="srr-panel" style="display:none;max-width:100%;background:#f0f3f8;min-height:calc(100vh - 50px)">
   <div style="background:#1a3a5c;color:#fff;padding:11px 18px;display:flex;align-items:center;gap:12px">
-    <div style="font-size:15px;font-weight:800;flex:1">&#128279; Observation → Sub-Risk Mapping</div>
-    <div style="font-size:11px;color:#a0c0e0">Review and validate how each observation is linked to a Sub-Risk Register entry. Flag mismatches and reassign where needed.</div>
+    <div style="font-size:15px;font-weight:800;flex:1">&#128279; Risk Mapping Editor</div>
+    <div style="font-size:11px;color:#a0c0e0">Review and edit how each observation is linked to a Sub-Risk (SRR). Flag mismatches and reassign where needed.</div>
     <button onclick="toggleSRRPanel()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:13px;padding:3px 10px;border-radius:4px;cursor:pointer;font-family:inherit">&#10005; Close</button>
   </div>
   <!-- Toolbar -->
@@ -21685,9 +21685,9 @@ function _w2rBuildHtml(d){
     <div style="width:1px;height:24px;background:#dde6f0;margin:0 4px;flex-shrink:0"></div>
     <button onclick="srrUploadClick()" style="padding:5px 11px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px">&#128206; Upload Files <span id="srr-file-badge" style="display:none;background:#f0c040;color:#1a2a38;border-radius:8px;padding:0 6px;font-size:10px;font-weight:800;margin-left:2px">0</span></button>
     <input type="file" id="srr-file-input" multiple style="display:none" onchange="srrHandleFiles(this.files)">
-    <button onclick="srrShowSubmit()" style="padding:5px 14px;background:#c07000;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#9993; Submit SRR Map</button>
+    <button onclick="srrShowSubmit()" style="padding:5px 14px;background:#c07000;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#9993; Submit Risk Map</button>
     <div style="width:1px;height:24px;background:#dde6f0;margin:0 4px;flex-shrink:0"></div>
-    <button onclick="document.getElementById('srr-import-input').click()" style="padding:5px 11px;background:#4a1a7a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Import SRR Updates</button>
+    <button onclick="document.getElementById('srr-import-input').click()" style="padding:5px 11px;background:#4a1a7a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Import Risk Map Updates</button>
     <input type="file" id="srr-import-input" accept=".json" style="display:none" onchange="srrImportSession(this)">
     <span style="font-size:11px;color:#888;margin-left:4px" id="srr-count-lbl"></span>
   </div>
@@ -21715,7 +21715,7 @@ function _w2rBuildHtml(d){
           <th style="padding:9px 10px;text-align:left;width:80px">ID</th>
           <th style="padding:9px 10px;text-align:left">Observation Title</th>
           <th style="padding:9px 10px;text-align:left;width:130px">Category</th>
-          <th style="padding:9px 10px;text-align:left;width:130px">Linked SRR</th>
+          <th style="padding:9px 10px;text-align:left;width:130px">Mapped SRR</th>
           <th style="padding:9px 10px;text-align:left;width:160px">Sub-Risk Name</th>
           <th style="padding:9px 10px;text-align:left;width:110px">RR</th>
           <th style="padding:9px 10px;text-align:left;width:80px">Action</th>
@@ -21738,7 +21738,7 @@ function _w2rBuildHtml(d){
       <div id="srr-d-rec" style="font-size:11px;color:#4a5a70;background:#f5f8fc;border-radius:5px;padding:9px;margin-bottom:12px;line-height:1.5"></div>
       <!-- Current SRR -->
       <div style="background:#e8f0fc;border-radius:6px;padding:10px;margin-bottom:12px">
-        <div style="font-size:10px;font-weight:700;color:#1a3a5c;margin-bottom:4px">CURRENT SRR MAPPING</div>
+        <div style="font-size:10px;font-weight:700;color:#1a3a5c;margin-bottom:4px">CURRENT RISK MAPPING</div>
         <span id="srr-d-srr-badge" style="font-size:11px;font-weight:700;color:#fff;border-radius:3px;padding:2px 8px"></span>
         <div style="font-size:12px;font-weight:600;color:#1a3a5c;margin-top:5px" id="srr-d-srr-name"></div>
         <div style="font-size:10px;color:#888;margin-top:2px" id="srr-d-rr-ref"></div>
@@ -21746,14 +21746,14 @@ function _w2rBuildHtml(d){
       <!-- Flag toggle -->
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
         <button id="srr-flag-btn" onclick="srrToggleFlag()" style="padding:5px 14px;border-radius:4px;border:none;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit">&#9873; Flag Mismatch</button>
-        <span style="font-size:11px;color:#888">Flag this observation if the SRR assignment seems wrong</span>
+        <span style="font-size:11px;color:#888">Flag this observation if the risk mapping seems incorrect</span>
       </div>
       <!-- Reassign section -->
       <div style="border-top:1px solid #e0e8f0;padding-top:12px">
-        <div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:8px">REASSIGN TO DIFFERENT SRR</div>
+        <div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:8px">CHANGE RISK MAPPING</div>
         <!-- Tabs -->
         <div style="display:flex;border-bottom:2px solid #e0e8f0;margin-bottom:10px">
-          <button id="srr-tab-ex" onclick="srrSwitchTab('existing')" style="padding:5px 14px;border:none;border-bottom:2px solid #1a3a5c;margin-bottom:-2px;background:#fff;font-size:11px;font-weight:700;color:#1a3a5c;cursor:pointer;font-family:inherit">Choose Existing SRR</button>
+          <button id="srr-tab-ex" onclick="srrSwitchTab('existing')" style="padding:5px 14px;border:none;border-bottom:2px solid #1a3a5c;margin-bottom:-2px;background:#fff;font-size:11px;font-weight:700;color:#1a3a5c;cursor:pointer;font-family:inherit">Select Existing SRR</button>
           <button id="srr-tab-cu" onclick="srrSwitchTab('custom')" style="padding:5px 14px;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;background:#fff;font-size:11px;color:#888;cursor:pointer;font-family:inherit">Define New Risk</button>
         </div>
         <!-- Existing SRR pane -->
