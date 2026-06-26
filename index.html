@@ -17487,6 +17487,7 @@ function toggleRAPanel(){
     setRptBtnsDisabled(true);
     ra_initBranches();
     ra_initModeButtons();
+    setTimeout(function(){ ra_showModeTable(RA_MODES[3]); },100);
   }
 }
 
@@ -19228,8 +19229,14 @@ function ra_initModeButtons(){
       '</div>'+
       '<span style="font-size:10px;color:#c9962a;font-weight:700;white-space:nowrap">&#9432;</span>';
     row.addEventListener('mouseenter',function(){ ra_showModeTable(m); row.style.background='#e8f0fb'; row.style.borderColor='#1a3a5c'; });
-    row.addEventListener('mouseleave',function(){ ra_hideModeTable(); row.style.background='#fff'; row.style.borderColor='#c8d8ec'; });
-    row.addEventListener('click',function(){
+    row.addEventListener('mouseleave',function(){
+      // Keep table visible if this mode is selected; hide only on hover-away from unselected
+      var checked=document.querySelector('input[name="ra-score-mode"]:checked');
+      if(!checked||checked.value!==m.value){ row.style.background='#fff'; row.style.borderColor='#c8d8ec'; ra_hideModeTable(); }
+      // Show selected mode's table again
+      if(checked){ var sel=RA_MODES.filter(function(x){return x.value===checked.value;})[0]; if(sel) ra_showModeTable(sel); }
+    });
+    row.addEventListener('change',function(){
       ra_showModeTable(m);
       // Re-run if results already visible
       setTimeout(function(){
