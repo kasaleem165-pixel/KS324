@@ -9413,6 +9413,15 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
     </div>
   </div>
 
+  <div class="sec" id="repeat-detect-sec" style="display:none">
+    <div class="sh" style="display:flex;align-items:center;justify-content:space-between">
+      <span>&#128260; Repeat Detection</span>
+      <span id="repeat-detect-src" style="font-size:10px;font-weight:600;color:#a8d0f0"></span>
+    </div>
+    <div style="font-size:11px;color:#c8d8ea;line-height:1.5;margin-bottom:8px">Matches selected observations against the latest loaded report to auto-mark repeats and fill LARR.</div>
+    <button onclick="detectRepeatsFromPrevReport()" style="width:100%;padding:9px;background:linear-gradient(135deg,#6a3090,#9040c0);color:#fff;border:none;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px">&#128270; Detect Repeats from Previous Report</button>
+  </div>
+
   <div class="sec">
     <div class="sh">Filter Observations</div>
     <div class="fr"><label>Category</label>
@@ -17829,9 +17838,9 @@ function ra_handleFilePick(input){
       } else if(ext==='docx'||ext==='doc'){
         var r2=new FileReader();
         r2.onload=function(e){
-          ra_parseDocxFile(e.target.result,function(text,docxSens){
+          ra_parseDocxFile(e.target.result,function(text,docxSens,docxObsList){
             var sb2=(document.getElementById('ra-sel_branch')||{}).value||'';
-            ra_addLoadedReport(file.name,'',null,text||'',ra_detectBranchInText(text,sb2),false,docxSens||null);
+            ra_addLoadedReport(file.name,'',null,text||'',ra_detectBranchInText(text,sb2),false,docxSens||null,docxObsList||null);
             if(!text) ra_toast('Warning: could not extract text from '+file.name);
           });
         };
@@ -17856,7 +17865,7 @@ function ra_handleFilePick(input){
   input.value='';
 }
 
-function ra_addLoadedReport(name,date,sess,text,detectedBranch,isCertain,docxSens){
+function ra_addLoadedReport(name,date,sess,text,detectedBranch,isCertain,docxSens,docxObsList){
   for(var i=0;i<ra_loadedReports.length;i++){
     if(ra_loadedReports[i].name===name){ ra_toast(name+' is already loaded.'); return; }
   }
@@ -17873,7 +17882,8 @@ function ra_addLoadedReport(name,date,sess,text,detectedBranch,isCertain,docxSen
       if(!proceed) return;
     }
   }
-  ra_loadedReports.push({name:name,date:date,sess:sess,text:text,detectedBranch:detectedBranch||'',docxSens:docxSens||null});
+  ra_loadedReports.push({name:name,date:date,sess:sess,text:text,detectedBranch:detectedBranch||'',docxSens:docxSens||null,docxObsList:docxObsList||null});
+  _updateRepeatDetectPanel();
   ra_renderLoadedFilesList();
   ra_toast('Loaded: '+name+(detectedBranch?' ('+detectedBranch+')':''));
 }
@@ -17881,6 +17891,7 @@ function ra_addLoadedReport(name,date,sess,text,detectedBranch,isCertain,docxSen
 function ra_removeLoadedReport(idx){
   ra_loadedReports.splice(idx,1);
   ra_renderLoadedFilesList();
+  _updateRepeatDetectPanel();
 }
 
 function ra_renderLoadedFilesList(){
@@ -17898,7 +17909,8 @@ function ra_renderLoadedFilesList(){
     h+='<span style="font-size:14px;flex-shrink:0">'+icon+'</span>';
     h+='<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:700;color:#1a3a5c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+ra_esc(rp.name)+'</div>';
     if(rp.detectedBranch) h+='<div style="font-size:10px;color:#1a7040;font-weight:600;margin-top:1px">&#10003; '+ra_esc(rp.detectedBranch)+'</div>';
-    if(rp.docxSens){ var dsAreas=Object.keys(rp.docxSens).length; h+='<div style="font-size:10px;color:#6040b0;font-weight:600;margin-top:1px">&#128270; Sensitivity data read ('+dsAreas+' area'+(dsAreas!==1?'s':'')+')</div>'; }
+    if(rp.docxObsList){ h+='<div style="font-size:10px;color:#6040b0;font-weight:600;margin-top:1px">&#128270; '+rp.docxObsList.length+' observations read — repeat detection available</div>'; }
+    else if(rp.docxSens){ var dsAreas=Object.keys(rp.docxSens).length; h+='<div style="font-size:10px;color:#6040b0;font-weight:600;margin-top:1px">&#128270; Sensitivity data read ('+dsAreas+' area'+(dsAreas!==1?'s':'')+')</div>'; }
     else if((rp.name.indexOf('.docx')!==-1||rp.name.indexOf('.doc')!==-1)&&!rp.sess){ h+='<div style="font-size:10px;color:#a06020;margin-top:1px">&#9888; No sensitivity table found — using area weight fallback</div>'; }
     h+='<div style="display:flex;align-items:center;gap:6px;margin-top:3px"><input type="date" value="'+ra_esc(rp.date||'')+'" style="padding:2px 5px;font-size:10px;width:130px;border:1px solid #c8d8ec;border-radius:3px" onchange="ra_loadedReports['+i+'].date=this.value">';
     h+='<span style="font-size:10px;color:#9a9a9a">'+wc+' words</span></div></div>';
@@ -17920,7 +17932,199 @@ function ra_buildTextFromSession(sess){
   return lines.join('\n');
 }
 
-// Extract sensitivity per observation from docx XML — returns {catKey: {High:n, 'M to H':n, ...}}
+// Extract observation list from docx Observations Summary table
+// Returns array of {ref:'1.1', title:'Budget for...', catKey:'Finance', sens:'M to H'}
+function ra_extractDocxObsList(xml){
+  var obsRefRe=/^\d+\.\d+$/;
+  var SENS_NORM={'high':'High','medium to high':'M to H','m to h':'M to H','mth':'M to H','low to medium':'L to M','l to m':'L to M','ltm':'L to M','low':'Low'};
+  var result=[];
+
+  var rowRe=/<w:tr[\s>][\s\S]*?<\/w:tr>/gi; var rows=[]; var rm;
+  while((rm=rowRe.exec(xml))!==null) rows.push(rm[0]);
+
+  function cellTexts(rowXml){
+    var cells=[]; var tcRe=/<w:tc[\s>][\s\S]*?<\/w:tc>/gi; var tm;
+    while((tm=tcRe.exec(rowXml))!==null){
+      var tRe=/<w:t[^>]*>([\s\S]*?)<\/w:t>/gi; var tv; var parts=[];
+      while((tv=tRe.exec(tm[0]))!==null) parts.push(tv[1]);
+      cells.push(parts.join('').trim());
+    }
+    return cells;
+  }
+
+  function matchArea(txt){
+    var low=txt.toLowerCase().replace(/['']/g,"'").replace(/[^a-z0-9 &]/g,' ').replace(/\s+/g,' ').trim();
+    var keys=Object.keys(RA_CAT_KEYWORDS);
+    for(var i=0;i<keys.length;i++){
+      var kws=RA_CAT_KEYWORDS[keys[i]];
+      for(var k=0;k<kws.length;k++){ if(low.indexOf(kws[k])!==-1) return keys[i]; }
+    }
+    return null;
+  }
+
+  function normSens(s){
+    var low=s.toLowerCase().replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
+    for(var sv in SENS_NORM){ if(low===sv||low.indexOf(sv)!==-1) return SENS_NORM[sv]; }
+    return null;
+  }
+
+  var inObsSection=false; var currentCat=null;
+  for(var ri=0;ri<rows.length;ri++){
+    var cells=cellTexts(rows[ri]);
+    if(!cells.length) continue;
+    var first=cells[0];
+    if(!inObsSection){
+      var joined=cells.join(' ').toLowerCase();
+      if(joined.indexOf('risk sensitivity')!==-1&&joined.indexOf('observation')!==-1){ inObsSection=true; continue; }
+      continue;
+    }
+    if(cells.length===1&&/follow\s*up/i.test(first)) break;
+    // Area heading row
+    if(!obsRefRe.test(first)){
+      var area=matchArea(first);
+      if(area) currentCat=area;
+      continue;
+    }
+    // Observation row: cells[0]=ref, cells[1]=title, last=sens
+    if(cells.length>=2){
+      var ref=first;
+      var title=cells[1]||'';
+      var sens=null;
+      for(var ci=cells.length-1;ci>=2;ci--){ var ns=normSens(cells[ci]); if(ns){sens=ns;break;} }
+      result.push({ref:ref,title:title.trim(),catKey:currentCat||'',sens:sens});
+    }
+  }
+  return result.length?result:null;
+}
+
+// Show/hide the Repeat Detection panel based on whether RA reports are loaded
+function _updateRepeatDetectPanel(){
+  var sec=document.getElementById('repeat-detect-sec');
+  var src=document.getElementById('repeat-detect-src');
+  if(!sec) return;
+  if(!window.ra_loadedReports||!ra_loadedReports.length){ sec.style.display='none'; return; }
+  // Find latest report with obs list
+  var best=null;
+  for(var i=0;i<ra_loadedReports.length;i++){
+    var rp=ra_loadedReports[i];
+    if(!rp.docxObsList||!rp.docxObsList.length) continue;
+    if(!best||rp.date>best.date) best=rp;
+  }
+  if(!best){ sec.style.display='none'; return; }
+  sec.style.display='block';
+  if(src) src.textContent=best.name.replace(/\.[^.]+$/,'').substring(0,30)+(best.date?' ('+best.date+')':'');
+}
+
+function detectRepeatsFromPrevReport(){
+  // Find latest loaded report with obs list
+  var best=null;
+  for(var i=0;i<ra_loadedReports.length;i++){
+    var rp=ra_loadedReports[i];
+    if(!rp.docxObsList||!rp.docxObsList.length) continue;
+    if(!best||rp.date>best.date) best=rp;
+  }
+  if(!best){ alert('No previous report with a readable Observations Summary table is loaded in Risk Assessment.\n\nPlease load the previous audit report (Word file) in the Risk Assessment panel first.'); return; }
+
+  var selList=Object.keys(selIds).filter(function(k){return selIds[k];});
+  if(!selList.length){ alert('No observations are selected in the current report yet.\n\nPlease select observations first, then run repeat detection.'); return; }
+
+  // Normalise title for comparison
+  function norm(s){ return s.toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
+
+  // Word overlap score between two normalised strings
+  function overlap(a,b){
+    var wa=a.split(' ').filter(function(w){return w.length>2;}); // skip short words
+    var wb=b.split(' ').filter(function(w){return w.length>2;});
+    if(!wa.length||!wb.length) return 0;
+    var hits=0;
+    for(var i=0;i<wa.length;i++){ if(wb.indexOf(wa[i])!==-1) hits++; }
+    return hits/Math.max(wa.length,wb.length);
+  }
+
+  var prevObs=best.docxObsList;
+  var autoMatch=[]; var fuzzyMatch=[];
+
+  for(var si=0;si<selList.length;si++){
+    var obsId=selList[si];
+    // Get current obs title
+    var curTitle='';
+    for(var di=0;di<DB.observations.length;di++){ if(DB.observations[di].id===obsId){curTitle=DB.observations[di].title;break;} }
+    if(!curTitle) for(var ci=0;ci<customs.length;ci++){ if(customs[ci].id===obsId){curTitle=customs[ci].title;break;} }
+    if(!curTitle) continue;
+    var normCur=norm(curTitle);
+    var bestScore=0; var bestPrev=null;
+    for(var pi=0;pi<prevObs.length;pi++){
+      var sc=overlap(normCur,norm(prevObs[pi].title));
+      if(sc>bestScore){ bestScore=sc; bestPrev=prevObs[pi]; }
+    }
+    if(bestScore>=0.99){ autoMatch.push({obsId:obsId,title:curTitle,prev:bestPrev,score:bestScore}); }
+    else if(bestScore>=0.60){ fuzzyMatch.push({obsId:obsId,title:curTitle,prev:bestPrev,score:bestScore}); }
+  }
+
+  // Apply auto matches immediately
+  var autoCount=autoMatch.length;
+  for(var ai=0;ai<autoMatch.length;ai++){
+    var m=autoMatch[ai];
+    obsTypeMap[m.obsId]='Repeated';
+    setLastRef(m.obsId,m.prev.ref);
+  }
+
+  // Build review modal for fuzzy matches
+  if(!fuzzyMatch.length){
+    if(autoCount) { alert('Repeat Detection Complete\n\n'+autoCount+' observation(s) automatically marked as Repeated with LARR filled.\n\nNo uncertain matches found.'); renderList(); }
+    else { alert('No matches found between current observations and the previous report.'); }
+    return;
+  }
+
+  var mh='<div style="font-family:Inter,sans-serif;padding:4px">';
+  if(autoCount) mh+='<div style="background:#0f3d20;color:#6de08a;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px">&#10003; '+autoCount+' observation(s) already auto-marked as Repeated (100% match).</div>';
+  mh+='<div style="font-size:12px;color:#c8d8ea;margin-bottom:12px">The following observations are possible repeats. Review each and tick those you confirm as Repeated:</div>';
+  mh+='<div id="fuzzy-match-list" style="display:flex;flex-direction:column;gap:8px">';
+  for(var fi=0;fi<fuzzyMatch.length;fi++){
+    var fm=fuzzyMatch[fi];
+    var pct=Math.round(fm.score*100);
+    mh+='<div style="background:#1a2a3a;border:1px solid #2a4060;border-radius:6px;padding:10px">';
+    mh+='<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">';
+    mh+='<input type="checkbox" id="fmchk-'+fi+'" value="'+fi+'" style="margin-top:2px;flex-shrink:0">';
+    mh+='<div style="flex:1">';
+    mh+='<div style="font-size:12px;font-weight:700;color:#e8f0f8;margin-bottom:4px">'+ra_esc(fm.title)+'</div>';
+    mh+='<div style="font-size:10px;color:#90a8c0;margin-bottom:4px">&#128197; Previous report: <strong style="color:#f0c060">'+ra_esc(fm.prev.ref)+'</strong> — '+ra_esc(fm.prev.title)+'</div>';
+    mh+='<div style="display:inline-block;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;background:'+(pct>=80?'#0f3d20':'#3a2000')+';color:'+(pct>=80?'#6de08a':'#f0a040')+'">'+pct+'% match</div>';
+    mh+='</div></label></div>';
+  }
+  mh+='</div>';
+  mh+='<div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">';
+  mh+='<button onclick="document.getElementById(\'fuzzy-modal\').remove()" style="padding:7px 18px;border:1px solid #4a6080;border-radius:6px;background:transparent;color:#c8d8ea;font-size:12px;cursor:pointer">Skip All</button>';
+  mh+='<button onclick="_applyFuzzyRepeats('+JSON.stringify(fuzzyMatch.map(function(f){return {obsId:f.obsId,ref:f.prev.ref};}))+','+fuzzyMatch.length+')" style="padding:7px 18px;border:none;border-radius:6px;background:#6a3090;color:#fff;font-size:12px;font-weight:700;cursor:pointer">&#10003; Apply Selected</button>';
+  mh+='</div></div>';
+
+  var modal=document.createElement('div');
+  modal.id='fuzzy-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML='<div style="background:#0d1a2a;border:1px solid #2a4060;border-radius:10px;max-width:540px;width:100%;max-height:80vh;overflow-y:auto;padding:20px">'
+    +'<div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:12px">&#128260; Possible Repeats — Please Review</div>'
+    +mh+'</div>';
+  document.body.appendChild(modal);
+  renderList();
+}
+
+function _applyFuzzyRepeats(items,count){
+  var applied=0;
+  for(var i=0;i<count;i++){
+    var chk=document.getElementById('fmchk-'+i);
+    if(chk&&chk.checked){
+      obsTypeMap[items[i].obsId]='Repeated';
+      setLastRef(items[i].obsId,items[i].ref);
+      applied++;
+    }
+  }
+  var modal=document.getElementById('fuzzy-modal');
+  if(modal) modal.remove();
+  renderList();
+  if(applied) ra_toast(applied+' observation(s) marked as Repeated with LARR filled.');
+}
+
+// Extract observation list from docx XML — returns {catKey: {High:n, 'M to H':n, ...}}
 function ra_extractDocxSens(xml){
   // Normalise namespace prefixes away so we can match <w:tr>, <w:tc>, <w:t> simply
   // Strategy: parse all <w:tr> table rows; within each row collect <w:tc> cell text blocks
@@ -18039,7 +18243,7 @@ function ra_parseDocxFile(arrayBuffer,callback){
         var compData=arrayBuffer.slice(dataStart,dataStart+compSize);
         if(comprMethod===0){
           var xmlStr=new TextDecoder().decode(compData);
-          callback(ra_xmlToText(xmlStr),ra_extractDocxSens(xmlStr));
+          callback(ra_xmlToText(xmlStr),ra_extractDocxSens(xmlStr),ra_extractDocxObsList(xmlStr));
         } else if(comprMethod===8){
           var ds=new DecompressionStream('deflate-raw');
           var writer=ds.writable.getWriter();
@@ -18053,11 +18257,11 @@ function ra_parseDocxFile(arrayBuffer,callback){
                 var combined=new Uint8Array(ra_totalLen); var off=0;
                 for(var k=0;k<ra_chunks.length;k++){ combined.set(ra_chunks[k],off); off+=ra_chunks[k].length; }
                 var xmlStr2=new TextDecoder().decode(combined);
-                callback(ra_xmlToText(xmlStr2),ra_extractDocxSens(xmlStr2));
+                callback(ra_xmlToText(xmlStr2),ra_extractDocxSens(xmlStr2),ra_extractDocxObsList(xmlStr2));
               } else { ra_chunks.push(res.value); ra_totalLen+=res.value.length; ra_pump(); }
-            }).catch(function(){ callback('',''); });
+            }).catch(function(){ callback('',null,null); });
           })();
-        } else { callback('',null); }
+        } else { callback('',null,null); }
         return;
       }
       pos+=46+fnLen+extraLen+commentLen;
