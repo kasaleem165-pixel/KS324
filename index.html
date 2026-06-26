@@ -9713,6 +9713,44 @@ function idbGetUsageInfo(cb){
 }
 
 // ============================================================
+// RA LOADED REPORTS — IndexedDB persistence
+// Saves extracted Word file data so it survives page reloads
+// ============================================================
+var RA_IDB_KEY='bss_ra_loaded_reports';
+
+function _raReportsSave(){
+  // Save only the extracted data — not sess (full JSON session object) or binary
+  var toSave=(window.ra_loadedReports||[]).map(function(rp){
+    return {name:rp.name,date:rp.date,text:rp.text,detectedBranch:rp.detectedBranch,docxSens:rp.docxSens,docxObsList:rp.docxObsList};
+  });
+  idbSet(RA_IDB_KEY,toSave);
+}
+
+function _raReportsRestore(){
+  idbGet(RA_IDB_KEY,null,function(saved){
+    if(!saved||!saved.length) return;
+    if(!window.ra_loadedReports) window.ra_loadedReports=[];
+    for(var i=0;i<saved.length;i++){
+      var rp=saved[i];
+      // Skip if already loaded (e.g. user loaded manually before restore ran)
+      var already=false;
+      for(var j=0;j<ra_loadedReports.length;j++){ if(ra_loadedReports[j].name===rp.name){already=true;break;} }
+      if(!already) ra_loadedReports.push({name:rp.name,date:rp.date,sess:null,text:rp.text||'',detectedBranch:rp.detectedBranch||'',docxSens:rp.docxSens||null,docxObsList:rp.docxObsList||null});
+    }
+    // Update UI if RA panel is already initialised
+    if(typeof ra_renderLoadedFilesList==='function') ra_renderLoadedFilesList();
+    if(typeof _updateRepeatDetectPanel==='function') _updateRepeatDetectPanel();
+  });
+}
+
+function _raReportsClear(){
+  window.ra_loadedReports=[];
+  idbDel(RA_IDB_KEY);
+  if(typeof ra_renderLoadedFilesList==='function') ra_renderLoadedFilesList();
+  if(typeof _updateRepeatDetectPanel==='function') _updateRepeatDetectPanel();
+}
+
+// ============================================================
 // DATABANK EXTENSION (persisted in localStorage) — S&A Dept.
 // New observations approved from final reports are stored here
 // and merged into DB.observations so all existing code sees them
@@ -9872,6 +9910,7 @@ window.onload = function() {
     idbGet(VH_KEY, [], function(sessions){
       idbGet(AS_KEY, null, function(autoSaved){
         _doAutoRestore(sessions, autoSaved);
+        _raReportsRestore();
       });
     });
   }
@@ -12174,6 +12213,7 @@ function doCopy(){
 function doClear(){
   if(!confirm('Clear all selections?'))return;
   selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={};
+  _raReportsClear();
   for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
   responseLoaded=false; _wfSentAuditee=false; _wfReceivedBack=false; _wfSentRO=false;
   _brInfoHasData=false;
@@ -12196,6 +12236,7 @@ function doClear(){
 function doNewReport(){
   if(!confirm('Start a new blank report? All current data will be cleared.'))return;
   selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={};
+  _raReportsClear();
   responseLoaded=false; _wfSentAuditee=false; _wfReceivedBack=false; _wfSentRO=false;
   _brInfoHasData=false;
   _brInfoUnlocked=false; // force unlock path to run
@@ -17375,6 +17416,7 @@ function loadDemoData(){
 
   // --- Clear existing (inline, no confirm prompt) ---
   selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={};
+  _raReportsClear();
   responseLoaded=false; _brInfoHasData=false; _brInfoUnlocked=true;
   _reportEverGenerated=false;
   window.pendingSel={};
@@ -17883,6 +17925,7 @@ function ra_addLoadedReport(name,date,sess,text,detectedBranch,isCertain,docxSen
     }
   }
   ra_loadedReports.push({name:name,date:date,sess:sess,text:text,detectedBranch:detectedBranch||'',docxSens:docxSens||null,docxObsList:docxObsList||null});
+  _raReportsSave();
   _updateRepeatDetectPanel();
   ra_renderLoadedFilesList();
   ra_toast('Loaded: '+name+(detectedBranch?' ('+detectedBranch+')':''));
@@ -17890,6 +17933,7 @@ function ra_addLoadedReport(name,date,sess,text,detectedBranch,isCertain,docxSen
 
 function ra_removeLoadedReport(idx){
   ra_loadedReports.splice(idx,1);
+  _raReportsSave();
   ra_renderLoadedFilesList();
   _updateRepeatDetectPanel();
 }
