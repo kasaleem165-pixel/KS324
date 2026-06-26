@@ -10096,6 +10096,12 @@ function renderList(obs, toks, showScore) {
         inner += '<label style="display:flex;align-items:center;gap:3px;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;border:1.5px solid #d06020;background:'+(curType==='Repeated'?'#d06020':'#fff')+';color:'+(curType==='Repeated'?'#fff':'#d06020')+'" onclick="event.stopPropagation()">';
         inner += '<input type="radio" name="otyp-'+o.id+'" value="Repeated" style="display:none" '+(curType==='Repeated'?'checked':'')+' onchange="setObsType(\''+o.id+'\',\'Repeated\')">Repeated</label>';
         inner += '</div>';
+        if(curType==='Repeated'){
+          inner += '<div id="lrx-'+o.id+'" style="margin-top:4px;display:flex;align-items:center;gap:5px" onclick="event.stopPropagation()">';
+          inner += '<span style="font-size:10px;font-weight:700;color:#d06020;white-space:nowrap">Prior Ref:</span>';
+          inner += '<input type="text" id="lr-'+o.id+'" placeholder="e.g. Report No. SAB-2024-07" value="'+(lastRefMap[o.id]||'')+'" style="flex:1;font-size:11px;padding:3px 8px;border:1px solid #f0b080;border-radius:6px;font-family:inherit;color:#5a2000;background:#fff8f2" onclick="event.stopPropagation()" oninput="setLastRef(\''+o.id+'\',this.value)">';
+          inner += '</div>';
+        }
       }
 
       div.innerHTML = inner;
@@ -10167,7 +10173,16 @@ function injectTypePill(id, div){
     '<label style="display:flex;align-items:center;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;border:1.5px solid #d06020;background:'+(curType==='Repeated'?'#d06020':'#fff')+';color:'+(curType==='Repeated'?'#fff':'#d06020')+'" onclick="event.stopPropagation()">'+
     '<input type="radio" name="otyp-'+id+'" value="Repeated" style="display:none" '+(curType==='Repeated'?'checked':'')+' onchange="setObsType(\''+id+'\',\'Repeated\')">Repeated</label>';
   div.appendChild(row);
-  // Report-reference input row (always shown; label/style adapts to type)
+  // Prior-ref input row — only for repeated observations
+  if(curType==='Repeated'){
+    var lrRow=document.createElement('div');
+    lrRow.id='lrx-'+id;
+    lrRow.style.cssText='margin-top:4px;display:flex;align-items:center;gap:5px';
+    lrRow.onclick=function(e){e.stopPropagation();};
+    lrRow.innerHTML='<span style="font-size:10px;font-weight:700;color:#d06020;white-space:nowrap">Prior Ref:</span>'
+      +'<input type="text" id="lr-'+id+'" placeholder="e.g. Report No. SAB-2024-07" value="'+(lastRefMap[id]||'')+'" style="flex:1;font-size:11px;padding:3px 8px;border:1px solid #f0b080;border-radius:6px;font-family:inherit;color:#5a2000;background:#fff8f2" onclick="event.stopPropagation()" oninput="setLastRef(\''+id+'\',this.value)">';
+    div.appendChild(lrRow);
+  }
 }
 
 function handleSel(id, checked, div) {
@@ -10272,9 +10287,29 @@ function setObsType(id, val) {
       labels[i].style.color = active ? '#fff' : (isNew?'#2070b8':'#d06020');
     }
   }
+  // Show or hide the prior-ref input row based on type
+  var lrx=document.getElementById('lrx-'+id);
+  var lrInp=document.getElementById('lr-'+id);
+  if(val==='Repeated'){
+    if(!lrx){
+      var newRow=document.createElement('div');
+      newRow.id='lrx-'+id;
+      newRow.style.cssText='margin-top:4px;display:flex;align-items:center;gap:5px';
+      newRow.onclick=function(e){e.stopPropagation();};
+      newRow.innerHTML='<span style="font-size:10px;font-weight:700;color:#d06020;white-space:nowrap">Prior Ref:</span>'
+        +'<input type="text" id="lr-'+id+'" placeholder="e.g. Report No. SAB-2024-07" value="'+(lastRefMap[id]||'')+'" style="flex:1;font-size:11px;padding:3px 8px;border:1px solid #f0b080;border-radius:6px;font-family:inherit;color:#5a2000;background:#fff8f2" onclick="event.stopPropagation()" oninput="setLastRef(\''+id+'\',this.value)">';
+      var axRow=document.getElementById('ax-'+id);
+      if(axRow&&axRow.parentNode) axRow.parentNode.insertBefore(newRow, axRow.nextSibling);
+    }
+  } else {
+    if(lrx) lrx.parentNode.removeChild(lrx);
+  }
   renderRpt();
 }
 
+function setLastRef(id, val) {
+  if(val) lastRefMap[id]=val; else delete lastRefMap[id];
+}
 
 // ============================================================
 // DATE VALIDATION
@@ -11858,7 +11893,9 @@ function renderRpt(){
       var cosoClass=curCoso==='CE'?'c-ce':curCoso==='RA'?'c-ra':curCoso==='CA'?'c-ca':curCoso==='IC'?'c-ic':curCoso==='M'?'c-m':'';
       h+='<div class="oc '+tc+'" id="oc-'+o.id+'">';
       h+='<div class="och"><span class="onum">Obs. '+secPfx+'.'+num+'</span>';
+      var priorRefDraft=lastRefMap[o.id]||'';
       h+='<span class="otl">'+esc(o.title)+' <span class="badge '+tc+'">'+esc(effType)+'</span>'
+      +(tc==='repeated'?(priorRefDraft?'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fff8f0;color:#8a3000;border:1px solid #f0b080;margin-left:3px">Prior: '+esc(priorRefDraft)+'</span>':'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fde8e8;color:#9b1a1a;border:1px solid #f0a0a0;margin-left:3px" title="Prior Audit Reference required">&#9888; Prior Ref required</span>'):'')
       +obsReadinessBadge(o)+'</span>';
       h+='<select id="sens-sel-'+o.id+'" class="sens-sel '+sensClass+'" title="Sensitivity Level" onchange="setSensitivity(\''+o.id+'\',this)">';
       h+='<option value="">Sensitivity</option>';
@@ -11911,7 +11948,14 @@ function renderRpt(){
       var recText=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
       h+='<div class="osl">Recommendation</div>';
       h+='<textarea class="oedit" id="re-'+o.id+'" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].recommendation=this.value;WC_detect(\''+o.id+'\')">'+esc(recText)+'</textarea>';
-      // 3b. Audit Report Reference (editable, all obs types)
+      // 3b. Prior Audit Report Reference (editable, repeated obs only)
+      if(tc==='repeated'){
+        var curLrRef=lastRefMap[o.id]||'';
+        h+='<div style="margin:2px 0 6px;padding:6px 9px;background:#fff8f2;border:1px solid #f0c090;border-radius:6px">';
+        h+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#8a3000;margin-bottom:4px">&#128196; Prior Audit Report Reference</div>';
+        h+='<input type="text" id="lr-rpt-'+o.id+'" value="'+esc(curLrRef)+'" placeholder="e.g. Report No. SAB-2024-07" style="width:100%;box-sizing:border-box;font-size:12px;padding:4px 8px;border:1px solid #e0a060;border-radius:4px;font-family:inherit;color:#2a3a50;background:#fff" oninput="setLastRef(\''+o.id+'\',this.value)">';
+        h+='</div>';
+      }
       h+='</div>';
       // 4. Annexure Data (if set)
       if(ax) h+='<div class="oax"><strong>Annexure Data:</strong> '+esc(ax)+'</div>';
@@ -14752,7 +14796,15 @@ function parseObsInstances(obsId, text){
 // ============================================================
 // FINALIZE & SAVE FINAL REPORT
 // ============================================================
-function _checkPriorRefs(){ return []; }
+function _checkPriorRefs(all){
+  var missing=[];
+  for(var i=0;i<all.length;i++){
+    var o=all[i];
+    var t=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
+    if(t==='repeated'&&!lastRefMap[o.id]){missing.push(o);}
+  }
+  return missing;
+}
 
 // ── Pre-flight readiness check per observation ────────────────
 // Returns {score, total, blocking:[], advisory:[]}
@@ -14793,7 +14845,11 @@ function getObsReadiness(o){
       advisory.push({field:'Financial Impact',msg:'Instance count and financial impact not quantified (enter values or include an inline table in the observation text)'});
   }
 
-  var total=2+3; // obs+rec+sensitivity+coso+financial
+  // 3. Prior Audit Reference — blocking for Repeated observations only
+  if(obsType==='repeated'&&!lastRefMap[id])
+    blocking.push({field:'Prior Audit Ref',msg:'Prior Audit Report Reference is required for Repeated observations'});
+
+  var total=2+3+(obsType==='repeated'?1:0); // obs+rec+sensitivity+coso+financial (+prior ref if repeated)
   var passed=total-blocking.length-advisory.length;
   return{blocking:blocking,advisory:advisory,score:passed,total:total,obsType:obsType};
 }
@@ -14893,6 +14949,14 @@ function finalizeReport(){
     var refSelEl=document.getElementById('ref-sel-'+o.id); if(refSelEl&&refMap[o.id]!=null) refTxt=refSelEl.value||refTxt;
     if(refTxt){
       h+='<div style="margin-top:10px;padding:7px 12px;background:#fff8f0;border:1px solid #c07030;border-left:4px solid #b84000;border-radius:0 4px 4px 0;font-size:12px;font-style:italic;color:#6a2000;font-weight:600">'+esc(refTxt)+'</div>';
+    }
+    // Prior Audit Report Reference (repeated observations only)
+    var finLrRef=lastRefMap[o.id]||'';
+    var finObsType=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
+    if(finObsType==='repeated'&&finLrRef){
+      h+='<div style="margin-top:9px;padding:6px 12px;background:#fff8f0;border:1px solid #e0a060;border-left:4px solid #c06020;border-radius:0 5px 5px 0;font-size:12px;color:#1e2d40">'
+        +'<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#c06020">&#8635; Prior Audit Report Reference:</span>'
+        +' <strong>'+esc(finLrRef)+'</strong></div>';
     }
     // Risk-Based Framework panel (hidden by default; shown by toggleFramework())
     var fw=getFw(o);
@@ -15341,9 +15405,11 @@ function generateIssuedReport(){
     if(av) mBody+='<div class="modal-badge mb-view">Audit View</div><div class="modal-section ms-view">'+e(av)+'</div>';
     if(at) mBody+='<div class="modal-badge mb-action">Action Taken</div><div class="modal-section ms-action">'+e(at)+'</div>';
     vbData[id]={title:lbl+' — '+e(o.title),body:mBody};
+    var priorRef=lastRefMap[o.id]||'';
+    var synType=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
     return '<tr id="syn-row-'+id+'">'
       +'<td style="white-space:nowrap">'+lbl+'</td>'
-      +'<td>'+e(o.title)+(o.category?'<br><span class="cat">'+e(o.category)+'</span>':'')+'</td>'
+      +'<td>'+e(o.title)+(o.category?'<br><span class="cat">'+e(o.category)+'</span>':'')+(synType==='repeated'&&priorRef?'<br><span style="display:inline-block;margin-top:2px;font-size:.67rem;font-weight:700;background:#fff0e6;color:#b04800;border:1px solid #f0b080;border-radius:4px;padding:0 5px">Prior Ref: '+e(priorRef)+'</span>':'')+'</td>'
       +'<td>'+rk+'</td>'
       +'<td>'+resChip(adjResidual)+'</td>'
       +'<td>'+matChip+'</td>'
