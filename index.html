@@ -18331,6 +18331,8 @@ function detectRepeatsFromPrevReport(){
 
   // Sort by score descending — highest confidence first
   matches.sort(function(a,b){ return b.score-a.score; });
+  // Store in global so Apply button can read without JSON-in-HTML issues
+  window._rdMatches = matches.map(function(m){ return {obsId:m.obsId,ref:m.prev.ref||''}; });
 
   // Build unified review list — all pre-ticked, auditor unticks false positives
   var mh='<div style="font-family:Inter,sans-serif">';
@@ -18363,7 +18365,7 @@ function detectRepeatsFromPrevReport(){
   mh+='</div>';
   mh+='<div style="display:flex;gap:8px">';
   mh+='<button onclick="document.getElementById(\'rd-modal\').remove()" style="padding:7px 18px;border:1px solid #4a6080;border-radius:6px;background:transparent;color:#c8d8ea;font-size:12px;cursor:pointer">Cancel</button>';
-  mh+='<button onclick="_applyRepeatSelections('+JSON.stringify(matches.map(function(m){return {obsId:m.obsId,ref:m.prev.ref};}))+','+matches.length+')" style="padding:7px 22px;border:none;border-radius:6px;background:linear-gradient(135deg,#6a3090,#9040c0);color:#fff;font-size:12px;font-weight:700;cursor:pointer">&#10003; Apply Selected</button>';
+  mh+='<button onclick="_applyRepeatSelections()" style="padding:7px 22px;border:none;border-radius:6px;background:linear-gradient(135deg,#6a3090,#9040c0);color:#fff;font-size:12px;font-weight:700;cursor:pointer">&#10003; Apply Selected</button>';
   mh+='</div></div></div>';
 
   var modal=document.createElement('div');
@@ -18382,7 +18384,8 @@ function rdSelectAll(state){
   while(document.getElementById('rdchk-'+i)){ document.getElementById('rdchk-'+i).checked=state; i++; }
 }
 
-function _applyRepeatSelections(items,count){
+function _applyRepeatSelections(){
+  var items=window._rdMatches||[]; var count=items.length;
   var applied=0;
   for(var i=0;i<count;i++){
     var chk=document.getElementById('rdchk-'+i);
