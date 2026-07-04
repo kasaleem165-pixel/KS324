@@ -22647,7 +22647,7 @@ function _w2rBuildHtml(d){
       <button onclick="dbmExportProposed()" style="padding:5px 13px;background:#1a5c8c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit" title="Export your proposed databank changes (suppressions and edits) as a JSON file to send to HO for review and approval">&#128228; Export Proposed Changes</button>
       <button id="dbm-import-proposed-btn" onclick="if(window._hoAuthed)document.getElementById('dbm-import-proposed-input').click();else showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();document.getElementById('dbm-import-proposed-input').click();}})" disabled style="padding:5px 13px;background:#c07000;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:inherit;opacity:.45" title="&#128274; HO only — Import and review proposed changes from an auditor JSON file">&#128274; Import &amp; Review (HO)</button>
       <input type="file" id="dbm-import-proposed-input" accept=".json" style="display:none" onchange="dbmImportProposed(this)">
-      <button id="dbm-rebuild-btn" onclick="if(window._hoAuthed)dbmRebuildHTML();else showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmRebuildHTML();}})" disabled style="padding:5px 13px;background:#1e5c3a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:inherit;opacity:.45" title="&#128274; HO only — Bake all approved changes permanently into the databank and download a new master HTML file to distribute to all auditors">&#128274; Download Updated HTML</button>
+      <button id="dbm-rebuild-btn" onclick="if(window._hoAuthed)dbmRebuildHTML();else showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmRebuildHTML();}})" disabled style="padding:5px 13px;background:#1e5c3a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:inherit;opacity:.45" title="&#128274; HO only — All approved changes are currently saved in this browser only, not in the HTML file itself. Click here to bake those changes permanently into a new HTML file (index-updated.html). This new file is the updated version of the system — save it to your computer and upload it to Netlify so all auditors receive the latest databank.">&#128274; Update HTML File</button>
       <button onclick="dbmExportCSV()" style="padding:5px 11px;background:#4a6a4a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit" title="Export full databank as CSV">&#11123; Export CSV</button>
       <span id="dbm-stats" style="font-size:11px;color:#6a8aaa;margin-left:4px"></span>
     </div>
@@ -23319,7 +23319,7 @@ function dbmApplyProposal(){
   if(!confirm('Apply '+total+' approved change(s) to the databank?\n\n'
     +(approvedSuppress.length?'• '+approvedSuppress.length+' suppression(s)\n':'')
     +(approvedEdits.length?'• '+approvedEdits.length+' text edit(s)\n':'')
-    +'\nThese will be saved to your local session. Use "Download Updated HTML" to bake them permanently into a new master file.')) return;
+    +'\nThese will be saved to your local session. Use "Update HTML File" to bake them permanently into a new master file.')) return;
 
   approvedSuppress.forEach(function(id){
     _dbmHistory.push({type:'suppress',obsId:id});
@@ -23345,7 +23345,7 @@ function dbmApplyProposal(){
   _dbmPendingProposal=null;
   var m=document.getElementById('dbm-proposal-modal');
   if(m) m.remove();
-  if(typeof toast==='function') toast(total+' approved change(s) applied to databank. Use "Download Updated HTML" to publish to all auditors.');
+  if(typeof toast==='function') toast(total+' approved change(s) applied to databank. Use "Update HTML File" to publish to all auditors.');
   dbmBuildTable();
 }
 
@@ -23361,7 +23361,8 @@ function dbmRebuildHTML(){
     +'• '+supCount+' suppression(s) will be permanently removed from the built-in databank\n'
     +'• '+ovCount+' edit(s) will be permanently written into the built-in databank\n'
     +'• The new file will start clean (no localStorage overrides needed)\n\n'
-    +'Distribute this new index.html to all auditors to roll out the updated databank.\n\nProceed?')) return;
+    +'The file will be saved as "index-updated.html" in your browser\'s default Downloads folder.\n'
+    +'Rename it to "index.html" and upload it to Netlify to roll out the updated databank to all auditors.\n\nProceed?')) return;
   if(typeof toast==='function') toast('Fetching page source to rebuild…');
   fetch(window.location.href)
     .then(function(r){return r.text();})
@@ -23412,7 +23413,7 @@ function dbmRebuildHTML(){
       a.download='index-updated.html';
       a.click();
       setTimeout(function(){URL.revokeObjectURL(url);},5000);
-      if(typeof toast==='function') toast('New master HTML downloaded — distribute index-updated.html to all auditors.');
+      if(typeof toast==='function') toast('index-updated.html saved to your Downloads folder — rename to index.html and upload to Netlify.');
     })
     .catch(function(err){
       alert('Could not rebuild HTML: '+err.message+'\n\nThis can happen if the page was opened from a file:// URL in some browsers. Try opening via a local server, or contact your system administrator.');
