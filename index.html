@@ -18054,9 +18054,12 @@ function ra_extractDocxObsList(xml){
       }
       if(c.length>titleIdx){
         var title=c[titleIdx]||'';
+        // content: cells between title and sensitivity (typically columns 2-3)
+        var content='';
+        for(var cx=titleIdx+1;cx<c.length-1;cx++){ if(c[cx]&&c[cx].length>10) content+=(content?' ':'')+c[cx]; }
         var sens=null;
         for(var ci=c.length-1;ci>=sensStart;ci--){ var ns=normSens(c[ci]); if(ns){sens=ns;break;} }
-        if(title.trim()) res.push({ref:refVal,title:title.trim(),catKey:curCat||'',sens:sens});
+        if(title.trim()) res.push({ref:refVal,title:title.trim(),content:content.trim(),catKey:curCat||'',sens:sens});
       }
     }
     return res;
@@ -18104,7 +18107,8 @@ function ra_extractDocxObsList(xml){
     if(refV&&c3.length>tIdx&&c3[tIdx].trim()){
       var sens3=null;
       for(var ci=c3.length-1;ci>=sIdx;ci--){ var ns3=normSens(c3[ci]); if(ns3){sens3=ns3;break;} }
-      r3.push({ref:refV,title:c3[tIdx].trim(),catKey:'',sens:sens3});
+      var cont3=''; for(var cx3=tIdx+1;cx3<c3.length-1;cx3++){ if(c3[cx3]&&c3[cx3].length>10) cont3+=(cont3?' ':'')+c3[cx3]; }
+      r3.push({ref:refV,title:c3[tIdx].trim(),content:cont3.trim(),catKey:'',sens:sens3});
     }
   }
   return r3.length?r3:null;
@@ -18166,86 +18170,119 @@ function detectRepeatsFromPrevReport(){
   }
 
   var prevObs=best.docxObsList;
-  var autoMatch=[]; var fuzzyMatch=[];
+  var matches=[];
 
   for(var si=0;si<selList.length;si++){
     var obsId=selList[si];
-    // Get current obs title
-    var curTitle='';
-    for(var di=0;di<DB.observations.length;di++){ if(DB.observations[di].id===obsId){curTitle=DB.observations[di].title;break;} }
-    if(!curTitle) for(var ci=0;ci<customs.length;ci++){ if(customs[ci].id===obsId){curTitle=customs[ci].title;break;} }
-    if(!curTitle) continue;
-    var normCur=norm(curTitle);
-    var bestScore=0; var bestPrev=null;
-    for(var pi=0;pi<prevObs.length;pi++){
-      var sc=overlap(normCur,norm(prevObs[pi].title));
-      if(sc>bestScore){ bestScore=sc; bestPrev=prevObs[pi]; }
+    var curTitle=''; var curBody='';
+    for(var di=0;di<DB.observations.length;di++){
+      if(DB.observations[di].id===obsId){
+        curTitle=DB.observations[di].title||'';
+        curBody=(DB.observations[di].observation||'')+' '+(DB.observations[di].recommendation||'');
+        break;
+      }
     }
-    if(bestScore>=0.80){ autoMatch.push({obsId:obsId,title:curTitle,prev:bestPrev,score:bestScore}); }
-    else if(bestScore>=0.40){ fuzzyMatch.push({obsId:obsId,title:curTitle,prev:bestPrev,score:bestScore}); }
+    if(!curTitle) for(var ci=0;ci<customs.length;ci++){
+      if(customs[ci].id===obsId){ curTitle=customs[ci].title||''; curBody=customs[ci].observation||''; break; }
+    }
+    if(!curTitle) continue;
+
+    var nTitle=norm(curTitle);
+    var nBody=norm(curBody);
+
+    var bestScore=0; var bestPrev=null; var bestMatchType='';
+    for(var pi=0;pi<prevObs.length;pi++){
+      var p=prevObs[pi];
+      var nPrevTitle=norm(p.title||'');
+      var nPrevContent=norm(p.content||'');
+
+      var s1=overlap(nTitle,nPrevTitle);                                            // heading vs heading
+      var s2=(nBody&&nPrevContent)?overlap(nBody,nPrevContent):0;                   // content vs content
+      var s3=nPrevContent?overlap(nTitle,nPrevContent):0;                           // heading vs prev content
+      var s4=(nBody&&nPrevTitle)?overlap(nBody,nPrevTitle):0;                       // content vs prev heading
+
+      var best_s=Math.max(s1,s2,s3,s4);
+      var mtype=s1>=s2&&s1>=s3&&s1>=s4?'heading':(s2>=s3&&s2>=s4?'content':(s3>=s4?'heading in prev content':'content vs prev heading'));
+      if(best_s>bestScore){ bestScore=best_s; bestPrev=p; bestMatchType=mtype; }
+    }
+    if(bestScore>=0.60){
+      matches.push({obsId:obsId,title:curTitle,prev:bestPrev,score:bestScore,matchType:bestMatchType});
+    }
   }
 
-  // Apply auto matches immediately
-  var autoCount=autoMatch.length;
-  for(var ai=0;ai<autoMatch.length;ai++){
-    var m=autoMatch[ai];
-    obsTypeMap[m.obsId]='Repeated';
-    setLastRef(m.obsId,m.prev.ref);
-  }
-
-  // Build review modal for fuzzy matches
-  if(!fuzzyMatch.length){
-    if(autoCount) { alert('Repeat Detection Complete\n\n'+autoCount+' observation(s) automatically marked as Repeated with LARR filled.\n\nNo uncertain matches found.'); renderList(); }
-    else { alert('No matches found between current observations and the previous report.'); }
+  if(!matches.length){
+    alert('No matches found (≥60%) between the selected observations and the previous report.\n\nThe observations may have been new in the previous period, or the previous report file may not contain a readable Observations Summary table.');
     return;
   }
 
-  var mh='<div style="font-family:Inter,sans-serif;padding:4px">';
-  if(autoCount) mh+='<div style="background:#0f3d20;color:#6de08a;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:12px">&#10003; '+autoCount+' observation(s) already auto-marked as Repeated (100% match).</div>';
-  mh+='<div style="font-size:12px;color:#c8d8ea;margin-bottom:12px">The following observations are possible repeats. Review each and tick those you confirm as Repeated:</div>';
-  mh+='<div id="fuzzy-match-list" style="display:flex;flex-direction:column;gap:8px">';
-  for(var fi=0;fi<fuzzyMatch.length;fi++){
-    var fm=fuzzyMatch[fi];
-    var pct=Math.round(fm.score*100);
-    mh+='<div style="background:#1a2a3a;border:1px solid #2a4060;border-radius:6px;padding:10px">';
-    mh+='<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">';
-    mh+='<input type="checkbox" id="fmchk-'+fi+'" value="'+fi+'" style="margin-top:2px;flex-shrink:0">';
-    mh+='<div style="flex:1">';
-    mh+='<div style="font-size:12px;font-weight:700;color:#e8f0f8;margin-bottom:4px">'+ra_esc(fm.title)+'</div>';
-    mh+='<div style="font-size:10px;color:#90a8c0;margin-bottom:4px">&#128197; Previous report: <strong style="color:#f0c060">'+ra_esc(fm.prev.ref)+'</strong> — '+ra_esc(fm.prev.title)+'</div>';
-    mh+='<div style="display:inline-block;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;background:'+(pct>=80?'#0f3d20':'#3a2000')+';color:'+(pct>=80?'#6de08a':'#f0a040')+'">'+pct+'% match</div>';
+  // Sort by score descending — highest confidence first
+  matches.sort(function(a,b){ return b.score-a.score; });
+
+  // Build unified review list — all pre-ticked, auditor unticks false positives
+  var mh='<div style="font-family:Inter,sans-serif">';
+  mh+='<div style="font-size:12px;color:#c8d8ea;line-height:1.5;margin-bottom:12px">'
+    +'<strong style="color:#fff">'+matches.length+' possible repeat'+(matches.length!==1?'s':'')+' found</strong> — all are pre-selected. '
+    +'Untick any that are <em>not</em> repeats, then click <strong>Apply</strong>.</div>';
+  mh+='<div style="display:flex;flex-direction:column;gap:6px">';
+  for(var mi=0;mi<matches.length;mi++){
+    var m2=matches[mi];
+    var pct=Math.round(m2.score*100);
+    var barCol=pct>=80?'#3a9060':pct>=60?'#a06820':'#805030';
+    var labelCol=pct>=80?'#6de08a':pct>=60?'#f0c060':'#f09060';
+    mh+='<div style="background:#1a2a3a;border:1px solid #2a4060;border-radius:7px;padding:10px 12px">';
+    mh+='<label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer">';
+    mh+='<input type="checkbox" id="rdchk-'+mi+'" checked style="margin-top:3px;flex-shrink:0;width:15px;height:15px;cursor:pointer">';
+    mh+='<div style="flex:1;min-width:0">';
+    mh+='<div style="font-size:12px;font-weight:700;color:#e8f4ff;margin-bottom:3px">'+ra_esc(m2.title)+'</div>';
+    mh+='<div style="font-size:10px;color:#8ab0cc;margin-bottom:5px">&#128197; Previous: <strong style="color:#f0d070">'+ra_esc(m2.prev.ref)+'</strong> &mdash; '+ra_esc(m2.prev.title)+'</div>';
+    mh+='<div style="display:flex;align-items:center;gap:7px">';
+    mh+='<div style="flex:1;height:4px;background:#0d1a2a;border-radius:2px"><div style="width:'+pct+'%;height:4px;background:'+barCol+';border-radius:2px"></div></div>';
+    mh+='<span style="font-size:10px;font-weight:700;color:'+labelCol+';white-space:nowrap">'+pct+'% — '+m2.matchType+'</span>';
+    mh+='</div>';
     mh+='</div></label></div>';
   }
   mh+='</div>';
-  mh+='<div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">';
-  mh+='<button onclick="document.getElementById(\'fuzzy-modal\').remove()" style="padding:7px 18px;border:1px solid #4a6080;border-radius:6px;background:transparent;color:#c8d8ea;font-size:12px;cursor:pointer">Skip All</button>';
-  mh+='<button onclick="_applyFuzzyRepeats('+JSON.stringify(fuzzyMatch.map(function(f){return {obsId:f.obsId,ref:f.prev.ref};}))+','+fuzzyMatch.length+')" style="padding:7px 18px;border:none;border-radius:6px;background:#6a3090;color:#fff;font-size:12px;font-weight:700;cursor:pointer">&#10003; Apply Selected</button>';
-  mh+='</div></div>';
+  mh+='<div style="margin-top:14px;display:flex;align-items:center;gap:8px;justify-content:space-between">';
+  mh+='<div style="display:flex;gap:6px">';
+  mh+='<button onclick="rdSelectAll(true)" style="padding:4px 10px;font-size:11px;border:1px solid #4a6080;border-radius:4px;background:transparent;color:#c8d8ea;cursor:pointer">All</button>';
+  mh+='<button onclick="rdSelectAll(false)" style="padding:4px 10px;font-size:11px;border:1px solid #4a6080;border-radius:4px;background:transparent;color:#c8d8ea;cursor:pointer">None</button>';
+  mh+='</div>';
+  mh+='<div style="display:flex;gap:8px">';
+  mh+='<button onclick="document.getElementById(\'rd-modal\').remove()" style="padding:7px 18px;border:1px solid #4a6080;border-radius:6px;background:transparent;color:#c8d8ea;font-size:12px;cursor:pointer">Cancel</button>';
+  mh+='<button onclick="_applyRepeatSelections('+JSON.stringify(matches.map(function(m){return {obsId:m.obsId,ref:m.prev.ref};}))+','+matches.length+')" style="padding:7px 22px;border:none;border-radius:6px;background:linear-gradient(135deg,#6a3090,#9040c0);color:#fff;font-size:12px;font-weight:700;cursor:pointer">&#10003; Apply Selected</button>';
+  mh+='</div></div></div>';
 
   var modal=document.createElement('div');
-  modal.id='fuzzy-modal';
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
-  modal.innerHTML='<div style="background:#0d1a2a;border:1px solid #2a4060;border-radius:10px;max-width:540px;width:100%;max-height:80vh;overflow-y:auto;padding:20px">'
-    +'<div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:12px">&#128260; Possible Repeats — Please Review</div>'
-    +mh+'</div>';
+  modal.id='rd-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  var inner=document.createElement('div');
+  inner.style.cssText='background:#0d1a2a;border:1px solid #2a4060;border-radius:10px;max-width:560px;width:100%;max-height:82vh;overflow-y:auto;padding:20px';
+  inner.innerHTML='<div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:12px">&#128260; Possible Repeats — Review &amp; Confirm</div>'+mh;
+  modal.appendChild(inner);
   document.body.appendChild(modal);
   renderList();
 }
 
-function _applyFuzzyRepeats(items,count){
+function rdSelectAll(state){
+  var i=0;
+  while(document.getElementById('rdchk-'+i)){ document.getElementById('rdchk-'+i).checked=state; i++; }
+}
+
+function _applyRepeatSelections(items,count){
   var applied=0;
   for(var i=0;i<count;i++){
-    var chk=document.getElementById('fmchk-'+i);
+    var chk=document.getElementById('rdchk-'+i);
     if(chk&&chk.checked){
       obsTypeMap[items[i].obsId]='Repeated';
       setLastRef(items[i].obsId,items[i].ref);
       applied++;
     }
   }
-  var modal=document.getElementById('fuzzy-modal');
+  var modal=document.getElementById('rd-modal');
   if(modal) modal.remove();
   renderList();
   if(applied) ra_toast(applied+' observation(s) marked as Repeated with LARR filled.');
+  else ra_toast('No observations marked — all were unticked.');
 }
 
 // Extract observation list from docx XML — returns {catKey: {High:n, 'M to H':n, ...}}
