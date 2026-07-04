@@ -18149,14 +18149,20 @@ function detectRepeatsFromPrevReport(){
   // Normalise title for comparison
   function norm(s){ return s.toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
 
-  // Word overlap score between two normalised strings
+  // Word overlap score between two normalised strings.
+  // Uses min-denominator so that if the shorter title's words all appear in the
+  // longer title, it scores 1.0 — handles cases where the Word file title has
+  // extra context words that the DB title does not.
   function overlap(a,b){
-    var wa=a.split(' ').filter(function(w){return w.length>2;}); // skip short words
+    var wa=a.split(' ').filter(function(w){return w.length>2;});
     var wb=b.split(' ').filter(function(w){return w.length>2;});
     if(!wa.length||!wb.length) return 0;
-    var hits=0;
-    for(var i=0;i<wa.length;i++){ if(wb.indexOf(wa[i])!==-1) hits++; }
-    return hits/Math.max(wa.length,wb.length);
+    // count matches in both directions, take the better score
+    var hab=0; for(var i=0;i<wa.length;i++){ if(wb.indexOf(wa[i])!==-1) hab++; }
+    var hba=0; for(var j=0;j<wb.length;j++){ if(wa.indexOf(wb[j])!==-1) hba++; }
+    var scoreAB=hab/wa.length; // fraction of a's words found in b
+    var scoreBA=hba/wb.length; // fraction of b's words found in a
+    return Math.max(scoreAB,scoreBA);
   }
 
   var prevObs=best.docxObsList;
@@ -18175,8 +18181,8 @@ function detectRepeatsFromPrevReport(){
       var sc=overlap(normCur,norm(prevObs[pi].title));
       if(sc>bestScore){ bestScore=sc; bestPrev=prevObs[pi]; }
     }
-    if(bestScore>=0.99){ autoMatch.push({obsId:obsId,title:curTitle,prev:bestPrev,score:bestScore}); }
-    else if(bestScore>=0.60){ fuzzyMatch.push({obsId:obsId,title:curTitle,prev:bestPrev,score:bestScore}); }
+    if(bestScore>=0.80){ autoMatch.push({obsId:obsId,title:curTitle,prev:bestPrev,score:bestScore}); }
+    else if(bestScore>=0.40){ fuzzyMatch.push({obsId:obsId,title:curTitle,prev:bestPrev,score:bestScore}); }
   }
 
   // Apply auto matches immediately
