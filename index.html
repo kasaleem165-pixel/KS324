@@ -10171,7 +10171,7 @@ function renderList(obs, toks, showScore) {
       inner += '</div></div>';
 
       if(selIds[o.id]){
-        var curType = obsTypeMap[o.id] || o.type || 'New';
+        var curType = obsTypeMap[o.id] || 'New';
         inner += '<div style="display:flex;gap:6px;margin-top:6px;padding-top:6px;border-top:1px solid #eef2f7" id="ax-'+o.id+'">';
         inner += '<span style="font-size:11px;font-weight:700;color:var(--navy);line-height:26px;white-space:nowrap">Type:</span>';
         inner += '<label style="display:flex;align-items:center;gap:3px;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;transition:all .15s;'+(curType==='New'?'border:1.5px solid #2070b8;background:#2070b8;color:#fff;box-shadow:0 2px 6px rgba(32,112,184,.35)':'border:1.5px solid #ccc;background:#f0f0f0;color:#aaa;opacity:0.55;cursor:default')+'" onclick="event.stopPropagation()">';
@@ -10240,12 +10240,8 @@ function queuePending(id, checked) {
 
 function injectTypePill(id, div){
   if(!div || document.getElementById('ax-'+id)) return;
-  var curType = obsTypeMap[id];
-  if(!curType){
-    for(var i=0;i<DB.observations.length;i++){if(DB.observations[i].id===id){curType=DB.observations[i].type||'New';break;}}
-    if(!curType) for(var ci=0;ci<customs.length;ci++){if(customs[ci].id===id){curType=customs[ci].type||'New';break;}}
-    obsTypeMap[id]=curType;
-  }
+  var curType = obsTypeMap[id] || 'New';
+  if(!obsTypeMap[id]) obsTypeMap[id]='New';
   var row = document.createElement('div');
   row.style.cssText='display:flex;gap:6px;margin-top:6px;padding-top:6px;border-top:1px solid #eef2f7';
   row.id='ax-'+id;
