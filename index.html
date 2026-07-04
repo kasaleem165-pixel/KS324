@@ -10174,9 +10174,9 @@ function renderList(obs, toks, showScore) {
         var curType = obsTypeMap[o.id] || o.type || 'New';
         inner += '<div style="display:flex;gap:6px;margin-top:6px;padding-top:6px;border-top:1px solid #eef2f7" id="ax-'+o.id+'">';
         inner += '<span style="font-size:11px;font-weight:700;color:var(--navy);line-height:26px;white-space:nowrap">Type:</span>';
-        inner += '<label style="display:flex;align-items:center;gap:3px;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;border:1.5px solid #2070b8;background:'+(curType==='New'?'#2070b8':'#fff')+';color:'+(curType==='New'?'#fff':'#2070b8')+'" onclick="event.stopPropagation()">';
+        inner += '<label style="display:flex;align-items:center;gap:3px;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;transition:all .15s;'+(curType==='New'?'border:1.5px solid #2070b8;background:#2070b8;color:#fff;box-shadow:0 2px 6px rgba(32,112,184,.35)':'border:1.5px solid #ccc;background:#f0f0f0;color:#aaa;opacity:0.55;cursor:default')+'" onclick="event.stopPropagation()">';
         inner += '<input type="radio" name="otyp-'+o.id+'" value="New" style="display:none" '+(curType==='New'?'checked':'')+' onchange="setObsType(\''+o.id+'\',\'New\')">New</label>';
-        inner += '<label style="display:flex;align-items:center;gap:3px;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;border:1.5px solid #d06020;background:'+(curType==='Repeated'?'#d06020':'#fff')+';color:'+(curType==='Repeated'?'#fff':'#d06020')+'" onclick="event.stopPropagation()">';
+        inner += '<label style="display:flex;align-items:center;gap:3px;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;transition:all .15s;'+(curType==='Repeated'?'border:1.5px solid #d06020;background:#d06020;color:#fff;box-shadow:0 2px 6px rgba(208,96,32,.35)':'border:1.5px solid #ccc;background:#f0f0f0;color:#aaa;opacity:0.55;cursor:default')+'" onclick="event.stopPropagation()">';
         inner += '<input type="radio" name="otyp-'+o.id+'" value="Repeated" style="display:none" '+(curType==='Repeated'?'checked':'')+' onchange="setObsType(\''+o.id+'\',\'Repeated\')">Repeated</label>';
         inner += '</div>';
         if(curType==='Repeated'){
@@ -10251,9 +10251,9 @@ function injectTypePill(id, div){
   row.id='ax-'+id;
   row.innerHTML=
     '<span style="font-size:11px;font-weight:700;color:var(--navy);line-height:26px;white-space:nowrap">Type:</span>'+
-    '<label style="display:flex;align-items:center;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;border:1.5px solid #2070b8;background:'+(curType==='New'?'#2070b8':'#fff')+';color:'+(curType==='New'?'#fff':'#2070b8')+'" onclick="event.stopPropagation()">'+
+    '<label style="display:flex;align-items:center;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;transition:all .15s;'+(curType==='New'?'border:1.5px solid #2070b8;background:#2070b8;color:#fff;box-shadow:0 2px 6px rgba(32,112,184,.35)':'border:1.5px solid #ccc;background:#f0f0f0;color:#aaa;opacity:0.55;cursor:default')+'" onclick="event.stopPropagation()">'+
     '<input type="radio" name="otyp-'+id+'" value="New" style="display:none" '+(curType==='New'?'checked':'')+' onchange="setObsType(\''+id+'\',\'New\')">New</label>'+
-    '<label style="display:flex;align-items:center;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;border:1.5px solid #d06020;background:'+(curType==='Repeated'?'#d06020':'#fff')+';color:'+(curType==='Repeated'?'#fff':'#d06020')+'" onclick="event.stopPropagation()">'+
+    '<label style="display:flex;align-items:center;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;transition:all .15s;'+(curType==='Repeated'?'border:1.5px solid #d06020;background:#d06020;color:#fff;box-shadow:0 2px 6px rgba(208,96,32,.35)':'border:1.5px solid #ccc;background:#f0f0f0;color:#aaa;opacity:0.55;cursor:default')+'" onclick="event.stopPropagation()">'+
     '<input type="radio" name="otyp-'+id+'" value="Repeated" style="display:none" '+(curType==='Repeated'?'checked':'')+' onchange="setObsType(\''+id+'\',\'Repeated\')">Repeated</label>';
   div.appendChild(row);
   // Prior-ref input row — only for repeated observations
@@ -10366,8 +10366,21 @@ function setObsType(id, val) {
       if(!inp) continue;
       var isNew = inp.value==='New';
       var active = inp.value===val;
-      labels[i].style.background = active ? (isNew?'#2070b8':'#d06020') : '#fff';
-      labels[i].style.color = active ? '#fff' : (isNew?'#2070b8':'#d06020');
+      if(active){
+        labels[i].style.background = isNew?'#2070b8':'#d06020';
+        labels[i].style.color = '#fff';
+        labels[i].style.border = '1.5px solid '+(isNew?'#2070b8':'#d06020');
+        labels[i].style.opacity = '1';
+        labels[i].style.cursor = 'pointer';
+        labels[i].style.boxShadow = isNew?'0 2px 6px rgba(32,112,184,.35)':'0 2px 6px rgba(208,96,32,.35)';
+      } else {
+        labels[i].style.background = '#f0f0f0';
+        labels[i].style.color = '#aaa';
+        labels[i].style.border = '1.5px solid #ccc';
+        labels[i].style.opacity = '0.55';
+        labels[i].style.cursor = 'default';
+        labels[i].style.boxShadow = 'none';
+      }
     }
   }
   // Show or hide the prior-ref input row based on type
