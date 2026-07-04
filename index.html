@@ -19695,20 +19695,38 @@ function srrUploadClick(){
 }
 
 function srrHandleFiles(fileList){
+  if(!fileList.length) return;
+  // Build file list description for confirmation
+  var names = [];
+  for(var k=0;k<fileList.length;k++) names.push('• '+fileList[k].name+' ('+_srrFmtSize(fileList[k].size)+')');
+  var msg = 'You are about to attach '+(fileList.length===1?'1 file':''+fileList.length+' files')+' as supporting evidence to this Risk Mapping session:\n\n'
+    +names.join('\n')
+    +'\n\nThese files will be saved with the session and included in any export.\nProceed?';
+  if(!confirm(msg)){ document.getElementById('srr-file-input').value=''; return; }
+
   var remaining = fileList.length;
+  var added = 0;
   for(var i=0;i<fileList.length;i++){
     (function(f){
       var reader = new FileReader();
       reader.onload = function(e){
         srr_files.push({name:f.name, type:f.type, dataUrl:e.target.result});
-        remaining--;
-        if(remaining===0) srrRenderFilesBar();
+        added++; remaining--;
+        if(remaining===0){
+          srrRenderFilesBar();
+          _srrToast(added+' evidence file'+(added!==1?'s':'')+' attached successfully. Total attached: '+srr_files.length+'.');
+        }
       };
       reader.readAsDataURL(f);
     })(fileList[i]);
   }
-  // reset input so same file can be re-selected
   document.getElementById('srr-file-input').value='';
+}
+
+function _srrFmtSize(bytes){
+  if(bytes<1024) return bytes+'B';
+  if(bytes<1048576) return Math.round(bytes/1024)+'KB';
+  return (bytes/1048576).toFixed(1)+'MB';
 }
 
 function srrRenderFilesBar(){
@@ -19751,7 +19769,17 @@ function srrClearFiles(){
 function srrImportSession(input){
   if(!window._hoAuthed){ alert('This action requires HO authentication.'); input.value=''; return; }
   var file = input.files && input.files[0];
-  if(!file) return;
+  if(!file){ input.value=''; return; }
+
+  var isHtml = file.name.match(/\.html?$/i);
+  var confirmMsg = 'You are about to import Risk Map updates from:\n\n'
+    +'  File: '+file.name+' ('+_srrFmtSize(file.size)+')\n'
+    +'  Type: '+(isHtml?'Issued HTML Audit Report':'JSON Session File')+'\n\n'
+    +(isHtml
+      ? 'The system will extract embedded SRR reassignments and category changes from this issued report.'
+      : 'The system will read SRR reassignments and category changes from this session file.')
+    +'\n\nYou will be shown a detailed review of all detected changes before anything is applied. No changes will be made without your confirmation.\n\nProceed?';
+  if(!confirm(confirmMsg)){ input.value=''; return; }
   input.value = '';
   var reader = new FileReader();
   reader.onload = function(e){
@@ -19842,10 +19870,11 @@ function srrImportSession(input){
     });
 
     if(!changes.length){
-      alert('No SRR, RR or Category changes found in this session file that differ from the current data.');
+      alert('File read successfully, but no differences were found.\n\nNo SRR, RR or Category changes in this file differ from what is already in the current data. Nothing needs to be applied.');
       return;
     }
 
+    _srrToast('File read successfully — '+changes.length+' potential change'+(changes.length!==1?'s':'')+' found. Review the list below and select what to apply.');
     srrShowImportReview(changes);
   };
   reader.readAsText(file);
@@ -20025,9 +20054,13 @@ function srrApplyImport(changes){
 
   if(modal) modal.remove();
   srrBuildTable();
-  var msg = 'Risk Mapping Editor: '+appliedSrr+' sub-risk mapping'+(appliedSrr!==1?'s':'')+' updated, '+appliedCat+' category change'+(appliedCat!==1?'s':'')+' applied';
-  if(hoOverrideCount) msg += ' ('+hoOverrideCount+' HO override'+(hoOverrideCount!==1?'s':'')+')';
-  if(typeof toast==='function') toast(msg+'.');
+  var parts=[];
+  if(appliedSrr) parts.push(appliedSrr+' SRR mapping'+(appliedSrr!==1?'s':'')+' updated');
+  if(appliedCat) parts.push(appliedCat+' category change'+(appliedCat!==1?'s':'')+' applied');
+  if(hoOverrideCount) parts.push(hoOverrideCount+' HO override'+(hoOverrideCount!==1?'s':'')+' applied');
+  var msg='Import complete — '+parts.join(', ')+'. The Risk Mapping table has been refreshed.';
+  alert(msg);
+  _srrToast('Import applied successfully.');
 }
 
 // ── SRR Submit ───────────────────────────────────────────────────────────────
