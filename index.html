@@ -9423,13 +9423,8 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
   </div>
 
   <div class="sec" id="repeat-detect-sec">
-    <div class="sh" style="display:flex;align-items:center;justify-content:space-between">
-      <span>&#128260; Repeat Detection</span>
-      <span id="repeat-detect-src" style="font-size:10px;font-weight:600;color:#a8d0f0"></span>
-    </div>
-    <div id="repeat-detect-body">
-      <div style="font-size:11px;color:#a0b0c0;line-height:1.5;padding:6px 0">Load the previous audit report (Word file) in <strong style="color:#c8d8ea">Risk Assessment</strong> to enable automatic repeat detection.</div>
-    </div>
+    <div class="sh">&#128260; Repeat Detection</div>
+    <div id="repeat-detect-body"></div>
   </div>
 
   <div class="sec">
@@ -18196,13 +18191,16 @@ function _updateRepeatDetectPanel(){
     }
   }
   if(!best){
-    body.innerHTML='<div style="font-size:11px;color:#a0b0c0;line-height:1.5;padding:6px 0">Load the previous audit report (Word file) in <strong style="color:#c8d8ea">Risk Assessment</strong> to enable automatic repeat detection.</div>';
-    if(src) src.textContent='';
+    body.innerHTML='<div style="display:flex;align-items:flex-start;gap:8px;background:rgba(255,255,255,.04);border:1px dashed rgba(160,180,200,.25);border-radius:7px;padding:10px 11px">'
+      +'<span style="font-size:18px;line-height:1">&#128196;</span>'
+      +'<div style="font-size:11px;color:#8aa0b8;line-height:1.55">Load the <strong style="color:#c8d8ea">previous audit report</strong> (Word file) in the <strong style="color:#c8d8ea">Risk Assessment</strong> panel to enable repeat detection.</div>'
+      +'</div>';
   } else {
-    var mode=best.docxObsList&&best.docxObsList.length?'structured &mdash; '+best.docxObsList.length+' obs':'text search mode';
-    body.innerHTML='<div style="font-size:11px;color:#c8d8ea;line-height:1.5;margin-bottom:8px">Matches selected observations against the previous report to auto-mark repeats and fill LARR.<br><span style="color:#8ab0cc;font-size:10px">Mode: '+mode+'</span></div>'
-      +'<button onclick="detectRepeatsFromPrevReport()" style="width:100%;padding:9px;background:linear-gradient(135deg,#6a3090,#9040c0);color:#fff;border:none;border-radius:6px;font-family:\'Inter\',sans-serif;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px">&#128270; Detect Repeats from Previous Report</button>';
-    if(src) src.textContent=best.name.replace(/\.[^.]+$/,'').substring(0,30)+(best.date?' ('+best.date+')':'');
+    var shortName=best.name.replace(/\.[^.]+$/,'');
+    if(shortName.length>32) shortName=shortName.substring(0,32)+'…';
+    var dateLabel=best.date?' &bull; '+best.date:'';
+    body.innerHTML='<div style="font-size:10.5px;color:#7a9ab8;background:rgba(100,160,220,.08);border:1px solid rgba(100,160,220,.18);border-radius:5px;padding:5px 9px;margin-bottom:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+best.name+'">&#128196; '+shortName+dateLabel+'</div>'
+      +'<button onclick="detectRepeatsFromPrevReport()" style="width:100%;padding:10px;background:linear-gradient(135deg,#6a3090,#9040c0);color:#fff;border:none;border-radius:6px;font-family:\'Inter\',sans-serif;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px;box-shadow:0 3px 10px rgba(144,64,192,.35);transition:box-shadow .2s,transform .1s" onmouseover="this.style.boxShadow=\'0 4px 16px rgba(144,64,192,.55)\';this.style.transform=\'translateY(-1px)\'" onmouseout="this.style.boxShadow=\'0 3px 10px rgba(144,64,192,.35)\';this.style.transform=\'\'">&#128270; Detect Repeats</button>';
   }
 }
 
