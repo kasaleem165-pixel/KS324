@@ -17882,6 +17882,19 @@ function ra_onBranchSelect(val){
   }
   var clr=document.getElementById('ra-branch-search-clear');
   if(clr) clr.style.display=val?'':'none';
+  // Show complexity hint in Stage 1 panel
+  var hint=document.getElementById('ra-s1-cx-hint');
+  if(hint&&val){
+    ra_loadComplexityMap();
+    var cs=ra_getComplexityScore(val);
+    if(cs!=null){
+      hint.innerHTML='&#9881; Complexity score for this branch: <strong>'+cs+'/100</strong> ('+ra_cxLevel(cs).replace(/<[^>]+>/g,'').trim()+') — from matrix';
+      hint.style.display='block';
+    } else {
+      hint.innerHTML='&#9888; No complexity score set for this branch. Default 50 will be used. <a href="#" onclick="ra_switchStage(3);return false" style="color:#1a3a5c;font-weight:700">Set it in Complexity Matrix &#8594;</a>';
+      hint.style.display='block';
+    }
+  } else if(hint){ hint.style.display='none'; }
 }
 
 function _ra_checkBranchMismatch(){
@@ -20468,17 +20481,16 @@ function ra_stage1CalcPlanningScore(){
   var outstandingScore=docxOut&&docxOut.lastTotal>0?Math.round(docxOut.unresolved/docxOut.lastTotal*100):null;
 
   // ── Branch Complexity Score ───────────────────────────────────
-  function bandScore(sel){ var v=parseInt((document.getElementById(sel)||{}).value||'0'); return isNaN(v)?20:v; }
-  var staffScore=bandScore('ra-s1-staff');
-  var studScore=bandScore('ra-s1-students');
-  var impScore=bandScore('ra-s1-imprest');
-  var complexityScore=Math.round(staffScore*0.40+studScore*0.35+impScore*0.25);
+  ra_loadComplexityMap();
+  var matrixScore=ra_getComplexityScore(branchName);
+  var complexityScore=matrixScore!=null?matrixScore:50; // default 50 if not set
+  var complexityFromMatrix=matrixScore!=null;
 
   // ── Planning Score ────────────────────────────────────────────
   var components={
     sensArea:{score:sensAreaScore,wt:0.40,available:docxSens!=null},
     outstanding:{score:outstandingScore!=null?outstandingScore:0,wt:0.40,available:outstandingScore!=null},
-    complexity:{score:complexityScore,wt:0.20,available:true}
+    complexity:{score:complexityScore,wt:0.20,available:true,fromMatrix:complexityFromMatrix}
   };
   var planningScore=Math.round(
     components.sensArea.score*components.sensArea.wt+
@@ -20491,10 +20503,10 @@ function ra_stage1CalcPlanningScore(){
             planningScore>=30?{num:3,label:'Priority 3',days:'within 90 days',col:'#806000',bg:'#fffbe0',bd:'#e0c030'}:
                               {num:4,label:'Priority 4',days:'within 6 months',col:'#1a6020',bg:'#e8f8e8',bd:'#80c880'};
 
-  ra_renderPlanningScore(branchName,planningScore,tier,components,sensAreaDetail,docxOut,{staff:staffScore,students:studScore,imprest:impScore,complexity:complexityScore});
+  ra_renderPlanningScore(branchName,planningScore,tier,components,sensAreaDetail,docxOut);
 }
 
-function ra_renderPlanningScore(branch,score,tier,components,sensDetail,docxOut,complexity){
+function ra_renderPlanningScore(branch,score,tier,components,sensDetail,docxOut){
   var e=document.getElementById('ra-s1-results');
   if(!e) return;
 
@@ -20535,7 +20547,7 @@ function ra_renderPlanningScore(branch,score,tier,components,sensDetail,docxOut,
   }
 
   var outDetail=docxOut?'Un-resolved '+docxOut.unresolved+' ÷ Last Total '+docxOut.lastTotal+' × 100':'Not found in uploaded report — score omitted';
-  var cmpDetail='Staff: '+complexity.staff+'/100 · Students: '+complexity.students+'/100 · Imprest: '+complexity.imprest+'/100';
+  var cmpDetail=components.complexity.fromMatrix?'Score from Branch Complexity Matrix':'Default score used — set score in Complexity Matrix tab';
 
   e.innerHTML=
     '<div class="ra-card">'+
@@ -20588,28 +20600,116 @@ function ra_renderPlanningScore(branch,score,tier,components,sensDetail,docxOut,
   document.getElementById('ra-RP').scrollTop=0;
 }
 
+var RA_COMPLEXITY_KEY='bss_ra_complexity_v1';
+var _raComplexityMap={};
+
+function ra_loadComplexityMap(){
+  try{ var v=localStorage.getItem(RA_COMPLEXITY_KEY); _raComplexityMap=v?JSON.parse(v):{};} catch(e){_raComplexityMap={};}
+}
+function ra_saveComplexityMap(){
+  try{ localStorage.setItem(RA_COMPLEXITY_KEY,JSON.stringify(_raComplexityMap)); }catch(e){}
+}
+function ra_getComplexityScore(branchName){
+  if(!branchName) return null;
+  var key=branchName.trim().toLowerCase();
+  // Try exact lowercase match first, then partial
+  for(var k in _raComplexityMap){
+    if(k.toLowerCase()===key) return _raComplexityMap[k];
+  }
+  return null;
+}
+
+function ra_buildComplexityMatrix(){
+  ra_loadComplexityMap();
+  var wrap=document.getElementById('ra-complexity-body');
+  if(!wrap) return;
+  var branches=[];
+  if(typeof BSS_BRANCHES!=='undefined'&&BSS_BRANCHES.length) branches=BSS_BRANCHES;
+  else if(RA_BRANCHES.length) branches=RA_BRANCHES;
+  if(!branches.length){ wrap.innerHTML='<div style="padding:16px;font-size:12px;color:#9a9aaa;text-align:center">No branch list loaded yet. Open a branch report first.</div>'; return; }
+  var filter=(document.getElementById('ra-cx-search')||{}).value||'';
+  var fl=filter.toLowerCase();
+  var filtered=filter?branches.filter(function(b){ return (b.name||'').toLowerCase().indexOf(fl)!==-1||(b.code||'').toLowerCase().indexOf(fl)!==-1; }):branches;
+  var sorted=filtered.slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+  var h='<table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<thead><tr style="background:#1a3a5c;color:#fff;position:sticky;top:0;z-index:1">'
+    +'<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Branch</th>'
+    +'<th style="padding:7px 10px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap">Score (0–100)</th>'
+    +'<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Level</th>'
+    +'</tr></thead><tbody>';
+  for(var i=0;i<sorted.length;i++){
+    var br=sorted[i]; var nm=br.name||''; var cd=br.code||'';
+    var stored=ra_getComplexityScore(nm);
+    var rowBg=i%2===0?'#fff':'#f8fafc';
+    var sc=stored!=null?stored:'';
+    var lvlHtml=stored!=null?ra_cxLevel(stored):'<span style="font-size:10px;color:#c0c0c0;font-style:italic">not set</span>';
+    h+='<tr style="background:'+rowBg+';border-bottom:1px solid #eaeff6">'
+      +'<td style="padding:6px 10px"><div style="font-size:12px;font-weight:700;color:#1a3a5c">'+ra_esc(nm)+'</div>'
+      +(cd?'<div style="font-size:10px;color:#8a9aaa">'+ra_esc(cd)+'</div>':'')+'</td>'
+      +'<td style="padding:6px 10px;text-align:center">'
+        +'<input type="number" min="0" max="100" value="'+ra_esc(String(sc))+'" data-branch="'+ra_esc(nm)+'" onchange="ra_cxInputChange(this)" oninput="ra_cxInputChange(this)"'
+        +' style="width:64px;padding:4px 6px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:12px;font-weight:700;text-align:center;color:#1a3a5c">'
+      +'</td>'
+      +'<td style="padding:6px 10px" id="ra-cx-lvl-'+ra_esc(cd||nm.replace(/\s/g,'_'))+'">'+lvlHtml+'</td>'
+      +'</tr>';
+  }
+  h+='</tbody></table>';
+  wrap.innerHTML=h;
+}
+
+function ra_cxLevel(score){
+  var s=parseInt(score); if(isNaN(s)) return '<span style="color:#c0c0c0;font-size:10px">—</span>';
+  var lbl=s>=75?'Very High':s>=55?'High':s>=35?'Medium':s>=15?'Low':'Very Low';
+  var col=s>=75?'#c03030':s>=55?'#b04400':s>=35?'#806000':s>=15?'#1a6020':'#5a6a80';
+  var bg=s>=75?'#fde8e8':s>=55?'#fff0e0':s>=35?'#fffbe0':s>=15?'#e8f8e8':'#f0f4fa';
+  var bar='<div style="height:5px;background:#e8edf4;border-radius:3px;margin-top:3px;overflow:hidden"><div style="height:100%;width:'+Math.min(100,s)+'%;background:'+col+';border-radius:3px"></div></div>';
+  return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;background:'+bg+';color:'+col+'">'+lbl+'</span>'+bar;
+}
+
+function ra_cxInputChange(inp){
+  var nm=inp.getAttribute('data-branch'); if(!nm) return;
+  var val=inp.value.trim();
+  if(val===''){ delete _raComplexityMap[nm]; }
+  else { var n=Math.max(0,Math.min(100,parseInt(val)||0)); _raComplexityMap[nm]=n; inp.value=n; }
+  ra_saveComplexityMap();
+  // Update level cell
+  var br=null;
+  if(typeof BSS_BRANCHES!=='undefined') for(var i=0;i<BSS_BRANCHES.length;i++){ if(BSS_BRANCHES[i].name===nm){br=BSS_BRANCHES[i];break;} }
+  if(!br&&RA_BRANCHES.length) for(var j=0;j<RA_BRANCHES.length;j++){ if(RA_BRANCHES[j].name===nm){br=RA_BRANCHES[j];break;} }
+  var cdKey=br?(br.code||nm.replace(/\s/g,'_')):nm.replace(/\s/g,'_');
+  var lvlEl=document.getElementById('ra-cx-lvl-'+cdKey);
+  if(lvlEl) lvlEl.innerHTML=val===''?'<span style="font-size:10px;color:#c0c0c0;font-style:italic">not set</span>':ra_cxLevel(parseInt(val)||0);
+}
+
+function ra_cxClearAll(){
+  if(!confirm('Clear all complexity scores?\n\nThis cannot be undone.')) return;
+  _raComplexityMap={}; ra_saveComplexityMap(); ra_buildComplexityMatrix();
+  ra_toast('All complexity scores cleared.');
+}
+
 function ra_switchStage(stage){
   var s1=document.getElementById('ra-s1-section');
   var s23=document.getElementById('ra-s23-section');
+  var scx=document.getElementById('ra-scx-section');
   var rp1=document.getElementById('ra-s1-rp');
   var rp23=document.getElementById('ra-s23-rp');
+  var rpcx=document.getElementById('ra-scx-rp');
   var t1=document.getElementById('ra-stab-1');
   var t2=document.getElementById('ra-stab-23');
-  if(stage===1){
-    if(s1) s1.style.display='block';
-    if(s23) s23.style.display='none';
-    if(rp1) rp1.style.display='block';
-    if(rp23) rp23.style.display='none';
-    if(t1){t1.style.background='#1a3a5c';t1.style.color='#fff';t1.style.borderColor='#1a3a5c';}
-    if(t2){t2.style.background='#fff';t2.style.color='#1a3a5c';t2.style.borderColor='#c8d8ec';}
-  } else {
-    if(s1) s1.style.display='none';
-    if(s23) s23.style.display='block';
-    if(rp1) rp1.style.display='none';
-    if(rp23) rp23.style.display='block';
-    if(t1){t1.style.background='#fff';t1.style.color='#1a3a5c';t1.style.borderColor='#c8d8ec';}
-    if(t2){t2.style.background='#1a3a5c';t2.style.color='#fff';t2.style.borderColor='#1a3a5c';}
-  }
+  var t3=document.getElementById('ra-stab-cx');
+  function tabOn(btn){ if(btn){btn.style.background='#1a3a5c';btn.style.color='#fff';btn.style.borderColor='#1a3a5c';} }
+  function tabOff(btn){ if(btn){btn.style.background='#fff';btn.style.color='#1a3a5c';btn.style.borderColor='#c8d8ec';} }
+  var showS1=stage===1, showS23=stage===2, showCX=stage===3;
+  if(s1) s1.style.display=showS1?'block':'none';
+  if(s23) s23.style.display=showS23?'block':'none';
+  if(scx) scx.style.display=showCX?'block':'none';
+  if(rp1) rp1.style.display=showS1?'block':'none';
+  if(rp23) rp23.style.display=showS23?'block':'none';
+  if(rpcx) rpcx.style.display=showCX?'block':'none';
+  showS1?tabOn(t1):tabOff(t1);
+  showS23?tabOn(t2):tabOff(t2);
+  showCX?tabOn(t3):tabOff(t3);
+  if(showCX){ ra_loadComplexityMap(); ra_buildComplexityMatrix(); }
 }
 
 function ra_runAnalysis(){
@@ -22002,8 +22102,9 @@ function ra_methodologyHtml(){
       </div>
       <!-- Stage Tab Switcher -->
       <div style="display:flex;border-bottom:2px solid #c8d8ec;background:#f5f8fd">
-        <button id="ra-stab-1" onclick="ra_switchStage(1)" style="flex:1;padding:9px 6px;font-size:11px;font-weight:800;border:1px solid #1a3a5c;border-bottom:none;border-radius:4px 0 0 0;background:#1a3a5c;color:#fff;cursor:pointer;font-family:inherit;letter-spacing:.3px">&#9312; Stage 1<br><span style="font-size:9px;font-weight:600;opacity:.85">Branch Planning</span></button>
-        <button id="ra-stab-23" onclick="ra_switchStage(2)" style="flex:1;padding:9px 6px;font-size:11px;font-weight:800;border:1px solid #c8d8ec;border-bottom:none;border-radius:0 4px 0 0;background:#fff;color:#1a3a5c;cursor:pointer;font-family:inherit;letter-spacing:.3px">&#9313; Stage 2/3<br><span style="font-size:9px;font-weight:600;opacity:.7">Audit Analysis</span></button>
+        <button id="ra-stab-1" onclick="ra_switchStage(1)" style="flex:1;padding:9px 4px;font-size:11px;font-weight:800;border:1px solid #1a3a5c;border-bottom:none;border-radius:4px 0 0 0;background:#1a3a5c;color:#fff;cursor:pointer;font-family:inherit;letter-spacing:.3px">&#9312; Stage 1<br><span style="font-size:9px;font-weight:600;opacity:.85">Branch Planning</span></button>
+        <button id="ra-stab-23" onclick="ra_switchStage(2)" style="flex:1;padding:9px 4px;font-size:11px;font-weight:800;border:1px solid #c8d8ec;border-bottom:none;border-radius:0 0 0 0;background:#fff;color:#1a3a5c;cursor:pointer;font-family:inherit;letter-spacing:.3px">&#9313; Stage 2/3<br><span style="font-size:9px;font-weight:600;opacity:.7">Audit Analysis</span></button>
+        <button id="ra-stab-cx" onclick="ra_switchStage(3)" style="flex:1;padding:9px 4px;font-size:11px;font-weight:800;border:1px solid #c8d8ec;border-bottom:none;border-radius:0 4px 0 0;background:#fff;color:#1a3a5c;cursor:pointer;font-family:inherit;letter-spacing:.3px">&#9881; Complexity<br><span style="font-size:9px;font-weight:600;opacity:.7">Branch Matrix</span></button>
       </div>
       <div class="ra-sec" style="background:#f5f8fd">
         <div class="ra-sh">&#128205; Branch Being Audited</div>
@@ -22069,45 +22170,20 @@ function ra_methodologyHtml(){
         </div>
         <button style="padding:4px 10px;font-size:11px;border-radius:4px;border:1px solid #c8d8ec;background:#f5f8fd;color:#1a3a5c;cursor:pointer;font-weight:600" onclick="document.getElementById('ra-paste_text').value=''">&#10005; Clear Pasted Text</button>
       </div>
-      <!-- ── Stage 1: Branch Complexity ───────────────── -->
+      <!-- ── Stage 1: Calculate Planning Score ────────── -->
       <div id="ra-s1-section">
         <div class="ra-sec" style="background:#eaf6f0;border-top:2px solid #a8d8b8">
-          <div class="ra-sh" style="color:#1a6a3a">&#127968; Branch Complexity</div>
-          <div class="ra-hint" style="margin-bottom:10px">Used to normalise the planning score for branch size. Select the band that best describes this branch.</div>
-          <div class="ra-fr">
-            <label>Staffing (total employees)</label>
-            <select id="ra-s1-staff" style="width:100%;padding:6px 8px;border:1px solid #a8d8b8;border-radius:4px;font-family:inherit;font-size:12px;background:#fff;color:#1e2d40">
-              <option value="20">Under 20 staff — Very Small</option>
-              <option value="40" selected>20 – 49 staff — Small</option>
-              <option value="60">50 – 99 staff — Medium</option>
-              <option value="80">100 – 149 staff — Large</option>
-              <option value="100">150+ staff — Very Large</option>
-            </select>
+          <div class="ra-sh" style="color:#1a6a3a">&#9312; Branch Planning Score</div>
+          <div class="ra-hint" style="line-height:1.6">The system will use:<br>
+            &#8226; Sensitivity distribution from uploaded past report<br>
+            &#8226; Outstanding observations table (Analysis of Audit Observations)<br>
+            &#8226; Branch complexity score from the <strong>Complexity Matrix</strong> tab
           </div>
-          <div class="ra-fr">
-            <label>Student Enrolment</label>
-            <select id="ra-s1-students" style="width:100%;padding:6px 8px;border:1px solid #a8d8b8;border-radius:4px;font-family:inherit;font-size:12px;background:#fff;color:#1e2d40">
-              <option value="20">Under 200 students</option>
-              <option value="40" selected>200 – 499 students</option>
-              <option value="60">500 – 999 students</option>
-              <option value="80">1,000 – 1,999 students</option>
-              <option value="100">2,000+ students</option>
-            </select>
-          </div>
-          <div class="ra-fr">
-            <label>Monthly Imprest / Expenditure Budget</label>
-            <select id="ra-s1-imprest" style="width:100%;padding:6px 8px;border:1px solid #a8d8b8;border-radius:4px;font-family:inherit;font-size:12px;background:#fff;color:#1e2d40">
-              <option value="20">Under Rs. 500,000</option>
-              <option value="40" selected>Rs. 500,000 – 1,000,000</option>
-              <option value="60">Rs. 1,000,001 – 2,000,000</option>
-              <option value="80">Rs. 2,000,001 – 5,000,000</option>
-              <option value="100">Above Rs. 5,000,000</option>
-            </select>
-          </div>
+          <div id="ra-s1-cx-hint" style="margin-top:8px;font-size:10.5px;padding:5px 9px;border-radius:4px;border:1px solid #a8d8b8;background:#fff;color:#1a6a3a;display:none"></div>
         </div>
         <div style="padding:14px 16px">
           <button class="ra-btn-gold" onclick="ra_stage1CalcPlanningScore()" style="background:linear-gradient(135deg,#1a6a3a,#23a060);color:#fff">&#9312; Calculate Branch Planning Score</button>
-          <div class="ra-hint" style="text-align:center;margin-top:8px">Analyses sensitivity distribution and outstanding observations from the uploaded past report</div>
+          <div class="ra-hint" style="text-align:center;margin-top:8px">Extracts sensitivity &amp; outstanding data from uploaded past report · reads complexity from matrix</div>
         </div>
       </div><!-- end ra-s1-section -->
       <div id="ra-s23-section" style="display:none">
@@ -22154,6 +22230,19 @@ function ra_methodologyHtml(){
         <div class="ra-hint" style="text-align:center;margin-top:8px">Analyses previous report data to build a risk-prioritized audit program for the upcoming visit</div>
       </div>
       </div><!-- end ra-s23-section -->
+      <!-- ── Complexity Matrix Section ─────────────────────────── -->
+      <div id="ra-scx-section" style="display:none;flex-direction:column;height:100%">
+        <div style="padding:12px 14px;background:#f5f8fd;border-bottom:1px solid #dde4ee;flex-shrink:0">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#1a3a5c;margin-bottom:6px">&#9881; Branch Complexity Matrix</div>
+          <div style="font-size:11px;color:#5a6a80;line-height:1.6;margin-bottom:10px">Enter the pre-calculated complexity score (0–100) for each branch. Stage 1 reads this automatically — no manual entry needed at planning time.</div>
+          <input type="text" id="ra-cx-search" placeholder="&#128269; Search branch…" oninput="ra_buildComplexityMatrix()" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:12px;box-sizing:border-box;margin-bottom:8px">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button onclick="ra_cxClearAll()" style="padding:4px 10px;font-size:11px;border-radius:4px;border:1px solid #f0a0a0;background:#fff8f8;color:#c03030;cursor:pointer;font-weight:600">&#10005; Clear All</button>
+            <span style="font-size:10px;color:#8a9aaa;align-self:center">Changes save automatically</span>
+          </div>
+        </div>
+        <div id="ra-complexity-body" style="flex:1;overflow-y:auto"></div>
+      </div><!-- end ra-scx-section -->
     </div><!-- end ra-LP -->
 
     <!-- RIGHT PANEL -->
@@ -22174,6 +22263,21 @@ function ra_methodologyHtml(){
         </div>
         <div id="ra-s1-results" style="display:none"></div>
       </div><!-- end ra-s1-rp -->
+      <!-- Complexity Matrix Right Panel -->
+      <div id="ra-scx-rp" style="display:none">
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#7a8a9a;text-align:center;gap:12px">
+          <div style="font-size:48px">&#9881;</div>
+          <div style="font-size:16px;font-weight:800;color:#1a3a5c">Branch Complexity Matrix</div>
+          <div style="max-width:420px;line-height:1.8;font-size:12px">
+            Enter the complexity score for each branch in the table on the left.<br><br>
+            <strong>Score Guide:</strong><br>
+            <span style="color:#c03030;font-weight:700">75–100 Very High</span> · <span style="color:#b04400;font-weight:700">55–74 High</span><br>
+            <span style="color:#806000;font-weight:700">35–54 Medium</span> · <span style="color:#1a6020;font-weight:700">15–34 Low</span> · <span style="color:#5a6a80;font-weight:700">0–14 Very Low</span><br><br>
+            Stage 1 will automatically use the stored score for any branch you select.<br>
+            If no score is set for a branch, a default of 50 is applied.
+          </div>
+        </div>
+      </div><!-- end ra-scx-rp -->
       <!-- Stage 2/3 Right Panel -->
       <div id="ra-s23-rp" style="display:none">
       <div id="ra-results-empty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#7a8a9a;text-align:center;gap:12px">
