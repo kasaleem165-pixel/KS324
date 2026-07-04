@@ -18006,9 +18006,9 @@ function ra_buildTextFromSession(sess){
 // Extract observation list from docx Observations Summary table
 // Returns array of {ref:'1.1', title:'Budget for...', catKey:'Finance', sens:'M to H'}
 function ra_extractDocxObsList(xml){
-  var obsRefRe=/^\d+\.\d+$/;
+  // ref pattern: 1.1  1.01  1.1.1  (digits separated by dots, at least two parts)
+  var obsRefRe=/^\d+\.\d[\d.]*$/;
   var SENS_NORM={'high':'High','medium to high':'M to H','m to h':'M to H','mth':'M to H','low to medium':'L to M','l to m':'L to M','ltm':'L to M','low':'Low'};
-  var result=[];
 
   var rowRe=/<w:tr[\s>][\s\S]*?<\/w:tr>/gi; var rows=[]; var rm;
   while((rm=rowRe.exec(xml))!==null) rows.push(rm[0]);
@@ -18039,62 +18039,79 @@ function ra_extractDocxObsList(xml){
     return null;
   }
 
-  // Detect header row: look for sensitivity + observation keywords (flexible)
-  function isObsTableHeader(cells){
-    var j=cells.join(' ').toLowerCase();
-    var hasSens=j.indexOf('sensitivity')!==-1||j.indexOf('risk level')!==-1||j.indexOf('risk rating')!==-1;
-    var hasObs=j.indexOf('observ')!==-1||j.indexOf('finding')!==-1;
-    return hasSens&&hasObs;
-  }
-  // Fallback: count how many rows in this row-block look like obs refs
-  function blockHasObsRefs(startIdx){
-    var count=0;
-    for(var k=startIdx;k<Math.min(startIdx+20,rows.length);k++){
-      if(obsRefRe.test((cellTexts(rows[k])[0]||''))) count++;
+  // Try to extract obs from a slice of rows (startIdx inclusive, already past the header)
+  function extractFromRows(startIdx){
+    var res=[]; var curCat=null;
+    for(var i=startIdx;i<rows.length;i++){
+      var c=cellTexts(rows[i]);
+      if(!c.length) continue;
+      var f=c[0];
+      if(c.length===1&&/follow\s*up/i.test(f)) break;
+      // Check ref in cell[0]; also handle Sr.No in cell[0] + ref in cell[1]
+      var refVal=null; var titleIdx=1; var sensStart=2;
+      if(obsRefRe.test(f)){ refVal=f; }
+      else if(c.length>=3&&obsRefRe.test(c[1])){ refVal=c[1]; titleIdx=2; sensStart=3; }
+      if(!refVal){
+        // area heading
+        var area=matchArea(f); if(area) curCat=area;
+        continue;
+      }
+      if(c.length>titleIdx){
+        var title=c[titleIdx]||'';
+        var sens=null;
+        for(var ci=c.length-1;ci>=sensStart;ci--){ var ns=normSens(c[ci]); if(ns){sens=ns;break;} }
+        if(title.trim()) res.push({ref:refVal,title:title.trim(),catKey:curCat||'',sens:sens});
+      }
     }
-    return count>=2;
-  }
-
-  var inObsSection=false; var currentCat=null;
-  // First pass: find header row
-  var headerIdx=-1;
-  for(var ri=0;ri<rows.length;ri++){
-    var cells0=cellTexts(rows[ri]);
-    if(isObsTableHeader(cells0)){ headerIdx=ri; break; }
-  }
-  // Fallback: if no header found, find first row-block with ≥2 obs-ref rows
-  if(headerIdx===-1){
-    for(var ri=0;ri<rows.length;ri++){
-      var cells0=cellTexts(rows[ri]);
-      if(obsRefRe.test(cells0[0]||'')&&blockHasObsRefs(ri)){ headerIdx=ri-1; break; }
-    }
+    return res;
   }
 
+  // Strategy 1: header row with sensitivity + observation keywords
+  function isObsHdr(c){
+    var j=c.join(' ').toLowerCase();
+    return (j.indexOf('sensitivity')!==-1||j.indexOf('risk level')!==-1||j.indexOf('risk rating')!==-1)
+        && (j.indexOf('observ')!==-1||j.indexOf('finding')!==-1);
+  }
   for(var ri=0;ri<rows.length;ri++){
-    var cells=cellTexts(rows[ri]);
-    if(!cells.length) continue;
-    var first=cells[0];
-    if(!inObsSection){
-      if(ri===headerIdx){ inObsSection=true; continue; }
-      continue;
-    }
-    if(cells.length===1&&/follow\s*up/i.test(first)) break;
-    // Area heading row
-    if(!obsRefRe.test(first)){
-      var area=matchArea(first);
-      if(area) currentCat=area;
-      continue;
-    }
-    // Observation row: cells[0]=ref, cells[1]=title, last=sens
-    if(cells.length>=2){
-      var ref=first;
-      var title=cells[1]||'';
-      var sens=null;
-      for(var ci=cells.length-1;ci>=2;ci--){ var ns=normSens(cells[ci]); if(ns){sens=ns;break;} }
-      result.push({ref:ref,title:title.trim(),catKey:currentCat||'',sens:sens});
+    if(isObsHdr(cellTexts(rows[ri]))){
+      var r1=extractFromRows(ri+1);
+      if(r1.length) return r1;
     }
   }
-  return result.length?result:null;
+
+  // Strategy 2: find largest block of consecutive ref rows
+  var bestStart=-1; var bestCount=0; var runStart=-1; var runCount=0;
+  for(var ri=0;ri<rows.length;ri++){
+    var c2=cellTexts(rows[ri]);
+    var f2=c2[0]||'';
+    var isRef=obsRefRe.test(f2)||(c2.length>=3&&obsRefRe.test(c2[1]||''));
+    if(isRef){ if(runStart===-1) runStart=ri; runCount++; }
+    else {
+      if(runCount>bestCount){ bestCount=runCount; bestStart=runStart; }
+      runStart=-1; runCount=0;
+    }
+  }
+  if(runCount>bestCount){ bestCount=runCount; bestStart=runStart; }
+  if(bestStart!==-1&&bestCount>=2){
+    var r2=extractFromRows(bestStart);
+    if(r2.length) return r2;
+  }
+
+  // Strategy 3: collect every row anywhere that looks like an obs row (ref + title)
+  var r3=[];
+  for(var ri=0;ri<rows.length;ri++){
+    var c3=cellTexts(rows[ri]);
+    var f3=c3[0]||'';
+    var refV=null; var tIdx=1; var sIdx=2;
+    if(obsRefRe.test(f3)){ refV=f3; }
+    else if(c3.length>=3&&obsRefRe.test(c3[1]||'')){ refV=c3[1]; tIdx=2; sIdx=3; }
+    if(refV&&c3.length>tIdx&&c3[tIdx].trim()){
+      var sens3=null;
+      for(var ci=c3.length-1;ci>=sIdx;ci--){ var ns3=normSens(c3[ci]); if(ns3){sens3=ns3;break;} }
+      r3.push({ref:refV,title:c3[tIdx].trim(),catKey:'',sens:sens3});
+    }
+  }
+  return r3.length?r3:null;
 }
 
 // Show/hide the Repeat Detection panel based on whether RA reports are loaded
