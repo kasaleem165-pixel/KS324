@@ -18508,7 +18508,7 @@ function ra_parseDocxFile(arrayBuffer,callback){
     if(eocdPos<0){ callback(''); return; }
     var cdOffset=dv.getUint32(eocdPos+16,true);
     var cdSize=dv.getUint32(eocdPos+12,true);
-    var target='word/document.xml';
+    var target='word/document.xml'; var target2='word/document2.xml';
     var pos=cdOffset;
     while(pos<cdOffset+cdSize){
       if(dv.getUint32(pos,true)!==0x02014B50) break;
@@ -18521,13 +18521,25 @@ function ra_parseDocxFile(arrayBuffer,callback){
       var fnBytes=bytes.subarray(pos+46,pos+46+fnLen);
       var fn='';
       for(var ci=0;ci<fnBytes.length;ci++) fn+=String.fromCharCode(fnBytes[ci]);
-      if(fn===target){
+      if(fn===target||fn===target2){
         var lhFnLen=dv.getUint16(localOffset+26,true);
         var lhExtraLen=dv.getUint16(localOffset+28,true);
         var dataStart=localOffset+30+lhFnLen+lhExtraLen;
         var compData=arrayBuffer.slice(dataStart,dataStart+compSize);
+        function ra_decodeXml(buf){
+          // Detect BOM and use correct encoding
+          var b=new Uint8Array(buf instanceof ArrayBuffer?buf:buf.buffer||buf);
+          if(b[0]===0xFF&&b[1]===0xFE) return new TextDecoder('utf-16le').decode(b);
+          if(b[0]===0xFE&&b[1]===0xFF) return new TextDecoder('utf-16be').decode(b);
+          var s=new TextDecoder('utf-8').decode(b);
+          // If UTF-8 decode produced no w: tags, try utf-16le as last resort
+          if(s.indexOf('<w:')<0&&s.indexOf('w:p')<0){
+            try{ var s2=new TextDecoder('utf-16le').decode(b); if(s2.indexOf('<w:')>=0) return s2; }catch(ex){}
+          }
+          return s;
+        }
         if(comprMethod===0){
-          var xmlStr=new TextDecoder().decode(compData);
+          var xmlStr=ra_decodeXml(compData);
           callback(ra_xmlToText(xmlStr),ra_extractDocxSens(xmlStr),ra_extractDocxObsList(xmlStr));
         } else if(comprMethod===8){
           var ds=new DecompressionStream('deflate-raw');
@@ -18541,7 +18553,7 @@ function ra_parseDocxFile(arrayBuffer,callback){
               if(res.done){
                 var combined=new Uint8Array(ra_totalLen); var off=0;
                 for(var k=0;k<ra_chunks.length;k++){ combined.set(ra_chunks[k],off); off+=ra_chunks[k].length; }
-                var xmlStr2=new TextDecoder().decode(combined);
+                var xmlStr2=ra_decodeXml(combined);
                 callback(ra_xmlToText(xmlStr2),ra_extractDocxSens(xmlStr2),ra_extractDocxObsList(xmlStr2));
               } else { ra_chunks.push(res.value); ra_totalLen+=res.value.length; ra_pump(); }
             }).catch(function(){ callback('',null,null); });
