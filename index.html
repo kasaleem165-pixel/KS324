@@ -9745,7 +9745,12 @@ function _raReportsRestore(){
       // Skip if already loaded (e.g. user loaded manually before restore ran)
       var already=false;
       for(var j=0;j<ra_loadedReports.length;j++){ if(ra_loadedReports[j].name===rp.name){already=true;break;} }
-      if(!already) ra_loadedReports.push({name:rp.name,date:rp.date,sess:null,text:rp.text||'',detectedBranch:rp.detectedBranch||'',docxSens:rp.docxSens||null,docxObsList:rp.docxObsList||null});
+      if(!already){
+        var obsL=rp.docxObsList||null;
+        // Backfill: if previously saved without obs list, try text extraction now
+        if(!obsL&&rp.text&&typeof ra_extractObsListFromText==='function') obsL=ra_extractObsListFromText(rp.text)||null;
+        ra_loadedReports.push({name:rp.name,date:rp.date,sess:null,text:rp.text||'',detectedBranch:rp.detectedBranch||'',docxSens:rp.docxSens||null,docxObsList:obsL});
+      }
     }
     // Update UI if RA panel is already initialised
     if(typeof ra_renderLoadedFilesList==='function') ra_renderLoadedFilesList();
@@ -17947,6 +17952,11 @@ function ra_addLoadedReport(name,date,sess,text,detectedBranch,isCertain,docxSen
       if(!proceed) return;
     }
   }
+  // If XML table extraction failed, fall back to text-based extraction
+  if(!docxObsList&&text){
+    var txtObs=ra_extractObsListFromText(text);
+    if(txtObs) docxObsList=txtObs;
+  }
   ra_loadedReports.push({name:name,date:date,sess:sess,text:text,detectedBranch:detectedBranch||'',docxSens:docxSens||null,docxObsList:docxObsList||null});
   _raReportsSave();
   _updateRepeatDetectPanel();
@@ -18112,6 +18122,64 @@ function ra_extractDocxObsList(xml){
     }
   }
   return r3.length?r3:null;
+}
+
+// Strategy 4 (text-based fallback): used when XML table extraction finds nothing.
+// Parses the plain text produced by ra_xmlToText — looks for lines starting with
+// a ref pattern (e.g. "1.1") followed by a title on the same or next line.
+function ra_extractObsListFromText(text){
+  if(!text) return null;
+  var refTitleRe=/^(\d+\.\d[\d.]*)\s{1,15}(.{5,200})$/;
+  var refOnlyRe=/^(\d+\.\d[\d.]*)$/;
+  var SENS_NORM={'high':'High','medium to high':'M to H','m to h':'M to H','mth':'M to H','low to medium':'L to M','l to m':'L to M','ltm':'L to M','low':'Low'};
+  function normSensT(s){
+    var low=(s||'').toLowerCase().replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
+    for(var sv in SENS_NORM){ if(low===sv||low.indexOf(sv)!==-1) return SENS_NORM[sv]; }
+    return null;
+  }
+  var lines=text.split(/\r?\n/).map(function(l){return l.trim();});
+  var result=[]; var seen={};
+  for(var i=0;i<lines.length;i++){
+    var l=lines[i]; if(!l) continue;
+    // Pattern A: "1.1  Title text on same line"
+    var mA=refTitleRe.exec(l);
+    if(mA&&!seen[mA[1]]){
+      seen[mA[1]]=true;
+      // Look ahead for content (next non-ref, non-sens lines up to 3)
+      var content=''; var sens=null;
+      for(var j=i+1;j<Math.min(i+6,lines.length);j++){
+        var nxt=lines[j]; if(!nxt) continue;
+        if(refTitleRe.test(nxt)||refOnlyRe.test(nxt)) break;
+        var ns=normSensT(nxt); if(ns){ sens=ns; break; }
+        if(nxt.length>15) content+=(content?' ':'')+nxt;
+      }
+      result.push({ref:mA[1],title:mA[2].trim(),content:content,catKey:'',sens:sens});
+      continue;
+    }
+    // Pattern B: "1.1" alone on a line, title follows on next non-empty line
+    var mB=refOnlyRe.exec(l);
+    if(mB&&!seen[mB[1]]&&i+1<lines.length){
+      var title='';
+      for(var j=i+1;j<Math.min(i+4,lines.length);j++){
+        var nxt=lines[j]; if(!nxt) continue;
+        if(refOnlyRe.test(nxt)||refTitleRe.test(nxt)) break;
+        if(nxt.length>=5&&nxt.length<=200){ title=nxt; i=j; break; }
+      }
+      if(title){
+        seen[mB[1]]=true;
+        // Look ahead for content
+        var content=''; var sens=null;
+        for(var j=i+1;j<Math.min(i+6,lines.length);j++){
+          var nxt=lines[j]; if(!nxt) continue;
+          if(refTitleRe.test(nxt)||refOnlyRe.test(nxt)) break;
+          var ns=normSensT(nxt); if(ns){ sens=ns; break; }
+          if(nxt.length>15) content+=(content?' ':'')+nxt;
+        }
+        result.push({ref:mB[1],title:title,content:content,catKey:'',sens:sens});
+      }
+    }
+  }
+  return result.length>=2?result:null;
 }
 
 // Show/hide the Repeat Detection panel based on whether RA reports are loaded
