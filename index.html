@@ -9326,11 +9326,11 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       <div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">&#128205; Branch Lookup — type in any field to auto-fill all others</div>
       <div class="g2" style="margin-bottom:6px">
         <div class="fr" style="margin-bottom:0"><label>Branch Code</label>
-          <input type="text" id="brcode" placeholder="e.g. 240" list="dl-brcode" oninput="brAutoFill('code',this.value)" autocomplete="off">
+          <input type="text" id="brcode" placeholder="e.g. 240" list="dl-brcode" oninput="brAutoFill('code',this.value);_ra_checkBranchMismatch()" autocomplete="off">
           <datalist id="dl-brcode"></datalist>
         </div>
         <div class="fr" style="margin-bottom:0"><label>Branch Name</label>
-          <input type="text" id="brname" placeholder="e.g. LMA 11-FCC Gulberg" list="dl-brname" oninput="brAutoFill('name',this.value)" autocomplete="off">
+          <input type="text" id="brname" placeholder="e.g. LMA 11-FCC Gulberg" list="dl-brname" oninput="brAutoFill('name',this.value);_ra_checkBranchMismatch()" autocomplete="off">
           <datalist id="dl-brname"></datalist>
         </div>
       </div>
@@ -12257,6 +12257,9 @@ function _performFullClear(){
   var badge=document.getElementById('brinfo-lockbadge');
   if(ov) ov.style.display='none';
   if(badge) badge.style.display='none';
+  // Hide branch mismatch warning
+  var _bmw=document.getElementById('ra-report-mismatch-warn');
+  if(_bmw) _bmw.style.display='none';
   // Right panel — wipe old HTML immediately so nothing stale can re-appear
   var _rpc=document.getElementById('rpcont');
   var _rpe=document.getElementById('rpempty');
@@ -17831,6 +17834,19 @@ function ra_onBranchSelect(val){
   if(ci) ci.value=ra_currentBranch?ra_currentBranch.city:'';
   var mw=document.getElementById('ra-branch-mismatch');
   if(mw) mw.style.display='none';
+  // Auto-fill main report branch fields if they are currently blank
+  if(ra_currentBranch){
+    var rptCode=document.getElementById('brcode');
+    var rptName=document.getElementById('brname');
+    var rptRegion=document.getElementById('brregion');
+    var rptCity=document.getElementById('brcity');
+    if(rptCode&&!rptCode.value.trim()) rptCode.value=ra_currentBranch.code||'';
+    if(rptName&&!rptName.value.trim()) rptName.value=ra_currentBranch.name||'';
+    if(rptRegion&&!rptRegion.value.trim()) rptRegion.value=ra_currentBranch.region||'';
+    if(rptCity&&!rptCity.value.trim()) rptCity.value=ra_currentBranch.city||'';
+  }
+  // Show mismatch warning if report already has a different branch
+  _ra_checkBranchMismatch();
   // Sync search box and badge when called programmatically (e.g. session restore)
   var si=document.getElementById('ra-branch-search');
   if(si && si.value!==val) si.value=val||'';
@@ -17842,6 +17858,33 @@ function ra_onBranchSelect(val){
   }
   var clr=document.getElementById('ra-branch-search-clear');
   if(clr) clr.style.display=val?'':'none';
+}
+
+function _ra_checkBranchMismatch(){
+  var warn=document.getElementById('ra-report-mismatch-warn');
+  if(!ra_currentBranch){
+    if(warn) warn.style.display='none';
+    return;
+  }
+  var rptCode=(document.getElementById('brcode')||{}).value||'';
+  var rptName=(document.getElementById('brname')||{}).value||'';
+  if(!rptCode&&!rptName){ if(warn) warn.style.display='none'; return; }
+  var raName=(ra_currentBranch.name||'').toLowerCase();
+  var raCode=(ra_currentBranch.code||'').toLowerCase();
+  var match=(rptName.toLowerCase()===raName)||(rptCode.toLowerCase()===raCode)||
+            (rptName.toLowerCase().indexOf(raName)!==-1)||(raName.indexOf(rptName.toLowerCase())!==-1);
+  if(!warn){
+    warn=document.createElement('div');
+    warn.id='ra-report-mismatch-warn';
+    warn.style.cssText='position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:9998;background:#7a1a00;color:#fff;border:1.5px solid #e05030;border-radius:7px;padding:9px 18px;font-size:12px;font-weight:700;box-shadow:0 4px 18px rgba(0,0,0,.45);text-align:center;max-width:520px;width:90%';
+    document.body.appendChild(warn);
+  }
+  if(match){
+    warn.style.display='none';
+  } else {
+    warn.style.display='block';
+    warn.innerHTML='&#9888; Branch mismatch: Risk Assessment is set to <strong>'+ra_esc(ra_currentBranch.name)+'</strong> but the audit report has <strong>'+ra_esc(rptName||rptCode)+'</strong>. Please align them to avoid conflicts.';
+  }
 }
 
 function ra_detectBranchInText(text, selectedBranch){
