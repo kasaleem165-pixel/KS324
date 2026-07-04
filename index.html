@@ -17983,9 +17983,9 @@ function ra_handleFilePick(input){
       } else if(ext==='docx'||ext==='doc'){
         var r2=new FileReader();
         r2.onload=function(e){
-          ra_parseDocxFile(e.target.result,function(text,docxSens,docxObsList){
+          ra_parseDocxFile(e.target.result,function(text,docxSens,docxObsList,docxOutstanding){
             var sb2=(document.getElementById('ra-sel_branch')||{}).value||'';
-            ra_addLoadedReport(file.name,'',null,text||'',ra_detectBranchInText(text,sb2),false,docxSens||null,docxObsList||null);
+            ra_addLoadedReport(file.name,'',null,text||'',ra_detectBranchInText(text,sb2),false,docxSens||null,docxObsList||null,docxOutstanding||null);
             if(!text) ra_toast('Warning: could not extract text from '+file.name);
           });
         };
@@ -18010,7 +18010,7 @@ function ra_handleFilePick(input){
   input.value='';
 }
 
-function ra_addLoadedReport(name,date,sess,text,detectedBranch,isCertain,docxSens,docxObsList){
+function ra_addLoadedReport(name,date,sess,text,detectedBranch,isCertain,docxSens,docxObsList,docxOutstanding){
   for(var i=0;i<ra_loadedReports.length;i++){
     if(ra_loadedReports[i].name===name){ ra_toast(name+' is already loaded.'); return; }
   }
@@ -18032,7 +18032,7 @@ function ra_addLoadedReport(name,date,sess,text,detectedBranch,isCertain,docxSen
     var txtObs=ra_extractObsListFromText(text);
     if(txtObs) docxObsList=txtObs;
   }
-  ra_loadedReports.push({name:name,date:date,sess:sess,text:text,detectedBranch:detectedBranch||'',docxSens:docxSens||null,docxObsList:docxObsList||null});
+  ra_loadedReports.push({name:name,date:date,sess:sess,text:text,detectedBranch:detectedBranch||'',docxSens:docxSens||null,docxObsList:docxObsList||null,docxOutstanding:docxOutstanding||null});
   _raReportsSave();
   _updateRepeatDetectPanel();
   ra_renderLoadedFilesList();
@@ -18064,6 +18064,7 @@ function ra_renderLoadedFilesList(){
     if(rp.docxObsList){ h+='<div style="font-size:10px;color:#6040b0;font-weight:600;margin-top:1px">&#128270; '+rp.docxObsList.length+' observations read — repeat detection available</div>'; }
     else if(rp.docxSens){ var dsAreas=Object.keys(rp.docxSens).length; h+='<div style="font-size:10px;color:#6040b0;font-weight:600;margin-top:1px">&#128270; Sensitivity data read ('+dsAreas+' area'+(dsAreas!==1?'s':'')+')</div>'; }
     else if((rp.name.indexOf('.docx')!==-1||rp.name.indexOf('.doc')!==-1)&&!rp.sess){ h+='<div style="font-size:10px;color:#a06020;margin-top:1px">&#9888; No sensitivity table found — using area weight fallback</div>'; }
+    if(rp.docxOutstanding){ h+='<div style="font-size:10px;color:#1a6a3a;font-weight:600;margin-top:1px">&#128200; Outstanding table read — A:'+rp.docxOutstanding.lastTotal+', C:'+rp.docxOutstanding.unresolved+'</div>'; }
     h+='<div style="display:flex;align-items:center;gap:6px;margin-top:3px"><input type="date" value="'+ra_esc(rp.date||'')+'" style="padding:2px 5px;font-size:10px;width:130px;border:1px solid #c8d8ec;border-radius:3px" onchange="ra_loadedReports['+i+'].date=this.value">';
     h+='<span style="font-size:10px;color:#9a9a9a">'+wc+' words</span></div></div>';
     h+='<button onclick="ra_removeLoadedReport('+i+')" title="Remove" style="padding:3px 7px;font-size:11px;border:1px solid #f0a0a0;border-radius:4px;background:#f5f8fd;color:#c03030;cursor:pointer;font-weight:600;flex-shrink:0">&#10005;</button>';
@@ -18579,6 +18580,51 @@ function ra_extractDocxSens(xml){
   return Object.keys(result).length?result:null;
 }
 
+function ra_extractOutstandingTable(xml){
+  var rows=[];
+  var rowRe=/<w:tr[\s>][\s\S]*?<\/w:tr>/gi; var rm;
+  while((rm=rowRe.exec(xml))!==null) rows.push(rm[0]);
+
+  function cellTexts(rowXml){
+    var cells=[]; var tcRe=/<w:tc[\s>][\s\S]*?<\/w:tc>/gi; var tm;
+    while((tm=tcRe.exec(rowXml))!==null){
+      var tRe=/<w:t[^>]*>([\s\S]*?)<\/w:t>/gi; var tv; var parts=[];
+      while((tv=tRe.exec(tm[0]))!==null) parts.push(tv[1]);
+      cells.push(parts.join('').trim());
+    }
+    return cells;
+  }
+
+  function isHdrRow(c){ var j=c.join(' ').toLowerCase(); return j.indexOf('resolved')!==-1&&(j.indexOf('total')!==-1||j.indexOf('last')!==-1); }
+  function isTotalRow(c){ return c.length>=4&&/^total$/i.test(c[0]); }
+  function parseNum(s){ var n=parseInt((s||'').replace(/[^0-9]/g,'')); return isNaN(n)?0:n; }
+
+  // Strategy 1: find header row with resolved+total keywords, then look for Total row
+  for(var ri=0;ri<rows.length;ri++){
+    var c=cellTexts(rows[ri]);
+    if(isHdrRow(c)){
+      // Find Total row within next 10 rows
+      for(var rj=ri+1;rj<Math.min(ri+10,rows.length);rj++){
+        var ct=cellTexts(rows[rj]);
+        if(isTotalRow(ct)&&ct.length>=4){
+          var A=parseNum(ct[1]); var C=parseNum(ct[3]);
+          if(A>0) return {lastTotal:A,unresolved:C};
+        }
+      }
+    }
+  }
+  // Strategy 2: any row where first cell='Total', 7+ cells, all numeric after first
+  for(var ri2=0;ri2<rows.length;ri2++){
+    var c2=cellTexts(rows[ri2]);
+    if(isTotalRow(c2)&&c2.length>=7){
+      var allNum=true;
+      for(var ci=1;ci<c2.length;ci++){ if(c2[ci]&&!/^[\d\s,]+$/.test(c2[ci])){ allNum=false; break; } }
+      if(allNum){ var A2=parseNum(c2[1]); var C2=parseNum(c2[3]); if(A2>0) return {lastTotal:A2,unresolved:C2}; }
+    }
+  }
+  return null;
+}
+
 function ra_parseDocxFile(arrayBuffer,callback){
   try{
     var bytes=new Uint8Array(arrayBuffer);
@@ -18622,7 +18668,7 @@ function ra_parseDocxFile(arrayBuffer,callback){
         }
         if(comprMethod===0){
           var xmlStr=ra_decodeXml(compData);
-          callback(ra_xmlToText(xmlStr),ra_extractDocxSens(xmlStr),ra_extractDocxObsList(xmlStr));
+          callback(ra_xmlToText(xmlStr),ra_extractDocxSens(xmlStr),ra_extractDocxObsList(xmlStr),ra_extractOutstandingTable(xmlStr));
         } else if(comprMethod===8){
           var ds=new DecompressionStream('deflate-raw');
           var writer=ds.writable.getWriter();
@@ -18636,7 +18682,7 @@ function ra_parseDocxFile(arrayBuffer,callback){
                 var combined=new Uint8Array(ra_totalLen); var off=0;
                 for(var k=0;k<ra_chunks.length;k++){ combined.set(ra_chunks[k],off); off+=ra_chunks[k].length; }
                 var xmlStr2=ra_decodeXml(combined);
-                callback(ra_xmlToText(xmlStr2),ra_extractDocxSens(xmlStr2),ra_extractDocxObsList(xmlStr2));
+                callback(ra_xmlToText(xmlStr2),ra_extractDocxSens(xmlStr2),ra_extractDocxObsList(xmlStr2),ra_extractOutstandingTable(xmlStr2));
               } else { ra_chunks.push(res.value); ra_totalLen+=res.value.length; ra_pump(); }
             }).catch(function(){ callback('',null,null); });
           })();
@@ -20379,6 +20425,193 @@ function ra_hideModeTable(){
   if(el) el.style.display='none';
 }
 
+// ── STAGE 1 — Branch Planning Score ──────────────────────────────
+
+function ra_stage1CalcPlanningScore(){
+  var brEl=document.getElementById('ra-sel_branch'); var branchName=brEl?brEl.value.trim():'';
+  if(!branchName){ ra_toast('Please select a branch first.'); return; }
+  if(!ra_loadedReports.length){ ra_toast('Please load at least one previous audit report.'); return; }
+
+  // ── Sensitivity-Area Score ────────────────────────────────────
+  var docxSens=null;
+  for(var i=ra_loadedReports.length-1;i>=0;i--){ if(ra_loadedReports[i].docxSens){ docxSens=ra_loadedReports[i].docxSens; break; } }
+
+  var sensAreaScore=0, sensAreaDetail=[], totalObsSens=0;
+  if(docxSens){
+    var maxAreaWt=0;
+    var cats=Object.keys(RA_DB_CATS);
+    for(var ci=0;ci<cats.length;ci++){
+      var d=RA_DIL_WT[cats[ci]]; var aw=d?(d.areaWtScore/25):(RA_DB_CATS[cats[ci]].areaWt||0.10);
+      if(aw>maxAreaWt) maxAreaWt=aw;
+    }
+    var sumContrib=0;
+    var catKeys=Object.keys(docxSens);
+    for(var k=0;k<catKeys.length;k++){
+      var cat=catKeys[k]; var sensMap=docxSens[cat];
+      var d2=RA_DIL_WT[cat]; var aw2=d2?(d2.areaWtScore/25):(RA_DB_CATS[cat]?RA_DB_CATS[cat].areaWt||0.10:0.10);
+      var aw2Norm=maxAreaWt>0?aw2/maxAreaWt:aw2;
+      var catTotal=0, catContrib=0;
+      var svs=Object.keys(sensMap);
+      for(var s=0;s<svs.length;s++){
+        var sw=RA_SENS_WT[svs[s]]||0; var cnt=sensMap[svs[s]]||0;
+        catTotal+=cnt; catContrib+=sw*aw2Norm*cnt;
+      }
+      sumContrib+=catContrib; totalObsSens+=catTotal;
+      sensAreaDetail.push({cat:cat,obs:catTotal,areaWtNorm:aw2Norm,contrib:catContrib});
+    }
+    sensAreaScore=totalObsSens>0?Math.round(sumContrib/totalObsSens*100):0;
+  }
+
+  // ── Outstanding Risk Score ────────────────────────────────────
+  var docxOut=null;
+  for(var i2=ra_loadedReports.length-1;i2>=0;i2--){ if(ra_loadedReports[i2].docxOutstanding){ docxOut=ra_loadedReports[i2].docxOutstanding; break; } }
+  var outstandingScore=docxOut&&docxOut.lastTotal>0?Math.round(docxOut.unresolved/docxOut.lastTotal*100):null;
+
+  // ── Branch Complexity Score ───────────────────────────────────
+  function bandScore(sel){ var v=parseInt((document.getElementById(sel)||{}).value||'0'); return isNaN(v)?20:v; }
+  var staffScore=bandScore('ra-s1-staff');
+  var studScore=bandScore('ra-s1-students');
+  var impScore=bandScore('ra-s1-imprest');
+  var complexityScore=Math.round(staffScore*0.40+studScore*0.35+impScore*0.25);
+
+  // ── Planning Score ────────────────────────────────────────────
+  var components={
+    sensArea:{score:sensAreaScore,wt:0.40,available:docxSens!=null},
+    outstanding:{score:outstandingScore!=null?outstandingScore:0,wt:0.40,available:outstandingScore!=null},
+    complexity:{score:complexityScore,wt:0.20,available:true}
+  };
+  var planningScore=Math.round(
+    components.sensArea.score*components.sensArea.wt+
+    components.outstanding.score*components.outstanding.wt+
+    components.complexity.score*components.complexity.wt
+  );
+
+  var tier=planningScore>=70?{num:1,label:'Priority 1',days:'within 30 days',col:'#c03030',bg:'#fde8e8',bd:'#f0a0a0'}:
+            planningScore>=50?{num:2,label:'Priority 2',days:'within 60 days',col:'#b04400',bg:'#fff0e0',bd:'#f0b080'}:
+            planningScore>=30?{num:3,label:'Priority 3',days:'within 90 days',col:'#806000',bg:'#fffbe0',bd:'#e0c030'}:
+                              {num:4,label:'Priority 4',days:'within 6 months',col:'#1a6020',bg:'#e8f8e8',bd:'#80c880'};
+
+  ra_renderPlanningScore(branchName,planningScore,tier,components,sensAreaDetail,docxOut,{staff:staffScore,students:studScore,imprest:impScore,complexity:complexityScore});
+}
+
+function ra_renderPlanningScore(branch,score,tier,components,sensDetail,docxOut,complexity){
+  var e=document.getElementById('ra-s1-results');
+  if(!e) return;
+
+  var e2=function(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+
+  // Sensitivity-Area detail rows
+  var sensRows='';
+  if(sensDetail&&sensDetail.length){
+    var sorted=sensDetail.slice().sort(function(a,b){return b.contrib-a.contrib;});
+    var maxC=sorted.length?sorted[0].contrib:1;
+    for(var i=0;i<sorted.length;i++){
+      var r=sorted[i]; if(!r.obs) continue;
+      var barW=maxC>0?Math.round(r.contrib/maxC*100):0;
+      var rowBg=i%2===0?'#fff':'#f8fafc';
+      sensRows+='<tr style="background:'+rowBg+'">'+
+        '<td style="padding:5px 8px;font-size:11.5px;color:#1a3a5c;font-weight:600">'+e2(r.cat)+'</td>'+
+        '<td style="padding:5px 8px;text-align:center;font-size:11.5px">'+r.obs+'</td>'+
+        '<td style="padding:5px 8px;text-align:center;font-size:11.5px">'+(r.areaWtNorm*100).toFixed(0)+'%</td>'+
+        '<td style="padding:5px 8px;min-width:90px"><div style="display:flex;align-items:center;gap:5px"><div style="flex:1;height:7px;background:#e8edf4;border-radius:3px;overflow:hidden"><div style="height:100%;width:'+barW+'%;background:#1a3a5c;border-radius:3px"></div></div><span style="font-size:10px;color:#5a6a80;white-space:nowrap">'+Math.round(r.contrib*10)/10+'</span></div></td>'+
+      '</tr>';
+    }
+  }
+
+  function compRow(label,score,wt,avail,detail){
+    var contribution=Math.round(score*wt);
+    var scoreDisp=avail?score+'%':'N/A';
+    var barcol=score>=70?'#c03030':score>=50?'#d07020':score>=30?'#c0a000':'#40a040';
+    var bar=avail?'<div style="height:8px;background:#e8edf4;border-radius:4px;overflow:hidden;margin-top:4px"><div style="height:100%;width:'+Math.min(100,score)+'%;background:'+barcol+';border-radius:4px"></div></div>':'';
+    return '<tr>'+
+      '<td style="padding:8px 10px;font-size:12px;font-weight:700;color:#1a3a5c;border-bottom:1px solid #eaeff6">'+label+'</td>'+
+      '<td style="padding:8px 10px;text-align:center;font-size:12px;font-weight:700;color:#1a3a5c;border-bottom:1px solid #eaeff6">'+(wt*100)+'%</td>'+
+      '<td style="padding:8px 10px;border-bottom:1px solid #eaeff6">'+
+        '<div style="font-size:12px;font-weight:800;color:'+(avail?'#1a3a5c':'#9a9aaa')+'">'+(avail?score+'/100':'—')+'</div>'+bar+
+        (detail?'<div style="font-size:10px;color:#6a7888;margin-top:3px">'+e2(detail)+'</div>':'')+
+      '</td>'+
+      '<td style="padding:8px 10px;text-align:right;font-size:13px;font-weight:800;color:#1a3a5c;border-bottom:1px solid #eaeff6">'+(avail?contribution:'—')+'</td>'+
+    '</tr>';
+  }
+
+  var outDetail=docxOut?'Un-resolved '+docxOut.unresolved+' ÷ Last Total '+docxOut.lastTotal+' × 100':'Not found in uploaded report — score omitted';
+  var cmpDetail='Staff: '+complexity.staff+'/100 · Students: '+complexity.students+'/100 · Imprest: '+complexity.imprest+'/100';
+
+  e.innerHTML=
+    '<div class="ra-card">'+
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:14px">'+
+        '<div>'+
+          '<div style="font-size:18px;font-weight:900;color:#1a3a5c">'+e2(branch)+'</div>'+
+          '<div style="font-size:11px;color:#6a7888;margin-top:2px">Stage 1 — Branch Planning Score</div>'+
+        '</div>'+
+        '<div style="text-align:right;flex-shrink:0">'+
+          '<div style="font-size:42px;font-weight:900;color:'+tier.col+';line-height:1">'+score+'</div>'+
+          '<div style="font-size:9px;font-weight:700;color:'+tier.col+';text-transform:uppercase;letter-spacing:.5px">/ 100</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="background:'+tier.bg+';border:1px solid '+tier.bd+';border-radius:6px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">'+
+        '<div style="font-size:24px;font-weight:900;color:'+tier.col+'">'+tier.num+'</div>'+
+        '<div><div style="font-size:13px;font-weight:800;color:'+tier.col+'">'+tier.label+'</div><div style="font-size:11px;color:'+tier.col+';opacity:.8">Recommended audit '+tier.days+'</div></div>'+
+      '</div>'+
+      '<div class="ra-card-title">Score Breakdown</div>'+
+      '<table style="width:100%;border-collapse:collapse;font-size:12px">'+
+        '<thead><tr style="background:#f0f4fa">'+
+          '<th style="padding:7px 10px;text-align:left;font-size:10px;color:#5a6a80;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Component</th>'+
+          '<th style="padding:7px 10px;text-align:center;font-size:10px;color:#5a6a80;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Weight</th>'+
+          '<th style="padding:7px 10px;text-align:left;font-size:10px;color:#5a6a80;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Score</th>'+
+          '<th style="padding:7px 10px;text-align:right;font-size:10px;color:#5a6a80;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Contribution</th>'+
+        '</tr></thead><tbody>'+
+        compRow('Sensitivity-Area Score',components.sensArea.score,components.sensArea.wt,components.sensArea.available,'From "Observation Summary" section × Diligent area weights')+
+        compRow('Outstanding Risk Score',components.outstanding.score,components.outstanding.wt,components.outstanding.available,outDetail)+
+        compRow('Branch Complexity Score',components.complexity.score,components.complexity.wt,true,cmpDetail)+
+        '</tbody><tfoot><tr style="background:#f0f4fa">'+
+          '<td colspan="3" style="padding:8px 10px;font-size:12px;font-weight:800;color:#1a3a5c;border-top:2px solid #1a3a5c">Planning Score</td>'+
+          '<td style="padding:8px 10px;text-align:right;font-size:16px;font-weight:900;color:'+tier.col+';border-top:2px solid #1a3a5c">'+score+' / 100</td>'+
+        '</tr></tfoot>'+
+      '</table>'+
+    '</div>'+
+    (sensDetail&&sensDetail.length?
+    '<div class="ra-card">'+
+      '<div class="ra-card-title">Sensitivity-Area Breakdown by Category</div>'+
+      '<table style="width:100%;border-collapse:collapse;font-size:12px">'+
+        '<thead><tr style="background:#f0f4fa">'+
+          '<th style="padding:6px 8px;text-align:left;font-size:10px;color:#5a6a80;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Category</th>'+
+          '<th style="padding:6px 8px;text-align:center;font-size:10px;color:#5a6a80;font-weight:700">Obs</th>'+
+          '<th style="padding:6px 8px;text-align:center;font-size:10px;color:#5a6a80;font-weight:700">Area Wt</th>'+
+          '<th style="padding:6px 8px;text-align:left;font-size:10px;color:#5a6a80;font-weight:700">Contribution</th>'+
+        '</tr></thead><tbody>'+sensRows+'</tbody>'+
+      '</table>'+
+    '</div>':'');
+
+  document.getElementById('ra-s1-empty').style.display='none';
+  e.style.display='block';
+  document.getElementById('ra-RP').scrollTop=0;
+}
+
+function ra_switchStage(stage){
+  var s1=document.getElementById('ra-s1-section');
+  var s23=document.getElementById('ra-s23-section');
+  var rp1=document.getElementById('ra-s1-rp');
+  var rp23=document.getElementById('ra-s23-rp');
+  var t1=document.getElementById('ra-stab-1');
+  var t2=document.getElementById('ra-stab-23');
+  if(stage===1){
+    if(s1) s1.style.display='block';
+    if(s23) s23.style.display='none';
+    if(rp1) rp1.style.display='block';
+    if(rp23) rp23.style.display='none';
+    if(t1){t1.style.background='#1a3a5c';t1.style.color='#fff';t1.style.borderColor='#1a3a5c';}
+    if(t2){t2.style.background='#fff';t2.style.color='#1a3a5c';t2.style.borderColor='#c8d8ec';}
+  } else {
+    if(s1) s1.style.display='none';
+    if(s23) s23.style.display='block';
+    if(rp1) rp1.style.display='none';
+    if(rp23) rp23.style.display='block';
+    if(t1){t1.style.background='#fff';t1.style.color='#1a3a5c';t1.style.borderColor='#c8d8ec';}
+    if(t2){t2.style.background='#1a3a5c';t2.style.color='#fff';t2.style.borderColor='#1a3a5c';}
+  }
+}
+
 function ra_runAnalysis(){
   var brEl=document.getElementById('ra-sel_branch'); var branchName=brEl?brEl.value.trim():'Unknown Branch'; if(!branchName) branchName='Unknown Branch';
   var ptEl=document.getElementById('ra-paste_text'); var pasteText=ptEl?ptEl.value.trim():'';
@@ -21766,6 +21999,11 @@ function ra_methodologyHtml(){
           </div>
           <button onclick="ra_showMethodology()" title="How does this analysis work?" style="flex-shrink:0;margin-top:2px;padding:5px 9px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);border-radius:6px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">&#9432; Methodology</button>
         </div>
+      </div>
+      <!-- Stage Tab Switcher -->
+      <div style="display:flex;border-bottom:2px solid #c8d8ec;background:#f5f8fd">
+        <button id="ra-stab-1" onclick="ra_switchStage(1)" style="flex:1;padding:9px 6px;font-size:11px;font-weight:800;border:1px solid #1a3a5c;border-bottom:none;border-radius:4px 0 0 0;background:#1a3a5c;color:#fff;cursor:pointer;font-family:inherit;letter-spacing:.3px">&#9312; Stage 1<br><span style="font-size:9px;font-weight:600;opacity:.85">Branch Planning</span></button>
+        <button id="ra-stab-23" onclick="ra_switchStage(2)" style="flex:1;padding:9px 6px;font-size:11px;font-weight:800;border:1px solid #c8d8ec;border-bottom:none;border-radius:0 4px 0 0;background:#fff;color:#1a3a5c;cursor:pointer;font-family:inherit;letter-spacing:.3px">&#9313; Stage 2/3<br><span style="font-size:9px;font-weight:600;opacity:.7">Audit Analysis</span></button>
       </div>
       <div class="ra-sec" style="background:#f5f8fd">
         <div class="ra-sh">&#128205; Branch Being Audited</div>
