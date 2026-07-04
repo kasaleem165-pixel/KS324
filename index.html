@@ -18191,7 +18191,7 @@ function _updateRepeatDetectPanel(){
   if(window.ra_loadedReports){
     for(var i=0;i<ra_loadedReports.length;i++){
       var rp=ra_loadedReports[i];
-      if(!rp.text&&!(rp.docxObsList&&rp.docxObsList.length)) continue;
+      // Accept any loaded report — even if text/obs extraction failed
       if(!best||rp.date>best.date) best=rp;
     }
   }
@@ -18208,14 +18208,15 @@ function _updateRepeatDetectPanel(){
 
 function detectRepeatsFromPrevReport(){
   // Find latest report — prefer one with structured obs list, fall back to text-only
-  var bestStr=null, bestTxt=null;
+  var bestStr=null, bestAny=null;
   for(var i=0;i<ra_loadedReports.length;i++){
     var rp=ra_loadedReports[i];
     if(rp.docxObsList&&rp.docxObsList.length){ if(!bestStr||rp.date>bestStr.date) bestStr=rp; }
-    else if(rp.text){ if(!bestTxt||rp.date>bestTxt.date) bestTxt=rp; }
+    if(!bestAny||rp.date>bestAny.date) bestAny=rp;
   }
-  var best=bestStr||bestTxt;
+  var best=bestStr||bestAny;
   if(!best){ alert('No previous report loaded in Risk Assessment.\n\nPlease load the previous audit report (Word file) in the Risk Assessment panel first.'); return; }
+  if(!best.docxObsList&&!best.text){ alert('The loaded report file could not be read (text extraction failed).\n\nPlease try re-loading the Word file in Risk Assessment.'); return; }
 
   var selList=Object.keys(selIds).filter(function(k){return selIds[k];});
   if(!selList.length){ alert('No observations are selected in the current report yet.\n\nPlease select observations first, then run repeat detection.'); return; }
@@ -18228,8 +18229,8 @@ function detectRepeatsFromPrevReport(){
   // longer title, it scores 1.0 — handles cases where the Word file title has
   // extra context words that the DB title does not.
   function overlap(a,b){
-    var wa=a.split(' ').filter(function(w){return w.length>2;});
-    var wb=b.split(' ').filter(function(w){return w.length>2;});
+    var wa=a.split(' ').filter(function(w){return w.length>1;});
+    var wb=b.split(' ').filter(function(w){return w.length>1;});
     if(!wa.length||!wb.length) return 0;
     // count matches in both directions, take the better score
     var hab=0; for(var i=0;i<wa.length;i++){ if(wb.indexOf(wa[i])!==-1) hab++; }
@@ -18287,7 +18288,7 @@ function detectRepeatsFromPrevReport(){
     for(var si=0;si<selList.length;si++){
       var obsId=selList[si];
       var cur=getCurObs(obsId); if(!cur||!cur.title) continue;
-      var words=norm(cur.title+' '+cur.body).split(' ').filter(function(w){return w.length>3;});
+      var words=norm(cur.title+' '+cur.body).split(' ').filter(function(w){return w.length>1;});
       if(!words.length) continue;
       var bestScore=0; var bestRef='';
       // Search around each ref position
