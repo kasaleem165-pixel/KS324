@@ -18039,14 +18039,43 @@ function ra_extractDocxObsList(xml){
     return null;
   }
 
+  // Detect header row: look for sensitivity + observation keywords (flexible)
+  function isObsTableHeader(cells){
+    var j=cells.join(' ').toLowerCase();
+    var hasSens=j.indexOf('sensitivity')!==-1||j.indexOf('risk level')!==-1||j.indexOf('risk rating')!==-1;
+    var hasObs=j.indexOf('observ')!==-1||j.indexOf('finding')!==-1;
+    return hasSens&&hasObs;
+  }
+  // Fallback: count how many rows in this row-block look like obs refs
+  function blockHasObsRefs(startIdx){
+    var count=0;
+    for(var k=startIdx;k<Math.min(startIdx+20,rows.length);k++){
+      if(obsRefRe.test((cellTexts(rows[k])[0]||''))) count++;
+    }
+    return count>=2;
+  }
+
   var inObsSection=false; var currentCat=null;
+  // First pass: find header row
+  var headerIdx=-1;
+  for(var ri=0;ri<rows.length;ri++){
+    var cells0=cellTexts(rows[ri]);
+    if(isObsTableHeader(cells0)){ headerIdx=ri; break; }
+  }
+  // Fallback: if no header found, find first row-block with ≥2 obs-ref rows
+  if(headerIdx===-1){
+    for(var ri=0;ri<rows.length;ri++){
+      var cells0=cellTexts(rows[ri]);
+      if(obsRefRe.test(cells0[0]||'')&&blockHasObsRefs(ri)){ headerIdx=ri-1; break; }
+    }
+  }
+
   for(var ri=0;ri<rows.length;ri++){
     var cells=cellTexts(rows[ri]);
     if(!cells.length) continue;
     var first=cells[0];
     if(!inObsSection){
-      var joined=cells.join(' ').toLowerCase();
-      if(joined.indexOf('risk sensitivity')!==-1&&joined.indexOf('observation')!==-1){ inObsSection=true; continue; }
+      if(ri===headerIdx){ inObsSection=true; continue; }
       continue;
     }
     if(cells.length===1&&/follow\s*up/i.test(first)) break;
@@ -18250,6 +18279,19 @@ function ra_extractDocxSens(xml){
   var currentCat=null;
   var inObsSection=false;
 
+  function isObsHdr(cells){
+    var j=cells.join(' ').toLowerCase();
+    var hasSens=j.indexOf('sensitivity')!==-1||j.indexOf('risk level')!==-1||j.indexOf('risk rating')!==-1;
+    var hasObs=j.indexOf('observ')!==-1||j.indexOf('finding')!==-1;
+    return hasSens&&hasObs;
+  }
+  function blockHasRefs(startIdx){
+    var n=0; for(var k=startIdx;k<Math.min(startIdx+20,rows.length);k++){ if(obsRefRe.test((cellTexts(rows[k])[0]||''))) n++; } return n>=2;
+  }
+  var headerIdx2=-1;
+  for(var ri=0;ri<rows.length;ri++){ if(isObsHdr(cellTexts(rows[ri]))){ headerIdx2=ri; break; } }
+  if(headerIdx2===-1){ for(var ri=0;ri<rows.length;ri++){ if(obsRefRe.test((cellTexts(rows[ri])[0]||''))&&blockHasRefs(ri)){ headerIdx2=ri-1; break; } } }
+
   for(var ri=0;ri<rows.length;ri++){
     var cells=cellTexts(rows[ri]);
     if(!cells.length) continue;
@@ -18257,8 +18299,7 @@ function ra_extractDocxSens(xml){
 
     // Detect header row of Observations Summary table
     if(!inObsSection){
-      var joined=cells.join(' ').toLowerCase();
-      if(joined.indexOf('risk sensitivity')!==-1&&joined.indexOf('observation')!==-1){ inObsSection=true; continue; }
+      if(ri===headerIdx2){ inObsSection=true; continue; }
       continue;
     }
 
