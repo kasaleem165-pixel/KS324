@@ -19756,8 +19756,18 @@ function srrImportSession(input){
   var reader = new FileReader();
   reader.onload = function(e){
     var sess;
-    try{ sess = JSON.parse(e.target.result); }
-    catch(err){ alert('Could not read the session file. Please ensure it is a valid JSON session file.'); return; }
+    var raw = e.target.result;
+    try{
+      // HTML report: extract embedded session from <script id="bhs-session-data" type="application/json">
+      if(file.name.match(/\.html?$/i)){
+        var m = raw.match(/<script[^>]+id=["']bhs-session-data["'][^>]*>([\s\S]*?)<\/script>/i);
+        if(!m) { alert('No embedded session data found in this HTML report.\n\nThis report may have been generated before session embedding was supported.'); return; }
+        sess = JSON.parse(m[1]);
+      } else {
+        sess = JSON.parse(raw);
+      }
+    }
+    catch(err){ alert('Could not read the file. Please ensure it is a valid JSON session file or an issued HTML audit report.'); return; }
 
     // Extract SRR reassignments and category changes from session
     var impSrr  = sess.srr_reassigned || {};
@@ -22547,36 +22557,43 @@ function _w2rBuildHtml(d){
     <button onclick="toggleSRRPanel()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:13px;padding:3px 10px;border-radius:4px;cursor:pointer;font-family:inherit">&#10005; Close</button>
   </div>
   <!-- Toolbar -->
-  <div style="background:#fff;border-bottom:1px solid #dde6f0;padding:9px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    <input id="srr-search" type="text" placeholder="Search observations..." style="padding:5px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:inherit;width:200px" oninput="srrApplyFilters()">
-    <select id="srr-cat-filter" onchange="srrApplyFilters()" style="padding:5px 8px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:inherit">
-      <option value="">All Categories</option>
-      <option>Branch Imprest, Payments &amp; Accounts</option>
-      <option>Cash and Bank</option>
-      <option>Fixed Assets</option>
-      <option>HR &amp; Payroll</option>
-      <option>Library</option>
-      <option>Recruitment/Payroll/Employee Record</option>
-      <option>Safety &amp; Security</option>
-      <option>Science Laboratory</option>
-      <option>Student Record</option>
-      <option>Others</option>
-    </select>
-    <select id="srr-flag-filter" onchange="srrApplyFilters()" style="padding:5px 8px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:inherit">
-      <option value="">All Observations</option>
-      <option value="flagged">Flagged only</option>
-      <option value="reassigned">Reassigned only</option>
-    </select>
-    <button id="srr-reset-btn" onclick="if(window._hoAuthed)srrResetAll();else alert('This action requires HO authentication.')" disabled style="padding:5px 11px;background:#8b1a1a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:not-allowed;font-family:inherit;opacity:.4" title="&#128274; HO access required">&#128274; Reset All</button>
-    <button onclick="srrExport()" style="padding:5px 11px;background:#1e5c3a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit">&#11123; Export CSV</button>
-    <div style="width:1px;height:24px;background:#dde6f0;margin:0 4px;flex-shrink:0"></div>
-    <button onclick="srrUploadClick()" style="padding:5px 11px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px">&#128206; Upload Files <span id="srr-file-badge" style="display:none;background:#f0c040;color:#1a2a38;border-radius:8px;padding:0 6px;font-size:10px;font-weight:800;margin-left:2px">0</span></button>
-    <input type="file" id="srr-file-input" multiple style="display:none" onchange="srrHandleFiles(this.files)">
-    <button id="srr-submit-btn" onclick="if(window._hoAuthed)srrShowSubmit();else alert('This action requires HO authentication.')" disabled style="padding:5px 14px;background:#c07000;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:inherit;opacity:.4" title="&#128274; HO access required">&#128274; Submit Risk Map</button>
-    <div style="width:1px;height:24px;background:#dde6f0;margin:0 4px;flex-shrink:0"></div>
-    <button id="srr-import-btn" onclick="if(window._hoAuthed)document.getElementById('srr-import-input').click();else alert('This action requires HO authentication.')" disabled style="padding:5px 11px;background:#4a1a7a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:inherit;opacity:.4" title="&#128274; HO access required">&#128274; Import Risk Map Updates</button>
-    <input type="file" id="srr-import-input" accept=".json" style="display:none" onchange="srrImportSession(this)">
-    <span style="font-size:11px;color:#888;margin-left:4px" id="srr-count-lbl"></span>
+  <div style="background:#f8fafd;border-bottom:1px solid #dde6f0;padding:8px 16px 0">
+    <!-- Description bar -->
+    <div style="font-size:10.5px;color:#5a7a9a;padding:4px 0 8px;line-height:1.5">
+      Review how each observation is mapped to its Sub-Risk Register (SRR) entry and parent Risk Register (RR). Flag mismatches, reassign where needed, attach supporting evidence, and submit approved changes to HO. Use <strong>Import Risk Map Updates</strong> to load changes from a saved session or issued HTML report.
+    </div>
+    <!-- Controls row -->
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-bottom:8px">
+      <input id="srr-search" type="text" placeholder="&#128269; Search observations..." style="padding:5px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:inherit;width:210px" oninput="srrApplyFilters()">
+      <select id="srr-cat-filter" onchange="srrApplyFilters()" title="Filter by observation category" style="padding:5px 8px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:inherit">
+        <option value="">All Categories</option>
+        <option>Branch Imprest, Payments &amp; Accounts</option>
+        <option>Cash and Bank</option>
+        <option>Fixed Assets</option>
+        <option>HR &amp; Payroll</option>
+        <option>Library</option>
+        <option>Recruitment/Payroll/Employee Record</option>
+        <option>Safety &amp; Security</option>
+        <option>Science Laboratory</option>
+        <option>Student Record</option>
+        <option>Others</option>
+      </select>
+      <select id="srr-flag-filter" onchange="srrApplyFilters()" title="Filter by flag or reassignment status" style="padding:5px 8px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:inherit">
+        <option value="">All Observations</option>
+        <option value="flagged">Flagged only</option>
+        <option value="reassigned">Reassigned only</option>
+      </select>
+      <div style="width:1px;height:24px;background:#dde6f0;flex-shrink:0"></div>
+      <button onclick="srrUploadClick()" title="Attach supporting evidence files (PDFs, images, Word docs) to this risk mapping session. Attached files are saved with the session and included when the session is exported." style="padding:5px 11px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px">&#128206; Attach Evidence <span id="srr-file-badge" style="display:none;background:#f0c040;color:#1a2a38;border-radius:8px;padding:0 6px;font-size:10px;font-weight:800;margin-left:2px">0</span></button>
+      <input type="file" id="srr-file-input" multiple style="display:none" onchange="srrHandleFiles(this.files)">
+      <button onclick="srrExport()" title="Export the current risk mapping table as a CSV file for records or review" style="padding:5px 11px;background:#1e5c3a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit">&#11123; Export CSV</button>
+      <div style="width:1px;height:24px;background:#dde6f0;flex-shrink:0"></div>
+      <button id="srr-import-btn" onclick="if(window._hoAuthed)document.getElementById('srr-import-input').click();else alert('This action requires HO authentication.')" disabled title="&#128274; HO access required — Load a saved session file (.json) or an issued HTML audit report (.html) to extract and review any SRR reassignments or category changes, then selectively apply them to the databank." style="padding:5px 11px;background:#4a1a7a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:inherit;opacity:.4">&#128274; Import Risk Map Updates</button>
+      <input type="file" id="srr-import-input" accept=".json,.html,.htm" style="display:none" onchange="srrImportSession(this)">
+      <button id="srr-submit-btn" onclick="if(window._hoAuthed)srrShowSubmit();else alert('This action requires HO authentication.')" disabled title="&#128274; HO access required — Submit the reviewed and approved risk map changes to Head Office for databank update." style="padding:5px 14px;background:#c07000;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:inherit;opacity:.4">&#128274; Submit Risk Map</button>
+      <button id="srr-reset-btn" onclick="if(window._hoAuthed)srrResetAll();else alert('This action requires HO authentication.')" disabled title="&#128274; HO access required — Reset all flags and SRR reassignments back to the original databank defaults." style="padding:5px 11px;background:#8b1a1a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:not-allowed;font-family:inherit;opacity:.4">&#128274; Reset All</button>
+      <span style="font-size:11px;color:#888;margin-left:4px" id="srr-count-lbl"></span>
+    </div>
   </div>
   <!-- Uploaded files bar -->
   <div id="srr-files-bar" style="display:none;background:#f0f5fb;border-bottom:1px solid #c8d8ec;padding:6px 16px;display:none;align-items:center;gap:8px;flex-wrap:wrap">
