@@ -12231,54 +12231,48 @@ function doCopy(){
   });
 }
 
-function doClear(){
-  if(!confirm('Clear all selections?'))return;
-  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={};
+function _performFullClear(){
+  // Data maps
+  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  // SRR / Risk Mapping state
+  if(typeof srr_flagged!=='undefined') srr_flagged={};
+  if(typeof srr_reassigned!=='undefined') srr_reassigned={};
+  if(typeof srr_files!=='undefined') srr_files=[];
+  // RA reports
   _raReportsClear();
-  for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
+  // Flags
   responseLoaded=false; _wfSentAuditee=false; _wfReceivedBack=false; _wfSentRO=false;
-  _brInfoHasData=false;
-  _brInfoUnlocked=true;
-  _reportEverGenerated=false;
+  _brInfoHasData=false; _brInfoUnlocked=true; _reportEverGenerated=false;
+  // Header / branch fields
+  var fields=['brcode','brname','brregion','brcity','brhead','brhemail','braddress','brautype','rno','spb','rdt','rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk'];
+  for(var fi=0;fi<fields.length;fi++){var el=document.getElementById(fields[fi]);if(el)el.value='';}
+  // Intro sections
+  for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
+  setVal('brfwk','COSO Internal Control – Integrated Framework');
+  // Branch info lock UI
   setBrInfoDisabled(false);
   var ov=document.getElementById('brinfo-lock-overlay');
   var badge=document.getElementById('brinfo-lockbadge');
   if(ov) ov.style.display='none';
   if(badge) badge.style.display='none';
+  // Left panel
   renderAnnexList();
   document.getElementById('qinp').value='';
   document.getElementById('scat').value='All Categories';
   showPrompt();
+  // Right panel
   renderRpt();
+}
+
+function doClear(){
+  if(!confirm('Clear all selections and reset the report?'))return;
+  _performFullClear();
   toast('Cleared.');
 }
 
 function doNewReport(){
   if(!confirm('Start a new blank report? All current data will be cleared.'))return;
-  // Force right panel blank immediately — direct DOM, no conditions
-  var _rpc=document.getElementById('rpcont');
-  var _rpe=document.getElementById('rpempty');
-  if(_rpc){_rpc.innerHTML='';_rpc.style.cssText='display:none';}
-  if(_rpe){_rpe.style.cssText='display:block';}
-  // Clear all data maps
-  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
-  _raReportsClear();
-  responseLoaded=false; _wfSentAuditee=false; _wfReceivedBack=false; _wfSentRO=false;
-  _brInfoHasData=false; _brInfoUnlocked=true; _reportEverGenerated=false;
-  // Clear all header/form fields
-  var fields=['brcode','brname','brregion','brcity','brhead','brhemail','braddress','brautype','rno','spb','rdt','rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk'];
-  for(var fi=0;fi<fields.length;fi++){var el=document.getElementById(fields[fi]);if(el)el.value='';}
-  for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
-  setVal('brfwk','COSO Internal Control – Integrated Framework');
-  setBrInfoDisabled(false);
-  var ov=document.getElementById('brinfo-lock-overlay');
-  var badge=document.getElementById('brinfo-lockbadge');
-  if(ov) ov.style.display='none';
-  if(badge) badge.style.display='none';
-  renderAnnexList();
-  document.getElementById('qinp').value='';
-  document.getElementById('scat').value='All Categories';
-  showPrompt();
+  _performFullClear();
   toast('New report started — please fill in branch information.');
 }
 
