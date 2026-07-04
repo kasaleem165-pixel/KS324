@@ -22643,7 +22643,12 @@ function _w2rBuildHtml(d){
       <div style="width:1px;height:24px;background:#dde6f0;flex-shrink:0"></div>
       <button id="dbm-scan-btn" onclick="if(window._hoAuthed)dbmScanDuplicates();else showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmScanDuplicates();}})" style="padding:5px 13px;background:#6a3090;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit" title="Scan all active observations for similar titles and suggest merges">&#128270; Scan Duplicates</button>
       <button onclick="dbmUndoLast()" style="padding:5px 11px;background:#5a4a00;color:#ffe87a;border:1px solid #a89020;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit" title="Undo the last suppress, restore, edit, or merge action">&#8629; Undo Last</button>
-      <button onclick="dbmExportCSV()" style="padding:5px 11px;background:#1e5c3a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit" title="Export full databank as CSV">&#11123; Export CSV</button>
+      <div style="width:1px;height:24px;background:#dde6f0;flex-shrink:0"></div>
+      <button onclick="dbmExportProposed()" style="padding:5px 13px;background:#1a5c8c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit" title="Export your proposed databank changes (suppressions and edits) as a JSON file to send to HO for review and approval">&#128228; Export Proposed Changes</button>
+      <button id="dbm-import-proposed-btn" onclick="if(window._hoAuthed)document.getElementById('dbm-import-proposed-input').click();else showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();document.getElementById('dbm-import-proposed-input').click();}})" disabled style="padding:5px 13px;background:#c07000;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:inherit;opacity:.45" title="&#128274; HO only — Import and review proposed changes from an auditor JSON file">&#128274; Import &amp; Review (HO)</button>
+      <input type="file" id="dbm-import-proposed-input" accept=".json" style="display:none" onchange="dbmImportProposed(this)">
+      <button id="dbm-rebuild-btn" onclick="if(window._hoAuthed)dbmRebuildHTML();else showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmRebuildHTML();}})" disabled style="padding:5px 13px;background:#1e5c3a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:inherit;opacity:.45" title="&#128274; HO only — Bake all approved changes permanently into the databank and download a new master HTML file to distribute to all auditors">&#128274; Download Updated HTML</button>
+      <button onclick="dbmExportCSV()" style="padding:5px 11px;background:#4a6a4a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit" title="Export full databank as CSV">&#11123; Export CSV</button>
       <span id="dbm-stats" style="font-size:11px;color:#6a8aaa;margin-left:4px"></span>
     </div>
   </div>
@@ -23133,6 +23138,244 @@ function dbmScanDuplicates(){
   inner.innerHTML=h;
   modal.appendChild(inner);
   document.body.appendChild(modal);
+}
+
+// ── FEATURE 1: Auditor exports proposed changes ──────────────────────────────
+function dbmExportProposed(){
+  var supIds=Object.keys(_dbmSuppressed);
+  var ovKeys=Object.keys(_dbmOverrides);
+  if(!supIds.length&&!ovKeys.length){
+    alert('No proposed changes to export.\n\nMake some changes in the Databank Manager first (suppress or edit observations), then export.');
+    return;
+  }
+  var authorNote=prompt('Optional: Add a note about these changes (your name, date, reason).\nLeave blank to skip.','');
+  var payload={
+    _version:1,
+    _type:'dbm-proposed-changes',
+    _note:authorNote||'',
+    _exported:new Date().toISOString().replace('T',' ').substring(0,19),
+    suppressions:supIds,
+    overrides:_dbmOverrides
+  };
+  var json=JSON.stringify(payload,null,2);
+  var a=document.createElement('a');
+  a.href='data:application/json;charset=utf-8,'+encodeURIComponent(json);
+  a.download='dbm-proposed-changes.json';
+  a.click();
+  if(typeof toast==='function') toast('Proposed changes exported — send dbm-proposed-changes.json to HO for review.');
+}
+
+// ── FEATURE 2: HO imports and reviews proposed changes ───────────────────────
+var _dbmPendingProposal=null; // holds imported proposal until HO approves/rejects
+
+function dbmImportProposed(inp){
+  var file=inp.files[0];
+  if(!file) return;
+  inp.value='';
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var payload;
+    try{ payload=JSON.parse(e.target.result); }
+    catch(err){ alert('Invalid file — could not parse JSON.\n\n'+err.message); return; }
+    if(payload._type!=='dbm-proposed-changes'){ alert('This file does not appear to be a Databank proposed-changes export.\nPlease use a file generated by "Export Proposed Changes".'); return; }
+    _dbmPendingProposal=payload;
+    dbmShowProposalReview(payload);
+  };
+  reader.readAsText(file);
+}
+
+function dbmShowProposalReview(payload){
+  var modal=document.createElement('div');
+  modal.id='dbm-proposal-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box';
+  var supIds=payload.suppressions||[];
+  var ovrs=payload.overrides||{};
+  var ovKeys=Object.keys(ovrs);
+  var totalChanges=supIds.length+ovKeys.length;
+
+  var supRows='';
+  supIds.forEach(function(id){
+    var o=null;
+    for(var i=0;i<_dbmAllObs.length;i++){if(_dbmAllObs[i].id===id){o=_dbmAllObs[i];break;}}
+    var title=o?o.title:id;
+    supRows+='<tr>'
+      +'<td style="padding:6px 8px;font-size:11px;color:#1a2a40;border-bottom:1px solid #edf0f5">'+_dbmEsc(title)+'<br><span style="font-size:10px;color:#888">'+_dbmEsc(id)+'</span></td>'
+      +'<td style="padding:6px 8px;font-size:11px;color:#8b1a1a;font-weight:700;border-bottom:1px solid #edf0f5">Suppress (hide)</td>'
+      +'<td style="padding:6px 8px;text-align:center;border-bottom:1px solid #edf0f5"><label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;cursor:pointer"><input type="checkbox" class="dbm-prop-chk" data-id="'+_dbmEsc(id)+'" data-action="suppress" checked style="accent-color:#1a3a5c"> Approve</label></td>'
+      +'</tr>';
+  });
+
+  var editRows='';
+  ovKeys.forEach(function(id){
+    var ov=ovrs[id];
+    var orig=_dbmOriginals[id]||{};
+    var o=null;
+    for(var i=0;i<_dbmAllObs.length;i++){if(_dbmAllObs[i].id===id){o=_dbmAllObs[i];break;}}
+    var curTitle=o?o.title:(orig.title||id);
+    var changes=[];
+    if(ov.title!==undefined&&ov.title!==orig.title) changes.push('<span style="font-weight:700">Title:</span> <span style="text-decoration:line-through;color:#aaa">'+_dbmEsc(orig.title||'')+'</span> → <span style="color:#1a5c8c">'+_dbmEsc(ov.title)+'</span>');
+    if(ov.category!==undefined&&ov.category!==orig.category) changes.push('<span style="font-weight:700">Category:</span> <span style="text-decoration:line-through;color:#aaa">'+_dbmEsc(orig.category||'')+'</span> → <span style="color:#1a5c8c">'+_dbmEsc(ov.category)+'</span>');
+    if(ov.type!==undefined&&ov.type!==orig.type) changes.push('<span style="font-weight:700">Type:</span> <span style="text-decoration:line-through;color:#aaa">'+_dbmEsc(orig.type||'')+'</span> → <span style="color:#1a5c8c">'+_dbmEsc(ov.type)+'</span>');
+    if(ov.observation!==undefined&&ov.observation!==orig.observation) changes.push('<span style="font-weight:700">Observation text</span> changed');
+    if(ov.recommendation!==undefined&&ov.recommendation!==orig.recommendation) changes.push('<span style="font-weight:700">Recommendation text</span> changed');
+    if(!changes.length) return;
+    editRows+='<tr>'
+      +'<td style="padding:6px 8px;font-size:11px;color:#1a2a40;border-bottom:1px solid #edf0f5">'+_dbmEsc(curTitle)+'<br><span style="font-size:10px;color:#888">'+_dbmEsc(id)+'</span></td>'
+      +'<td style="padding:6px 8px;font-size:10.5px;color:#2a4a6a;border-bottom:1px solid #edf0f5">'+changes.join('<br>')+'</td>'
+      +'<td style="padding:6px 8px;text-align:center;border-bottom:1px solid #edf0f5"><label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;cursor:pointer"><input type="checkbox" class="dbm-prop-chk" data-id="'+_dbmEsc(id)+'" data-action="edit" checked style="accent-color:#1a3a5c"> Approve</label></td>'
+      +'</tr>';
+  });
+
+  var noteHtml=payload._note?'<div style="background:#fff8e6;border:1px solid #f0d080;border-radius:4px;padding:7px 12px;font-size:11px;color:#6a4a00;margin-bottom:12px">&#128196; <strong>Auditor note:</strong> '+_dbmEsc(payload._note)+'</div>':'';
+  var exportedHtml=payload._exported?'<span style="font-size:10px;color:#888;margin-left:8px">Exported: '+_dbmEsc(payload._exported)+'</span>':'';
+
+  modal.innerHTML='<div style="background:#fff;border-radius:8px;max-width:760px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.4)">'
+    +'<div style="background:#1a3a5c;color:#fff;padding:12px 18px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:10px">'
+    +'<div style="font-size:15px;font-weight:800;flex:1">&#128229; Review Proposed Databank Changes'+exportedHtml+'</div>'
+    +'<button onclick="document.getElementById(\'dbm-proposal-modal\').remove();_dbmPendingProposal=null;" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:3px 10px;border-radius:4px;cursor:pointer;font-family:inherit">&#10005; Cancel</button>'
+    +'</div>'
+    +'<div style="padding:16px 18px;overflow-y:auto;flex:1">'
+    +noteHtml
+    +'<div style="font-size:12px;color:#3a5a7a;margin-bottom:10px">Review each proposed change below. <strong>Uncheck</strong> any item you want to reject. Then click <strong>Apply Approved Changes</strong>.</div>'
+    +(supRows||editRows
+      ?'<table style="width:100%;border-collapse:collapse;font-size:11px">'
+       +'<thead><tr style="background:#f0f4f9">'
+       +'<th style="padding:7px 8px;text-align:left;color:#1a3a5c;font-size:11px;font-weight:700">Observation</th>'
+       +'<th style="padding:7px 8px;text-align:left;color:#1a3a5c;font-size:11px;font-weight:700">Proposed Change</th>'
+       +'<th style="padding:7px 8px;text-align:center;color:#1a3a5c;font-size:11px;font-weight:700">Decision</th>'
+       +'</tr></thead><tbody>'
+       +supRows+editRows
+       +'</tbody></table>'
+      :'<div style="padding:20px;text-align:center;color:#888;font-style:italic">No recognisable changes found in this file.</div>')
+    +'</div>'
+    +'<div style="padding:12px 18px;border-top:1px solid #edf0f5;display:flex;gap:10px;justify-content:flex-end">'
+    +'<button onclick="dbmSelectAllProposals(true)" style="padding:6px 14px;background:#e8f0e8;color:#1e5c3a;border:1px solid #aad0aa;border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit">&#10003; Select All</button>'
+    +'<button onclick="dbmSelectAllProposals(false)" style="padding:6px 14px;background:#f0e8e8;color:#8b1a1a;border:1px solid #d0aaaa;border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit">&#10005; Deselect All</button>'
+    +'<button onclick="dbmApplyProposal()" style="padding:7px 20px;background:#1e5c3a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Apply Approved Changes</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(modal);
+}
+
+function dbmSelectAllProposals(state){
+  var chks=document.querySelectorAll('.dbm-prop-chk');
+  for(var i=0;i<chks.length;i++) chks[i].checked=state;
+}
+
+function dbmApplyProposal(){
+  if(!_dbmPendingProposal){alert('No proposal loaded.');return;}
+  var chks=document.querySelectorAll('.dbm-prop-chk');
+  var approvedSuppress=[], approvedEdits=[];
+  for(var i=0;i<chks.length;i++){
+    if(!chks[i].checked) continue;
+    var id=chks[i].getAttribute('data-id');
+    var action=chks[i].getAttribute('data-action');
+    if(action==='suppress') approvedSuppress.push(id);
+    else if(action==='edit') approvedEdits.push(id);
+  }
+  var total=approvedSuppress.length+approvedEdits.length;
+  if(!total){alert('No changes selected for approval. Tick at least one item.');return;}
+  if(!confirm('Apply '+total+' approved change(s) to the databank?\n\n'
+    +(approvedSuppress.length?'• '+approvedSuppress.length+' suppression(s)\n':'')
+    +(approvedEdits.length?'• '+approvedEdits.length+' text edit(s)\n':'')
+    +'\nThese will be saved to your local session. Use "Download Updated HTML" to bake them permanently into a new master file.')) return;
+
+  approvedSuppress.forEach(function(id){
+    _dbmHistory.push({type:'suppress',obsId:id});
+    _dbmSuppressed[id]=true;
+    DB.observations=DB.observations.filter(function(o){return o.id!==id;});
+  });
+  ss(DB_SUP_KEY,Object.keys(_dbmSuppressed));
+
+  approvedEdits.forEach(function(id){
+    var ov=(_dbmPendingProposal.overrides||{})[id];
+    if(!ov) return;
+    var o=null;
+    for(var j=0;j<_dbmAllObs.length;j++){if(_dbmAllObs[j].id===id){o=_dbmAllObs[j];break;}}
+    if(o) _dbmHistory.push({type:'edit',obsId:id,prev:{title:o.title,category:o.category,type:o.type,observation:o.observation,recommendation:o.recommendation}});
+    _dbmOverrides[id]=ov;
+    if(o){if(ov.title!==undefined)o.title=ov.title;if(ov.category!==undefined)o.category=ov.category;if(ov.type!==undefined)o.type=ov.type;if(ov.observation!==undefined)o.observation=ov.observation;if(ov.recommendation!==undefined)o.recommendation=ov.recommendation;}
+    for(var k=0;k<DB.observations.length;k++){
+      if(DB.observations[k].id===id){var a=DB.observations[k];if(ov.title!==undefined)a.title=ov.title;if(ov.category!==undefined)a.category=ov.category;if(ov.type!==undefined)a.type=ov.type;if(ov.observation!==undefined)a.observation=ov.observation;if(ov.recommendation!==undefined)a.recommendation=ov.recommendation;break;}
+    }
+  });
+  ss(DB_OVR_KEY,_dbmOverrides);
+
+  _dbmPendingProposal=null;
+  var m=document.getElementById('dbm-proposal-modal');
+  if(m) m.remove();
+  if(typeof toast==='function') toast(total+' approved change(s) applied to databank. Use "Download Updated HTML" to publish to all auditors.');
+  dbmBuildTable();
+}
+
+// ── FEATURE 3: HO bakes changes into HTML and downloads new master ────────────
+function dbmRebuildHTML(){
+  var supCount=Object.keys(_dbmSuppressed).length;
+  var ovCount=Object.keys(_dbmOverrides).length;
+  if(!supCount&&!ovCount){
+    alert('No local changes found to bake in.\n\nApply some suppressions or edits first, or import a proposed-changes file from an auditor.');
+    return;
+  }
+  if(!confirm('Download a new master HTML file with all current databank changes baked in?\n\n'
+    +'• '+supCount+' suppression(s) will be permanently removed from the built-in databank\n'
+    +'• '+ovCount+' edit(s) will be permanently written into the built-in databank\n'
+    +'• The new file will start clean (no localStorage overrides needed)\n\n'
+    +'Distribute this new index.html to all auditors to roll out the updated databank.\n\nProceed?')) return;
+  if(typeof toast==='function') toast('Fetching page source to rebuild…');
+  fetch(window.location.href)
+    .then(function(r){return r.text();})
+    .then(function(html){
+      // Build updated observations array (apply suppression + overrides to built-in data)
+      var updatedObs=_dbmAllObs
+        .filter(function(o){return !_dbmSuppressed[o.id];})
+        .map(function(o){
+          var ov=_dbmOverrides[o.id];
+          if(!ov) return o;
+          var n={};
+          for(var k in o) n[k]=o[k];
+          if(ov.title!==undefined) n.title=ov.title;
+          if(ov.category!==undefined) n.category=ov.category;
+          if(ov.type!==undefined) n.type=ov.type;
+          if(ov.observation!==undefined) n.observation=ov.observation;
+          if(ov.recommendation!==undefined) n.recommendation=ov.recommendation;
+          return n;
+        });
+
+      // Replace the observations array inside the audit-data JSON blob
+      html=html.replace(
+        /(<script[^>]+id=["']audit-data["'][^>]*>)([\s\S]*?)(<\/script>)/i,
+        function(match, open, content, close){
+          try{
+            var data=JSON.parse(content);
+            data.observations=updatedObs;
+            return open+JSON.stringify(data)+close;
+          } catch(err){
+            throw new Error('Could not parse audit-data block: '+err.message);
+          }
+        }
+      );
+
+      // Strip out any bss_dbsup / bss_dbovr initialisation from localStorage
+      // so the new file starts completely clean (the data is now baked in)
+      var cleanNote='/* databank rebuilt '+new Date().toISOString().substring(0,10)+' — overrides baked in */';
+      html=html.replace(/localStorage\.removeItem\s*\(\s*['"]bss_dbsup_v1['"]\s*\)/g,'/* cleared */');
+      html=html.replace(/localStorage\.removeItem\s*\(\s*['"]bss_dbovr_v1['"]\s*\)/g,'/* cleared */');
+      // Insert a self-clearing init snippet just before </head> so old localStorage is purged on first load
+      var clearSnippet='<script>try{localStorage.removeItem("bss_dbsup_v1");localStorage.removeItem("bss_dbovr_v1");}catch(e){}<\/script>'+cleanNote;
+      html=html.replace(/<\/head>/i, clearSnippet+'</head>');
+
+      var blob=new Blob([html],{type:'text/html;charset=utf-8'});
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url;
+      a.download='index-updated.html';
+      a.click();
+      setTimeout(function(){URL.revokeObjectURL(url);},5000);
+      if(typeof toast==='function') toast('New master HTML downloaded — distribute index-updated.html to all auditors.');
+    })
+    .catch(function(err){
+      alert('Could not rebuild HTML: '+err.message+'\n\nThis can happen if the page was opened from a file:// URL in some browsers. Try opening via a local server, or contact your system administrator.');
+    });
 }
 
 function dbmExportCSV(){
