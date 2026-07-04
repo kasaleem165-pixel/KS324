@@ -12243,8 +12243,8 @@ function _performFullClear(){
   // Flags
   responseLoaded=false; _wfSentAuditee=false; _wfReceivedBack=false; _wfSentRO=false;
   _brInfoHasData=false; _brInfoUnlocked=true; _reportEverGenerated=false;
-  // Header / branch fields
-  var fields=['brcode','brname','brregion','brcity','brhead','brhemail','braddress','brautype','rno','spb','rdt','rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk'];
+  // Header / branch fields (including rpt_stage)
+  var fields=['brcode','brname','brregion','brcity','brhead','brhemail','braddress','brautype','rno','spb','rdt','rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk','rpt_stage'];
   for(var fi=0;fi<fields.length;fi++){var el=document.getElementById(fields[fi]);if(el)el.value='';}
   // Intro sections
   for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
@@ -12255,12 +12255,17 @@ function _performFullClear(){
   var badge=document.getElementById('brinfo-lockbadge');
   if(ov) ov.style.display='none';
   if(badge) badge.style.display='none';
+  // Right panel — wipe old HTML immediately so nothing stale can re-appear
+  var _rpc=document.getElementById('rpcont');
+  var _rpe=document.getElementById('rpempty');
+  if(_rpc){ _rpc.innerHTML=''; _rpc.style.display='none'; }
+  if(_rpe) _rpe.style.display='block';
   // Left panel
   renderAnnexList();
   document.getElementById('qinp').value='';
   document.getElementById('scat').value='All Categories';
   showPrompt();
-  // Right panel
+  // Full re-render (will confirm empty state)
   renderRpt();
 }
 
