@@ -18288,7 +18288,9 @@ function detectRepeatsFromPrevReport(){
     for(var si=0;si<selList.length;si++){
       var obsId=selList[si];
       var cur=getCurObs(obsId); if(!cur||!cur.title) continue;
-      var words=norm(cur.title+' '+cur.body).split(' ').filter(function(w){return w.length>1;});
+      // Title words only — including the long DB body paragraph would make
+      // score = hits/200_words which is always near 0 in any 400-char window
+      var words=norm(cur.title).split(' ').filter(function(w){return w.length>1;});
       if(!words.length) continue;
       var bestScore=0; var bestRef='';
       // Search around each ref position
