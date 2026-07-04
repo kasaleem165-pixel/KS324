@@ -9433,7 +9433,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
   <div class="sec">
     <div class="sh">Filter Observations</div>
     <div class="fr"><label>Category</label>
-      <select id="scat" onchange="applyFilter()"></select>
+      <select id="scat" onchange="applyFilter();updateSearchHintPlaceholder()"></select>
     </div>
   </div>
 
@@ -10151,6 +10151,41 @@ function applyFilter() {
   }
 
   renderList(res, toks, toks.length>0);
+}
+
+// Category-specific placeholder examples for the search hint textarea
+var _catHintExamples = {
+  'Financial Management':       'Type keywords e.g: budget variance not explained\nexpenditure not supported\nover-expenditure reported',
+  'Cash & Bank':                'Type keywords e.g: cash balance unverified\ncheque not deposited\npetty cash voucher missing',
+  'HR & Payroll':               'Type keywords e.g: attendance not marked\nleave record incomplete\npayroll discrepancy found',
+  'Student Records & Fee':      'Type keywords e.g: fee not deposited\nstudent file incomplete\nregistration form missing',
+  'Fixed Assets & Inventory':   'Type keywords e.g: fixed assets untraced\ninventory record not updated\nphysical verification not done',
+  'Library & Records':          'Type keywords e.g: books record not maintained\nlibrary register incomplete\nbooks not returned',
+  'Science Laboratory':         'Type keywords e.g: lab equipment not maintained\nchemicals not properly stored\nlab record missing',
+  'Safety & Security':          'Type keywords e.g: fire extinguisher not checked\nemergency exit blocked\nsecurity log not maintained',
+  'General Administration':     'Type keywords e.g: vendor registration not done\nmeeting minutes not prepared\nprocurement record incomplete'
+};
+var _catHintDefault = 'Type keywords e.g: vendor registration not done\nattendance not marked\nfixed assets untraced';
+
+function updateSearchHintPlaceholder(){
+  var catF = document.getElementById('scat').value;
+  var ta   = document.getElementById('qinp');
+  if(!ta) return;
+  if(!catF || catF==='All Categories' || catF==='__NIL__'){
+    ta.placeholder = _catHintDefault;
+  } else {
+    // Try exact match first, then partial keyword match
+    var ph = _catHintExamples[catF];
+    if(!ph){
+      var catLow = catF.toLowerCase();
+      for(var k in _catHintExamples){
+        if(catLow.indexOf(k.toLowerCase())>=0 || k.toLowerCase().indexOf(catLow)>=0){ ph=_catHintExamples[k]; break; }
+      }
+    }
+    ta.placeholder = ph
+      ? 'Search within "'+catF+'":\n'+ph.replace(/^Type keywords e.g: /,'e.g: ')
+      : 'Type keywords to search within "'+catF+'"…';
+  }
 }
 
 function renderList(obs, toks, showScore) {
