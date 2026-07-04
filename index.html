@@ -431,7 +431,13 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 .tbtn-back{animation:backPulse 1.5s ease-in-out infinite!important;font-size:12.5px!important;padding:7px 16px!important;border:2px solid #f0c040!important;font-weight:700!important}
 #main{transition:opacity .25s ease}
 #aws-panel{transition:opacity .25s ease}
-#ra-panel{transition:opacity .25s ease}
+#ra-panel{position:fixed;top:50px;right:0;width:42%;max-width:680px;min-width:340px;height:calc(100vh - 50px);z-index:1200;transform:translateX(100%);transition:transform .3s ease;box-shadow:-4px 0 24px rgba(0,0,0,.25);display:block!important}
+#ra-panel.ra-drawer-open{transform:translateX(0)}
+#ra-drawer-toggle{position:fixed;top:50%;right:0;transform:translateY(-50%);z-index:1201;background:#1a3a5c;color:#fff;border:none;border-radius:6px 0 0 6px;padding:10px 6px;cursor:pointer;font-size:16px;writing-mode:vertical-rl;letter-spacing:1px;font-family:Inter,sans-serif;font-size:11px;font-weight:700;transition:right .3s ease,background .2s;display:none}
+#ra-drawer-toggle.visible{display:block}
+#ra-drawer-toggle.open{right:42%;max-right:680px;background:#2a5a8c}
+#main.ra-drawer-open{margin-right:42%;transition:margin-right .3s ease}
+@media(max-width:900px){#ra-panel{width:90%;min-width:0}#main.ra-drawer-open{margin-right:0}}
 .panel-fadein{animation:panelFadeIn .25s ease}
 @keyframes panelFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 /* Animated stat counters */
@@ -9340,6 +9346,9 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       <div class="fr" style="margin-bottom:0"><label>Branch Head</label>
         <input type="text" id="brhead" placeholder="e.g. Sana Omer">
       </div>
+      <div class="fr" style="margin-bottom:0;margin-top:6px"><label>Branch Head Email</label>
+        <input type="email" id="brhemail" placeholder="e.g. sana.omer@beaconhouse.edu.pk">
+      </div>
     </div>
 
     <div class="fr"><label>Branch Address</label>
@@ -9413,13 +9422,14 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
     </div>
   </div>
 
-  <div class="sec" id="repeat-detect-sec" style="display:none">
+  <div class="sec" id="repeat-detect-sec">
     <div class="sh" style="display:flex;align-items:center;justify-content:space-between">
       <span>&#128260; Repeat Detection</span>
       <span id="repeat-detect-src" style="font-size:10px;font-weight:600;color:#a8d0f0"></span>
     </div>
-    <div style="font-size:11px;color:#c8d8ea;line-height:1.5;margin-bottom:8px">Matches selected observations against the latest loaded report to auto-mark repeats and fill LARR.</div>
-    <button onclick="detectRepeatsFromPrevReport()" style="width:100%;padding:9px;background:linear-gradient(135deg,#6a3090,#9040c0);color:#fff;border:none;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px">&#128270; Detect Repeats from Previous Report</button>
+    <div id="repeat-detect-body">
+      <div style="font-size:11px;color:#a0b0c0;line-height:1.5;padding:6px 0">Load the previous audit report (Word file) in <strong style="color:#c8d8ea">Risk Assessment</strong> to enable automatic repeat detection.</div>
+    </div>
   </div>
 
   <div class="sec">
@@ -9853,6 +9863,7 @@ function showDemoAuth(){
 // INIT
 // ============================================================
 window.onload = function() {
+  _ensureRADrawerToggle();
   buildObsSrrCache();
   if(_hoAuthed) _hoActivateBtns();
   buildSel('spb', PREPBY);
@@ -11006,6 +11017,7 @@ function getHdrVals(){
     brregion  : document.getElementById('brregion').value.trim(),
     brcity    : document.getElementById('brcity').value.trim(),
     brhead    : document.getElementById('brhead').value.trim(),
+    brhemail  : document.getElementById('brhemail').value.trim(),
     braddress : document.getElementById('braddress').value.trim(),
     brautype  : document.getElementById('brautype').value.trim(),
     brvisit   : fmtRange(document.getElementById('brvisit_from').value, document.getElementById('brvisit_to').value),
@@ -11029,7 +11041,7 @@ var VH_KEY = 'bss_sessions';
 function captureSession() {
   syncAnnexTextFromDom();
   // Collect all form field values
-  var fields = ['brcode','rno','rpt_stage','brname','brregion','brcity','brhead','braddress','brautype','rdt',
+  var fields = ['brcode','rno','rpt_stage','brname','brregion','brcity','brhead','brhemail','braddress','brautype','rdt',
                 'rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk','spb'];
   var formData = {};
   for(var i=0;i<fields.length;i++){
@@ -11080,7 +11092,7 @@ function restoreSession(sess) {
   setBrInfoDisabled(false);
   // Restore form fields
   var fd = sess.formData || {};
-  var fields = ['brcode','rno','rpt_stage','brname','brregion','brcity','brhead','braddress','brautype','rdt',
+  var fields = ['brcode','rno','rpt_stage','brname','brregion','brcity','brhead','brhemail','braddress','brautype','rdt',
                 'rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk','spb'];
   for(var i=0;i<fields.length;i++){
     var el=document.getElementById(fields[i]);
@@ -12242,7 +12254,7 @@ function doNewReport(){
   _brInfoUnlocked=false; // force unlock path to run
   _reportEverGenerated=false;
   // Clear all header/form fields
-  var fields=['brcode','brname','brregion','brcity','brhead','braddress','brautype','rno','pb','rdt','rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk'];
+  var fields=['brcode','brname','brregion','brcity','brhead','brhemail','braddress','brautype','rno','pb','rdt','rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk'];
   for(var fi=0;fi<fields.length;fi++){var el=document.getElementById(fields[fi]);if(el)el.value='';}
   for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
   setVal('brfwk','COSO Internal Control – Integrated Framework');
@@ -12258,6 +12270,7 @@ function doNewReport(){
   var badge=document.getElementById('brinfo-lockbadge');
   if(ov) ov.style.display='none';
   if(badge) badge.style.display='none';
+  renderList();
   showPrompt();
   toast('New report started — please fill in branch information.');
 }
@@ -16909,7 +16922,7 @@ function loadReportFile(e){
 // ============================================================
 var _brInfoUnlocked = true;  // start unlocked — locked only after save/load
 var _brInfoHasData  = false; // becomes true once a session is saved or restored
-var BR_INFO_FIELDS = ['brcode','rno','rpt_stage','brname','brregion','brcity','brhead','braddress',
+var BR_INFO_FIELDS = ['brcode','rno','rpt_stage','brname','brregion','brcity','brhead','brhemail','braddress',
                       'brautype','rdt','rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk','spb'];
 
 function setBrInfoDisabled(disabled){
@@ -17536,32 +17549,35 @@ var ra_loadedReports = [];
 function toggleRAPanel(){
   var panel=document.getElementById('ra-panel');
   var main=document.getElementById('main');
-  var awsPanel=document.getElementById('aws-panel');
+  var toggle=document.getElementById('ra-drawer-toggle');
   var btn=document.getElementById('ra-tab-btn');
-  var awsBtn=document.getElementById('aws-tab-btn');
   if(!panel||!main) return;
-  var showing=panel.style.display==='block';
-  if(showing){
-    panel.style.display='none';
-    main.style.display='';
-    btn.textContent='\u{1F4CA} Risk Assessment';
+  var open=panel.classList.contains('ra-drawer-open');
+  if(open){
+    panel.classList.remove('ra-drawer-open');
+    main.classList.remove('ra-drawer-open');
+    if(toggle){ toggle.classList.remove('open'); toggle.innerHTML='&#128202; RA'; }
     _setPanelBack(null);
-    setRptBtnsDisabled(false);
-    if(awsBtn) awsBtn.disabled=false;
   } else {
-    panel.style.display='block';
-    panel.classList.add('panel-fadein');
-    setTimeout(function(){ panel.classList.remove('panel-fadein'); }, 300);
-    main.style.display='none';
-    if(awsPanel) awsPanel.style.display='none';
-    if(awsBtn){ awsBtn.textContent='\u{1F4CB} Work Status'; awsBtn.disabled=true; }
-    btn.textContent='\u{1F4CA} Risk Assessment';
-    _setPanelBack('Risk Assessment');
-    setRptBtnsDisabled(true);
+    panel.classList.add('ra-drawer-open');
+    main.classList.add('ra-drawer-open');
+    if(toggle){ toggle.classList.add('open'); toggle.innerHTML='&#10005; RA'; }
+    _setPanelBack(null); // no back button needed — main stays visible
     ra_initBranches();
     ra_initModeButtons();
     setTimeout(function(){ ra_showModeTable(RA_MODES[3]); },100);
   }
+}
+
+function _ensureRADrawerToggle(){
+  if(document.getElementById('ra-drawer-toggle')) return;
+  var btn=document.createElement('button');
+  btn.id='ra-drawer-toggle';
+  btn.className='visible';
+  btn.innerHTML='&#128202; RA';
+  btn.title='Open / Close Risk Assessment';
+  btn.onclick=function(){ toggleRAPanel(); };
+  document.body.appendChild(btn);
 }
 
 function ra_initBranches(){
@@ -18043,20 +18059,25 @@ function ra_extractDocxObsList(xml){
 
 // Show/hide the Repeat Detection panel based on whether RA reports are loaded
 function _updateRepeatDetectPanel(){
-  var sec=document.getElementById('repeat-detect-sec');
+  var body=document.getElementById('repeat-detect-body');
   var src=document.getElementById('repeat-detect-src');
-  if(!sec) return;
-  if(!window.ra_loadedReports||!ra_loadedReports.length){ sec.style.display='none'; return; }
-  // Find latest report with obs list
+  if(!body) return;
   var best=null;
-  for(var i=0;i<ra_loadedReports.length;i++){
-    var rp=ra_loadedReports[i];
-    if(!rp.docxObsList||!rp.docxObsList.length) continue;
-    if(!best||rp.date>best.date) best=rp;
+  if(window.ra_loadedReports){
+    for(var i=0;i<ra_loadedReports.length;i++){
+      var rp=ra_loadedReports[i];
+      if(!rp.docxObsList||!rp.docxObsList.length) continue;
+      if(!best||rp.date>best.date) best=rp;
+    }
   }
-  if(!best){ sec.style.display='none'; return; }
-  sec.style.display='block';
-  if(src) src.textContent=best.name.replace(/\.[^.]+$/,'').substring(0,30)+(best.date?' ('+best.date+')':'');
+  if(!best){
+    body.innerHTML='<div style="font-size:11px;color:#a0b0c0;line-height:1.5;padding:6px 0">Load the previous audit report (Word file) in <strong style="color:#c8d8ea">Risk Assessment</strong> to enable automatic repeat detection.</div>';
+    if(src) src.textContent='';
+  } else {
+    body.innerHTML='<div style="font-size:11px;color:#c8d8ea;line-height:1.5;margin-bottom:8px">Matches selected observations against the previous report to auto-mark repeats and fill LARR.</div>'
+      +'<button onclick="detectRepeatsFromPrevReport()" style="width:100%;padding:9px;background:linear-gradient(135deg,#6a3090,#9040c0);color:#fff;border:none;border-radius:6px;font-family:\'Inter\',sans-serif;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px">&#128270; Detect Repeats from Previous Report</button>';
+    if(src) src.textContent=best.name.replace(/\.[^.]+$/,'').substring(0,30)+(best.date?' ('+best.date+')':'');
+  }
 }
 
 function detectRepeatsFromPrevReport(){
@@ -18950,12 +18971,14 @@ function _setPanelBack(label){
   else { bb.style.display='none'; }
 }
 function _closePanelBack(){
-  var panels=['aws-panel','ra-panel','srr-panel'];
+  // Close RA drawer if open
+  var raPanel=document.getElementById('ra-panel');
+  if(raPanel&&raPanel.classList.contains('ra-drawer-open')){ toggleRAPanel(); return; }
+  var panels=['aws-panel','srr-panel'];
   for(var i=0;i<panels.length;i++){
     var p=document.getElementById(panels[i]);
     if(p&&p.style.display==='block'){
       if(panels[i]==='aws-panel') toggleAWSPanel();
-      else if(panels[i]==='ra-panel') toggleRAPanel();
       else if(panels[i]==='srr-panel') toggleSRRPanel();
       return;
     }
