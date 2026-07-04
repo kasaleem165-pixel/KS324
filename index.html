@@ -9786,13 +9786,18 @@ var DB_OVR_KEY='bss_dbovr_v1';
 var _dbmSuppressed={};
 var _dbmOverrides={};
 var _dbmAllObs=[];
+var _dbmOriginals={};   // original field values before any override, for no-reload revert
+var _dbmHistory=[];     // undo stack — [{type,obsId,prev}]
 (function initDbm(){
   var sup=sg(DB_SUP_KEY,[]);
   for(var i=0;i<sup.length;i++) _dbmSuppressed[sup[i]]=true;
   _dbmOverrides=sg(DB_OVR_KEY,{});
   for(var j=0;j<DB.observations.length;j++){
-    var o=DB.observations[j]; var ov=_dbmOverrides[o.id];
-    if(ov){ if(ov.title!==undefined)o.title=ov.title; if(ov.observation!==undefined)o.observation=ov.observation; if(ov.recommendation!==undefined)o.recommendation=ov.recommendation; if(ov.category!==undefined)o.category=ov.category; }
+    var o=DB.observations[j];
+    // Snapshot BEFORE overrides
+    _dbmOriginals[o.id]={title:o.title,category:o.category,type:o.type,observation:o.observation,recommendation:o.recommendation};
+    var ov=_dbmOverrides[o.id];
+    if(ov){ if(ov.title!==undefined)o.title=ov.title; if(ov.observation!==undefined)o.observation=ov.observation; if(ov.recommendation!==undefined)o.recommendation=ov.recommendation; if(ov.category!==undefined)o.category=ov.category; if(ov.type!==undefined)o.type=ov.type; }
   }
   _dbmAllObs=DB.observations.slice();
   DB.observations=DB.observations.filter(function(o){return !_dbmSuppressed[o.id];});
@@ -22637,6 +22642,7 @@ function _w2rBuildHtml(d){
       </select>
       <div style="width:1px;height:24px;background:#dde6f0;flex-shrink:0"></div>
       <button id="dbm-scan-btn" onclick="if(window._hoAuthed)dbmScanDuplicates();else showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmScanDuplicates();}})" style="padding:5px 13px;background:#6a3090;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit" title="Scan all active observations for similar titles and suggest merges">&#128270; Scan Duplicates</button>
+      <button onclick="dbmUndoLast()" style="padding:5px 11px;background:#5a4a00;color:#ffe87a;border:1px solid #a89020;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit" title="Undo the last suppress, restore, edit, or merge action">&#8629; Undo Last</button>
       <button onclick="dbmExportCSV()" style="padding:5px 11px;background:#1e5c3a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit" title="Export full databank as CSV">&#11123; Export CSV</button>
       <span id="dbm-stats" style="font-size:11px;color:#6a8aaa;margin-left:4px"></span>
     </div>
@@ -22781,7 +22787,7 @@ function dbmApplyFilters(q,cat,src){
   tbody.innerHTML=h;
 }
 
-function dbmOpenDetail(obsId){
+function dbmOpenDetail(obsId, editMode){
   _dbmCurrentId=obsId;
   var o=null;
   for(var i=0;i<_dbmAllObs.length;i++){if(_dbmAllObs[i].id===obsId){o=_dbmAllObs[i];break;}}
@@ -22794,44 +22800,80 @@ function dbmOpenDetail(obsId){
   var sup=!!_dbmSuppressed[obsId];
   var isCustom=_dbmIsCustom(obsId);
   var ov=_dbmOverrides[obsId]||{};
-  if(meta) meta.textContent=obsId+' | '+(isCustom?'Custom':'Built-in')+' | '+(sup?'Suppressed':'Active');
+  var hasOverrides=ov&&Object.keys(ov).length>0;
+  if(meta) meta.textContent=obsId+' | '+(isCustom?'Custom':'Built-in')+' | '+(sup?'🔴 Suppressed':'🟢 Active')+(hasOverrides?' | ✏ Edited':'');
   if(titleLbl) titleLbl.textContent=o.title;
-  var supBtn=sup
-    ?'<button onclick="dbmRestoreObs(\''+_dbmEsc(obsId)+'\')" style="flex:1;padding:9px;background:#1e5c3a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#9654; Restore (Make Active)</button>'
-    :'<button onclick="dbmConfirmSuppress(\''+_dbmEsc(obsId)+'\')" style="flex:1;padding:9px;background:#8b1a1a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128683; Suppress (Hide from Reports)</button>';
-  var resetBtn=(ov&&Object.keys(ov).length)
-    ?'<button onclick="dbmResetOverride(\''+_dbmEsc(obsId)+'\')" style="padding:9px 14px;background:#e8edf5;color:#444;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit">&#8635; Reset Edits</button>':'' ;
-  body.innerHTML=
-    '<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">TITLE</div>'
-    +'<input id="dbm-e-title" value="'+_dbmEsc(o.title)+'" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:12px;margin-bottom:10px;box-sizing:border-box">'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
-    +'<div><div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">CATEGORY</div>'
-    +'<select id="dbm-e-cat" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:11px">'
-    +['Branch Imprest, Payments & Accounts','Cash and Bank','Fixed Assets','HR & Payroll','Library','Recruitment/Payroll/Employee Record','Safety & Security','Science Laboratory','Student Record','Others'].map(function(c){return'<option'+(c===(o.category||'')?'  selected':'')+'>'+_dbmEsc(c)+'</option>';}).join('')
-    +'</select></div>'
-    +'<div><div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">TYPE</div>'
-    +'<select id="dbm-e-type" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:11px">'
-    +'<option'+(o.type==='New'?' selected':'')+'>New</option>'
-    +'<option'+(o.type==='Repeated'?' selected':'')+'>Repeated</option>'
-    +'</select></div></div>'
-    +'<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">OBSERVATION TEXT</div>'
-    +'<textarea id="dbm-e-obs" rows="5" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:11px;resize:vertical;margin-bottom:10px;box-sizing:border-box">'+_dbmEsc(o.observation||'')+'</textarea>'
-    +'<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">RECOMMENDATION</div>'
-    +'<textarea id="dbm-e-rec" rows="4" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:11px;resize:vertical;margin-bottom:14px;box-sizing:border-box">'+_dbmEsc(o.recommendation||'')+'</textarea>'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
-    +'<button onclick="dbmSaveEdit(\''+_dbmEsc(obsId)+'\')" style="flex:1;padding:9px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Save Changes</button>'
-    +resetBtn
-    +'</div>'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+supBtn+'</div>'
-    +'<div style="border-top:1px solid #dde6f0;padding-top:10px;margin-top:4px">'
-    +'<div style="font-size:11px;font-weight:700;color:#6a3090;margin-bottom:6px">&#128260; MERGE WITH ANOTHER OBSERVATION</div>'
-    +'<div style="font-size:10.5px;color:#5a6a7a;margin-bottom:6px;line-height:1.5">Merge this observation into another — this one will be suppressed and the chosen one kept as the canonical version.</div>'
-    +'<input id="dbm-merge-q" type="text" placeholder="Search for target observation..." style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:11px;margin-bottom:6px;box-sizing:border-box" oninput="dbmMergeSearch(\''+_dbmEsc(obsId)+'\')">'
-    +'<div id="dbm-merge-results" style="max-height:160px;overflow-y:auto;border:1px solid #dde6f0;border-radius:4px;background:#f8fafd"></div>'
-    +'</div>';
+
+  if(editMode){
+    // ── EDIT MODE ──
+    var resetBtn=hasOverrides
+      ?'<button onclick="dbmResetOverride(\''+_dbmEsc(obsId)+'\')" style="padding:9px 14px;background:#e8edf5;color:#444;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit">&#8635; Reset to Original</button>':'' ;
+    body.innerHTML=
+      '<div style="background:#fff8e6;border:1px solid #f0d080;border-radius:5px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:#7a5a00">✏ <strong>Edit Mode</strong> — Changes are saved to your local session and persist across sessions. They do not affect the built-in databank for other users.</div>'
+      +'<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">TITLE</div>'
+      +'<input id="dbm-e-title" value="'+_dbmEsc(o.title)+'" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:12px;margin-bottom:10px;box-sizing:border-box">'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
+      +'<div><div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">CATEGORY</div>'
+      +'<select id="dbm-e-cat" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:11px">'
+      +['Branch Imprest, Payments & Accounts','Cash and Bank','Fixed Assets','HR & Payroll','Library','Recruitment/Payroll/Employee Record','Safety & Security','Science Laboratory','Student Record','Others'].map(function(c){return'<option'+(c===(o.category||'')?'  selected':'')+'>'+_dbmEsc(c)+'</option>';}).join('')
+      +'</select></div>'
+      +'<div><div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">TYPE</div>'
+      +'<select id="dbm-e-type" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:11px">'
+      +'<option'+(o.type==='New'?' selected':'')+'>New</option>'
+      +'<option'+(o.type==='Repeated'?' selected':'')+'>Repeated</option>'
+      +'</select></div></div>'
+      +'<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">OBSERVATION TEXT</div>'
+      +'<textarea id="dbm-e-obs" rows="5" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:11px;resize:vertical;margin-bottom:10px;box-sizing:border-box">'+_dbmEsc(o.observation||'')+'</textarea>'
+      +'<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">RECOMMENDATION</div>'
+      +'<textarea id="dbm-e-rec" rows="4" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:11px;resize:vertical;margin-bottom:14px;box-sizing:border-box">'+_dbmEsc(o.recommendation||'')+'</textarea>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+      +'<button onclick="dbmSaveEdit(\''+_dbmEsc(obsId)+'\')" style="flex:1;padding:9px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Save Changes</button>'
+      +resetBtn
+      +'<button onclick="dbmOpenDetail(\''+_dbmEsc(obsId)+'\')" style="padding:9px 14px;background:#e8edf5;color:#444;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit">&#10005; Cancel</button>'
+      +'</div>';
+  } else {
+    // ── VIEW MODE (default) ──
+    var orig=_dbmOriginals[obsId]||{};
+    var titleChanged=hasOverrides&&ov.title!==undefined&&ov.title!==orig.title;
+    var obsChanged=hasOverrides&&ov.observation!==undefined&&ov.observation!==orig.observation;
+    var recChanged=hasOverrides&&ov.recommendation!==undefined&&ov.recommendation!==orig.recommendation;
+    var supBtn=sup
+      ?'<button onclick="dbmRestoreObs(\''+_dbmEsc(obsId)+'\')" style="flex:1;padding:9px;background:#1e5c3a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#9654; Restore (Make Active)</button>'
+      :'<button onclick="dbmConfirmSuppress(\''+_dbmEsc(obsId)+'\')" style="flex:1;padding:9px;background:#8b1a1a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128683; Suppress (Hide from Reports)</button>';
+    body.innerHTML=
+      '<div style="margin-bottom:12px">'
+      +'<div style="font-size:10px;font-weight:700;color:#8899aa;letter-spacing:.5px;margin-bottom:3px">TITLE</div>'
+      +'<div style="font-size:13px;font-weight:700;color:#0d2540;line-height:1.4">'+(titleChanged?'<span style="text-decoration:line-through;color:#aaa;font-size:11px;font-weight:400">'+_dbmEsc(orig.title||'')+'</span><br>':'')+_dbmEsc(o.title)+'</div>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
+      +'<div><div style="font-size:10px;font-weight:700;color:#8899aa;letter-spacing:.5px;margin-bottom:3px">CATEGORY</div>'
+      +'<div style="font-size:11.5px;color:#1a2a40;background:#f0f4f9;border-radius:4px;padding:5px 8px">'+_dbmEsc(o.category||'—')+'</div></div>'
+      +'<div><div style="font-size:10px;font-weight:700;color:#8899aa;letter-spacing:.5px;margin-bottom:3px">TYPE</div>'
+      +'<div style="font-size:11.5px;color:#1a2a40;background:#f0f4f9;border-radius:4px;padding:5px 8px">'+_dbmEsc(o.type||'—')+'</div></div>'
+      +'</div>'
+      +'<div style="margin-bottom:12px">'
+      +'<div style="font-size:10px;font-weight:700;color:#8899aa;letter-spacing:.5px;margin-bottom:4px">OBSERVATION TEXT</div>'
+      +(obsChanged?'<div style="font-size:10px;color:#aaa;font-style:italic;margin-bottom:3px">Original: <em>'+_dbmEsc((orig.observation||'').substring(0,120))+(orig.observation&&orig.observation.length>120?'…':'')+'</em></div>':'')
+      +'<div style="font-size:11px;color:#2a3a50;background:#f8fafd;border:1px solid #dde6f0;border-radius:4px;padding:8px 10px;line-height:1.6;max-height:120px;overflow-y:auto;white-space:pre-wrap">'+_dbmEsc(o.observation||'(none)')+'</div>'
+      +'</div>'
+      +'<div style="margin-bottom:14px">'
+      +'<div style="font-size:10px;font-weight:700;color:#8899aa;letter-spacing:.5px;margin-bottom:4px">RECOMMENDATION</div>'
+      +(recChanged?'<div style="font-size:10px;color:#aaa;font-style:italic;margin-bottom:3px">Original: <em>'+_dbmEsc((orig.recommendation||'').substring(0,120))+(orig.recommendation&&orig.recommendation.length>120?'…':'')+'</em></div>':'')
+      +'<div style="font-size:11px;color:#2a3a50;background:#f8fafd;border:1px solid #dde6f0;border-radius:4px;padding:8px 10px;line-height:1.6;max-height:100px;overflow-y:auto;white-space:pre-wrap">'+_dbmEsc(o.recommendation||'(none)')+'</div>'
+      +'</div>'
+      +'<div style="border-top:1px solid #dde6f0;padding-top:10px;margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap">'
+      +'<button onclick="dbmOpenDetail(\''+_dbmEsc(obsId)+'\',true)" style="flex:1;padding:9px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✏ Edit Details</button>'
+      +'</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+supBtn+'</div>'
+      +'<div style="border-top:1px solid #dde6f0;padding-top:10px;margin-top:4px">'
+      +'<div style="font-size:11px;font-weight:700;color:#6a3090;margin-bottom:6px">&#128260; MERGE WITH ANOTHER OBSERVATION</div>'
+      +'<div style="font-size:10.5px;color:#5a6a7a;margin-bottom:6px;line-height:1.5">Merge this observation into another — this one will be suppressed and the chosen one kept as the canonical version.</div>'
+      +'<input id="dbm-merge-q" type="text" placeholder="Search for target observation..." style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:11px;margin-bottom:6px;box-sizing:border-box" oninput="dbmMergeSearch(\''+_dbmEsc(obsId)+'\')">'
+      +'<div id="dbm-merge-results" style="max-height:160px;overflow-y:auto;border:1px solid #dde6f0;border-radius:4px;background:#f8fafd"></div>'
+      +'</div>';
+  }
   detail.style.display='flex';
   detail.style.flexDirection='column';
-  // Shrink table wrap
   var tw=document.getElementById('dbm-table-wrap');
   if(tw) tw.style.paddingRight='0';
 }
@@ -22853,29 +22895,49 @@ function dbmSaveEdit(obsId){
   var obs=(document.getElementById('dbm-e-obs')||{}).value||'';
   var rec=(document.getElementById('dbm-e-rec')||{}).value||'';
   if(!title.trim()){alert('Title cannot be blank.');return;}
+  // Snapshot previous state for undo
+  var o=null;
+  for(var i=0;i<_dbmAllObs.length;i++){if(_dbmAllObs[i].id===obsId){o=_dbmAllObs[i];break;}}
+  if(o) _dbmHistory.push({type:'edit',obsId:obsId,prev:{title:o.title,category:o.category,type:o.type,observation:o.observation,recommendation:o.recommendation}});
+  if(_dbmHistory.length>50) _dbmHistory.shift();
   // Save override
   _dbmOverrides[obsId]={title:title,category:cat,type:type,observation:obs,recommendation:rec};
   ss(DB_OVR_KEY,_dbmOverrides);
   // Apply to live DB
-  var o=null;
-  for(var i=0;i<_dbmAllObs.length;i++){if(_dbmAllObs[i].id===obsId){o=_dbmAllObs[i];break;}}
   if(o){o.title=title;o.category=cat;o.type=type;o.observation=obs;o.recommendation=rec;}
   var inActive=DB.observations;
   for(var j=0;j<inActive.length;j++){if(inActive[j].id===obsId){inActive[j].title=title;inActive[j].category=cat;inActive[j].type=type;inActive[j].observation=obs;inActive[j].recommendation=rec;break;}}
   if(typeof toast==='function') toast('Changes saved for: '+title);
   dbmBuildTable();
-  // Re-open detail to refresh
   dbmOpenDetail(obsId);
 }
 
 function dbmResetOverride(obsId){
   if(!window._hoAuthed){showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmResetOverride(obsId);}});return;}
-  if(!confirm('Reset all local edits for this observation? It will revert to the original built-in text.')) return;
+  var orig=_dbmOriginals[obsId];
+  if(!orig){alert('No original snapshot found for this observation.');return;}
+  var o=null;
+  for(var i=0;i<_dbmAllObs.length;i++){if(_dbmAllObs[i].id===obsId){o=_dbmAllObs[i];break;}}
+  var curTitle=o?o.title:obsId;
+  if(!confirm('Reset all local edits for this observation?\n\n"'+curTitle+'"\n\nIt will revert to the original built-in text without reloading the page.')) return;
+  // Push undo snapshot before reverting
+  if(o) _dbmHistory.push({type:'edit',obsId:obsId,prev:{title:o.title,category:o.category,type:o.type,observation:o.observation,recommendation:o.recommendation}});
+  if(_dbmHistory.length>50) _dbmHistory.shift();
+  // Remove override from storage
   delete _dbmOverrides[obsId];
   ss(DB_OVR_KEY,_dbmOverrides);
-  // Reload page to re-apply original — simplest approach
-  if(typeof toast==='function') toast('Edits reset. Reloading to restore original text...');
-  setTimeout(function(){location.reload();},1500);
+  // Restore live objects from snapshot (no reload needed)
+  if(o){o.title=orig.title;o.category=orig.category;o.type=orig.type;o.observation=orig.observation;o.recommendation=orig.recommendation;}
+  var inActive=DB.observations;
+  for(var j=0;j<inActive.length;j++){
+    if(inActive[j].id===obsId){
+      inActive[j].title=orig.title;inActive[j].category=orig.category;inActive[j].type=orig.type;
+      inActive[j].observation=orig.observation;inActive[j].recommendation=orig.recommendation;break;
+    }
+  }
+  if(typeof toast==='function') toast('Edits reverted — observation restored to original built-in text.');
+  dbmBuildTable();
+  dbmOpenDetail(obsId);
 }
 
 function dbmConfirmSuppress(obsId){
@@ -22888,24 +22950,27 @@ function dbmConfirmSuppress(obsId){
 }
 
 function dbmSuppressObs(obsId){
+  _dbmHistory.push({type:'suppress',obsId:obsId});
+  if(_dbmHistory.length>50) _dbmHistory.shift();
   _dbmSuppressed[obsId]=true;
   var sup=Object.keys(_dbmSuppressed);
   ss(DB_SUP_KEY,sup);
-  // Remove from active DB.observations
   DB.observations=DB.observations.filter(function(o){return o.id!==obsId;});
-  if(typeof toast==='function') toast('Observation suppressed — hidden from all reports.');
+  if(typeof toast==='function') toast('Observation suppressed — hidden from all reports. Use "↩ Undo" to reverse.');
   dbmBuildTable();
   dbmOpenDetail(obsId);
 }
 
 function dbmRestoreObs(obsId){
   if(!window._hoAuthed){showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmRestoreObs(obsId);}});return;}
-  if(!confirm('Restore this observation? It will become active again in all filters and reports.')) return;
-  delete _dbmSuppressed[obsId];
-  ss(DB_SUP_KEY,Object.keys(_dbmSuppressed));
-  // Add back to DB.observations
   var o=null;
   for(var i=0;i<_dbmAllObs.length;i++){if(_dbmAllObs[i].id===obsId){o=_dbmAllObs[i];break;}}
+  var title=o?o.title:obsId;
+  if(!confirm('Restore this observation?\n\n"'+title+'"\n\nIt will become active again in all filters, searches and reports.')) return;
+  _dbmHistory.push({type:'restore',obsId:obsId});
+  if(_dbmHistory.length>50) _dbmHistory.shift();
+  delete _dbmSuppressed[obsId];
+  ss(DB_SUP_KEY,Object.keys(_dbmSuppressed));
   if(o) DB.observations.push(o);
   if(typeof toast==='function') toast('Observation restored — now active in all reports.');
   dbmBuildTable();
@@ -22949,11 +23014,68 @@ function dbmDoMerge(suppressId, keepId){
     if(_dbmAllObs[i].id===keepId) keepObs=_dbmAllObs[i];
   }
   if(!suppObs||!keepObs) return;
-  if(!confirm('Merge observations?\n\nSUPPRESS (hide): "'+suppObs.title+'"\nKEEP (canonical): "'+keepObs.title+'"\n\nThe first observation will be suppressed. The second remains active. This cannot be auto-undone but you can restore from the Suppressed filter.')) return;
-  dbmSuppressObs(suppressId);
-  if(typeof toast==='function') toast('Merged — "'+suppObs.title+'" suppressed. "'+keepObs.title+'" kept as canonical.');
+  if(!confirm('Merge observations?\n\n🗑 SUPPRESS (hide):\n"'+suppObs.title+'"\n\n✔ KEEP (canonical):\n"'+keepObs.title+'"\n\nThe first will be suppressed and hidden from all reports.\nThe second remains active as the canonical version.\n\nYou can undo this using "↩ Undo Last" in the toolbar.')) return;
+  // Push merge event to history (suppression inside dbmSuppressObs will push its own entry too — clear that and push one unified merge entry)
+  _dbmHistory.push({type:'merge',suppressId:suppressId,keepId:keepId,suppressTitle:suppObs.title,keepTitle:keepObs.title});
+  if(_dbmHistory.length>50) _dbmHistory.shift();
+  _dbmSuppressed[suppressId]=true;
+  ss(DB_SUP_KEY,Object.keys(_dbmSuppressed));
+  DB.observations=DB.observations.filter(function(o){return o.id!==suppressId;});
+  if(typeof toast==='function') toast('Merged — "'+suppObs.title+'" suppressed. "'+keepObs.title+'" kept as canonical. Use "↩ Undo" to reverse.');
   dbmCloseDetail();
   dbmBuildTable();
+}
+
+function dbmUndoLast(){
+  if(!_dbmHistory.length){if(typeof toast==='function') toast('Nothing to undo.');return;}
+  var entry=_dbmHistory.pop();
+  if(entry.type==='edit'){
+    var prev=entry.prev;
+    var o=null;
+    for(var i=0;i<_dbmAllObs.length;i++){if(_dbmAllObs[i].id===entry.obsId){o=_dbmAllObs[i];break;}}
+    if(o){o.title=prev.title;o.category=prev.category;o.type=prev.type;o.observation=prev.observation;o.recommendation=prev.recommendation;}
+    for(var j=0;j<DB.observations.length;j++){
+      if(DB.observations[j].id===entry.obsId){DB.observations[j].title=prev.title;DB.observations[j].category=prev.category;DB.observations[j].type=prev.type;DB.observations[j].observation=prev.observation;DB.observations[j].recommendation=prev.recommendation;break;}
+    }
+    // Update or remove override to match previous state
+    var orig=_dbmOriginals[entry.obsId]||{};
+    if(prev.title===orig.title&&prev.observation===orig.observation&&prev.recommendation===orig.recommendation&&prev.category===orig.category&&prev.type===orig.type){
+      delete _dbmOverrides[entry.obsId];
+    } else {
+      _dbmOverrides[entry.obsId]=prev;
+    }
+    ss(DB_OVR_KEY,_dbmOverrides);
+    if(typeof toast==='function') toast('Undo: reverted edit for "'+prev.title+'".');
+    dbmBuildTable();
+    if(_dbmCurrentId===entry.obsId) dbmOpenDetail(entry.obsId);
+  } else if(entry.type==='suppress'){
+    // Undo suppress = restore
+    delete _dbmSuppressed[entry.obsId];
+    ss(DB_SUP_KEY,Object.keys(_dbmSuppressed));
+    var ro=null;
+    for(var k=0;k<_dbmAllObs.length;k++){if(_dbmAllObs[k].id===entry.obsId){ro=_dbmAllObs[k];break;}}
+    if(ro&&!DB.observations.find(function(x){return x.id===entry.obsId;})) DB.observations.push(ro);
+    if(typeof toast==='function') toast('Undo: observation restored from suppression.');
+    dbmBuildTable();
+    if(_dbmCurrentId===entry.obsId) dbmOpenDetail(entry.obsId);
+  } else if(entry.type==='restore'){
+    // Undo restore = suppress again
+    _dbmSuppressed[entry.obsId]=true;
+    ss(DB_SUP_KEY,Object.keys(_dbmSuppressed));
+    DB.observations=DB.observations.filter(function(o){return o.id!==entry.obsId;});
+    if(typeof toast==='function') toast('Undo: observation re-suppressed.');
+    dbmBuildTable();
+    if(_dbmCurrentId===entry.obsId) dbmOpenDetail(entry.obsId);
+  } else if(entry.type==='merge'){
+    // Undo merge = restore suppressed obs
+    delete _dbmSuppressed[entry.suppressId];
+    ss(DB_SUP_KEY,Object.keys(_dbmSuppressed));
+    var mo=null;
+    for(var m=0;m<_dbmAllObs.length;m++){if(_dbmAllObs[m].id===entry.suppressId){mo=_dbmAllObs[m];break;}}
+    if(mo&&!DB.observations.find(function(x){return x.id===entry.suppressId;})) DB.observations.push(mo);
+    if(typeof toast==='function') toast('Undo: merge reversed — "'+entry.suppressTitle+'" restored.');
+    dbmBuildTable();
+  }
 }
 
 function dbmScanDuplicates(){
