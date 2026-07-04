@@ -440,6 +440,7 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 @media(max-width:900px){#ra-panel{width:90%;min-width:0}#main.ra-drawer-open{margin-right:0}}
 .panel-fadein{animation:panelFadeIn .25s ease}
 @keyframes panelFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+body.dbm-panel-open #step-guide,body.dbm-panel-open #step-guide-hint{display:none!important}
 /* Animated stat counters */
 .aws-pct-big{transition:color .3s}
 /* Improved card hover in RP */
@@ -22734,24 +22735,20 @@ function toggleDBMPanel(){
   var awsPanel=document.getElementById('aws-panel');
   var raPanel=document.getElementById('ra-panel');
   if(!panel||!main) return;
-  var sg=document.getElementById('step-guide');
-  var sgh=document.getElementById('step-guide-hint');
   var showing=panel.style.display==='block';
   if(showing){
     panel.style.display='none';
     main.style.display='';
-    if(sg) sg.style.display='';
-    if(sgh) sgh.style.display='';
+    document.body.classList.remove('dbm-panel-open');
     _setPanelBack(null);
     setRptBtnsDisabled(false);
   } else {
     if(srrPanel) srrPanel.style.display='none';
     if(awsPanel) awsPanel.style.display='none';
     if(raPanel && raPanel.classList) raPanel.classList.remove('ra-drawer-open');
-    if(sg) sg.style.display='none';
-    if(sgh) sgh.style.display='none';
     main.style.display='none';
     panel.style.display='block';
+    document.body.classList.add('dbm-panel-open');
     _setPanelBack('Databank Manager');
     setRptBtnsDisabled(true);
     dbmBuildTable();
