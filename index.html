@@ -12246,29 +12246,30 @@ function doClear(){
 
 function doNewReport(){
   if(!confirm('Start a new blank report? All current data will be cleared.'))return;
-  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={};
+  // Force right panel blank immediately — direct DOM, no conditions
+  var _rpc=document.getElementById('rpcont');
+  var _rpe=document.getElementById('rpempty');
+  if(_rpc){_rpc.innerHTML='';_rpc.style.cssText='display:none';}
+  if(_rpe){_rpe.style.cssText='display:block';}
+  // Clear all data maps
+  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
   _raReportsClear();
   responseLoaded=false; _wfSentAuditee=false; _wfReceivedBack=false; _wfSentRO=false;
-  _brInfoHasData=false;
-  _brInfoUnlocked=false; // force unlock path to run
-  _reportEverGenerated=false;
+  _brInfoHasData=false; _brInfoUnlocked=true; _reportEverGenerated=false;
   // Clear all header/form fields
   var fields=['brcode','brname','brregion','brcity','brhead','brhemail','braddress','brautype','rno','spb','rdt','rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk'];
   for(var fi=0;fi<fields.length;fi++){var el=document.getElementById(fields[fi]);if(el)el.value='';}
   for(var ci=0;ci<INTRO_SECTION_IDS.length;ci++){var cEl=document.getElementById(INTRO_SECTION_IDS[ci]);if(cEl)cEl.value='';}
   setVal('brfwk','COSO Internal Control – Integrated Framework');
-  renderAnnexList();
-  document.getElementById('qinp').value='';
-  document.getElementById('scat').value='All Categories';
-  // Directly enable fields without a confirm prompt
-  _brInfoUnlocked=true;
   setBrInfoDisabled(false);
   var ov=document.getElementById('brinfo-lock-overlay');
   var badge=document.getElementById('brinfo-lockbadge');
   if(ov) ov.style.display='none';
   if(badge) badge.style.display='none';
+  renderAnnexList();
+  document.getElementById('qinp').value='';
+  document.getElementById('scat').value='All Categories';
   showPrompt();
-  renderRpt();
   toast('New report started — please fill in branch information.');
 }
 
