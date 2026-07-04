@@ -22616,8 +22616,47 @@ function _w2rBuildHtml(d){
   </div>
   <!-- Toolbar -->
   <div style="background:#f8fafd;border-bottom:1px solid #dde6f0;padding:8px 16px 0">
-    <div style="font-size:10.5px;color:#5a7a9a;padding:4px 0 8px;line-height:1.5">
-      View and manage all observations in the databank. <strong>Suppress</strong> removes an observation from all reports and filters without permanently deleting it. <strong>Edit</strong> updates the text locally. <strong>Scan Duplicates</strong> finds near-identical observations so you can merge them.
+    <!-- Collapsible User Guide -->
+    <div style="margin-bottom:8px">
+      <button onclick="(function(btn){var g=document.getElementById('dbm-guide');var open=g.style.display!=='none';g.style.display=open?'none':'block';btn.innerHTML=open?'&#9432; How to use this section &#9660;':'&#9432; How to use this section &#9650;';})(this)" style="background:none;border:none;color:#1a5c8c;font-size:11.5px;font-weight:700;cursor:pointer;padding:2px 0;font-family:inherit;display:flex;align-items:center;gap:5px">&#9432; How to use this section &#9660;</button>
+      <div id="dbm-guide" style="display:none;background:#eef4fc;border:1px solid #c0d8f0;border-radius:7px;padding:14px 16px;margin-top:6px;margin-bottom:4px">
+        <div style="font-size:12px;font-weight:800;color:#1a3a5c;margin-bottom:10px;letter-spacing:.2px">&#128196; Databank Manager — User Guide</div>
+        <!-- Section 1: Basic Actions -->
+        <div style="font-size:11px;font-weight:700;color:#1a5c8c;margin-bottom:5px;border-bottom:1px solid #c0d8f0;padding-bottom:3px">Basic Actions</div>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px">
+          <tr><td style="padding:4px 8px 4px 0;color:#1a3a5c;font-weight:700;white-space:nowrap;vertical-align:top;width:170px">Click any row</td><td style="padding:4px 0;color:#3a5a7a;line-height:1.5">Opens the observation detail panel on the right in read-only view. Read the full observation text and recommendation before taking any action.</td></tr>
+          <tr style="background:rgba(255,255,255,.5)"><td style="padding:4px 8px 4px 0;color:#1a3a5c;font-weight:700;white-space:nowrap;vertical-align:top">✏ Edit Details</td><td style="padding:4px 0;color:#3a5a7a;line-height:1.5">Switches to edit mode. You can update the title, category, type, observation text and recommendation. Changes are saved to your local browser and do not affect other users.</td></tr>
+          <tr><td style="padding:4px 8px 4px 0;color:#1a3a5c;font-weight:700;white-space:nowrap;vertical-align:top">🔴 Suppress</td><td style="padding:4px 0;color:#3a5a7a;line-height:1.5">Hides the observation from all filters, searches and reports without permanently deleting it. It can be restored at any time using the Suppressed filter.</td></tr>
+          <tr style="background:rgba(255,255,255,.5)"><td style="padding:4px 8px 4px 0;color:#1a3a5c;font-weight:700;white-space:nowrap;vertical-align:top">🟢 Restore</td><td style="padding:4px 0;color:#3a5a7a;line-height:1.5">Brings a suppressed observation back to active status. Use the <em>Suppressed only</em> filter to find suppressed observations.</td></tr>
+          <tr><td style="padding:4px 8px 4px 0;color:#1a3a5c;font-weight:700;white-space:nowrap;vertical-align:top">⇄ Merge</td><td style="padding:4px 0;color:#3a5a7a;line-height:1.5">Suppresses one observation and keeps the other as the canonical version. Use when two observations have the same meaning but different wording.</td></tr>
+          <tr style="background:rgba(255,255,255,.5)"><td style="padding:4px 8px 4px 0;color:#1a3a5c;font-weight:700;white-space:nowrap;vertical-align:top">↩ Undo Last</td><td style="padding:4px 0;color:#3a5a7a;line-height:1.5">Reverses the most recent action (suppress, restore, edit or merge). Up to 50 actions can be undone within the current session.</td></tr>
+          <tr><td style="padding:4px 8px 4px 0;color:#1a3a5c;font-weight:700;white-space:nowrap;vertical-align:top">🔍 Scan Duplicates</td><td style="padding:4px 0;color:#3a5a7a;line-height:1.5">Automatically scans all active observations and finds pairs with 70%+ title similarity. Both observations are shown side by side in full so you can read and compare before deciding which to keep.</td></tr>
+        </table>
+        <!-- Section 2: HO Workflow -->
+        <div style="font-size:11px;font-weight:700;color:#c07000;margin-bottom:5px;border-bottom:1px solid #c0d8f0;padding-bottom:3px">&#128274; HO Update Workflow (step by step)</div>
+        <div style="font-size:11px;color:#3a5a7a;line-height:1.8;margin-bottom:10px">
+          <div style="display:grid;grid-template-columns:26px 1fr;gap:4px 8px;align-items:start">
+            <span style="background:#1a5c8c;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0">1</span>
+            <span><strong>Auditor</strong> makes changes in Databank Manager (suppress, edit or merge observations), then clicks <strong>"📤 Export Proposed Changes"</strong>. This downloads a small <em>dbm-proposed-changes.json</em> file and sends it to HO.</span>
+            <span style="background:#c07000;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0">2</span>
+            <span><strong>HO</strong> opens the system, goes to Databank Manager, and clicks <strong>"🔒 Import &amp; Review (HO)"</strong> (requires HO password). A review screen opens showing every proposed change with Approve / Reject checkboxes.</span>
+            <span style="background:#c07000;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0">3</span>
+            <span><strong>HO</strong> reviews each change, ticks or unticks as required, then clicks <strong>"Apply Approved Changes"</strong>. The approved changes are now active in HO's browser session.</span>
+            <span style="background:#1e5c3a;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0">4</span>
+            <span><strong>HO</strong> clicks <strong>"🔒 Update HTML File"</strong>. This permanently bakes all approved changes into a new file called <em>index-updated.html</em> which is saved to the <strong>Downloads folder</strong> on HO's computer.</span>
+            <span style="background:#1e5c3a;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0">5</span>
+            <span><strong>HO</strong> renames <em>index-updated.html</em> to <em>index.html</em> and uploads it to <strong>Netlify</strong>. All auditors who open the Netlify link will now have the updated databank automatically.</span>
+          </div>
+        </div>
+        <!-- Section 3: Important Notes -->
+        <div style="font-size:11px;font-weight:700;color:#8b1a1a;margin-bottom:5px;border-bottom:1px solid #c0d8f0;padding-bottom:3px">Important Notes</div>
+        <div style="font-size:11px;color:#3a5a7a;line-height:1.7">
+          &#8226; All changes made in Databank Manager are saved in the <strong>browser only</strong> — they are not written into the HTML file automatically.<br>
+          &#8226; The <em>dbm-proposed-changes.json</em> file exported by an auditor is <strong>not</strong> a system file and cannot be uploaded to Netlify directly.<br>
+          &#8226; Only the <em>index-updated.html</em> produced by <strong>"Update HTML File"</strong> should be uploaded to Netlify.<br>
+          &#8226; After uploading to Netlify, ask auditors to do a <strong>hard refresh</strong> (Ctrl+Shift+R) once to ensure they get the latest version.
+        </div>
+      </div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-bottom:8px">
       <input id="dbm-search" type="text" placeholder="&#128269; Search title or text..." style="padding:5px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:inherit;width:220px" oninput="dbmApplyFilters()">
