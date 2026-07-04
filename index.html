@@ -9131,6 +9131,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <button class="tb-dd-item" id="aws-tab-btn" onclick="toggleAWSPanel();tbDDClose()"><span class="di">&#128203;</span> Work Status</button>
         <button class="tb-dd-item" id="ra-tab-btn"  onclick="toggleRAPanel();tbDDClose()"><span class="di">&#128202;</span> Risk Assessment</button>
         <button class="tb-dd-item" id="srr-tab-btn" onclick="toggleSRRPanel();tbDDClose()"><span class="di">&#128279;</span> Risk Mapping Editor</button>
+        <button class="tb-dd-item" id="dbm-tab-btn" onclick="toggleDBMPanel();tbDDClose()"><span class="di">&#128196;</span> Databank Manager</button>
         <button class="tb-dd-item" id="analysis-btn" onclick="toggleAnalysis();tbDDClose()"><span class="di">&#128200;</span> Sensitivity &amp; COSO Analysis</button>
       </div>
     </div>
@@ -9778,6 +9779,23 @@ var DB_EXT_KEY = 'bss_dbext_v1';
       existingIds[ext[j].id]=true;
     }
   }
+})();
+// ── Databank Manager: suppression + override store ──────────────────
+var DB_SUP_KEY='bss_dbsup_v1';
+var DB_OVR_KEY='bss_dbovr_v1';
+var _dbmSuppressed={};
+var _dbmOverrides={};
+var _dbmAllObs=[];
+(function initDbm(){
+  var sup=sg(DB_SUP_KEY,[]);
+  for(var i=0;i<sup.length;i++) _dbmSuppressed[sup[i]]=true;
+  _dbmOverrides=sg(DB_OVR_KEY,{});
+  for(var j=0;j<DB.observations.length;j++){
+    var o=DB.observations[j]; var ov=_dbmOverrides[o.id];
+    if(ov){ if(ov.title!==undefined)o.title=ov.title; if(ov.observation!==undefined)o.observation=ov.observation; if(ov.recommendation!==undefined)o.recommendation=ov.recommendation; if(ov.category!==undefined)o.category=ov.category; }
+  }
+  _dbmAllObs=DB.observations.slice();
+  DB.observations=DB.observations.filter(function(o){return !_dbmSuppressed[o.id];});
 })();
 function ss(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 (function(){
@@ -19290,6 +19308,7 @@ function showToast(msg, duration){
 // Detect wording changes when clearing to reset
 var _origDoClear = typeof doClear === 'function' ? doClear : null;
 
+function _srrToast(msg){ if(typeof toast==='function') toast(msg); }
 /* ══════════════════════════════════════════════════════════
    RISK MAPPING EDITOR PANEL — JavaScript
    ══════════════════════════════════════════════════════════ */
@@ -22577,6 +22596,435 @@ function _w2rBuildHtml(d){
   +'<div id="om"><div class="mb"><div class="mhd"><h2 id="mttl">Detail</h2><button class="mc" onclick="closeM()">&#10005;</button></div><div class="mbdy" id="mbdy"></div></div></div>\n'
   +'<div id="ft"><strong>Beaconhouse Group &mdash; Systems &amp; Audit Department</strong><br>'+esc(meta.title)+' &mdash; '+esc(meta.branch||'')+'</div>\n'
   +'<script>\n'+js+'\n<\/script>\n</body>\n</html>';
+}
+</script>
+
+<!-- ══════════════════════════════════════════════════════════
+     DATABANK MANAGER PANEL
+     ══════════════════════════════════════════════════════════ -->
+<div id="dbm-panel" style="display:none;max-width:100%;background:#f0f3f8;min-height:calc(100vh - 50px)">
+  <!-- Header -->
+  <div style="background:#1a3a5c;color:#fff;padding:11px 18px;display:flex;align-items:center;gap:12px">
+    <div style="font-size:15px;font-weight:800;flex:1">&#128196; Databank Manager</div>
+    <div style="font-size:11px;color:#a0c0e0">Browse, edit, suppress and merge observations in the audit databank. All changes are stored locally and reversible.</div>
+    <button onclick="toggleDBMPanel()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:13px;padding:3px 10px;border-radius:4px;cursor:pointer;font-family:inherit">&#10005; Close</button>
+  </div>
+  <!-- Toolbar -->
+  <div style="background:#f8fafd;border-bottom:1px solid #dde6f0;padding:8px 16px 0">
+    <div style="font-size:10.5px;color:#5a7a9a;padding:4px 0 8px;line-height:1.5">
+      View and manage all observations in the databank. <strong>Suppress</strong> removes an observation from all reports and filters without permanently deleting it. <strong>Edit</strong> updates the text locally. <strong>Scan Duplicates</strong> finds near-identical observations so you can merge them.
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-bottom:8px">
+      <input id="dbm-search" type="text" placeholder="&#128269; Search title or text..." style="padding:5px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:inherit;width:220px" oninput="dbmApplyFilters()">
+      <select id="dbm-cat-filter" onchange="dbmApplyFilters()" style="padding:5px 8px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:inherit">
+        <option value="">All Categories</option>
+        <option>Branch Imprest, Payments &amp; Accounts</option>
+        <option>Cash and Bank</option>
+        <option>Fixed Assets</option>
+        <option>HR &amp; Payroll</option>
+        <option>Library</option>
+        <option>Recruitment/Payroll/Employee Record</option>
+        <option>Safety &amp; Security</option>
+        <option>Science Laboratory</option>
+        <option>Student Record</option>
+        <option>Others</option>
+      </select>
+      <select id="dbm-src-filter" onchange="dbmApplyFilters()" style="padding:5px 8px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:inherit">
+        <option value="active">Active only</option>
+        <option value="suppressed">Suppressed only</option>
+        <option value="all">All (incl. suppressed)</option>
+        <option value="custom">Custom (added) only</option>
+      </select>
+      <div style="width:1px;height:24px;background:#dde6f0;flex-shrink:0"></div>
+      <button id="dbm-scan-btn" onclick="if(window._hoAuthed)dbmScanDuplicates();else showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmScanDuplicates();}})" style="padding:5px 13px;background:#6a3090;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit" title="Scan all active observations for similar titles and suggest merges">&#128270; Scan Duplicates</button>
+      <button onclick="dbmExportCSV()" style="padding:5px 11px;background:#1e5c3a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit" title="Export full databank as CSV">&#11123; Export CSV</button>
+      <span id="dbm-stats" style="font-size:11px;color:#6a8aaa;margin-left:4px"></span>
+    </div>
+  </div>
+  <!-- Body -->
+  <div id="dbm-body" style="display:flex;align-items:flex-start;min-height:calc(100vh - 160px)">
+    <!-- Table -->
+    <div id="dbm-table-wrap" style="flex:1;min-width:0;padding:14px 16px;overflow-x:auto">
+      <table id="dbm-table" style="width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);font-size:12px">
+        <thead>
+          <tr style="background:#1a3a5c;color:#fff">
+            <th style="padding:9px 10px;text-align:left;width:50px">#</th>
+            <th style="padding:9px 10px;text-align:left">Title</th>
+            <th style="padding:9px 10px;text-align:left;width:160px">Category</th>
+            <th style="padding:9px 10px;text-align:left;width:70px">Type</th>
+            <th style="padding:9px 10px;text-align:left;width:70px">Source</th>
+            <th style="padding:9px 10px;text-align:left;width:80px">Status</th>
+            <th style="padding:9px 10px;text-align:center;width:100px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="dbm-tbody"></tbody>
+      </table>
+    </div>
+    <!-- Detail panel -->
+    <div id="dbm-detail" style="display:none;position:sticky;top:0;width:480px;min-width:480px;max-width:480px;height:calc(100vh - 50px);background:#fff;border-left:2px solid #c8d8ec;flex-direction:column;overflow-y:auto;flex-shrink:0;box-shadow:-4px 0 12px rgba(0,0,0,.10)">
+      <div style="background:#1a3a5c;color:#fff;padding:11px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0">
+        <div style="flex:1"><div style="font-size:10px;color:#a0c0e0" id="dbm-d-meta"></div><div style="font-size:13px;font-weight:700" id="dbm-d-title-lbl"></div></div>
+        <button onclick="dbmCloseDetail()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:13px;width:26px;height:26px;border-radius:4px;cursor:pointer">&#10005;</button>
+      </div>
+      <div style="padding:14px;overflow-y:auto;flex:1" id="dbm-d-body"></div>
+    </div>
+  </div>
+</div>
+<script>
+// ══════════════════════════════════════════════════════════
+// DATABANK MANAGER — JavaScript
+// ══════════════════════════════════════════════════════════
+var _dbmCurrentId=null;
+var _dbmShowSuppressed=false;
+
+function toggleDBMPanel(){
+  var panel=document.getElementById('dbm-panel');
+  var main=document.getElementById('main');
+  var srrPanel=document.getElementById('srr-panel');
+  var awsPanel=document.getElementById('aws-panel');
+  var raPanel=document.getElementById('ra-panel');
+  if(!panel||!main) return;
+  var showing=panel.style.display==='block';
+  if(showing){
+    panel.style.display='none';
+    main.style.display='';
+    _setPanelBack(null);
+    setRptBtnsDisabled(false);
+  } else {
+    if(srrPanel) srrPanel.style.display='none';
+    if(awsPanel) awsPanel.style.display='none';
+    if(raPanel && raPanel.classList) raPanel.classList.remove('ra-drawer-open');
+    main.style.display='none';
+    panel.style.display='block';
+    _setPanelBack('Databank Manager');
+    setRptBtnsDisabled(true);
+    dbmBuildTable();
+  }
+}
+
+function _dbmEsc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _dbmNorm(s){ return (s||'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
+function _dbmOverlap(a,b){
+  var wa=a.split(' ').filter(function(w){return w.length>1;});
+  var wb=b.split(' ').filter(function(w){return w.length>1;});
+  if(!wa.length||!wb.length) return 0;
+  var hab=0; for(var i=0;i<wa.length;i++){if(wb.indexOf(wa[i])!==-1)hab++;}
+  var hba=0; for(var j=0;j<wb.length;j++){if(wa.indexOf(wb[j])!==-1)hba++;}
+  return Math.max(hab/wa.length,hba/wb.length);
+}
+function _dbmIsCustom(id){
+  var ext=sg(DB_EXT_KEY,[]);
+  for(var i=0;i<ext.length;i++){if(ext[i].id===id)return true;}
+  return false;
+}
+
+function dbmBuildTable(){
+  var q=(document.getElementById('dbm-search')||{}).value||'';
+  var cat=(document.getElementById('dbm-cat-filter')||{}).value||'';
+  var src=(document.getElementById('dbm-src-filter')||{}).value||'active';
+  dbmApplyFilters(q,cat,src);
+}
+
+function dbmApplyFilters(q,cat,src){
+  q=q!==undefined?q:((document.getElementById('dbm-search')||{}).value||'');
+  cat=cat!==undefined?cat:((document.getElementById('dbm-cat-filter')||{}).value||'');
+  src=src!==undefined?src:((document.getElementById('dbm-src-filter')||{}).value||'active');
+  var ql=q.toLowerCase();
+  var rows=[];
+  var pool=_dbmAllObs.slice();
+  pool.forEach(function(o){
+    var suppressed=!!_dbmSuppressed[o.id];
+    if(src==='active'&&suppressed) return;
+    if(src==='suppressed'&&!suppressed) return;
+    if(src==='custom'&&!_dbmIsCustom(o.id)) return;
+    if(cat&&o.category!==cat) return;
+    if(ql){
+      var hay=(o.title+' '+(o.observation||'')).toLowerCase();
+      if(hay.indexOf(ql)===-1) return;
+    }
+    rows.push(o);
+  });
+  var active=_dbmAllObs.filter(function(o){return !_dbmSuppressed[o.id];}).length;
+  var suppTotal=Object.keys(_dbmSuppressed).length;
+  var custom=sg(DB_EXT_KEY,[]).length;
+  var stats=document.getElementById('dbm-stats');
+  if(stats) stats.textContent='Active: '+active+' | Suppressed: '+suppTotal+' | Custom: '+custom+' | Showing: '+rows.length;
+  var tbody=document.getElementById('dbm-tbody');
+  if(!tbody) return;
+  var h='';
+  for(var i=0;i<rows.length;i++){
+    var o=rows[i];
+    var sup=!!_dbmSuppressed[o.id];
+    var isCustom=_dbmIsCustom(o.id);
+    var hasOverride=!!_dbmOverrides[o.id];
+    var rowBg=sup?'background:#fff5f5':i%2===0?'background:#fff':'background:#f8fbff';
+    var statusBadge=sup
+      ?'<span style="background:#fde8e8;color:#a00;border:1px solid #f0b0b0;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700">Suppressed</span>'
+      :'<span style="background:#e8f5e9;color:#1a7a1a;border:1px solid #b0d8b0;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700">Active</span>';
+    var srcBadge=isCustom
+      ?'<span style="background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600">Custom</span>'
+      :'<span style="background:#e8edf5;color:#3a5a80;border:1px solid #b8cce0;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600">Built-in</span>';
+    var editDot=hasOverride?'<span style="color:#c07000;font-size:10px" title="Has local edits"> &#9998;</span>':'';
+    h+='<tr style="'+rowBg+';border-bottom:1px solid #eef2f8;cursor:pointer" onclick="dbmOpenDetail(\''+_dbmEsc(o.id)+'\')">'
+      +'<td style="padding:7px 10px;color:#888;font-size:11px">'+(i+1)+'</td>'
+      +'<td style="padding:7px 10px;font-weight:600;color:#1a2a40">'+_dbmEsc(o.title)+editDot+'</td>'
+      +'<td style="padding:7px 10px;font-size:11px;color:#3a5a80">'+_dbmEsc(o.category||'')+'</td>'
+      +'<td style="padding:7px 10px">'+_dbmEsc(o.type||'New')+'</td>'
+      +'<td style="padding:7px 10px">'+srcBadge+'</td>'
+      +'<td style="padding:7px 10px">'+statusBadge+'</td>'
+      +'<td style="padding:7px 10px;text-align:center">'
+      +'<button onclick="event.stopPropagation();dbmOpenDetail(\''+_dbmEsc(o.id)+'\')" style="padding:2px 8px;font-size:10px;border:1px solid #1a3a5c;background:#1a3a5c;color:#fff;border-radius:3px;cursor:pointer;font-family:inherit">&#9998; Edit</button>'
+      +'</td>'
+      +'</tr>';
+  }
+  if(!h) h='<tr><td colspan="7" style="padding:24px;text-align:center;color:#888;font-style:italic">No observations match the current filters.</td></tr>';
+  tbody.innerHTML=h;
+}
+
+function dbmOpenDetail(obsId){
+  _dbmCurrentId=obsId;
+  var o=null;
+  for(var i=0;i<_dbmAllObs.length;i++){if(_dbmAllObs[i].id===obsId){o=_dbmAllObs[i];break;}}
+  if(!o) return;
+  var detail=document.getElementById('dbm-detail');
+  var meta=document.getElementById('dbm-d-meta');
+  var titleLbl=document.getElementById('dbm-d-title-lbl');
+  var body=document.getElementById('dbm-d-body');
+  if(!detail||!body) return;
+  var sup=!!_dbmSuppressed[obsId];
+  var isCustom=_dbmIsCustom(obsId);
+  var ov=_dbmOverrides[obsId]||{};
+  if(meta) meta.textContent=obsId+' | '+(isCustom?'Custom':'Built-in')+' | '+(sup?'Suppressed':'Active');
+  if(titleLbl) titleLbl.textContent=o.title;
+  var supBtn=sup
+    ?'<button onclick="dbmRestoreObs(\''+_dbmEsc(obsId)+'\')" style="flex:1;padding:9px;background:#1e5c3a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#9654; Restore (Make Active)</button>'
+    :'<button onclick="dbmConfirmSuppress(\''+_dbmEsc(obsId)+'\')" style="flex:1;padding:9px;background:#8b1a1a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128683; Suppress (Hide from Reports)</button>';
+  var resetBtn=(ov&&Object.keys(ov).length)
+    ?'<button onclick="dbmResetOverride(\''+_dbmEsc(obsId)+'\')" style="padding:9px 14px;background:#e8edf5;color:#444;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit">&#8635; Reset Edits</button>':'' ;
+  body.innerHTML=
+    '<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">TITLE</div>'
+    +'<input id="dbm-e-title" value="'+_dbmEsc(o.title)+'" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:12px;margin-bottom:10px;box-sizing:border-box">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
+    +'<div><div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">CATEGORY</div>'
+    +'<select id="dbm-e-cat" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:11px">'
+    +['Branch Imprest, Payments & Accounts','Cash and Bank','Fixed Assets','HR & Payroll','Library','Recruitment/Payroll/Employee Record','Safety & Security','Science Laboratory','Student Record','Others'].map(function(c){return'<option'+(c===(o.category||'')?'  selected':'')+'>'+_dbmEsc(c)+'</option>';}).join('')
+    +'</select></div>'
+    +'<div><div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">TYPE</div>'
+    +'<select id="dbm-e-type" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:11px">'
+    +'<option'+(o.type==='New'?' selected':'')+'>New</option>'
+    +'<option'+(o.type==='Repeated'?' selected':'')+'>Repeated</option>'
+    +'</select></div></div>'
+    +'<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">OBSERVATION TEXT</div>'
+    +'<textarea id="dbm-e-obs" rows="5" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:11px;resize:vertical;margin-bottom:10px;box-sizing:border-box">'+_dbmEsc(o.observation||'')+'</textarea>'
+    +'<div style="font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:3px">RECOMMENDATION</div>'
+    +'<textarea id="dbm-e-rec" rows="4" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:11px;resize:vertical;margin-bottom:14px;box-sizing:border-box">'+_dbmEsc(o.recommendation||'')+'</textarea>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+    +'<button onclick="dbmSaveEdit(\''+_dbmEsc(obsId)+'\')" style="flex:1;padding:9px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Save Changes</button>'
+    +resetBtn
+    +'</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+supBtn+'</div>'
+    +'<div style="border-top:1px solid #dde6f0;padding-top:10px;margin-top:4px">'
+    +'<div style="font-size:11px;font-weight:700;color:#6a3090;margin-bottom:6px">&#128260; MERGE WITH ANOTHER OBSERVATION</div>'
+    +'<div style="font-size:10.5px;color:#5a6a7a;margin-bottom:6px;line-height:1.5">Merge this observation into another — this one will be suppressed and the chosen one kept as the canonical version.</div>'
+    +'<input id="dbm-merge-q" type="text" placeholder="Search for target observation..." style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:11px;margin-bottom:6px;box-sizing:border-box" oninput="dbmMergeSearch(\''+_dbmEsc(obsId)+'\')">'
+    +'<div id="dbm-merge-results" style="max-height:160px;overflow-y:auto;border:1px solid #dde6f0;border-radius:4px;background:#f8fafd"></div>'
+    +'</div>';
+  detail.style.display='flex';
+  detail.style.flexDirection='column';
+  // Shrink table wrap
+  var tw=document.getElementById('dbm-table-wrap');
+  if(tw) tw.style.paddingRight='0';
+}
+
+function dbmCloseDetail(){
+  var detail=document.getElementById('dbm-detail');
+  if(detail) detail.style.display='none';
+  _dbmCurrentId=null;
+}
+
+function dbmSaveEdit(obsId){
+  if(!window._hoAuthed){
+    showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmSaveEdit(obsId);}});
+    return;
+  }
+  var title=(document.getElementById('dbm-e-title')||{}).value||'';
+  var cat=(document.getElementById('dbm-e-cat')||{}).value||'';
+  var type=(document.getElementById('dbm-e-type')||{}).value||'New';
+  var obs=(document.getElementById('dbm-e-obs')||{}).value||'';
+  var rec=(document.getElementById('dbm-e-rec')||{}).value||'';
+  if(!title.trim()){alert('Title cannot be blank.');return;}
+  // Save override
+  _dbmOverrides[obsId]={title:title,category:cat,type:type,observation:obs,recommendation:rec};
+  ss(DB_OVR_KEY,_dbmOverrides);
+  // Apply to live DB
+  var o=null;
+  for(var i=0;i<_dbmAllObs.length;i++){if(_dbmAllObs[i].id===obsId){o=_dbmAllObs[i];break;}}
+  if(o){o.title=title;o.category=cat;o.type=type;o.observation=obs;o.recommendation=rec;}
+  var inActive=DB.observations;
+  for(var j=0;j<inActive.length;j++){if(inActive[j].id===obsId){inActive[j].title=title;inActive[j].category=cat;inActive[j].type=type;inActive[j].observation=obs;inActive[j].recommendation=rec;break;}}
+  if(typeof toast==='function') toast('Changes saved for: '+title);
+  dbmBuildTable();
+  // Re-open detail to refresh
+  dbmOpenDetail(obsId);
+}
+
+function dbmResetOverride(obsId){
+  if(!window._hoAuthed){showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmResetOverride(obsId);}});return;}
+  if(!confirm('Reset all local edits for this observation? It will revert to the original built-in text.')) return;
+  delete _dbmOverrides[obsId];
+  ss(DB_OVR_KEY,_dbmOverrides);
+  // Reload page to re-apply original — simplest approach
+  if(typeof toast==='function') toast('Edits reset. Reloading to restore original text...');
+  setTimeout(function(){location.reload();},1500);
+}
+
+function dbmConfirmSuppress(obsId){
+  if(!window._hoAuthed){showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmConfirmSuppress(obsId);}});return;}
+  var o=null;
+  for(var i=0;i<_dbmAllObs.length;i++){if(_dbmAllObs[i].id===obsId){o=_dbmAllObs[i];break;}}
+  var title=o?o.title:obsId;
+  if(!confirm('Suppress this observation?\n\n"'+title+'"\n\nIt will be hidden from all filters, searches and reports. You can restore it at any time from this manager.')) return;
+  dbmSuppressObs(obsId);
+}
+
+function dbmSuppressObs(obsId){
+  _dbmSuppressed[obsId]=true;
+  var sup=Object.keys(_dbmSuppressed);
+  ss(DB_SUP_KEY,sup);
+  // Remove from active DB.observations
+  DB.observations=DB.observations.filter(function(o){return o.id!==obsId;});
+  if(typeof toast==='function') toast('Observation suppressed — hidden from all reports.');
+  dbmBuildTable();
+  dbmOpenDetail(obsId);
+}
+
+function dbmRestoreObs(obsId){
+  if(!window._hoAuthed){showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmRestoreObs(obsId);}});return;}
+  if(!confirm('Restore this observation? It will become active again in all filters and reports.')) return;
+  delete _dbmSuppressed[obsId];
+  ss(DB_SUP_KEY,Object.keys(_dbmSuppressed));
+  // Add back to DB.observations
+  var o=null;
+  for(var i=0;i<_dbmAllObs.length;i++){if(_dbmAllObs[i].id===obsId){o=_dbmAllObs[i];break;}}
+  if(o) DB.observations.push(o);
+  if(typeof toast==='function') toast('Observation restored — now active in all reports.');
+  dbmBuildTable();
+  dbmOpenDetail(obsId);
+}
+
+function dbmMergeSearch(sourceId){
+  var q=(document.getElementById('dbm-merge-q')||{}).value||'';
+  var res=document.getElementById('dbm-merge-results');
+  if(!res) return;
+  if(!q.trim()){res.innerHTML='';return;}
+  var ql=q.toLowerCase();
+  var matches=[];
+  for(var i=0;i<_dbmAllObs.length;i++){
+    var o=_dbmAllObs[i];
+    if(o.id===sourceId) continue;
+    if(_dbmSuppressed[o.id]) continue;
+    if(o.title.toLowerCase().indexOf(ql)!==-1) matches.push(o);
+    if(matches.length>=8) break;
+  }
+  if(!matches.length){res.innerHTML='<div style="padding:8px;font-size:11px;color:#888;font-style:italic">No matches found.</div>';return;}
+  var h='';
+  matches.forEach(function(o){
+    var score=Math.round(_dbmOverlap(_dbmNorm(o.title), _dbmNorm(
+      (function(){for(var i=0;i<_dbmAllObs.length;i++){if(_dbmAllObs[i].id===sourceId)return _dbmAllObs[i].title;} return '';})()
+    ))*100);
+    h+='<div style="padding:7px 10px;border-bottom:1px solid #eef2f8;display:flex;align-items:center;gap:8px;font-size:11px">'
+      +'<div style="flex:1;color:#1a2a40">'+_dbmEsc(o.title)+'<span style="font-size:10px;color:#888;margin-left:4px">('+_dbmEsc(o.category||'')+')</span></div>'
+      +(score>=60?'<span style="font-size:10px;font-weight:700;color:#6a3090">'+score+'% match</span>':'')
+      +'<button onclick="dbmDoMerge(\''+_dbmEsc(sourceId)+'\',\''+_dbmEsc(o.id)+'\')" style="padding:2px 10px;background:#6a3090;color:#fff;border:none;border-radius:3px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">Merge into this</button>'
+      +'</div>';
+  });
+  res.innerHTML=h;
+}
+
+function dbmDoMerge(suppressId, keepId){
+  if(!window._hoAuthed){showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmDoMerge(suppressId,keepId);}});return;}
+  var suppObs=null, keepObs=null;
+  for(var i=0;i<_dbmAllObs.length;i++){
+    if(_dbmAllObs[i].id===suppressId) suppObs=_dbmAllObs[i];
+    if(_dbmAllObs[i].id===keepId) keepObs=_dbmAllObs[i];
+  }
+  if(!suppObs||!keepObs) return;
+  if(!confirm('Merge observations?\n\nSUPPRESS (hide): "'+suppObs.title+'"\nKEEP (canonical): "'+keepObs.title+'"\n\nThe first observation will be suppressed. The second remains active. This cannot be auto-undone but you can restore from the Suppressed filter.')) return;
+  dbmSuppressObs(suppressId);
+  if(typeof toast==='function') toast('Merged — "'+suppObs.title+'" suppressed. "'+keepObs.title+'" kept as canonical.');
+  dbmCloseDetail();
+  dbmBuildTable();
+}
+
+function dbmScanDuplicates(){
+  var THRESHOLD=0.70;
+  var active=_dbmAllObs.filter(function(o){return !_dbmSuppressed[o.id];});
+  var pairs=[];
+  var seen={};
+  for(var i=0;i<active.length;i++){
+    for(var j=i+1;j<active.length;j++){
+      var sc=_dbmOverlap(_dbmNorm(active[i].title),_dbmNorm(active[j].title));
+      if(sc>=THRESHOLD){
+        var key=active[i].id+':'+active[j].id;
+        if(!seen[key]){seen[key]=true; pairs.push({a:active[i],b:active[j],score:Math.round(sc*100)});}
+      }
+    }
+  }
+  pairs.sort(function(x,y){return y.score-x.score;});
+  // Show modal
+  var modal=document.createElement('div');
+  modal.id='dbm-scan-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  var inner=document.createElement('div');
+  inner.style.cssText='background:#0d1a2a;border:1px solid #2a4060;border-radius:10px;width:100%;max-width:720px;max-height:85vh;overflow-y:auto;padding:20px';
+  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    +'<div style="font-size:14px;font-weight:800;color:#fff">&#128270; Duplicate Scan Results</div>'
+    +'<button onclick="document.getElementById(\'dbm-scan-modal\').remove()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:4px;width:26px;height:26px;font-size:14px;cursor:pointer">&#10005;</button>'
+    +'</div>';
+  if(!pairs.length){
+    h+='<div style="color:#a0c0d0;font-size:13px;text-align:center;padding:20px">No near-duplicate observations found at '+Math.round(THRESHOLD*100)+'%+ title similarity.</div>';
+  } else {
+    h+='<div style="font-size:11px;color:#80a0c0;margin-bottom:12px">Found <strong style="color:#fff">'+pairs.length+'</strong> pair'+(pairs.length!==1?'s':'')+' with ≥'+Math.round(THRESHOLD*100)+'% title similarity. Review each pair and decide which to keep.</div>';
+    pairs.forEach(function(p,idx){
+      h+='<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:12px;margin-bottom:10px">'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+        +'<span style="background:#6a3090;color:#fff;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:800">'+p.score+'% match</span>'
+        +'<span style="font-size:10px;color:#80a0c0">'+_dbmEsc(p.a.category||'')+'</span>'
+        +'</div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+        +'<div style="background:rgba(255,255,255,.05);border-radius:5px;padding:8px">'
+        +'<div style="font-size:10px;color:#80a0c0;font-weight:700;margin-bottom:4px">'+_dbmEsc(p.a.id)+'</div>'
+        +'<div style="font-size:12px;font-weight:600;color:#e0eaf8;line-height:1.4">'+_dbmEsc(p.a.title)+'</div>'
+        +'</div>'
+        +'<div style="background:rgba(255,255,255,.05);border-radius:5px;padding:8px">'
+        +'<div style="font-size:10px;color:#80a0c0;font-weight:700;margin-bottom:4px">'+_dbmEsc(p.b.id)+'</div>'
+        +'<div style="font-size:12px;font-weight:600;color:#e0eaf8;line-height:1.4">'+_dbmEsc(p.b.title)+'</div>'
+        +'</div></div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+        +'<button onclick="document.getElementById(\'dbm-scan-modal\').remove();dbmDoMerge(\''+_dbmEsc(p.b.id)+'\',\''+_dbmEsc(p.a.id)+'\')" style="flex:1;padding:6px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Keep Left, suppress right</button>'
+        +'<button onclick="document.getElementById(\'dbm-scan-modal\').remove();dbmDoMerge(\''+_dbmEsc(p.a.id)+'\',\''+_dbmEsc(p.b.id)+'\')" style="flex:1;padding:6px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Keep Right, suppress left</button>'
+        +'<button onclick="this.closest(\'div[style*=border-radius]\').remove()" style="padding:6px 12px;background:rgba(255,255,255,.1);color:#aaa;border:1px solid rgba(255,255,255,.15);border-radius:4px;font-size:11px;cursor:pointer;font-family:inherit">Skip</button>'
+        +'</div>'
+        +'</div>';
+    });
+  }
+  inner.innerHTML=h;
+  modal.appendChild(inner);
+  document.body.appendChild(modal);
+}
+
+function dbmExportCSV(){
+  var rows=[['ID','Title','Category','Type','Status','Source','Observation','Recommendation']];
+  _dbmAllObs.forEach(function(o){
+    var sup=_dbmSuppressed[o.id]?'Suppressed':'Active';
+    var src=_dbmIsCustom(o.id)?'Custom':'Built-in';
+    rows.push([o.id,o.title,o.category||'',o.type||'',sup,src,(o.observation||'').replace(/\n/g,' '),(o.recommendation||'').replace(/\n/g,' ')]);
+  });
+  var csv=rows.map(function(r){return r.map(function(c){return'"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+  var a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='databank_export.csv';
+  a.click();
 }
 </script>
 
