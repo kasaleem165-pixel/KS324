@@ -18191,7 +18191,7 @@ function _updateRepeatDetectPanel(){
   if(window.ra_loadedReports){
     for(var i=0;i<ra_loadedReports.length;i++){
       var rp=ra_loadedReports[i];
-      if(!rp.docxObsList||!rp.docxObsList.length) continue;
+      if(!rp.text&&!(rp.docxObsList&&rp.docxObsList.length)) continue;
       if(!best||rp.date>best.date) best=rp;
     }
   }
@@ -18199,21 +18199,23 @@ function _updateRepeatDetectPanel(){
     body.innerHTML='<div style="font-size:11px;color:#a0b0c0;line-height:1.5;padding:6px 0">Load the previous audit report (Word file) in <strong style="color:#c8d8ea">Risk Assessment</strong> to enable automatic repeat detection.</div>';
     if(src) src.textContent='';
   } else {
-    body.innerHTML='<div style="font-size:11px;color:#c8d8ea;line-height:1.5;margin-bottom:8px">Matches selected observations against the previous report to auto-mark repeats and fill LARR.</div>'
+    var mode=best.docxObsList&&best.docxObsList.length?'structured &mdash; '+best.docxObsList.length+' obs':'text search mode';
+    body.innerHTML='<div style="font-size:11px;color:#c8d8ea;line-height:1.5;margin-bottom:8px">Matches selected observations against the previous report to auto-mark repeats and fill LARR.<br><span style="color:#8ab0cc;font-size:10px">Mode: '+mode+'</span></div>'
       +'<button onclick="detectRepeatsFromPrevReport()" style="width:100%;padding:9px;background:linear-gradient(135deg,#6a3090,#9040c0);color:#fff;border:none;border-radius:6px;font-family:\'Inter\',sans-serif;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.3px">&#128270; Detect Repeats from Previous Report</button>';
     if(src) src.textContent=best.name.replace(/\.[^.]+$/,'').substring(0,30)+(best.date?' ('+best.date+')':'');
   }
 }
 
 function detectRepeatsFromPrevReport(){
-  // Find latest loaded report with obs list
-  var best=null;
+  // Find latest report — prefer one with structured obs list, fall back to text-only
+  var bestStr=null, bestTxt=null;
   for(var i=0;i<ra_loadedReports.length;i++){
     var rp=ra_loadedReports[i];
-    if(!rp.docxObsList||!rp.docxObsList.length) continue;
-    if(!best||rp.date>best.date) best=rp;
+    if(rp.docxObsList&&rp.docxObsList.length){ if(!bestStr||rp.date>bestStr.date) bestStr=rp; }
+    else if(rp.text){ if(!bestTxt||rp.date>bestTxt.date) bestTxt=rp; }
   }
-  if(!best){ alert('No previous report with a readable Observations Summary table is loaded in Risk Assessment.\n\nPlease load the previous audit report (Word file) in the Risk Assessment panel first.'); return; }
+  var best=bestStr||bestTxt;
+  if(!best){ alert('No previous report loaded in Risk Assessment.\n\nPlease load the previous audit report (Word file) in the Risk Assessment panel first.'); return; }
 
   var selList=Object.keys(selIds).filter(function(k){return selIds[k];});
   if(!selList.length){ alert('No observations are selected in the current report yet.\n\nPlease select observations first, then run repeat detection.'); return; }
@@ -18237,49 +18239,78 @@ function detectRepeatsFromPrevReport(){
     return Math.max(scoreAB,scoreBA);
   }
 
-  var prevObs=best.docxObsList;
   var matches=[];
 
-  for(var si=0;si<selList.length;si++){
-    var obsId=selList[si];
-    var curTitle=''; var curBody='';
+  // Helper: get current obs title + body
+  function getCurObs(obsId){
     for(var di=0;di<DB.observations.length;di++){
-      if(DB.observations[di].id===obsId){
-        curTitle=DB.observations[di].title||'';
-        curBody=(DB.observations[di].observation||'')+' '+(DB.observations[di].recommendation||'');
-        break;
+      if(DB.observations[di].id===obsId) return {title:DB.observations[di].title||'',body:(DB.observations[di].observation||'')+' '+(DB.observations[di].recommendation||'')};
+    }
+    for(var ci=0;ci<customs.length;ci++){
+      if(customs[ci].id===obsId) return {title:customs[ci].title||'',body:customs[ci].observation||''};
+    }
+    return null;
+  }
+
+  if(best.docxObsList&&best.docxObsList.length){
+    // ── Structured matching (docxObsList available) ──
+    var prevObs=best.docxObsList;
+    for(var si=0;si<selList.length;si++){
+      var obsId=selList[si];
+      var cur=getCurObs(obsId); if(!cur||!cur.title) continue;
+      var nTitle=norm(cur.title); var nBody=norm(cur.body);
+      var bestScore=0; var bestPrev=null; var bestMatchType='';
+      for(var pi=0;pi<prevObs.length;pi++){
+        var p=prevObs[pi];
+        var nPT=norm(p.title||''); var nPC=norm(p.content||'');
+        var s1=overlap(nTitle,nPT);
+        var s2=(nBody&&nPC)?overlap(nBody,nPC):0;
+        var s3=nPC?overlap(nTitle,nPC):0;
+        var s4=(nBody&&nPT)?overlap(nBody,nPT):0;
+        var bs=Math.max(s1,s2,s3,s4);
+        var mt=s1>=s2&&s1>=s3&&s1>=s4?'heading':(s2>=s3&&s2>=s4?'content':(s3>=s4?'heading in prev content':'content vs prev heading'));
+        if(bs>bestScore){ bestScore=bs; bestPrev=p; bestMatchType=mt; }
       }
+      if(bestScore>=0.60) matches.push({obsId:obsId,title:cur.title,prev:bestPrev,score:bestScore,matchType:bestMatchType});
     }
-    if(!curTitle) for(var ci=0;ci<customs.length;ci++){
-      if(customs[ci].id===obsId){ curTitle=customs[ci].title||''; curBody=customs[ci].observation||''; break; }
+  } else {
+    // ── Text-search fallback (no structured obs list) ──
+    // Scan the plain text directly: for each observation, look for its key words
+    // near a reference number pattern in the loaded report text.
+    var rText=best.text||'';
+    var nText=rText.toLowerCase().replace(/[^a-z0-9\n]/g,' ');
+    // collect all ref positions in text
+    var refPositions=[];
+    var refScanRe=/(\d+\s*\.\s*\d+)/g; var rm2;
+    while((rm2=refScanRe.exec(nText))!==null){
+      refPositions.push({ref:rm2[1].replace(/\s/g,''),pos:rm2.index});
     }
-    if(!curTitle) continue;
-
-    var nTitle=norm(curTitle);
-    var nBody=norm(curBody);
-
-    var bestScore=0; var bestPrev=null; var bestMatchType='';
-    for(var pi=0;pi<prevObs.length;pi++){
-      var p=prevObs[pi];
-      var nPrevTitle=norm(p.title||'');
-      var nPrevContent=norm(p.content||'');
-
-      var s1=overlap(nTitle,nPrevTitle);                                            // heading vs heading
-      var s2=(nBody&&nPrevContent)?overlap(nBody,nPrevContent):0;                   // content vs content
-      var s3=nPrevContent?overlap(nTitle,nPrevContent):0;                           // heading vs prev content
-      var s4=(nBody&&nPrevTitle)?overlap(nBody,nPrevTitle):0;                       // content vs prev heading
-
-      var best_s=Math.max(s1,s2,s3,s4);
-      var mtype=s1>=s2&&s1>=s3&&s1>=s4?'heading':(s2>=s3&&s2>=s4?'content':(s3>=s4?'heading in prev content':'content vs prev heading'));
-      if(best_s>bestScore){ bestScore=best_s; bestPrev=p; bestMatchType=mtype; }
-    }
-    if(bestScore>=0.60){
-      matches.push({obsId:obsId,title:curTitle,prev:bestPrev,score:bestScore,matchType:bestMatchType});
+    for(var si=0;si<selList.length;si++){
+      var obsId=selList[si];
+      var cur=getCurObs(obsId); if(!cur||!cur.title) continue;
+      var words=norm(cur.title+' '+cur.body).split(' ').filter(function(w){return w.length>3;});
+      if(!words.length) continue;
+      var bestScore=0; var bestRef=''; var bestContext='';
+      for(var ri=0;ri<refPositions.length;ri++){
+        var rPos=refPositions[ri].pos;
+        // window: 80 chars before ref + 350 chars after (title + content)
+        var win=nText.substring(Math.max(0,rPos-80),rPos+350);
+        var hits=0;
+        for(var wi=0;wi<words.length;wi++){ if(win.indexOf(words[wi])!==-1) hits++; }
+        var sc=hits/words.length;
+        if(sc>bestScore){ bestScore=sc; bestRef=refPositions[ri].ref; bestContext=win; }
+      }
+      if(bestScore>=0.60){
+        // Extract a readable title snippet from the original text near this ref
+        var rp2=rText.indexOf(bestRef);
+        var snippet=''; if(rp2>=0){ snippet=rText.substring(rp2,rp2+120).replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim(); }
+        matches.push({obsId:obsId,title:cur.title,prev:{ref:bestRef,title:snippet},score:bestScore,matchType:'text search'});
+      }
     }
   }
 
   if(!matches.length){
-    alert('No matches found (≥60%) between the selected observations and the previous report.\n\nThe observations may have been new in the previous period, or the previous report file may not contain a readable Observations Summary table.');
+    alert('No matches found (≥60%) between the selected observations and the previous report.\n\nTip: make sure observations are selected in the filter panel before clicking Detect Repeats.');
     return;
   }
 
