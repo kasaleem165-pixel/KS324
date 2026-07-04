@@ -20372,13 +20372,13 @@ var RA_MODES=[
      {name:'S&A all-branches historical databank',yes:true}
    ],
    weights:'Frequency 30 + Repeat Rate 25 + Diligent 25 + Sensitivity 15 + Databank 5 = 100 pts'},
-  {value:'mode5', label:'Mode 5', title:'Area Weight × Sensitivity (Branch Risk Index)',
+  {value:'mode5', label:'Mode 5', title:'Stage 3 — Branch Risk Index (BRI)',
    sources:[
-     {name:'Diligent Risk Register',yes:false},
+     {name:'Diligent Risk Register',yes:true},
      {name:'Specific branch\'s uploaded reports',yes:true},
-     {name:'S&A all-branches historical databank',yes:false}
+     {name:'Branch Complexity Matrix',yes:true}
    ],
-   weights:'Σ (Area Weight × Sensitivity Weight) per observation × 100 — branch-level total score for cross-branch comparison'}
+   weights:'BRI = (Avg Stage 2 Score ÷ Complexity Score) × 50 — normalised for branch size; use for cross-branch ranking only'}
 ];
 
 function ra_initModeButtons(){
@@ -20736,28 +20736,26 @@ function ra_runAnalysis(){
   else { rpt1=parsedList[parsedList.length-1]; rpt2=parsedList[0]; d1=allSources[allSources.length-1].date||''; d2=allSources[0].date||''; }
   var catNames=Object.keys(RA_DB_CATS); var scores=[];
   var mode5=ra_getScoreMode()==='mode5';
-  // Mode 5: compute branch-level index separately (sum of areaWt×avgSens×obs per area)
-  var m5BranchTotal=0, m5AreaItems=[];
   for(var si=0;si<catNames.length;si++){
     var sc=ra_scoreCategory(catNames[si],rpt1,rpt2);
     var _d1=rpt1[catNames[si]]||{obs:0,repeated:0,sensTotals:{}};
-    if(mode5){
-      var db5=RA_DB_CATS[catNames[si]]; var areaWt5=db5?db5.areaWt||0.10:0.10;
-      var rawSens5=0,hasSens5=false,sc5=0;
-      if(_d1.obs>0&&_d1.sensTotals){
-        var sw5=0;
-        for(var sk5 in _d1.sensTotals){sw5+=(RA_SENS_WT[sk5]||0)*_d1.sensTotals[sk5];sc5+=_d1.sensTotals[sk5];}
-        if(sc5>0){rawSens5=sw5/sc5;hasSens5=true;}
-      }
-      var contrib=hasSens5 ? _d1.obs*areaWt5*rawSens5 : 0;
-      m5BranchTotal+=contrib;
-      m5AreaItems.push({cat:catNames[si],obs:_d1.obs,areaWt:areaWt5,avgSens:rawSens5,hasSens:hasSens5,contrib:contrib});
-    }
     scores.push({cat:catNames[si],score:sc,level:ra_scoreToLevel(sc),d1:_d1,d2:rpt2?rpt2[catNames[si]]:null,fromReport:(_d1.obs>0)});
   }
   scores.sort(function(a,b){return b.score-a.score;});
   var overall=Math.round((scores[0].score*0.5)+(scores[1].score*0.3)+(scores[2].score*0.2));
-  if(mode5) overall=Math.min(100,Math.round(m5BranchTotal*100)); // Mode 5 overall = branch index scaled
+  // Mode 5 — Stage 3 BRI: (Avg Stage 2 Score ÷ Complexity Score) × 50
+  var m5Data=null;
+  if(mode5){
+    ra_loadComplexityMap();
+    var cx=ra_getComplexityScore(branchName); var cxScore=cx!=null?Math.max(10,cx):50;
+    var activeScores=scores.filter(function(s){return s.fromReport;});
+    var avgS2=activeScores.length?Math.round(activeScores.reduce(function(s,x){return s+x.score;},0)/activeScores.length):0;
+    var bri=Math.min(100,Math.round((avgS2/Math.max(10,cxScore))*50));
+    overall=bri;
+    // Save BRI for this branch to cross-branch store
+    ra_saveBRI(branchName,bri,avgS2,cxScore);
+    m5Data={bri:bri,avgScore:avgS2,cxScore:cxScore,cxFromMatrix:cx!=null,activeAreas:activeScores.length,totalAreas:scores.length};
+  }
   var nextDate=(document.getElementById('ra-next_date')||{}).value||'';
   var nextDays=parseInt((document.getElementById('ra-next_days')||{}).value||'3',10)||3;
   var nextTeam=parseInt((document.getElementById('ra-next_team')||{}).value||'2',10)||2;
@@ -20803,75 +20801,113 @@ function ra_renderResults(branch,scores,overall,d1,d2,autype,pb,hasTrend,nextDat
   if(m5Data) ra_renderM5Card(branch,m5Data,scores);
 }
 
+var RA_BRI_KEY='bss_ra_bri_v1';
+function ra_saveBRI(branch,bri,avgScore,cxScore){
+  try{
+    var store={}; try{store=JSON.parse(localStorage.getItem(RA_BRI_KEY)||'{}');}catch(e){}
+    store[branch]={bri:bri,avgScore:avgScore,cxScore:cxScore,date:new Date().toISOString().slice(0,10)};
+    localStorage.setItem(RA_BRI_KEY,JSON.stringify(store));
+  }catch(e){}
+}
+function ra_loadBRIStore(){
+  try{return JSON.parse(localStorage.getItem(RA_BRI_KEY)||'{}');}catch(e){return {};}
+}
+
 function ra_renderM5Card(branch,m5Data,scores){
   var el=document.getElementById('ra-m5-card');
   if(!el) return;
-  var idx=Math.round(m5Data.total*100*10)/10; // one decimal
-  var idxPct=Math.min(100,Math.round(m5Data.total*100));
-  var ol=ra_scoreToLevel(idxPct);
-  var fg=ra_levelColor(ol); var bg={critical:'#fde8e8',high:'#fff3e8',medium:'#fffbe0',low:'#e8f8e8'}[ol]||'#f5f8fd';
+  var bri=m5Data.bri; var ol=ra_scoreToLevel(bri);
+  var fg=ra_levelColor(ol);
+  var briLabel=bri>=75?'Systemic Risk':bri>=50?'Elevated Risk':bri>=25?'Managed Risk':'Low Risk';
+  var bg={critical:'#fde8e8',high:'#fff3e8',medium:'#fffbe0',low:'#e8f8e8'}[ol]||'#f5f8fd';
   var bd={critical:'#f0a0a0',high:'#f0c080',medium:'#e0c030',low:'#80c880'}[ol]||'#c8d8ec';
-  // Per-area breakdown table — sorted by contribution descending
-  var sorted=m5Data.areas.slice().sort(function(a,b){return b.contrib-a.contrib;});
-  var totalObs=0; sorted.forEach(function(r){totalObs+=r.obs;});
-  var rows=sorted.map(function(r,i){
-    var sensLabel=!r.hasSens?'—':r.avgSens>=1.00?'High':r.avgSens>=0.64?'M to H':r.avgSens>=0.40?'L to M':'Low';
-    var sensCol=!r.hasSens?'#999':r.avgSens>=1.00?'#9b1a1a':r.avgSens>=0.64?'#b04400':r.avgSens>=0.40?'#806000':'#1a6020';
-    var contribPct=m5Data.total>0?Math.round(r.contrib/m5Data.total*100):0;
-    var barW=m5Data.total>0?Math.min(100,Math.round(r.contrib/m5Data.total*100)):0;
+
+  // Stage 2 area scores for this branch
+  var activeScores=scores.filter(function(s){return s.fromReport;}).slice().sort(function(a,b){return b.score-a.score;});
+  var areaRows=activeScores.map(function(s,i){
     var rowBg=i%2===0?'#fff':'#f8fafc';
+    var barcol=ra_levelBarColor(s.level);
     return '<tr style="background:'+rowBg+';border-bottom:1px solid #eaeff6">'
-      +'<td style="padding:7px 10px;font-size:12px;font-weight:600;color:#1a3a5c">'+ra_esc(r.cat)+'</td>'
-      +'<td style="padding:7px 10px;text-align:center;font-size:12px;color:#2a3a50">'+r.obs+'</td>'
-      +'<td style="padding:7px 10px;text-align:center;font-size:11.5px;font-weight:700;color:#2a3a50">'+(r.areaWt*100).toFixed(0)+'%</td>'
-      +'<td style="padding:7px 10px;text-align:center;font-size:11.5px;font-weight:700;color:'+sensCol+'">'+sensLabel+'</td>'
-      +'<td style="padding:7px 10px;text-align:center;font-size:12px;font-weight:800;color:#1a3a5c">'+(Math.round(r.contrib*1000)/10).toFixed(1)+'</td>'
-      +'<td style="padding:7px 10px;min-width:100px">'
-        +'<div style="display:flex;align-items:center;gap:6px">'
-          +'<div style="flex:1;height:8px;background:#e8edf4;border-radius:4px;overflow:hidden"><div style="height:100%;width:'+barW+'%;background:'+fg+';border-radius:4px;transition:width .4s"></div></div>'
-          +'<span style="font-size:10.5px;font-weight:700;color:#5a6a80;white-space:nowrap">'+contribPct+'%</span>'
-        +'</div>'
-      +'</td>'
+      +'<td style="padding:6px 10px;font-size:12px;font-weight:600;color:#1a3a5c">'+ra_esc(s.cat)+'</td>'
+      +'<td style="padding:6px 10px;text-align:center"><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:3px;background:'+bg+';color:'+fg+'">'+ra_levelLabel(s.level)+'</span></td>'
+      +'<td style="padding:6px 10px;min-width:100px"><div style="display:flex;align-items:center;gap:5px"><div style="flex:1;height:7px;background:#e8edf4;border-radius:3px;overflow:hidden"><div style="height:100%;width:'+s.score+'%;background:'+barcol+';border-radius:3px"></div></div><strong style="font-size:11.5px;color:#1a3a5c">'+s.score+'</strong></div></td>'
+      +'</tr>';
+  }).join('');
+
+  // Cross-branch BRI ranking table
+  var briStore=ra_loadBRIStore();
+  var briEntries=Object.keys(briStore).map(function(k){return {branch:k,bri:briStore[k].bri,avgScore:briStore[k].avgScore,cxScore:briStore[k].cxScore,date:briStore[k].date};});
+  briEntries.sort(function(a,b){return b.bri-a.bri;});
+  var rankRows=briEntries.map(function(r,i){
+    var rol=ra_scoreToLevel(r.bri); var rfg=ra_levelColor(rol);
+    var rlbl=r.bri>=75?'Systemic':r.bri>=50?'Elevated':r.bri>=25?'Managed':'Low';
+    var isCurrent=r.branch===branch;
+    var rowBg=isCurrent?'#e8f2ff':(i%2===0?'#fff':'#f8fafc');
+    var bold=isCurrent?'font-weight:800':'font-weight:600';
+    return '<tr style="background:'+rowBg+';border-bottom:1px solid #eaeff6">'
+      +'<td style="padding:6px 10px;font-size:11px;font-weight:700;color:#5a6a80;text-align:center">'+(i+1)+'</td>'
+      +'<td style="padding:6px 10px;font-size:12px;'+bold+';color:#1a3a5c">'+(isCurrent?'&#9654; ':'')+ra_esc(r.branch)+'</td>'
+      +'<td style="padding:6px 10px;text-align:center;font-size:13px;font-weight:900;color:'+rfg+'">'+r.bri+'</td>'
+      +'<td style="padding:6px 10px;text-align:center"><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;background:'+rfg+'22;color:'+rfg+';border:1px solid '+rfg+'55">'+rlbl+'</span></td>'
+      +'<td style="padding:6px 10px;text-align:center;font-size:11px;color:#5a6a80">'+r.avgScore+'</td>'
+      +'<td style="padding:6px 10px;text-align:center;font-size:11px;color:#5a6a80">'+r.cxScore+'</td>'
+      +'<td style="padding:6px 10px;font-size:10px;color:#9a9aaa">'+r.date+'</td>'
       +'</tr>';
   }).join('');
 
   el.innerHTML=
     '<div style="background:#1a3a5c;color:#fff;padding:12px 16px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:12px">'
-      +'<div style="flex:1"><div style="font-size:13px;font-weight:800">&#128202; Mode 5 — Branch Risk Index</div>'
-      +'<div style="font-size:11px;color:#a0c0e0;margin-top:2px">Area Weight × Observation Sensitivity — for cross-branch comparison</div></div>'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:800">&#9313; Stage 3 — Branch Risk Index (BRI)</div>'
+      +'<div style="font-size:11px;color:#a0c0e0;margin-top:2px">Normalised for branch size — use for cross-branch ranking only</div></div>'
       +'<div style="text-align:center;background:'+bg+';border:2px solid '+bd+';border-radius:10px;padding:8px 18px">'
-        +'<div style="font-size:26px;font-weight:900;color:'+fg+'">'+idx.toFixed(1)+'</div>'
-        +'<div style="font-size:10px;font-weight:700;color:'+fg+';text-transform:uppercase;letter-spacing:.5px">Risk Index</div>'
+        +'<div style="font-size:30px;font-weight:900;color:'+fg+'">'+bri+'</div>'
+        +'<div style="font-size:10px;font-weight:700;color:'+fg+';text-transform:uppercase;letter-spacing:.5px">'+briLabel+'</div>'
       +'</div>'
     +'</div>'
-    +'<div style="padding:10px 16px;background:#f0f5fc;border-bottom:1px solid #c8d8ec;font-size:11.5px;color:#2a3a50;line-height:1.6">'
-      +'<strong>Formula:</strong> Σ (Area Weight × Avg Sensitivity) per observation × 100 &nbsp;|&nbsp; '
-      +'<strong>Branch:</strong> '+ra_esc(branch)+' &nbsp;|&nbsp; '
-      +'<strong>Total Observations:</strong> '+totalObs+' &nbsp;|&nbsp; '
-      +'<strong>Raw Sum:</strong> '+(Math.round(m5Data.total*1000)/10).toFixed(2)+' &nbsp;|&nbsp; '
-      +'<strong>Index (×100):</strong> <span style="font-weight:800;color:'+fg+'">'+idx.toFixed(1)+'</span>'
+    +'<div style="padding:10px 16px;background:#f0f5fc;border-bottom:1px solid #c8d8ec;font-size:11.5px;color:#2a3a50;line-height:1.7">'
+      +'<strong>Formula:</strong> BRI = (Avg Stage 2 Score ÷ Complexity Score) × 50'
+      +'&nbsp;&nbsp;|&nbsp;&nbsp;<strong>Avg Stage 2 Score:</strong> '+m5Data.avgScore+'/100 (from '+m5Data.activeAreas+' areas with observations)'
+      +'&nbsp;&nbsp;|&nbsp;&nbsp;<strong>Complexity Score:</strong> '+m5Data.cxScore+(m5Data.cxFromMatrix?' (from matrix)':' (default — set in Complexity Matrix tab)')
+      +'&nbsp;&nbsp;|&nbsp;&nbsp;<strong>BRI:</strong> ('+m5Data.avgScore+' ÷ '+m5Data.cxScore+') × 50 = <strong style="color:'+fg+'">'+bri+'</strong>'
     +'</div>'
-    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">'
-      +'<thead><tr style="background:#1a3a5c;color:#fff">'
-        +'<th style="padding:8px 10px;text-align:left;font-size:11px">Audit Area</th>'
-        +'<th style="padding:8px 10px;text-align:center;font-size:11px">Obs</th>'
-        +'<th style="padding:8px 10px;text-align:center;font-size:11px">Area Weight</th>'
-        +'<th style="padding:8px 10px;text-align:center;font-size:11px">Avg Sensitivity</th>'
-        +'<th style="padding:8px 10px;text-align:center;font-size:11px">Contribution</th>'
-        +'<th style="padding:8px 10px;text-align:left;font-size:11px">% of Total</th>'
-      +'</tr></thead>'
-      +'<tbody>'+rows+'</tbody>'
-      +'<tfoot><tr style="background:#e8edf4">'
-        +'<td style="padding:8px 10px;font-weight:800;font-size:12px;color:#1a3a5c">TOTAL</td>'
-        +'<td style="padding:8px 10px;text-align:center;font-weight:800;font-size:12px;color:#1a3a5c">'+totalObs+'</td>'
-        +'<td colspan="2"></td>'
-        +'<td style="padding:8px 10px;text-align:center;font-weight:900;font-size:13px;color:'+fg+'">'+(Math.round(m5Data.total*1000)/10).toFixed(2)+'</td>'
-        +'<td style="padding:8px 10px;font-weight:800;font-size:12px;color:'+fg+'">Index: '+idx.toFixed(1)+'</td>'
-      +'</tr></tfoot>'
-    +'</table></div>'
-    +'<div style="padding:10px 16px;background:#fffbe0;border-top:1px solid #e8d840;font-size:11px;color:#5a4a00">'
-      +'&#9432; <strong>How to read this index:</strong> A higher score means the branch has more observations concentrated in high-weight audit areas with serious (High) sensitivity ratings. Use this number to rank branches — not to replace the area-by-area risk analysis above. Areas with no sensitivity data (no JSON session loaded) contribute 0 to this index.'
-    +'</div>';
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px solid #c8d8ec">'
+      // Left: Stage 2 area scores
+      +'<div style="border-right:1px solid #c8d8ec">'
+        +'<div style="padding:8px 10px;background:#f5f8fd;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a3a5c">Stage 2 Area Scores (this branch)</div>'
+        +'<table style="width:100%;border-collapse:collapse">'
+          +'<thead><tr style="background:#e8edf4"><th style="padding:5px 10px;text-align:left;font-size:10px;color:#5a6a80;font-weight:700">Category</th><th style="padding:5px 10px;font-size:10px;color:#5a6a80;font-weight:700">Level</th><th style="padding:5px 10px;font-size:10px;color:#5a6a80;font-weight:700">Score</th></tr></thead>'
+          +'<tbody>'+areaRows+'</tbody>'
+        +'</table>'
+      +'</div>'
+      // Right: BRI interpretation
+      +'<div style="padding:12px 14px">'
+        +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a3a5c;margin-bottom:8px">BRI Interpretation</div>'
+        +'<table style="width:100%;font-size:11.5px;border-collapse:collapse">'
+          +'<tr><td style="padding:4px 6px;color:#5a6a80">≥ 75</td><td style="padding:4px 6px"><span style="font-weight:700;color:#c03030">Systemic Risk</span></td><td style="padding:4px 6px;font-size:10px;color:#8a9aaa">Controls failing vs complexity</td></tr>'
+          +'<tr><td style="padding:4px 6px;color:#5a6a80">50–74</td><td style="padding:4px 6px"><span style="font-weight:700;color:#b04400">Elevated Risk</span></td><td style="padding:4px 6px;font-size:10px;color:#8a9aaa">Partially effective controls</td></tr>'
+          +'<tr><td style="padding:4px 6px;color:#5a6a80">25–49</td><td style="padding:4px 6px"><span style="font-weight:700;color:#806000">Managed Risk</span></td><td style="padding:4px 6px;font-size:10px;color:#8a9aaa">Controls broadly adequate</td></tr>'
+          +'<tr><td style="padding:4px 6px;color:#5a6a80">0–24</td><td style="padding:4px 6px"><span style="font-weight:700;color:#1a6020">Low Risk</span></td><td style="padding:4px 6px;font-size:10px;color:#8a9aaa">Controls strong for size</td></tr>'
+        +'</table>'
+        +'<div style="margin-top:10px;font-size:10px;color:#8a9aaa;line-height:1.6">A large branch that is well-controlled will score <em>lower</em> than a small branch with poor controls. BRI removes size bias from cross-branch comparison.</div>'
+      +'</div>'
+    +'</div>'
+    +(briEntries.length?
+    '<div>'
+      +'<div style="padding:8px 10px;background:#1a3a5c;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Cross-Branch BRI Ranking (all audited branches)</div>'
+      +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">'
+        +'<thead><tr style="background:#2a4a6c;color:#fff">'
+          +'<th style="padding:6px 10px;font-size:10px;font-weight:700;text-align:center">#</th>'
+          +'<th style="padding:6px 10px;font-size:10px;font-weight:700;text-align:left">Branch</th>'
+          +'<th style="padding:6px 10px;font-size:10px;font-weight:700;text-align:center">BRI</th>'
+          +'<th style="padding:6px 10px;font-size:10px;font-weight:700;text-align:center">Risk Level</th>'
+          +'<th style="padding:6px 10px;font-size:10px;font-weight:700;text-align:center">Avg Score</th>'
+          +'<th style="padding:6px 10px;font-size:10px;font-weight:700;text-align:center">Complexity</th>'
+          +'<th style="padding:6px 10px;font-size:10px;font-weight:700;text-align:left">Last Run</th>'
+        +'</tr></thead><tbody>'+rankRows+'</tbody>'
+      +'</table></div>'
+      +'<div style="padding:7px 12px;background:#fffbe0;border-top:1px solid #e8d840;font-size:10.5px;color:#5a4a00">&#9432; Ranking updates each time Mode 5 is run for a branch. &#9654; marks the current branch. Run Mode 5 for each branch to build the complete ranking.</div>'
+    +'</div>':'')
+    +'<div style="padding:10px 16px;background:#f0f5fc;border-top:1px solid #c8d8ec;font-size:11px;color:#5a6a80">&#9432; <strong>Rule:</strong> Only BRI should be used when comparing branches. The raw Overall Score from Mode 4 carries size bias and must not be used for inter-branch ranking.</div>';
 }
 
 function ra_tile(cls,count,label){
