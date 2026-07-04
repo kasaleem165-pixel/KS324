@@ -18275,36 +18275,48 @@ function detectRepeatsFromPrevReport(){
     }
   } else {
     // ── Text-search fallback (no structured obs list) ──
-    // Scan the plain text directly: for each observation, look for its key words
-    // near a reference number pattern in the loaded report text.
     var rText=best.text||'';
-    var nText=rText.toLowerCase().replace(/[^a-z0-9\n]/g,' ');
-    // collect all ref positions in text
+    // Use lowercase original text — do NOT strip dots so ref patterns like 1.1 survive
+    var rTextLow=rText.toLowerCase();
+    // Collect all ref positions from original lowercase text (dots preserved)
     var refPositions=[];
-    var refScanRe=/(\d+\s*\.\s*\d+)/g; var rm2;
-    while((rm2=refScanRe.exec(nText))!==null){
-      refPositions.push({ref:rm2[1].replace(/\s/g,''),pos:rm2.index});
+    var refScanRe=/\b(\d+\.\d[\d.]*)\b/g; var rm2;
+    while((rm2=refScanRe.exec(rTextLow))!==null){
+      refPositions.push({ref:rm2[1],pos:rm2.index});
     }
     for(var si=0;si<selList.length;si++){
       var obsId=selList[si];
       var cur=getCurObs(obsId); if(!cur||!cur.title) continue;
       var words=norm(cur.title+' '+cur.body).split(' ').filter(function(w){return w.length>3;});
       if(!words.length) continue;
-      var bestScore=0; var bestRef=''; var bestContext='';
+      var bestScore=0; var bestRef='';
+      // Search around each ref position
       for(var ri=0;ri<refPositions.length;ri++){
         var rPos=refPositions[ri].pos;
-        // window: 80 chars before ref + 350 chars after (title + content)
-        var win=nText.substring(Math.max(0,rPos-80),rPos+350);
+        // window: 80 chars before + 350 after; normalize window for word matching
+        var win=rTextLow.substring(Math.max(0,rPos-80),rPos+350).replace(/[^a-z0-9 ]/g,' ');
         var hits=0;
         for(var wi=0;wi<words.length;wi++){ if(win.indexOf(words[wi])!==-1) hits++; }
         var sc=hits/words.length;
-        if(sc>bestScore){ bestScore=sc; bestRef=refPositions[ri].ref; bestContext=win; }
+        if(sc>bestScore){ bestScore=sc; bestRef=refPositions[ri].ref; }
+      }
+      // Fallback: sliding window across full text when no refs found or score too low
+      if(bestScore<0.60){
+        for(var p2=0;p2<rTextLow.length-200;p2+=80){
+          var win2=rTextLow.substring(p2,p2+400).replace(/[^a-z0-9 ]/g,' ');
+          var hits2=0;
+          for(var wi=0;wi<words.length;wi++){ if(win2.indexOf(words[wi])!==-1) hits2++; }
+          var sc2=hits2/words.length;
+          if(sc2>bestScore){ bestScore=sc2; bestRef=''; }
+        }
       }
       if(bestScore>=0.60){
         // Extract a readable title snippet from the original text near this ref
-        var rp2=rText.indexOf(bestRef);
-        var snippet=''; if(rp2>=0){ snippet=rText.substring(rp2,rp2+120).replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim(); }
-        matches.push({obsId:obsId,title:cur.title,prev:{ref:bestRef,title:snippet},score:bestScore,matchType:'text search'});
+        var rp2=bestRef?rText.toLowerCase().indexOf(bestRef):-1;
+        var snippet='';
+        if(rp2>=0){ snippet=rText.substring(rp2,rp2+120).replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim(); }
+        else { snippet='(matched in report text)'; }
+        matches.push({obsId:obsId,title:cur.title,prev:{ref:bestRef||'—',title:snippet},score:bestScore,matchType:'text search'});
       }
     }
   }
