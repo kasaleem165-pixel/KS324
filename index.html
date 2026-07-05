@@ -23278,7 +23278,7 @@ function _w2rBuildHtml(d){
         <option value="custom">Custom (added) only</option>
       </select>
       <div style="width:1px;height:24px;background:#dde6f0;flex-shrink:0"></div>
-      <button id="dbm-scan-btn" onclick="if(window._hoAuthed)dbmScanDuplicates();else showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmScanDuplicates();}})" style="padding:5px 13px;background:#6a3090;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit" title="Scan all active observations for similar titles and suggest merges">&#128270; Scan Duplicates</button>
+      <button id="dbm-scan-btn" onclick="dbmScanDuplicates()" style="padding:5px 13px;background:#6a3090;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit" title="Scan all active observations for similar titles and suggest merges">&#128270; Scan Duplicates</button>
       <button onclick="dbmUndoLast()" style="padding:5px 11px;background:#5a4a00;color:#ffe87a;border:1px solid #a89020;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit" title="Undo the last suppress, restore, edit, or merge action">&#8629; Undo Last</button>
       <div style="width:1px;height:24px;background:#dde6f0;flex-shrink:0"></div>
       <button onclick="dbmExportProposed()" style="padding:5px 13px;background:#1a5c8c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit" title="Export your proposed databank changes (suppressions and edits) as a JSON file to send to HO for review and approval">&#128228; Export Proposed Changes</button>
@@ -23529,10 +23529,6 @@ function dbmCloseDetail(){
 }
 
 function dbmSaveEdit(obsId){
-  if(!window._hoAuthed){
-    showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmSaveEdit(obsId);}});
-    return;
-  }
   var title=(document.getElementById('dbm-e-title')||{}).value||'';
   var cat=(document.getElementById('dbm-e-cat')||{}).value||'';
   var type=(document.getElementById('dbm-e-type')||{}).value||'New';
@@ -23557,7 +23553,6 @@ function dbmSaveEdit(obsId){
 }
 
 function dbmResetOverride(obsId){
-  if(!window._hoAuthed){showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmResetOverride(obsId);}});return;}
   var orig=_dbmOriginals[obsId];
   if(!orig){alert('No original snapshot found for this observation.');return;}
   var o=null;
@@ -23585,7 +23580,6 @@ function dbmResetOverride(obsId){
 }
 
 function dbmConfirmSuppress(obsId){
-  if(!window._hoAuthed){showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmConfirmSuppress(obsId);}});return;}
   var o=null;
   for(var i=0;i<_dbmAllObs.length;i++){if(_dbmAllObs[i].id===obsId){o=_dbmAllObs[i];break;}}
   var title=o?o.title:obsId;
@@ -23606,7 +23600,6 @@ function dbmSuppressObs(obsId){
 }
 
 function dbmRestoreObs(obsId){
-  if(!window._hoAuthed){showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmRestoreObs(obsId);}});return;}
   var o=null;
   for(var i=0;i<_dbmAllObs.length;i++){if(_dbmAllObs[i].id===obsId){o=_dbmAllObs[i];break;}}
   var title=o?o.title:obsId;
@@ -23651,7 +23644,6 @@ function dbmMergeSearch(sourceId){
 }
 
 function dbmDoMerge(suppressId, keepId){
-  if(!window._hoAuthed){showHOAuthModal(function(g){if(g){window._hoAuthed=true;_hoActivateBtns();dbmDoMerge(suppressId,keepId);}});return;}
   var suppObs=null, keepObs=null;
   for(var i=0;i<_dbmAllObs.length;i++){
     if(_dbmAllObs[i].id===suppressId) suppObs=_dbmAllObs[i];
