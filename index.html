@@ -19460,8 +19460,14 @@ function ra_scoreCategory(catName,rpt1,rpt2){
    ══════════════════════════════════════════════════════════ */
 
 function generateReviewerHtml(role){
-  var _rvHtml = generateIssuedReport(role==='ro'?'ro_review':'ho_review');
-  if(!_rvHtml) return; // aborted (e.g. no observations selected)
+  var _rvHtml;
+  try {
+    _rvHtml = generateIssuedReport(role==='ro'?'ro_review':'ho_review');
+  } catch(e) {
+    alert('Error generating review report:\n'+e.message+'\n\n'+e.stack);
+    return;
+  }
+  if(!_rvHtml){ alert('Could not generate review report — please ensure at least one observation is selected in the selection list.'); return; }
   var H = getHdrVals();
   var branch = H.brname||'Branch';
   var dt = new Date().toISOString().slice(0,10);
