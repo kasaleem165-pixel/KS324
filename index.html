@@ -15459,6 +15459,10 @@ function finalizeReport(){
 // ISSUED REPORT — polished interactive HTML (matching sample)
 // ============================================================
 function generateIssuedReport(forROCopy){
+  var isReview=(forROCopy==='ro_review'||forROCopy==='ho_review');
+  var reviewRole=isReview?forROCopy.replace('_review',''):null;
+  var stageLabel=reviewRole==='ro'?'RO Manager Review':reviewRole==='ho'?'HO Final Review':'';
+  if(isReview) WC_detectAll();
   var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
   var all=dbObs.concat(cuObs);
@@ -15740,7 +15744,56 @@ function generateIssuedReport(forROCopy){
       +'</div>'
       +'</div>'
       +'</div>';
-    if(forROCopy){
+    if(isReview){
+      var _bhRv=respBHMap[o.id]!=null?respBHMap[o.id]:'';
+      var _roRv=respROMap[o.id]!=null?respROMap[o.id]:'';
+      var wc=wordingChanges[o.id];
+      h+='<div class="rv-panel" id="ri-'+e(o.id)+'">';
+      // Existing responses (read-only)
+      if(_bhRv){
+        h+='<div class="rv-lbl">&#128172; Branch Head Response (Read Only)</div>';
+        h+='<div class="rv-resp-box">'+e(_bhRv)+'</div>';
+      }
+      if(_roRv&&reviewRole==='ho'){
+        h+='<div class="rv-lbl">&#128172; RO Response (Read Only)</div>';
+        h+='<div class="rv-resp-box" style="background:#f0f8ff;border-color:#80a8d0">'+e(_roRv)+'</div>';
+      }
+      // Wording change diff
+      if(wc){
+        h+='<div class="rv-wc-box">';
+        h+='<div class="rv-wc-title">&#9999; Wording Changes Detected</div>';
+        if(wc.obsOrig!=null&&wc.obsEdit!=null&&wc.obsOrig!==wc.obsEdit){
+          h+='<div class="rv-wc-field"><div class="rv-wc-flabel">Observation text</div>';
+          h+='<div class="rv-wc-diff"><div class="rv-wc-orig"><div class="rv-wc-side">Original</div>'+e(wc.obsOrig)+'</div>';
+          h+='<div class="rv-wc-edit"><div class="rv-wc-side">Edited</div>'+e(wc.obsEdit)+'</div></div>';
+          h+='<div class="rv-wc-btns"><button class="rv-acc" id="wca-obs-'+e(o.id)+'" onclick="_rvSetWC(\''+e(o.id)+'\',\'obs\',true)">&#10003; Accept Edit</button>';
+          h+='<button class="rv-dec" id="wcd-obs-'+e(o.id)+'" onclick="_rvSetWC(\''+e(o.id)+'\',\'obs\',false)">&#10007; Decline (keep original)</button></div>';
+          h+='<input type="hidden" id="wcdv-obs-'+e(o.id)+'" value=""></div>';
+        }
+        if(wc.recOrig!=null&&wc.recEdit!=null&&wc.recOrig!==wc.recEdit){
+          h+='<div class="rv-wc-field" style="margin-top:8px"><div class="rv-wc-flabel">Recommendation text</div>';
+          h+='<div class="rv-wc-diff"><div class="rv-wc-orig"><div class="rv-wc-side">Original</div>'+e(wc.recOrig)+'</div>';
+          h+='<div class="rv-wc-edit"><div class="rv-wc-side">Edited</div>'+e(wc.recEdit)+'</div></div>';
+          h+='<div class="rv-wc-btns"><button class="rv-acc" id="wca-rec-'+e(o.id)+'" onclick="_rvSetWC(\''+e(o.id)+'\',\'rec\',true)">&#10003; Accept Edit</button>';
+          h+='<button class="rv-dec" id="wcd-rec-'+e(o.id)+'" onclick="_rvSetWC(\''+e(o.id)+'\',\'rec\',false)">&#10007; Decline (keep original)</button></div>';
+          h+='<input type="hidden" id="wcdv-rec-'+e(o.id)+'" value=""></div>';
+        }
+        h+='</div>';
+      }
+      // Amend auditee response
+      h+='<div class="rv-amend-box">';
+      h+='<div class="rv-amend-hdr">&#128393; Amend Auditee Response <span style="font-weight:400;font-size:.78rem;color:#6a7ab0">(optional)</span></div>';
+      h+='<textarea class="rv-amend-area" id="rv-amend-'+e(o.id)+'" placeholder="Enter amended response text if required..." oninput="_rvSyncStats()"></textarea>';
+      h+='<input class="rv-amend-reason" id="rv-amend-reason-'+e(o.id)+'" type="text" placeholder="Reason for amendment (required if amending)...">';
+      h+='</div>';
+      // Flag + comment
+      h+='<div class="rv-flag-row">';
+      h+='<input type="checkbox" class="rv-flag-cb" id="rv-flag-'+e(o.id)+'" onchange="_rvOnFlag(\''+e(o.id)+'\',this)">';
+      h+='<label class="rv-flag-lbl" for="rv-flag-'+e(o.id)+'">&#9873; Flag this observation — requires correction by auditor</label>';
+      h+='</div>';
+      h+='<textarea class="rv-cmt-area" id="rv-cmt-'+e(o.id)+'" placeholder="Reviewer comment for this observation..."></textarea>';
+      h+='</div>';
+    } else if(forROCopy){
       var _bhRo=respBHMap[o.id]!=null?respBHMap[o.id]:'';
       var _roRo=respROMap[o.id]!=null?respROMap[o.id]:'';
       h+='<div style="margin-top:1rem;border-top:2px dashed #c8d8ec;padding-top:1rem">';
@@ -16017,10 +16070,12 @@ function generateIssuedReport(forROCopy){
     +'<tr class="total-row"><td>Total</td><td>'+totLast+'</td><td>'+totRes+'</td><td>'+totUnres+'</td><td>'+totNew+'</td><td>'+totNR+'</td><td>'+totNU+'</td><td><strong>'+totTU+'</strong></td></tr>'
     +'</tbody></table></div></div>';
 
+  var _rvSessJson=isReview?JSON.stringify((function(){var s=captureSession();s.reviewRole=reviewRole;s.reviewStage=reviewRole+'_review';s.ts=new Date().toISOString();return s;})()).replace(/<\/script>/gi,'<\\/script>'):'';
   var html='<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n'
     +'<meta name="viewport" content="width=device-width,initial-scale=1.0">\n'
-    +'<title>'+(forROCopy?'RO Manager Review Copy':'Issued Audit Report')+' | '+e(brDisp)+(H.rno?' | Report No. '+e(H.rno):'')+'</title>\n'
-    +(forROCopy?saveScript:'')
+    +'<title>'+(isReview?stageLabel+' Copy':forROCopy?'RO Manager Review Copy':'Issued Audit Report')+' | '+e(brDisp)+(H.rno?' | Report No. '+e(H.rno):'')+'</title>\n'
+    +(isReview?'<script type="application/json" id="bss-session">'+_rvSessJson+'<\/script>\n<script type="application/json" id="bss-decisions">null<\/script>\n'
+               :(forROCopy?saveScript:''))
     +'<style>\n'
     +'  :root{--primary:#1a3557;--accent:#c8960c;--high:#c0392b;--mh:#e67e22;--lm:#2980b9;--low:#27ae60;--bg:#f4f6f9;--card:#fff;--border:#dde2ea;--text:#2c3e50;--muted:#7f8c8d}\n'
     +'  *{box-sizing:border-box;margin:0;padding:0}\n'
@@ -16099,26 +16154,62 @@ function generateIssuedReport(forROCopy){
     +'  .modal-section{border-left:3px solid var(--border);padding:.5rem .9rem;line-height:1.65;white-space:pre-wrap;word-break:break-word}.modal-section.ms-find{border-color:var(--accent);background:#fffdf5}.modal-section.ms-rec{border-color:var(--low);background:#f5fdf7}.modal-section.ms-resp{border-color:var(--lm);background:#f3f9ff}.modal-section.ms-view{border-color:var(--mh);background:#fffaf0}.modal-section.ms-action{border-color:var(--low);background:#e9f7ef;font-weight:600}\n'
     +'  .modal-srcnote{font-size:.7rem;color:var(--muted);text-align:right;margin-top:.5rem;border-top:1px solid var(--border);padding-top:.5rem}\n'
     +'  footer{background:var(--primary);color:#7fb3d3;text-align:center;padding:1.5rem;font-size:.78rem;margin-top:3rem}footer strong{color:#fff}\n'
-    +'  @media print{.topnav,.back-link,.det-btn,.rep-btn{display:none}.acc-body,.detail-row{display:block!important}.detail-panel{border:1px solid #ccc}}\n'
+    +'  @media print{.topnav,.back-link,.det-btn,.rep-btn,.rv-panel,.rv-action-bar{display:none}.acc-body,.detail-row{display:block!important}.detail-panel{border:1px solid #ccc}}\n'
     +'  @media(max-width:640px){.cover h1{font-size:1.4rem}.topnav a{display:none}}\n'
+    +(isReview
+      ?'  .rv-panel{margin-top:1.1rem;border-top:2px solid #b0c8f0;padding-top:1rem;background:#f8fbff;border-radius:0 0 8px 8px;padding:1rem}\n'
+       +'  .rv-lbl{font-size:.73rem;font-weight:800;color:#1a3557;text-transform:uppercase;letter-spacing:.4px;margin-bottom:.3rem}\n'
+       +'  .rv-resp-box{font-size:.86rem;background:#f0fff4;border:1px solid #80c8a0;border-radius:4px;padding:.55rem .8rem;margin-bottom:.8rem;white-space:pre-wrap;color:#1a3a2a;line-height:1.55}\n'
+       +'  .rv-wc-box{background:#fffbe6;border:1px solid #f0c840;border-radius:5px;padding:.75rem 1rem;margin:.6rem 0}\n'
+       +'  .rv-wc-title{font-size:.72rem;font-weight:700;color:#7a5800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:.6rem}\n'
+       +'  .rv-wc-field{margin-bottom:.5rem}\n'
+       +'  .rv-wc-flabel{font-size:.72rem;font-weight:700;color:#5a4000;margin-bottom:.3rem}\n'
+       +'  .rv-wc-diff{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:.4rem}\n'
+       +'  .rv-wc-orig{background:#ffe8e8;border-left:3px solid #c0392b;border-radius:0 4px 4px 0;padding:6px 8px;font-size:.82rem;line-height:1.5;color:#5a1010;white-space:pre-wrap}\n'
+       +'  .rv-wc-edit{background:#e8f8e8;border-left:3px solid #27ae60;border-radius:0 4px 4px 0;padding:6px 8px;font-size:.82rem;line-height:1.5;color:#105a10;white-space:pre-wrap}\n'
+       +'  .rv-wc-side{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.65;margin-bottom:2px}\n'
+       +'  .rv-wc-btns{display:flex;gap:.4rem;margin-top:.25rem}\n'
+       +'  .rv-acc,.rv-dec{padding:3px 10px;border:2px solid transparent;border-radius:4px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:inherit}\n'
+       +'  .rv-acc{background:#27ae60;color:#fff}.rv-acc.rv-active{outline:3px solid #000;outline-offset:1px}\n'
+       +'  .rv-dec{background:#e74c3c;color:#fff}.rv-dec.rv-active{outline:3px solid #000;outline-offset:1px}\n'
+       +'  .rv-amend-box{background:#f0f4ff;border:1px solid #b0c0e8;border-radius:5px;padding:.75rem 1rem;margin-top:.8rem}\n'
+       +'  .rv-amend-hdr{font-size:.72rem;font-weight:700;color:#1a3a8c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:.5rem}\n'
+       +'  .rv-amend-area{width:100%;padding:7px 9px;border:1px solid #b0c0e8;border-radius:4px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.85rem;color:#2a3a50;resize:vertical;min-height:60px;box-sizing:border-box;background:#fff}\n'
+       +'  .rv-amend-reason{width:100%;padding:5px 9px;border:1px solid #b0c0e8;border-radius:4px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.82rem;color:#2a3a50;box-sizing:border-box;background:#fff;margin-top:.4rem}\n'
+       +'  .rv-flag-row{display:flex;align-items:center;gap:.5rem;margin-top:.8rem;padding-top:.8rem;border-top:1px solid #dde4f0}\n'
+       +'  .rv-flag-cb{width:16px;height:16px;cursor:pointer;accent-color:#c0392b}\n'
+       +'  .rv-flag-lbl{font-size:.84rem;font-weight:600;color:#8a1a1a;cursor:pointer}\n'
+       +'  .rv-cmt-area{width:100%;padding:7px 9px;border:1px solid #dde2ea;border-radius:4px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.85rem;color:#2a3a50;resize:vertical;min-height:55px;box-sizing:border-box;margin-top:.5rem;background:#fff}\n'
+       +'  .rv-action-bar{position:fixed;bottom:0;left:0;right:0;background:#1a3557;border-top:3px solid #c8960c;padding:.9rem 1.5rem;display:flex;align-items:center;gap:1rem;z-index:9999;box-shadow:0 -4px 18px rgba(0,0,0,.25)}\n'
+       +'  .rv-name-inp{flex:1;padding:.45rem .9rem;border:1px solid #6080a0;border-radius:5px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.88rem;background:#f0f6ff;color:#1a2a40;min-width:140px;max-width:220px}\n'
+       +'  .rv-stats{display:flex;gap:.6rem;font-size:.78rem;color:#c8d8ec}\n'
+       +'  .rv-stat{background:rgba(255,255,255,.12);border-radius:4px;padding:.2rem .55rem;white-space:nowrap}\n'
+       +'  .rv-btn-sb{padding:.55rem 1.2rem;background:#8a2020;color:#fff;border:none;border-radius:6px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;letter-spacing:.3px}\n'
+       +'  .rv-btn-fwd{padding:.55rem 1.2rem;background:#1a7a40;color:#fff;border:none;border-radius:6px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;letter-spacing:.3px}\n'
+       +'  .rv-sb-panel{display:none;position:fixed;bottom:70px;left:0;right:0;background:#fff0f0;border-top:2px solid #c0392b;padding:.9rem 1.5rem;z-index:9998;box-shadow:0 -2px 12px rgba(0,0,0,.15)}\n'
+       +'  .rv-sb-ta{width:100%;padding:.5rem .8rem;border:2px solid #c04040;border-radius:5px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.88rem;color:#5a1010;background:#fff8f8;resize:vertical;min-height:55px;box-sizing:border-box}\n'
+       +'  body{padding-bottom:80px}\n'
+      :'')
     +'</style>\n'
     +'</head>\n<body>\n'
 
     // Top nav
     +'<nav class="topnav">'
     +'<div class="brand">Beaconhouse &nbsp;<span>Systems &amp; Audit</span></div>'
-    +'<div style="display:flex;align-items:center;gap:.5rem"><a href="#synopsis">Synopsis</a><a href="#repeated-syn">Repeated</a><a href="#new-syn">New Findings</a>'+(annexures.length?'<a href="#annexures">Annexures</a>':'')+'<a href="#methodology">Methodology</a>'
-    +(forROCopy?'</div><button onclick="saveDraftResponses()" style="padding:.35rem 1rem;background:#c8960c;color:#fff;border:none;border-radius:20px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.3px">&#128190; Save My Responses</button>':'')
-    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:.5rem"><a href="#synopsis">Synopsis</a><a href="#repeated-syn">Repeated</a><a href="#new-syn">New Findings</a>'+(annexures.length?'<a href="#annexures">Annexures</a>':'')+'<a href="#methodology">Methodology</a></div>'
+    +(isReview?'<span style="font-size:.8rem;font-weight:700;color:#c8960c;letter-spacing:.5px">'+stageLabel.toUpperCase()+'</span>':'')
+    +(forROCopy&&!isReview?'<button onclick="saveDraftResponses()" style="padding:.35rem 1rem;background:#c8960c;color:#fff;border:none;border-radius:20px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.3px">&#128190; Save My Responses</button>':'')
     +'</nav>\n'
 
     // Cover
     +'<div class="cover" id="top">'
     +'<div style="display:flex;align-items:center;gap:.7rem;flex-wrap:wrap">'
     +'<div class="badge">Confidential &nbsp;|&nbsp; Internal Audit</div>'
-    +(forROCopy
-      ?'<div style="background:#c8960c;color:#fff;display:inline-flex;align-items:center;gap:.4rem;padding:.22rem .9rem;border-radius:20px;font-size:.75rem;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;border:2px solid rgba(255,255,255,.35)">&#9997;&nbsp;RO MANAGER REVIEW COPY</div>'
-      :'<div style="background:#c8960c;color:#fff;display:inline-flex;align-items:center;gap:.4rem;padding:.22rem .9rem;border-radius:20px;font-size:.75rem;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;border:2px solid rgba(255,255,255,.35);box-shadow:0 2px 8px rgba(0,0,0,.25)">&#10003;&nbsp;OFFICIALLY&nbsp;ISSUED</div>'
+    +(isReview
+      ?'<div style="background:#8a2020;color:#fff;display:inline-flex;align-items:center;gap:.4rem;padding:.22rem .9rem;border-radius:20px;font-size:.75rem;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;border:2px solid rgba(255,255,255,.35)">&#9997;&nbsp;'+stageLabel.toUpperCase()+'</div>'
+      :forROCopy
+        ?'<div style="background:#c8960c;color:#fff;display:inline-flex;align-items:center;gap:.4rem;padding:.22rem .9rem;border-radius:20px;font-size:.75rem;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;border:2px solid rgba(255,255,255,.35)">&#9997;&nbsp;RO MANAGER REVIEW COPY</div>'
+        :'<div style="background:#c8960c;color:#fff;display:inline-flex;align-items:center;gap:.4rem;padding:.22rem .9rem;border-radius:20px;font-size:.75rem;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;border:2px solid rgba(255,255,255,.35);box-shadow:0 2px 8px rgba(0,0,0,.25)">&#10003;&nbsp;OFFICIALLY&nbsp;ISSUED</div>'
     )
     +'</div>'
     +'<h1>Issued Audit Report — '+e(brDisp)+(H.rno?'<br><small style="font-weight:400;font-size:1rem;color:#a8c8e0">Report No. '+e(H.rno)+' &nbsp;|&nbsp; Systems &amp; Audit Department</small>':'')+'</h1>'
@@ -16593,17 +16684,155 @@ function generateIssuedReport(forROCopy){
     +'});\n'
 
     +'<\/script>\n'
-    +(forROCopy?'':'<script id="bhs-session-data" type="application/json">'+JSON.stringify((function(){var s=captureSession();s.ts=new Date().toISOString();s.ver=0;return s;})())+'<\/script>\n')
-    +(forROCopy
+    +(!isReview&&!forROCopy?'<script id="bhs-session-data" type="application/json">'+JSON.stringify((function(){var s=captureSession();s.ts=new Date().toISOString();s.ver=0;return s;})())+'<\/script>\n':'')
+    +(forROCopy&&!isReview
       ?'<div style="text-align:center;padding:2rem 1rem 3rem;border-top:2px solid #c8960c;margin-top:2rem">'
         +'<button onclick="saveDraftResponses()" style="padding:14px 40px;background:#1a3557;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 3px 12px rgba(0,0,0,.2)">&#128190; Save My Responses</button>'
         +'<div id="_roAutolbl" style="margin-top:8px;font-size:12px;color:#2a6040;min-height:16px"></div>'
         +'<div style="margin-top:5px;font-size:11px;color:#888">Auto-saves every 2 seconds. Click to generate the file to send back to the auditor.</div>'
         +'</div>'
       :'')
+    +(isReview
+      ?(function(){
+        var _obsIds=all.map(function(o){return o.id;});
+        var _obsIdsJson=JSON.stringify(_obsIds).replace(/<\/script>/gi,'<\\/script>');
+        var _wcJson=JSON.stringify((function(){var w={};for(var i=0;i<all.length;i++){if(wordingChanges[all[i].id])w[all[i].id]=wordingChanges[all[i].id];}return w;})()).replace(/<\/script>/gi,'<\\/script>');
+        var _rl=reviewRole;
+        return ''
+        // Send-back panel (shown when sb button clicked)
+        +'<div id="rv-sb-panel" class="rv-sb-panel">'
+        +'<div style="font-size:.84rem;font-weight:700;color:#8a2020;margin-bottom:.5rem">&#9888; Overall Comment (required when sending back):</div>'
+        +'<textarea id="rv-sb-cmt" class="rv-sb-ta" placeholder="Explain overall reason for send-back..."></textarea>'
+        +'<div style="margin-top:.5rem;display:flex;gap:.6rem">'
+        +'<button onclick="_rvConfirmSendBack()" style="padding:.4rem 1rem;background:#8a2020;color:#fff;border:none;border-radius:5px;font-size:.84rem;font-weight:700;cursor:pointer">&#8617; Confirm Send Back</button>'
+        +'<button onclick="document.getElementById(\'rv-sb-panel\').style.display=\'none\'" style="padding:.4rem .9rem;background:#888;color:#fff;border:none;border-radius:5px;font-size:.84rem;cursor:pointer">Cancel</button>'
+        +'</div></div>'
+        // Sticky action bar
+        +'<div class="rv-action-bar">'
+        +'<input id="rv-reviewer-name" class="rv-name-inp" type="text" placeholder="Your full name...">'
+        +'<div class="rv-stats">'
+        +'<span class="rv-stat">&#9873; <span id="rv-stat-flagged">0</span> Flagged</span>'
+        +'<span class="rv-stat">&#128393; <span id="rv-stat-amended">0</span> Amended</span>'
+        +'</div>'
+        +(_rl==='ro'
+          ?'<button class="rv-btn-sb" onclick="_rvShowSB()">&#8617; Send Back to Auditor</button>'
+           +'<button class="rv-btn-fwd" onclick="_rvDoAction(\'forward_ho\')">&#8594; Forward to HO &#10003;</button>'
+          :'<button class="rv-btn-sb" onclick="_rvShowSB()">&#8617; Send Back to RO</button>'
+           +'<button class="rv-btn-fwd" onclick="_rvDoAction(\'issue\')" style="background:#1a6030">&#10003; Issue Report</button>'
+        )
+        +'</div>'
+        +'<script>\n'
+        +'var _rvObsIds='+_obsIdsJson+';\n'
+        +'var _rvWC='+_wcJson+';\n'
+        +'var _rvEvidence={};\n'
+        +'function _rvEsc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}\n'
+        +'function _rvOnFlag(id,cb){\n'
+        +'  var card=document.getElementById("ri-"+id);\n'
+        +'  if(card){\n'
+        +'    var obs=card.closest(".card");\n'
+        +'    if(obs){ if(cb.checked) obs.style.borderLeft="4px solid #c0392b"; else obs.style.borderLeft=""; }\n'
+        +'  }\n'
+        +'  var n=document.querySelectorAll(".rv-flag-cb:checked").length;\n'
+        +'  var el=document.getElementById("rv-stat-flagged"); if(el) el.textContent=n;\n'
+        +'}\n'
+        +'function _rvSyncStats(){\n'
+        +'  var filled=0; document.querySelectorAll(".rv-amend-area").forEach(function(ta){if(ta.value.trim())filled++;});\n'
+        +'  var el=document.getElementById("rv-stat-amended"); if(el) el.textContent=filled;\n'
+        +'}\n'
+        +'function _rvSetWC(id,field,accepted){\n'
+        +'  var inp=document.getElementById("wcdv-"+field+"-"+id); if(inp) inp.value=accepted?"1":"0";\n'
+        +'  var a=document.getElementById("wca-"+field+"-"+id), d=document.getElementById("wcd-"+field+"-"+id);\n'
+        +'  if(a){ a.classList.toggle("rv-active",accepted); }\n'
+        +'  if(d){ d.classList.toggle("rv-active",!accepted); }\n'
+        +'}\n'
+        +'function _rvShowSB(){\n'
+        +'  var p=document.getElementById("rv-sb-panel");\n'
+        +'  if(p){ p.style.display=p.style.display==="block"?"none":"block"; if(p.style.display==="block"){ var ta=document.getElementById("rv-sb-cmt"); if(ta){ta.scrollIntoView({behavior:"smooth"});ta.focus();} } }\n'
+        +'}\n'
+        +'function _rvCollect(action){\n'
+        +'  var flags={},comments={},wordingDec={},amendments={};\n'
+        +'  document.querySelectorAll(".rv-flag-cb").forEach(function(cb){ var id=cb.id.replace("rv-flag-",""); if(cb.checked) flags[id]=true; });\n'
+        +'  document.querySelectorAll(".rv-cmt-area").forEach(function(ta){ var id=ta.id.replace("rv-cmt-",""); if(ta.value.trim()) comments[id]=ta.value.trim(); });\n'
+        +'  document.querySelectorAll("input[id^=wcdv-obs-]").forEach(function(inp){ var id=inp.id.replace("wcdv-obs-",""); if(inp.value!==""){if(!wordingDec[id])wordingDec[id]={};wordingDec[id].obs=(inp.value==="1");} });\n'
+        +'  document.querySelectorAll("input[id^=wcdv-rec-]").forEach(function(inp){ var id=inp.id.replace("wcdv-rec-",""); if(inp.value!==""){if(!wordingDec[id])wordingDec[id]={};wordingDec[id].rec=(inp.value==="1");} });\n'
+        +'  document.querySelectorAll(".rv-amend-area").forEach(function(ta){\n'
+        +'    var id=ta.id.replace("rv-amend-",""); if(!ta.value.trim()) return;\n'
+        +'    var rEl=document.getElementById("rv-amend-reason-"+id);\n'
+        +'    amendments[id]={amended:ta.value.trim(),reason:rEl?rEl.value.trim():""};\n'
+        +'  });\n'
+        +'  var name=(document.getElementById("rv-reviewer-name")||{}).value||"";\n'
+        +'  var sbCmt=(document.getElementById("rv-sb-cmt")||{}).value||"";\n'
+        +'  return {action:action,reviewerName:name,reviewDate:new Date().toISOString().slice(0,10),flags:flags,comments:comments,wordingDecisions:wordingDec,amendments:amendments,sendBackComment:sbCmt};\n'
+        +'}\n'
+        +'function _rvDoAction(action){\n'
+        +'  var name=(document.getElementById("rv-reviewer-name")||{}).value||"";\n'
+        +'  if(!name.trim()){ alert("Please enter your name before submitting."); return; }\n'
+        +'  var dec=_rvCollect(action);\n'
+        +'  var dj=JSON.stringify(dec).replace(/<\\/script>/gi,"<\\\\/script>");\n'
+        +'  var html="<!DOCTYPE html>\\n"+document.documentElement.outerHTML;\n'
+        +'  html=html.replace(/<script type="application\\/json" id="bss-decisions">[\\s\\S]*?<\\/script>/,\'<script type="application/json" id="bss-decisions">\'+dj+\'<\\/script>\');\n'
+        +'  var suffix=action==="send_back"?"_SendBack":action==="send_back_to_ro"?"_SentBackRO":action==="forward_ho"?"_ForHO":"_Issued";\n'
+        +'  var sess=JSON.parse(document.getElementById("bss-session").textContent);\n'
+        +'  var br=(sess.brname||"").replace(/[^a-zA-Z0-9]/g,"_").slice(0,20);\n'
+        +'  var fname="BSS_Review_"+(sess.reviewRole||"RO").toUpperCase()+suffix+(br?"_"+br:"")+"_"+new Date().toISOString().slice(0,10)+".html";\n'
+        +'  var blob=new Blob([html],{type:"text/html"});\n'
+        +'  var url=URL.createObjectURL(blob);\n'
+        +'  var a=document.createElement("a"); a.href=url; a.download=fname; a.click(); URL.revokeObjectURL(url);\n'
+        +'  setTimeout(function(){ alert("\\u2705 Review submitted!\\nFile downloaded: "+fname); },300);\n'
+        +'}\n'
+        +'function _rvConfirmSendBack(){\n'
+        +'  var sb=document.getElementById("rv-sb-cmt"); if(!sb||!sb.value.trim()){ alert("Please enter a send-back comment."); return; }\n'
+        +'  var action="'+(reviewRole==='ho'?'send_back_to_ro':'send_back')+'";\n'
+        +'  _rvDoAction(action);\n'
+        +'}\n'
+        +'window.addEventListener("load",function(){\n'
+        +'  var decEl=document.getElementById("bss-decisions");\n'
+        +'  if(!decEl||!decEl.textContent||decEl.textContent.trim()==="null") return;\n'
+        +'  var dec; try{ dec=JSON.parse(decEl.textContent); }catch(e){ return; }\n'
+        +'  if(!dec||!dec.action) return;\n'
+        +'  var isSendBack=(dec.action==="send_back"||dec.action==="send_back_to_ro");\n'
+        +'  var fromLabel=dec.action==="send_back_to_ro"?"HO":"RO Manager";\n'
+        +'  var flags=dec.flags||{}, cmts=dec.comments||{};\n'
+        +'  Object.keys(flags).forEach(function(id){\n'
+        +'    if(!flags[id]) return;\n'
+        +'    var cb=document.getElementById("rv-flag-"+id); if(cb){ cb.checked=true; _rvOnFlag(id,cb); }\n'
+        +'  });\n'
+        +'  Object.keys(cmts).forEach(function(id){\n'
+        +'    var ta=document.getElementById("rv-cmt-"+id); if(ta&&cmts[id]) ta.value=cmts[id];\n'
+        +'  });\n'
+        +'  if(dec.reviewerName){ var ni=document.getElementById("rv-reviewer-name"); if(ni) ni.value=dec.reviewerName; }\n'
+        +'  if(isSendBack){\n'
+        +'    var body=document.body;\n'
+        +'    var banner=document.createElement("div");\n'
+        +'    banner.style.cssText="background:#fff0f0;border:2px solid #c0392b;border-radius:8px;padding:14px 16px;margin:14px auto;max-width:1100px;box-sizing:border-box";\n'
+        +'    var bh="<div style=\\"font-size:15px;font-weight:800;color:#8a2020;margin-bottom:6px\\">&#9888; Sent Back by "+_rvEsc(fromLabel)+"</div>";\n'
+        +'    if(dec.reviewerName||dec.reviewDate) bh+="<div style=\\"font-size:12px;color:#5a4040;margin-bottom:8px\\">Reviewer: <strong>"+_rvEsc(dec.reviewerName||"")+"</strong>"+(dec.reviewDate?" &nbsp;|&nbsp; Date: "+_rvEsc(dec.reviewDate):"")+"</div>";\n'
+        +'    if(dec.sendBackComment) bh+="<div style=\\"background:#ffe0e0;border-left:3px solid #c0392b;border-radius:0 5px 5px 0;padding:8px 12px;font-size:13px;color:#5a1010;margin-bottom:10px\\"><strong>Overall Comment:</strong> "+_rvEsc(dec.sendBackComment)+"</div>";\n'
+        +'    var flagIds=Object.keys(flags).filter(function(id){return flags[id];});\n'
+        +'    if(flagIds.length){\n'
+        +'      bh+="<div style=\\"font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#8a2020;margin-bottom:6px\\">&#9873; Flagged ("+flagIds.length+") — scroll to each:</div>";\n'
+        +'      flagIds.forEach(function(id){\n'
+        +'        var panEl=document.getElementById("ri-"+id);\n'
+        +'        var obsCard=panEl?panEl.closest(".card"):null;\n'
+        +'        var titleEl=obsCard?obsCard.querySelector(".obs-title"):null;\n'
+        +'        var obsTitle=titleEl?titleEl.textContent:id;\n'
+        +'        bh+="<div style=\\"border-left:3px solid #c0392b;padding:6px 10px;margin-bottom:5px;background:#fff8f8;border-radius:0 4px 4px 0\\">";\n'
+        +'        bh+="<div style=\\"font-size:13px;font-weight:700;color:#1e2d40\\">"+_rvEsc(obsTitle)+"</div>";\n'
+        +'        if(cmts[id]) bh+="<div style=\\"font-size:12px;color:#5a1010;margin-top:3px;white-space:pre-wrap\\">&#128172; "+_rvEsc(cmts[id])+"</div>";\n'
+        +'        bh+="<a href=\'#\' onclick=\'event.preventDefault();document.getElementById(\\"ri-"+id+"\\").scrollIntoView({behavior:\\"smooth\\",block:\\"center\\"});return false;\' style=\\"font-size:11px;font-weight:700;color:#2060a0\\">&#8595; Go to observation</a>";\n'
+        +'        bh+="</div>";\n'
+        +'      });\n'
+        +'    }\n'
+        +'    banner.innerHTML=bh;\n'
+        +'    var firstSection=document.querySelector(".section,nav+*"); if(firstSection) firstSection.parentNode.insertBefore(banner,firstSection); else body.insertBefore(banner,body.firstChild);\n'
+        +'  }\n'
+        +'});\n'
+        +'<\/script>\n';
+      })()
+      :'')
     +'</body>\n</html>';
 
-  if(forROCopy){ return html; }
+  if(forROCopy||isReview){ return html; }
   saveFileAs(new Blob([html],{type:'text/html'}), fname);
   toast('Issued report saved as '+fname);
 }
@@ -19247,7 +19476,19 @@ function ra_scoreCategory(catName,rpt1,rpt2){
    ══════════════════════════════════════════════════════════ */
 
 function generateReviewerHtml(role){
-  WC_detectAll();
+  var _rvHtml = generateIssuedReport(role==='ro'?'ro_review':'ho_review');
+  if(!_rvHtml) return; // aborted (e.g. no observations selected)
+  var H = getHdrVals();
+  var branch = H.brname||'Branch';
+  var dt = new Date().toISOString().slice(0,10);
+  var stageLabel = role==='ro' ? 'RO' : 'HO';
+  var fname='BSS_Review_'+stageLabel+'_'+branch.replace(/[^a-zA-Z0-9]/g,'_').slice(0,20)+'_'+dt+'.html';
+  var blob=new Blob([_rvHtml],{type:'text/html'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=url; a.download=fname; a.click();
+  URL.revokeObjectURL(url);
+  showToast('Full review report generated: '+fname+'\nSend this file to the '+(role==='ro'?'RO Manager':'HO')+'.', 3500);
+  return; // everything below is replaced
   var sess = captureSession();
   sess.reviewRole  = role;
   sess.reviewStage = role==='ro' ? 'ro_review' : 'ho_review';
