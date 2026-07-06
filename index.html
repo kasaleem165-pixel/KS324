@@ -15219,7 +15219,14 @@ function finalizeReport(){
         +'<div style="color:#555;font-size:10.5px;margin-bottom:8px;line-height:1.4">'+esc(fw.ca.desc)+'</div>'
         +'<div style="background:#fff;border:1px solid #b8ddc8;border-left:4px solid #1a7a4a;border-radius:0 5px 5px 0;padding:7px 10px;font-size:10.5px;color:#1a3a22;line-height:1.45">'
           +'<div style="font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#1a7a4a;margin-bottom:4px">Audit Conclusion</div>'
-          +'Based on application of <em>'+esc(fw.ca.name)+'</em>, the audit team identified control gaps in this area. '
+          +'Based on application of <em>'+esc(fw.ca.name)+'</em>, '
+          +(finObsType==='repeated'
+            ?'the audit team noted that this is a <strong>repeat finding</strong>. Prior corrective action has not been sustained, indicating a persistent control operating failure. '
+            :(fw.mx.likelihood==='Low'
+              ?'the audit team found the control to be <strong>operating with deficiencies</strong>. While the likelihood is assessed as low, lapses in compliance with control requirements were observed. '
+              :'the audit team found that the applicable control is <strong>not being effectively implemented</strong>. Non-compliance with established control requirements was observed. '
+            )
+          )
           +(inst.count>0?'A total of <strong>'+inst.count+' instance'+(inst.count!==1?'s':'')+' were identified</strong>, indicating a <strong>'+inst.label.toLowerCase()+'</strong> control failure. ':' ')
           +'Detailed findings and recommendations are documented in the observation above.'
         +'</div>'
@@ -15595,7 +15602,14 @@ function generateIssuedReport(forROCopy){
         +'<span style="background:#1a7a4a;color:#fff;border-radius:4px;padding:.1rem .45rem;font-size:.68rem;font-weight:700;margin-bottom:.35rem;display:inline-block">'+e(fw.ca.id)+'</span>'
         +'<div style="font-weight:700;color:#1a7a4a;font-size:.84rem;margin-bottom:.3rem">'+e(fw.ca.name)+'</div>'
         +'<div style="color:#555;font-size:.77rem;margin-bottom:.45rem">'+e(fw.ca.desc)+'</div>'
-        +'<div style="font-size:.72rem;color:#444;border-top:1px solid #d0e8d8;padding-top:.35rem"><strong>Audit Conclusion:</strong> Based on <em>'+e(fw.ca.name)+'</em>, the audit team identified control gaps. '
+        +'<div style="font-size:.72rem;color:#444;border-top:1px solid #d0e8d8;padding-top:.35rem"><strong>Audit Conclusion:</strong> Based on <em>'+e(fw.ca.name)+'</em>, '
+        +(finObsType==='repeated'
+          ?'this is a <strong>repeat finding</strong> — prior corrective action was not sustained. '
+          :(fw.mx.likelihood==='Low'
+            ?'the control is <strong>operating with deficiencies</strong>; compliance lapses were observed. '
+            :'the control is <strong>not being effectively implemented</strong>; non-compliance with requirements was observed. '
+          )
+        )
         +(inst.count>0?'<strong>'+inst.count+' instance'+(inst.count!==1?'s':'')+' identified</strong>, indicating a '+inst.label.toLowerCase()+' control failure. ':' ')
         +'Findings and recommendations are above.</div>'
       +'</div></div></div>';
@@ -15702,7 +15716,14 @@ function generateIssuedReport(forROCopy){
         +'<div style="display:inline-block;background:#1a7a4a;color:#fff;border-radius:5px;padding:.15rem .55rem;font-size:.72rem;font-weight:700;margin-bottom:.4rem">'+e(fw.ca.id)+'</div>'
         +'<div style="font-weight:700;color:#1a7a4a;font-size:.87rem;margin-bottom:.35rem">'+e(fw.ca.name)+'</div>'
         +'<div style="color:#555;font-size:.79rem;margin-bottom:.5rem">'+e(fw.ca.desc)+'</div>'
-        +'<div style="margin-top:.4rem;font-size:.74rem;color:#444;border-top:1px solid #d0e8d8;padding-top:.4rem"><strong>Audit Conclusion:</strong> Based on the application of <em>'+e(fw.ca.name)+'</em>, the audit team identified control gaps related to observation '+lbl+'. '
+        +'<div style="margin-top:.4rem;font-size:.74rem;color:#444;border-top:1px solid #d0e8d8;padding-top:.4rem"><strong>Audit Conclusion:</strong> Based on the application of <em>'+e(fw.ca.name)+'</em>, '
+        +(finObsType==='repeated'
+          ?'the audit team noted that observation '+lbl+' is a <strong>repeat finding</strong>. Prior corrective action was not sustained, indicating a persistent control operating failure. '
+          :(fw.mx.likelihood==='Low'
+            ?'the control for observation '+lbl+' is <strong>operating with deficiencies</strong>. Compliance lapses were identified despite the low likelihood assessment. '
+            :'the control applicable to observation '+lbl+' is <strong>not being effectively implemented</strong>. Non-compliance with established requirements was observed. '
+          )
+        )
         +(inst.count>0?'A total of <strong>'+inst.count+' instance'+(inst.count!==1?'s':'')+' were identified</strong>, indicating a '+inst.label.toLowerCase()+' control failure. ':' ')
         +'Specific findings and recommendations are documented above in the observation detail.</div>'
       +'</div>'
