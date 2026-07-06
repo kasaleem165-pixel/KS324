@@ -19637,28 +19637,160 @@ function loadReviewerHtml(evt, role){
 }
 
 function _showReviewSendBackModal(dec, fromRole){
+  // Remove any existing correction guide
+  var existing=document.getElementById('correction-guide-panel');
+  if(existing) existing.remove();
+
   var flags=dec.flags||{}, cmts=dec.comments||{};
   var flagged=Object.keys(flags).filter(function(id){return flags[id];});
-  var el=document.createElement('div');
-  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center';
-  var inner='<div style="background:#fff;border-radius:8px;max-width:560px;width:95%;padding:20px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.3)">';
-  inner+='<div style="font-size:15px;font-weight:800;color:#8a2020;margin-bottom:8px">&#9888; Report Sent Back by '+fromRole+' Manager<\/div>';
-  if(dec.reviewerName) inner+='<div style="font-size:12px;color:#4a5a6a;margin-bottom:6px">Reviewer: '+esc(dec.reviewerName)+(dec.reviewDate?' | '+dec.reviewDate:'')+'<\/div>';
-  if(dec.sendBackComment) inner+='<div style="background:#fff0f0;border:1px solid #f0b0b0;border-radius:4px;padding:8px 10px;font-size:12.5px;color:#5a1010;margin-bottom:12px"><strong>Overall Comment:<\/strong> '+esc(dec.sendBackComment)+'<\/div>';
-  if(flagged.length){
-    inner+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6a2020;margin-bottom:6px">Flagged Observations ('+flagged.length+'):<\/div>';
-    flagged.forEach(function(id){
-      var obs=(DB&&DB.observations?DB.observations.find(function(o){return o.id===id;}):null)||{title:id};
-      inner+='<div style="border-left:3px solid #c0392b;padding:6px 10px;margin-bottom:6px;background:#fff8f8;border-radius:0 4px 4px 0">';
-      inner+='<div style="font-size:12.5px;font-weight:700;color:#1e2d40">'+esc(obs.title||id)+'<\/div>';
-      if(cmts[id]) inner+='<div style="font-size:12px;color:#5a1010;margin-top:3px">'+esc(cmts[id])+'<\/div>';
-      inner+='<\/div>';
-    });
+  if(!flagged.length){
+    // No flagged observations — just show a brief toast
+    showToast('Report sent back by '+fromRole+'. No specific observations flagged — check overall comment.', 5000);
+    return;
   }
-  inner+='<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="margin-top:12px;width:100%;padding:10px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer">Close<\/button>';
-  inner+='<\/div>';
-  el.innerHTML=inner;
-  document.body.appendChild(el);
+
+  // Correction tracking state
+  window._cgDone = {};
+  window._cgFlagged = flagged;
+  window._cgFromRole = fromRole;
+  window._cgDec = dec;
+
+  // Build the panel
+  var panel = document.createElement('div');
+  panel.id = 'correction-guide-panel';
+  panel.style.cssText = 'position:fixed;right:0;top:0;width:310px;height:100vh;background:#1a2535;color:#e8f0fa;z-index:8000;display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,.35);font-family:Inter,sans-serif;font-size:13px';
+
+  // Header
+  var hdr = '<div style="background:#8a2020;padding:12px 14px;flex-shrink:0">';
+  hdr += '<div style="display:flex;align-items:center;justify-content:space-between">';
+  hdr += '<div style="font-size:13px;font-weight:800;color:#fff">&#9888; Correction Guide</div>';
+  hdr += '<button onclick="document.getElementById(\'correction-guide-panel\').style.display=\'none\'" style="background:none;border:none;color:#ffb0b0;font-size:16px;cursor:pointer;line-height:1;padding:0 2px">&#10005;</button>';
+  hdr += '</div>';
+  hdr += '<div style="font-size:10.5px;color:#ffb0b0;margin-top:3px">Sent back by: <strong style="color:#fff">'+esc(fromRole)+' Manager</strong>';
+  if(dec.reviewerName) hdr += ' — '+esc(dec.reviewerName);
+  if(dec.reviewDate) hdr += ' ('+esc(dec.reviewDate)+')';
+  hdr += '</div></div>';
+
+  // Overall comment
+  var body = '<div style="flex:1;overflow-y:auto;padding:10px 12px">';
+  if(dec.sendBackComment){
+    body += '<div style="background:#2a1010;border:1px solid #6a2020;border-radius:5px;padding:8px 10px;font-size:12px;color:#ffb0b0;margin-bottom:10px;line-height:1.5">';
+    body += '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#f08080;margin-bottom:4px">&#128172; Overall Comment</div>';
+    body += esc(dec.sendBackComment)+'</div>';
+  }
+
+  // Progress bar
+  body += '<div id="cg-progress-wrap" style="margin-bottom:10px">';
+  body += '<div style="display:flex;justify-content:space-between;font-size:10.5px;color:#8aa0c0;margin-bottom:4px">';
+  body += '<span>Corrections Required</span><span id="cg-progress-label">0 / '+flagged.length+' done</span></div>';
+  body += '<div style="height:5px;background:#0d1a2a;border-radius:3px">';
+  body += '<div id="cg-progress-bar" style="height:5px;background:#c0392b;border-radius:3px;width:0%;transition:width .3s"></div>';
+  body += '</div></div>';
+
+  // Observation checklist
+  body += '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6a8aaa;margin-bottom:6px">Flagged Observations ('+flagged.length+')</div>';
+  flagged.forEach(function(id, idx){
+    var obs=(DB&&DB.observations?DB.observations.find(function(o){return o.id===id;}):null);
+    var title=obs?obs.title:id;
+    body += '<div id="cg-item-'+id+'" style="background:#1e2e42;border:1px solid #2a4060;border-radius:6px;margin-bottom:7px;overflow:hidden">';
+    // Item header
+    body += '<div style="padding:8px 10px;border-bottom:1px solid #2a4060">';
+    body += '<div style="display:flex;align-items:flex-start;gap:8px">';
+    body += '<input type="checkbox" id="cgchk-'+id+'" onchange="_cgMarkDone(\''+id+'\')" style="margin-top:2px;flex-shrink:0;width:15px;height:15px;accent-color:#27ae60;cursor:pointer">';
+    body += '<div style="flex:1;min-width:0">';
+    body += '<div style="font-size:12px;font-weight:700;color:#c8e0fa;line-height:1.4">'+esc(title)+'</div>';
+    if(cmts[id]) body += '<div style="font-size:11px;color:#f0c080;margin-top:4px;line-height:1.45;white-space:pre-wrap">&#128172; '+esc(cmts[id])+'</div>';
+    body += '</div></div></div>';
+    // Go to button
+    body += '<div style="padding:6px 10px;display:flex;gap:6px">';
+    body += '<button onclick="_cgGoTo(\''+id+'\')" style="flex:1;padding:5px 8px;background:rgba(32,112,184,.25);color:#90c8f8;border:1px solid rgba(32,112,184,.4);border-radius:4px;font-family:Inter,sans-serif;font-size:11px;font-weight:700;cursor:pointer">&#128269; Go to Observation</button>';
+    body += '<div id="cg-done-'+id+'" style="display:none;padding:5px 8px;background:rgba(39,174,96,.2);color:#80e0a0;border:1px solid rgba(39,174,96,.4);border-radius:4px;font-size:11px;font-weight:700">&#10003; Done</div>';
+    body += '</div></div>';
+  });
+  body += '</div>'; // end scroll body
+
+  // Footer — completion area
+  var foot = '<div id="cg-footer" style="padding:10px 12px;border-top:1px solid #2a3a50;flex-shrink:0">';
+  foot += '<div id="cg-complete-msg" style="display:none;background:#0d2a1a;border:1px solid #27ae60;border-radius:5px;padding:8px 10px;font-size:12px;color:#60d090;margin-bottom:8px;text-align:center">';
+  foot += '&#9989; All corrections completed!<br><span style="font-size:11px;color:#40b070">You may now send the report back to '+fromRole+' Manager.</span></div>';
+  foot += '<button id="cg-resend-btn" onclick="_cgResend()" style="display:none;width:100%;padding:10px;background:linear-gradient(135deg,#1a6030,#27ae60);color:#fff;border:none;border-radius:5px;font-family:Inter,sans-serif;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:6px">&#128228; Send Back to '+fromRole+' for Further Action</button>';
+  foot += '<button onclick="document.getElementById(\'correction-guide-panel\').style.display=\'none\'" style="width:100%;padding:7px;background:transparent;color:#6a8aaa;border:1px solid #2a4060;border-radius:4px;font-family:Inter,sans-serif;font-size:11px;cursor:pointer">Minimise Panel</button>';
+  foot += '</div>';
+
+  panel.innerHTML = hdr + body + foot;
+  document.body.appendChild(panel);
+
+  // Add restore button (shown when panel is minimised)
+  var restoreBtn = document.createElement('button');
+  restoreBtn.id = 'cg-restore-btn';
+  restoreBtn.title = 'Open Correction Guide';
+  restoreBtn.innerHTML = '&#9888; Corrections';
+  restoreBtn.style.cssText = 'position:fixed;right:0;bottom:70px;background:#8a2020;color:#fff;border:none;border-radius:6px 0 0 6px;padding:10px 8px;font-family:Inter,sans-serif;font-size:11px;font-weight:700;cursor:pointer;z-index:7999;writing-mode:vertical-rl;letter-spacing:.5px;box-shadow:-2px 0 8px rgba(0,0,0,.3)';
+  restoreBtn.onclick = function(){ document.getElementById('correction-guide-panel').style.display='flex'; };
+  document.body.appendChild(restoreBtn);
+}
+
+function _cgGoTo(id){
+  // Scroll the observation into view in the left panel
+  var el=document.getElementById('ri-'+id);
+  if(el){
+    el.scrollIntoView({behavior:'smooth',block:'center'});
+    // Flash highlight
+    el.style.transition='box-shadow .2s';
+    el.style.boxShadow='0 0 0 3px #f0c030';
+    setTimeout(function(){ el.style.boxShadow=''; },1800);
+  } else {
+    showToast('Observation not found in current list — make sure it is selected.', 3000);
+  }
+  // Also scroll the report preview to the matching card
+  var card=document.querySelector('[id^="obs-"][id$="-'+id+'"]') || document.querySelector('.obs-card[data-id="'+id+'"]');
+  if(!card){
+    // Try finding inside rpcont by obs id marker
+    var rpcont=document.getElementById('rpcont');
+    if(rpcont){
+      var all=rpcont.querySelectorAll('[data-obsid]');
+      for(var i=0;i<all.length;i++){ if(all[i].getAttribute('data-obsid')===id){ card=all[i]; break; } }
+    }
+  }
+  if(card) card.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function _cgMarkDone(id){
+  var chk=document.getElementById('cgchk-'+id);
+  var done=chk&&chk.checked;
+  window._cgDone[id]=done;
+  var doneTag=document.getElementById('cg-done-'+id);
+  var item=document.getElementById('cg-item-'+id);
+  if(doneTag) doneTag.style.display=done?'block':'none';
+  if(item) item.style.borderColor=done?'rgba(39,174,96,.5)':'#2a4060';
+  // Update progress
+  var total=window._cgFlagged.length;
+  var doneCount=window._cgFlagged.filter(function(i){return window._cgDone[i];}).length;
+  var pct=total?Math.round(doneCount/total*100):0;
+  var bar=document.getElementById('cg-progress-bar');
+  var lbl=document.getElementById('cg-progress-label');
+  if(bar) bar.style.width=pct+'%';
+  if(bar) bar.style.background=pct===100?'#27ae60':'#c0392b';
+  if(lbl) lbl.textContent=doneCount+' / '+total+' done';
+  // Show completion area when all done
+  var allDone=(doneCount===total);
+  var completeMsg=document.getElementById('cg-complete-msg');
+  var resendBtn=document.getElementById('cg-resend-btn');
+  if(completeMsg) completeMsg.style.display=allDone?'block':'none';
+  if(resendBtn) resendBtn.style.display=allDone?'block':'none';
+}
+
+function _cgResend(){
+  var role=window._cgFromRole==='HO'?'ho':'ro';
+  if(!confirm('This will generate the corrected review file to send back to the '+window._cgFromRole+' Manager.\n\nProceed?')) return;
+  generateReviewerHtml(role);
+  setTimeout(function(){
+    var panel=document.getElementById('correction-guide-panel');
+    if(panel) panel.remove();
+    var btn=document.getElementById('cg-restore-btn');
+    if(btn) btn.remove();
+    showToast('Corrected file generated. Send it back to the '+window._cgFromRole+' Manager.', 4000);
+  }, 500);
 }
 
 
