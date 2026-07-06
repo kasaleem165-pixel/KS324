@@ -13726,13 +13726,8 @@ function downloadSoftCopy(){
   softHtml+='<div id="progressbar"><div id="progressfill" style="width:0%"></div></div>\n';
   softHtml+='<div id="progresslbl">0 of 0 responses completed</div>\n';
   softHtml+='<div id="autosavelbl"></div>\n';
-  softHtml+='<div class="row2btn">\n';
-  softHtml+='<button style="background:#1a6030;color:#fff" onclick="saveProgress()">&#128190; Save Progress</button>\n';
-  softHtml+='<button style="background:#4a5568;color:#fff" onclick="loadProgress()">&#128194; Load Progress</button>\n';
-  softHtml+='</div>\n';
   softHtml+='<button id="draftbtn" onclick="saveDraft()">&#9888; Save Draft (Incomplete &#8212; NOT FOR FORWARDING)</button>\n';
   softHtml+='<button id="savebtn" onclick="saveResponses()">&#10003; Submit Final Responses</button>\n';
-  softHtml+='<input type="file" id="loadfile" accept=".json" style="display:none" onchange="onLoadFile(event)">\n';
   softHtml+='</div>\n'; // end #actionbar
   softHtml+='</div>\n'; // end #wrap
 
@@ -13837,23 +13832,30 @@ function downloadSoftCopy(){
   softHtml+='  var banner=isDraft?"<div style=\\"background:#c0392b;color:#fff;text-align:center;font-family:Arial,sans-serif;font-size:15px;font-weight:700;padding:12px 20px;letter-spacing:.5px\\">&#9888; DRAFT &mdash; NOT FOR FORWARDING &mdash; "+done+" of "+total+" responses completed</div>":"";\n';
   // Clone #rp (contains only report content — action bar and notice are outside it)
   softHtml+='  var clone=document.getElementById("rp").cloneNode(true);\n';
-  // Replace resp_ textareas with styled read-only divs showing the entered value
-  softHtml+='  var clTas=clone.querySelectorAll("textarea[name^=\\"resp_\\"]");\n';
-  softHtml+='  for(var ti=clTas.length-1;ti>=0;ti--){\n';
-  softHtml+='    var ct=clTas[ti],cv=data[ct.name]||"";\n';
-  softHtml+='    var cdv=document.createElement("div");\n';
-  softHtml+='    cdv.style.cssText="font-size:12.5px;line-height:1.65;white-space:pre-wrap;padding:4px 0;min-height:18px;"+(cv.trim()?"color:#2a3a50":"color:#aaa;font-style:italic");\n';
-  softHtml+='    cdv.textContent=cv.trim()||"(No response entered)";\n';
-  softHtml+='    ct.parentNode.replaceChild(cdv,ct);\n';
-  softHtml+='  }\n';
-  // Replace eta_ inputs with static spans
-  softHtml+='  var clInps=clone.querySelectorAll("input[name^=\\"eta_\\"]");\n';
-  softHtml+='  for(var ii=clInps.length-1;ii>=0;ii--){\n';
-  softHtml+='    var ci=clInps[ii],cv2=data[ci.name]||"";\n';
-  softHtml+='    var cisp=document.createElement("span");\n';
-  softHtml+='    cisp.style.cssText="font-size:13px;font-weight:600;color:#1a6030";\n';
-  softHtml+='    cisp.textContent=cv2||"\\u2014";\n';
-  softHtml+='    ci.parentNode.replaceChild(cisp,ci);\n';
+  softHtml+='  if(isDraft){\n';
+  // Draft: keep textareas interactive, just pre-fill with saved values
+  softHtml+='    var clTas=clone.querySelectorAll("textarea[name^=\\"resp_\\"]");\n';
+  softHtml+='    for(var ti=0;ti<clTas.length;ti++){clTas[ti].value=data[clTas[ti].name]||"";}\n';
+  softHtml+='    var clInps=clone.querySelectorAll("input[name^=\\"eta_\\"]");\n';
+  softHtml+='    for(var ii=0;ii<clInps.length;ii++){clInps[ii].value=data[clInps[ii].name]||"";}\n';
+  softHtml+='  }else{\n';
+  // Final submit: replace textareas with static read-only divs
+  softHtml+='    var clTas=clone.querySelectorAll("textarea[name^=\\"resp_\\"]");\n';
+  softHtml+='    for(var ti=clTas.length-1;ti>=0;ti--){\n';
+  softHtml+='      var ct=clTas[ti],cv=data[ct.name]||"";\n';
+  softHtml+='      var cdv=document.createElement("div");\n';
+  softHtml+='      cdv.style.cssText="font-size:12.5px;line-height:1.65;white-space:pre-wrap;padding:4px 0;min-height:18px;"+(cv.trim()?"color:#2a3a50":"color:#aaa;font-style:italic");\n';
+  softHtml+='      cdv.textContent=cv.trim()||"(No response entered)";\n';
+  softHtml+='      ct.parentNode.replaceChild(cdv,ct);\n';
+  softHtml+='    }\n';
+  softHtml+='    var clInps=clone.querySelectorAll("input[name^=\\"eta_\\"]");\n';
+  softHtml+='    for(var ii=clInps.length-1;ii>=0;ii--){\n';
+  softHtml+='      var ci=clInps[ii],cv2=data[ci.name]||"";\n';
+  softHtml+='      var cisp=document.createElement("span");\n';
+  softHtml+='      cisp.style.cssText="font-size:13px;font-weight:600;color:#1a6030";\n';
+  softHtml+='      cisp.textContent=cv2||"\\u2014";\n';
+  softHtml+='      ci.parentNode.replaceChild(cisp,ci);\n';
+  softHtml+='    }\n';
   softHtml+='  }\n';
   // Submission stamp prepended at top of clone
   softHtml+='  var stamp=document.createElement("div");\n';
@@ -13870,6 +13872,8 @@ function downloadSoftCopy(){
   softHtml+='  ftr.innerHTML="Beaconhouse Group &mdash; Systems &amp; Audit Department &mdash; Auditee Response Record<br>"\n';
   softHtml+='    +"Generated: "+(new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}));\n';
   softHtml+='  clone.appendChild(ftr);\n';
+  // Draft: return full live page (scripts + action bar + pre-filled values preserved)
+  softHtml+='  if(isDraft){ return document.documentElement.outerHTML; }\n';
   // Outer page styles
   softHtml+='  var ocss="*{box-sizing:border-box}body{font-family:Inter,Arial,sans-serif;font-size:13px;color:#1e2d40;background:#f3f5f8;padding:20px}#wrap{max-width:860px;margin:0 auto}#rp{background:#fff;border-radius:6px;padding:28px 32px;box-shadow:0 2px 8px rgba(0,0,0,.1)}@media print{body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}}";\n';
   // Return the full HTML — embedded JSON preserved for import; formatted body for human reading
