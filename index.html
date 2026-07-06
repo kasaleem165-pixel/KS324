@@ -14573,11 +14573,9 @@ function applyRespLoad(){
   for(var i=0;i<loadedObs.length;i++){
     var id=loadedObs[i];
     var val=parsed[id]||'';
-    // Clear both maps first so stale data from a previous load doesn't show under the wrong heading
-    delete respBHMap[id];
-    delete respROMap[id];
-    if(isBH) respBHMap[id]=val;
-    if(isRO) respROMap[id]=val;
+    // Only clear the map being loaded into — preserve the other so both can coexist
+    if(isBH){ delete respBHMap[id]; respBHMap[id]=val; }
+    if(isRO){ delete respROMap[id]; respROMap[id]=val; }
     // keep respMap populated so existing code that reads it still works
     respMap[id]=val;
   }
