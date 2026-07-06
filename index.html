@@ -19979,38 +19979,38 @@ function _showReviewSendBackModal(dec, fromRole){
 }
 
 function _cgGoTo(id){
-  // Clear any active search/category filter so the observation row is in the DOM
+  // Always reset filters so applyFilter populates #rlist with all DB observations
   var qEl=document.getElementById('qinp');
   var catEl=document.getElementById('scat');
-  var needRefresh=false;
-  if(qEl&&qEl.value.trim()){qEl.value='';needRefresh=true;}
-  if(catEl&&catEl.value!=='All Categories'){catEl.value='All Categories';needRefresh=true;}
-  if(needRefresh&&typeof applyFilter==='function') applyFilter();
+  if(qEl) qEl.value='';
+  if(catEl) catEl.value='All Categories';
+  if(typeof applyFilter==='function') applyFilter();
 
-  function doScroll(){
+  setTimeout(function(){
     var el=document.getElementById('ri-'+id);
     if(el){
       el.scrollIntoView({behavior:'smooth',block:'center'});
       el.style.transition='box-shadow .2s';
       el.style.boxShadow='0 0 0 3px #f0c030';
       setTimeout(function(){ el.style.boxShadow=''; },1800);
-    } else {
-      showToast('Observation not found in current list — make sure it is selected.', 3000);
+      return;
     }
-  }
-  // Give the DOM one tick to re-render after filter reset before scrolling
-  if(needRefresh){ setTimeout(doScroll, 50); } else { doScroll(); }
-  // Also scroll the report preview to the matching card
-  var card=document.querySelector('[id^="obs-"][id$="-'+id+'"]') || document.querySelector('.obs-card[data-id="'+id+'"]');
-  if(!card){
-    // Try finding inside rpcont by obs id marker
+    // Fallback: custom observation or report preview card
+    var found=false;
     var rpcont=document.getElementById('rpcont');
     if(rpcont){
       var all=rpcont.querySelectorAll('[data-obsid]');
-      for(var i=0;i<all.length;i++){ if(all[i].getAttribute('data-obsid')===id){ card=all[i]; break; } }
+      for(var i=0;i<all.length;i++){
+        if(all[i].getAttribute('data-obsid')===id){ all[i].scrollIntoView({behavior:'smooth',block:'center'}); found=true; break; }
+      }
     }
-  }
-  if(card) card.scrollIntoView({behavior:'smooth',block:'start'});
+    if(!found){
+      // Try any element whose id contains the observation id
+      var generic=document.querySelector('[id*="'+id+'"]');
+      if(generic){ generic.scrollIntoView({behavior:'smooth',block:'center'}); found=true; }
+    }
+    if(!found) showToast('Observation not found — ensure it is selected in the report.', 3000);
+  }, 80);
 }
 
 function _cgMarkDone(id){
