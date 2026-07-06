@@ -9427,6 +9427,10 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
 
   <div class="sec" id="repeat-detect-sec">
     <div class="sh">&#128260; Repeat Detection</div>
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;padding:6px 8px;background:rgba(255,255,255,.04);border-radius:6px;border:1px solid rgba(160,180,200,.15)">
+      <input type="checkbox" id="chk-first-time-audit" style="width:14px;height:14px;cursor:pointer;flex-shrink:0" onchange="setFirstTimeAudit(this.checked)">
+      <label for="chk-first-time-audit" style="font-size:11px;color:#a8c0d8;cursor:pointer;line-height:1.4">&#127381; First Time Audit <span style="color:#6a8aaa;font-size:10px">(no previous report exists)</span></label>
+    </div>
     <div id="repeat-detect-body"></div>
   </div>
 
@@ -9870,6 +9874,7 @@ var selIds   = {};   // {obsId: true}
 var annexMap = {};   // {obsId: "text"}
 var obsTypeMap = {}; // {obsId: 'New'|'Repeated'} — per-report type override
 var lastRefMap = {}; // {obsId: 'string'} — prior audit report reference for Repeated obs
+var firstTimeAudit = false; // true = branch being audited for the first time; no previous report exists
 var sensitivityMap = {}; // {obsId: 'High'|'M to H'|'L to M'|'Low'}
 var cosoMap        = {}; // {obsId: 'CE'|'RA'|'CA'|'IC'|'M'}
 var avMap    = {};   // {obsId: manual audit view text}
@@ -11176,6 +11181,7 @@ function captureSession() {
     instAmountMap: instAmountMap,
     instSourceMap: instSourceMap,
     wordingChanges: wordingChanges,
+    firstTimeAudit: firstTimeAudit,
     roFlags: roFlags, roComments: roComments, roCorrections: roCorrections, roAccepted: roAccepted,
     hoFlags: hoFlags, hoComments: hoComments, hoCorrections: hoCorrections, hoAccepted: hoAccepted,
     respAmendments: respAmendments,
@@ -11208,6 +11214,8 @@ function restoreSession(sess) {
   selIds    = sess.selIds    || {};
   obsTypeMap= sess.obsTypeMap|| {};
   lastRefMap= sess.lastRefMap|| {};
+  firstTimeAudit = sess.firstTimeAudit || false;
+  if(typeof _updateRepeatDetectPanel==='function') _updateRepeatDetectPanel();
   annexMap  = sess.annexMap  || {};
   avMap     = sess.avMap     || {};
   actMap    = sess.actMap    || {};
@@ -18533,10 +18541,29 @@ function ra_extractObsListFromText(text){
 }
 
 // Show/hide the Repeat Detection panel based on whether RA reports are loaded
+function setFirstTimeAudit(val){
+  firstTimeAudit = !!val;
+  var chk = document.getElementById('chk-first-time-audit');
+  if(chk) chk.checked = firstTimeAudit;
+  _updateRepeatDetectPanel();
+  autoSaveNow();
+}
+
 function _updateRepeatDetectPanel(){
   var body=document.getElementById('repeat-detect-body');
   var src=document.getElementById('repeat-detect-src');
   if(!body) return;
+  // Sync checkbox state
+  var chk=document.getElementById('chk-first-time-audit');
+  if(chk) chk.checked=firstTimeAudit;
+  // First Time Audit — no previous report exists; repeat detection not applicable
+  if(firstTimeAudit){
+    body.innerHTML='<div style="background:rgba(20,100,60,.12);border:1px solid rgba(60,180,100,.25);border-radius:7px;padding:10px 12px;display:flex;align-items:flex-start;gap:8px">'
+      +'<span style="font-size:18px;line-height:1">&#127381;</span>'
+      +'<div style="font-size:11px;color:#80c8a0;line-height:1.6"><strong style="color:#a0e0b8">First Time Audit</strong> — this branch has no previous audit report on record. All observations will be treated as <strong style="color:#a0e0b8">New</strong>. Repeat detection is not applicable.</div>'
+      +'</div>';
+    return;
+  }
   var best=null;
   if(window.ra_loadedReports){
     for(var i=0;i<ra_loadedReports.length;i++){
@@ -18563,6 +18590,7 @@ function _updateRepeatDetectPanel(){
 }
 
 function detectRepeatsFromPrevReport(){
+  if(firstTimeAudit){ alert('This is marked as a First Time Audit — repeat detection is not applicable.'); return; }
   // Find latest report — prefer one with structured obs list, fall back to text-only
   var bestStr=null, bestAny=null;
   for(var i=0;i<ra_loadedReports.length;i++){
@@ -18693,7 +18721,8 @@ function detectRepeatsFromPrevReport(){
   matches.sort(function(a,b){ return b.score-a.score; });
   // Store in global so Apply button can read without JSON-in-HTML issues
   var _bestReportName=(best.name||'').replace(/\.[^.]+$/,''); // strip extension for LARR label
-  window._rdMatches = matches.map(function(m){ return {obsId:m.obsId,ref:m.prev.ref||'',reportName:_bestReportName}; });
+  var _bestYear=best.date?best.date.slice(0,4):'';
+  window._rdMatches = matches.map(function(m){ return {obsId:m.obsId,ref:m.prev.ref||'',reportName:_bestReportName,year:_bestYear}; });
 
   // Build unified review list — all pre-ticked, auditor unticks false positives
   var mh='<div style="font-family:Inter,sans-serif">';
@@ -18751,12 +18780,12 @@ function _applyRepeatSelections(){
     var chk=document.getElementById('rdchk-'+i);
     if(chk&&chk.checked){
       obsTypeMap[items[i].obsId]='Repeated';
-      // Build a meaningful LARR: "Para X.X — Report Name (please verify reference)"
+      // Build LARR: "Observation No. X.X - Last Audit Report YYYY (Please refer for full last query reference)"
       var larrVal='';
-      if(items[i].ref) larrVal='Para '+items[i].ref;
-      if(items[i].reportName) larrVal+=(larrVal?' — ':'')+items[i].reportName;
-      if(larrVal) larrVal+=' (please verify full report reference)';
-      setLastRef(items[i].obsId, larrVal||items[i].ref);
+      if(items[i].ref) larrVal='Observation No. '+items[i].ref;
+      larrVal+=' - Last Audit Report'+(items[i].year?' '+items[i].year:'');
+      larrVal+=' (Please refer for full last query reference)';
+      setLastRef(items[i].obsId, larrVal);
       applied++;
     }
   }
