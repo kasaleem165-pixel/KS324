@@ -19358,25 +19358,57 @@ function generateReviewerHtml(role){
 
   // ── Stats bar ─────────────────────────────────────────────────────────
   var totalObs=allObs.length;
+  var repCount=allObs.filter(function(o){return (o.type||'New').toLowerCase()==='repeated';}).length;
+  var newCount=totalObs-repCount;
   var wcCount=0; for(var wi=0;wi<allObs.length;wi++){ if(wordingChanges[allObs[wi].id]) wcCount++; }
   rv+='<div class="stats">';
-  rv+='<div class="stat"><div class="num">'+totalObs+'</div><div class="lbl">Observations</div></div>';
+  rv+='<div class="stat"><div class="num">'+repCount+'</div><div class="lbl">Repeated</div></div>';
+  rv+='<div class="stat"><div class="num">'+newCount+'</div><div class="lbl">New</div></div>';
   rv+='<div class="stat"><div class="num" id="stat-wc">'+wcCount+'</div><div class="lbl">Wording Changes</div></div>';
   rv+='<div class="stat"><div class="num" id="stat-flagged">0</div><div class="lbl">Flagged</div></div>';
-  rv+='<div class="stat"><div class="num" id="stat-amended">0</div><div class="lbl">Amended Responses</div></div>';
+  rv+='<div class="stat"><div class="num" id="stat-amended">0</div><div class="lbl">Amended</div></div>';
   rv+='</div>\n';
 
-  // ── Observation cards (pre-rendered) ──────────────────────────────────
-  for(var oi=0;oi<allObs.length;oi++){
-    var o=allObs[oi];
+  // ── Observation cards — split into Repeated / New sections ───────────
+  // Separate and sort to match the finalized report structure
+  var repObs=allObs.filter(function(o){return (o.type||'New').toLowerCase()==='repeated';});
+  var newObs=allObs.filter(function(o){return (o.type||'New').toLowerCase()!=='repeated';});
+  var orderedObs=[]; // [{obs, secNum, subNum, label}]
+  repObs.forEach(function(o,i){ orderedObs.push({obs:o,secNum:1,subNum:i+1,label:'1.'+(i+1)}); });
+  newObs.forEach(function(o,i){ orderedObs.push({obs:o,secNum:2,subNum:i+1,label:'2.'+(i+1)}); });
+
+  // Section header helper
+  function sectionHeader(title, count, color){
+    return '<div style="margin:18px 0 10px;padding:8px 14px;background:'+color+';border-radius:6px;display:flex;align-items:center;justify-content:space-between">'
+      +'<div style="font-size:13px;font-weight:800;color:#1e2d40">'+title+'</div>'
+      +'<div style="font-size:11px;font-weight:700;color:#4a5a6a;background:#fff;border-radius:10px;padding:2px 10px">'+count+' observation'+(count!==1?'s':'')+'</div>'
+      +'</div>';
+  }
+
+  var lastSec=0;
+  for(var oi=0;oi<orderedObs.length;oi++){
+    var entry=orderedObs[oi];
+    var o=entry.obs;
+    // Print section header when section changes
+    if(entry.secNum!==lastSec){
+      if(entry.secNum===1&&repObs.length>0) rv+=sectionHeader('1. Repeated Observations', repObs.length, '#fff0e6');
+      if(entry.secNum===2&&newObs.length>0) rv+=sectionHeader('2. New Observations', newObs.length, '#e8f4ff');
+      lastSec=entry.secNum;
+    }
     var tc=(o.type||'New').toLowerCase();
     var badgeSt=tc==='repeated'?'background:#fff0e6;color:#b04800;border:1px solid #f0b080':'background:#e6f0ff;color:#1050a0;border:1px solid #90b8e8';
     var wc=wordingChanges[o.id];
+    // LARR for repeated observations
+    var larrRef=lastRefMap[o.id]||'';
 
     rv+='<div class="obs-card'+(tc==='repeated'?' repeated':'')+'" id="card-'+esc(o.id)+'">';
-    rv+='<div class="obs-hdr"><span class="obs-num">Obs. '+(oi+1)+'</span>';
+    rv+='<div class="obs-hdr"><span class="obs-num">'+esc(entry.label)+'</span>';
     rv+='<span class="obs-title">'+esc(o.title)+'</span>';
     rv+='<span class="obs-badge" style="'+badgeSt+'">'+esc(o.type||'New')+'</span></div>';
+    if(tc==='repeated'&&larrRef){
+      rv+='<div style="padding:4px 14px;background:#fff8f0;font-size:10.5px;color:#b04800;border-bottom:1px solid #f0d8c0">';
+      rv+='<strong>&#8635; LARR:</strong> '+esc(larrRef)+'</div>';
+    }
     rv+='<div class="obs-body">';
 
     // Wording change diff
