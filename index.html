@@ -15191,7 +15191,14 @@ function finalizeReport(){
   finalHtml+='<style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{font-family:Inter,sans-serif;font-size:13.5px;color:#1e2d40;background:#f3f5f8;padding:20px}#wrap{max-width:860px;margin:0 auto}#rp{background:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(26,58,92,.1);padding:30px 34px}#finalbanner{background:#e6f4ea;border:1px solid #5a9a6a;border-radius:6px;padding:10px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:#2a6040}#prtbtn{margin-bottom:16px;padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-family:Inter,sans-serif;font-size:13px;font-weight:600;cursor:pointer}#prtbtn:hover{background:#2a5080}@media print{#finalbanner,#prtbtn,#fw-toggle-btn,.fw-panel{display:none!important}body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}div{page-break-inside:avoid}}</style>\n';
   finalHtml+=finalAnnexParts.head+'\n';
   finalHtml+='</head>\n<body>\n<div id="wrap">\n';
-  finalHtml+='<div id="finalbanner">&#128228; AUDIT REPORT — SUBMITTED FOR ISSUANCE &nbsp;|&nbsp; Finalized: '+today+'&nbsp;&nbsp;<span style="margin-left:auto;font-weight:400;font-size:11px;color:#3a7050">Prepared by field auditor. Pending official issuance by HO.</span></div>\n';
+  var _issDateBanner=window._reportIssuanceDate||'';
+  var _issFmtBanner='';
+  if(_issDateBanner){ try{ _issFmtBanner=new Date(_issDateBanner+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }catch(e){ _issFmtBanner=_issDateBanner; } }
+  if(_issFmtBanner){
+    finalHtml+='<div id="finalbanner" style="background:#1a3a5c;border-color:#0e2035;color:#fff">&#128228; AUDIT REPORT — OFFICIALLY ISSUED BY HEAD OFFICE &nbsp;|&nbsp; Issuance Date: '+_issFmtBanner+'&nbsp;&nbsp;<span style="margin-left:auto;font-weight:400;font-size:11px;color:#a0c8e8">Beaconhouse Group — Systems &amp; Audit Department</span></div>\n';
+  } else {
+    finalHtml+='<div id="finalbanner">&#128228; AUDIT REPORT — SUBMITTED FOR ISSUANCE &nbsp;|&nbsp; Finalized: '+today+'&nbsp;&nbsp;<span style="margin-left:auto;font-weight:400;font-size:11px;color:#3a7050">Prepared by field auditor. Pending official issuance by HO.</span></div>\n';
+  }
   finalHtml+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
     +'<button id="prtbtn" onclick="window.print()" style="padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-family:Inter,sans-serif;font-size:13px;font-weight:600;cursor:pointer">&#128462; Print / Save as PDF</button>'
     +'<button id="fw-toggle-btn" onclick="toggleFramework()" style="padding:10px 18px;background:#1e6e3e;color:#fff;border:none;border-radius:20px;font-family:Inter,sans-serif;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:background .2s" title="Show or hide the Risk-Based Audit Framework for each observation">&#128203; Show Risk Framework</button>'
@@ -15200,13 +15207,21 @@ function finalizeReport(){
   finalHtml+='<div style="text-align:center;border-bottom:3px solid #1a3a5c;padding-bottom:16px;margin-bottom:20px">';
   finalHtml+='<div style="font-size:10px;font-weight:700;letter-spacing:2px;color:#c9962a;text-transform:uppercase;margin-bottom:6px">Beaconhouse Group &nbsp;|&nbsp; Systems &amp; Audit</div>';
   finalHtml+='<h1 style="font-family:Merriweather,serif;font-size:23px;font-weight:700;color:#1a3a5c">AUDIT REPORT</h1>';
-  finalHtml+='<div style="display:inline-block;margin-top:6px;padding:.25rem 1rem;background:#e8f4ed;border:1.5px solid #5a9a6a;border-radius:20px;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#1a6030">&#128228; Submitted for Issuance — Pending HO Approval</div>';
+  var _issDate=window._reportIssuanceDate||'';
+  var _issFmt='';
+  if(_issDate){ try{ _issFmt=new Date(_issDate+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }catch(e){ _issFmt=_issDate; } }
+  if(_issFmt){
+    finalHtml+='<div style="display:inline-block;margin-top:6px;padding:.25rem 1rem;background:#1a3a5c;border:1.5px solid #0e2035;border-radius:20px;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#fff">&#128228; Officially Issued by Head Office</div>';
+  } else {
+    finalHtml+='<div style="display:inline-block;margin-top:6px;padding:.25rem 1rem;background:#e8f4ed;border:1.5px solid #5a9a6a;border-radius:20px;font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#1a6030">&#128228; Submitted for Issuance — Pending HO Approval</div>';
+  }
   if(H.brcode||H.brname) finalHtml+='<h2 style="font-family:Merriweather,serif;font-size:14px;font-weight:400;color:#2a5080;margin-top:4px">'+(H.brcode?esc(H.brcode)+' – ':'')+esc(H.brname)+'</h2>';
   finalHtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;margin-top:13px;text-align:left;font-size:12px">';
   if(H.rno) finalHtml+='<div><strong style="color:#1a3a5c;min-width:96px;display:inline-block">Report No.:</strong> '+esc(H.rno)+'</div>';
   if(H.dt)  finalHtml+='<div><strong style="color:#1a3a5c;min-width:96px;display:inline-block">Date:</strong> '+esc(fmtDt(H.dt))+'</div>';
   if(H.pb)  finalHtml+='<div><strong style="color:#1a3a5c;min-width:96px;display:inline-block">Prepared By:</strong> '+esc(H.pb)+'</div>';
   if(H.per) finalHtml+='<div><strong style="color:#1a3a5c;min-width:96px;display:inline-block">Audit Period:</strong> '+esc(H.per)+'</div>';
+  if(_issFmt) finalHtml+='<div style="grid-column:1/-1;margin-top:4px;padding-top:6px;border-top:1px solid #dde2ea"><strong style="color:#1a3a5c;min-width:96px;display:inline-block">Issued by:</strong> Head Office Systems &amp; Audit &nbsp;|&nbsp; <strong>Date:</strong> '+_issFmt+'</div>';
   finalHtml+='</div></div>\n';
   finalHtml+=misHtml;
   finalHtml+=buildIntroHtml(getIntroSectionVals(), true);
@@ -16846,6 +16861,15 @@ function showSaveDialog(){
 
     '</div>'+
 
+    (window._hoAuthed
+      ? '<div style="background:#f0f4ff;border:1px solid #b0c4e8;border-radius:7px;padding:11px 13px;margin-bottom:14px">'
+        +'<div style="font-size:11px;font-weight:800;color:#1a3a5c;letter-spacing:.4px;text-transform:uppercase;margin-bottom:6px">&#128228; HO Issuance Date</div>'
+        +'<div style="font-size:11px;color:#445;margin-bottom:7px">Set the official issuance date. Once saved, it will appear on the report cover as the HO-issued date.</div>'
+        +'<input type="date" id="sd-issue-date" value="'+(new Date().toISOString().slice(0,10))+'" style="width:100%;padding:7px 10px;border:1px solid #b0c4e8;border-radius:5px;font-size:12.5px;font-family:inherit;color:#1a3a5c;background:#fff">'
+        +'</div>'
+      : '<div style="background:#f8f8f8;border:1px dashed #ccc;border-radius:7px;padding:9px 13px;margin-bottom:14px;font-size:11px;color:#888">&#128274; HO Issuance Date — available after HO authentication</div>'
+    )+
+
     '<div style="display:flex;gap:10px;align-items:center">'+
     '<button onclick="saveSelected()" style="flex:1;padding:10px;background:#1a7a4a;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Save Selected</button>'+
     '<button onclick="document.getElementById(\'sdModal\').remove()" style="padding:10px 18px;background:#e8edf5;color:#444;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>'+
@@ -16863,6 +16887,8 @@ function saveSelected(){
   var pdf  = document.getElementById('sf-pdf')  && document.getElementById('sf-pdf').checked;
   if(!html && !word && !json && !pdf){ toast('Please select at least one format.'); return; }
 
+  var issueDateEl = document.getElementById('sd-issue-date');
+  if(issueDateEl && issueDateEl.value) window._reportIssuanceDate = issueDateEl.value;
   var modal = document.getElementById('sdModal');
   if(modal) modal.remove();
   var pf = window._pendingFinal;
