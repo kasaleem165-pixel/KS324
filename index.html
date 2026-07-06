@@ -19979,17 +19979,27 @@ function _showReviewSendBackModal(dec, fromRole){
 }
 
 function _cgGoTo(id){
-  // Scroll the observation into view in the left panel
-  var el=document.getElementById('ri-'+id);
-  if(el){
-    el.scrollIntoView({behavior:'smooth',block:'center'});
-    // Flash highlight
-    el.style.transition='box-shadow .2s';
-    el.style.boxShadow='0 0 0 3px #f0c030';
-    setTimeout(function(){ el.style.boxShadow=''; },1800);
-  } else {
-    showToast('Observation not found in current list — make sure it is selected.', 3000);
+  // Clear any active search/category filter so the observation row is in the DOM
+  var qEl=document.getElementById('qinp');
+  var catEl=document.getElementById('scat');
+  var needRefresh=false;
+  if(qEl&&qEl.value.trim()){qEl.value='';needRefresh=true;}
+  if(catEl&&catEl.value!=='All Categories'){catEl.value='All Categories';needRefresh=true;}
+  if(needRefresh&&typeof applyFilter==='function') applyFilter();
+
+  function doScroll(){
+    var el=document.getElementById('ri-'+id);
+    if(el){
+      el.scrollIntoView({behavior:'smooth',block:'center'});
+      el.style.transition='box-shadow .2s';
+      el.style.boxShadow='0 0 0 3px #f0c030';
+      setTimeout(function(){ el.style.boxShadow=''; },1800);
+    } else {
+      showToast('Observation not found in current list — make sure it is selected.', 3000);
+    }
   }
+  // Give the DOM one tick to re-render after filter reset before scrolling
+  if(needRefresh){ setTimeout(doScroll, 50); } else { doScroll(); }
   // Also scroll the report preview to the matching card
   var card=document.querySelector('[id^="obs-"][id$="-'+id+'"]') || document.querySelector('.obs-card[data-id="'+id+'"]');
   if(!card){
