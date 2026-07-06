@@ -13497,7 +13497,8 @@ function downloadDraft(individual){
     }
     if(!numD&&!total) h+='<p style="color:#888;text-align:center">No observations in selected categories.</p>';
     syncAnnexTextFromDom();
-    var annexParts=buildAnnexHtml(true);
+    var draftObsIds=allObs.filter(function(o){return (cats.indexOf(o.category||'Others')>=0);}).map(function(o){return o.id;});
+    var annexParts=buildAnnexHtml(true,{},draftObsIds);
     h+=annexParts.body;
     h+='</div>';
     return {html:h, annexHead:annexParts.head, annexData:annexParts.data};
@@ -13700,7 +13701,8 @@ function downloadSoftCopy(){
   softHtml+='#autosavelbl{font-size:11px;margin-top:6px;text-align:center;min-height:16px;color:#2a8a40}\n';
   softHtml+='@media print{#notice,#actionbar{display:none!important}body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}}\n';
   syncAnnexTextFromDom();
-  var annexParts=buildAnnexHtml(true);
+  var softObsIds=all.map(function(o){return o.id;});
+  var annexParts=buildAnnexHtml(true,{},softObsIds);
   softHtml+='</style>\n'+annexParts.head+'\n</head>\n<body>\n<div id="wrap">\n';
   softHtml+='<div id="notice"><strong>&#9432; Instructions for Auditee:</strong> Please read each observation carefully and enter your response in the yellow-highlighted <em>Auditee Response</em> field (required). Also fill in the <em>Estimated Time to Resolve</em> field. <strong>Your work is saved automatically</strong> in this browser — you can close this file and reopen it anytime to continue. To work on a different device, use <strong>&#128190; Save Progress</strong> to back up your work and <strong>&#128194; Load Progress</strong> to restore it. When all responses are complete, click <strong>&#10003; Submit Final Responses</strong> to download the completed file for return to the auditor.</div>\n';
   softHtml+='<div id="rp">\n';
@@ -14340,16 +14342,29 @@ function annexTextToHtml(text, navy, gbor){
 // buildAnnexHtml — returns {head:'', body:''} when inline=true so caller can
 // place the helper script in <head> and data holders outside #rp.
 // When inline=false (in-app preview) returns a plain HTML string as before.
-function buildAnnexHtml(inline, obsNumMap){
+function buildAnnexHtml(inline, obsNumMap, filterObsIds){
   if(!annexures.length) return inline ? {head:'',body:'',data:''} : '';
   var navy='#1a3a5c', gbor='#dde2ea', gtxt='#6a7888';
   obsNumMap=obsNumMap||{};
+  // If filterObsIds provided, only include annexures linked to those obs
+  // (annexures with no linkedObs at all are always included as general annexures)
+  var activeAnnexures=annexures;
+  if(filterObsIds&&filterObsIds.length){
+    var filterSet={};
+    for(var fi=0;fi<filterObsIds.length;fi++) filterSet[filterObsIds[fi]]=true;
+    activeAnnexures=annexures.filter(function(a){
+      if(!a.linkedObs||!a.linkedObs.length) return true; // unlinked — always include
+      for(var li=0;li<a.linkedObs.length;li++){ if(filterSet[a.linkedObs[li]]) return true; }
+      return false;
+    });
+    if(!activeAnnexures.length) return inline ? {head:'',body:'',data:''} : '';
+  }
 
   // Collect non-image/non-PDF files that need blob-URL download in exported HTML
   var blobFiles=[];
   if(inline){
-    for(var ai=0;ai<annexures.length;ai++){
-      var afs=annexures[ai].files||[];
+    for(var ai=0;ai<activeAnnexures.length;ai++){
+      var afs=activeAnnexures[ai].files||[];
       for(var afi=0;afi<afs.length;afi++){
         var af=afs[afi];
         if(af._stripped||!af.dataUrl) continue;
@@ -14402,8 +14417,8 @@ function buildAnnexHtml(inline, obsNumMap){
   var h='';
   h+='<div style="margin-top:32px;border-top:3px solid '+navy+';padding-top:20px">';
   h+='<h2 style="font-family:Merriweather,serif;font-size:16px;font-weight:700;color:'+navy+';margin-bottom:20px;text-align:center;letter-spacing:1px">ANNEXURES</h2>';
-  for(var i=0;i<annexures.length;i++){
-    var a=annexures[i];
+  for(var i=0;i<activeAnnexures.length;i++){
+    var a=activeAnnexures[i];
     h+='<div style="margin-bottom:28px;page-break-inside:avoid">';
     h+='<div style="font-family:Merriweather,serif;font-size:13px;font-weight:700;color:'+navy+';border-bottom:2px solid '+gbor+';padding-bottom:6px;margin-bottom:4px">';
     h+=esc(a.label||('Annexure-'+(i+1)));
