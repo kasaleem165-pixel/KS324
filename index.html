@@ -9731,6 +9731,7 @@ function idbGetUsageInfo(cb){
 // Saves extracted Word file data so it survives page reloads
 // ============================================================
 var RA_IDB_KEY='bss_ra_loaded_reports';
+var RA_STATE_KEY='bss_ra_state_v1';
 
 function _raReportsSave(){
   // Save only the extracted data — not sess (full JSON session object) or binary
@@ -9759,6 +9760,32 @@ function _raReportsRestore(){
     // Update UI if RA panel is already initialised
     if(typeof ra_renderLoadedFilesList==='function') ra_renderLoadedFilesList();
     if(typeof _updateRepeatDetectPanel==='function') _updateRepeatDetectPanel();
+    // Restore RA analysis state and auto-re-run if we have files
+    if(ra_loadedReports.length>0){
+      try{
+        var _raStRaw=localStorage.getItem(RA_STATE_KEY);
+        if(_raStRaw){
+          var _raSt=JSON.parse(_raStRaw);
+          // Restore branch
+          var brEl2=document.getElementById('ra-sel_branch');
+          if(brEl2&&_raSt.branch){ brEl2.value=_raSt.branch; brEl2.dispatchEvent(new Event('change')); }
+          // Restore mode radio
+          if(_raSt.mode){
+            var modeR=document.querySelector('input[name="ra-score-mode"][value="'+_raSt.mode+'"]');
+            if(modeR){ modeR.checked=true; modeR.dispatchEvent(new Event('change')); }
+          }
+          // Restore form fields
+          var atEl2=document.getElementById('ra-next_autype'); if(atEl2&&_raSt.autype) atEl2.value=_raSt.autype;
+          var pbEl2=document.getElementById('ra-next_pb'); if(pbEl2&&_raSt.pb) pbEl2.value=_raSt.pb;
+          var ptEl2=document.getElementById('ra-paste_text'); if(ptEl2&&_raSt.pasteText) ptEl2.value=_raSt.pasteText;
+          var ndEl=document.getElementById('ra-next_date'); if(ndEl&&_raSt.nextDate) ndEl.value=_raSt.nextDate;
+          var nDyEl=document.getElementById('ra-next_days'); if(nDyEl&&_raSt.nextDays) nDyEl.value=_raSt.nextDays;
+          var nTmEl=document.getElementById('ra-next_team'); if(nTmEl&&_raSt.nextTeam) nTmEl.value=_raSt.nextTeam;
+          // Auto-re-run analysis to rebuild results table
+          if(typeof ra_runAnalysis==='function') ra_runAnalysis();
+        }
+      }catch(e){}
+    }
   });
 }
 
@@ -20968,6 +20995,12 @@ function ra_runAnalysis(){
   document.getElementById('ra-results-content').style.display='block';
   document.getElementById('ra-RP').scrollTop=0;
   ra_toast('Risk assessment complete -- '+allSources.length+' report'+(allSources.length>1?'s':'')+' analysed.');
+  // Persist RA state so it survives browser close/reopen
+  try{
+    var _raSt={branch:branchName,mode:ra_getScoreMode(),autype:autype,pb:pb,pasteText:pasteText,
+      nextDate:nextDate,nextDays:nextDays,nextTeam:nextTeam};
+    localStorage.setItem(RA_STATE_KEY,JSON.stringify(_raSt));
+  }catch(e){}
 }
 
 function ra_renderResults(branch,scores,overall,d1,d2,autype,pb,hasTrend,nextDate,nextDays,nextTeam,m5Data){
