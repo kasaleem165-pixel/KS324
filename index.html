@@ -13607,18 +13607,12 @@ function downloadDraft(individual){
 
   var brSlug=(H.brname||'Branch').replace(/[^a-zA-Z0-9]+/g,'_').substring(0,30);
 
-  if(!individual){
-    // One combined file with all selected categories
-    triggerDownload(buildDraftHtml(selCats), 'Draft_Report_'+brSlug+'_RO_HO');
-  } else {
-    // One file per category
-    for(var sci=0;sci<selCats.length;sci++){
-      (function(cat){
-        var catSlug=cat.replace(/[^a-zA-Z0-9]+/g,'_').substring(0,30);
-        triggerDownload(buildDraftHtml([cat]), 'Draft_'+brSlug+'_'+catSlug+'_RO_HO');
-      })(selCats[sci]);
-    }
-  }
+  // Generate full issued-report format for RO Manager (with input fields)
+  var roHtml=generateIssuedReport(true);
+  if(!roHtml){alert('Please generate the report first.');return;}
+  var roFname='RO_Review_Copy_'+brSlug+'.html';
+  saveFileAs(new Blob([roHtml],{type:'text/html'}), roFname);
+  toast('RO Manager review copy saved.');
 }
 
 // ============================================================
@@ -15419,7 +15413,7 @@ function finalizeReport(){
 // ============================================================
 // ISSUED REPORT — polished interactive HTML (matching sample)
 // ============================================================
-function generateIssuedReport(){
+function generateIssuedReport(forROCopy){
   var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
   var all=dbObs.concat(cuObs);
@@ -15687,6 +15681,21 @@ function generateIssuedReport(){
       +'</div>'
       +'</div>'
       +'</div>';
+    if(forROCopy){
+      var _bhRo=respBHMap[o.id]!=null?respBHMap[o.id]:'';
+      var _roRo=respROMap[o.id]!=null?respROMap[o.id]:'';
+      h+='<div style="margin-top:1rem;border-top:2px dashed #c8d8ec;padding-top:1rem">';
+      if(_bhRo){
+        h+='<div style="font-size:.73rem;font-weight:800;color:#1a6040;text-transform:uppercase;letter-spacing:.4px;margin-bottom:.3rem">&#128172; Branch Head Response (Read Only)</div>';
+        h+='<div style="font-size:.87rem;background:#f0fff4;border:1px solid #80c8a0;border-radius:4px;padding:.55rem .8rem;margin-bottom:.8rem;white-space:pre-wrap;color:#1a3a2a;line-height:1.55">'+e(_bhRo)+'</div>';
+      }
+      h+='<div style="font-size:.73rem;font-weight:800;color:#1a3557;text-transform:uppercase;letter-spacing:.4px;margin-bottom:.3rem">&#128172; RO/HO Auditee Response <span style="font-weight:400;color:#888;text-transform:none;font-size:.7rem">(formal response to observation)</span></div>';
+      h+='<textarea name="resp_'+o.id+'" style="width:100%;box-sizing:border-box;border:1px solid #b0c8e8;border-radius:4px;padding:.5rem .75rem;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.87rem;color:#2a3a50;background:#fffef8;resize:vertical;min-height:68px;outline:none" placeholder="Enter formal RO/HO auditee response to this observation...">'+(_roRo?e(_roRo):'')+'</textarea>';
+      h+='<div style="margin-top:.65rem;background:#fff8e0;border:1.5px solid #e0c040;border-radius:6px;padding:.75rem 1rem">';
+      h+='<div style="font-size:.73rem;font-weight:800;color:#7a4800;text-transform:uppercase;letter-spacing:.4px;margin-bottom:.3rem">&#9997; RO Manager Review Notes <span style="font-weight:400;color:#888;text-transform:none;font-size:.7rem">(correction instructions for auditor — not printed in final report)</span></div>';
+      h+='<textarea name="ro_note_'+o.id+'" style="width:100%;box-sizing:border-box;border:1px solid #e0c060;border-radius:4px;padding:.5rem .75rem;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.85rem;color:#4a3000;background:#fffdf0;resize:vertical;min-height:52px;outline:none" placeholder="e.g. Please revise observation wording... / Update audit view... / Add financial figure..."></textarea>';
+      h+='</div></div>';
+    }
     h+='</div>';
     // Store verbatim data for shared modal
     var mBody='';
@@ -15951,7 +15960,8 @@ function generateIssuedReport(){
 
   var html='<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n'
     +'<meta name="viewport" content="width=device-width,initial-scale=1.0">\n'
-    +'<title>Issued Audit Report | '+e(brDisp)+(H.rno?' | Report No. '+e(H.rno):'')+'</title>\n'
+    +'<title>'+(forROCopy?'RO Manager Review Copy':'Issued Audit Report')+' | '+e(brDisp)+(H.rno?' | Report No. '+e(H.rno):'')+'</title>\n'
+    +(forROCopy?saveScript:'')
     +'<style>\n'
     +'  :root{--primary:#1a3557;--accent:#c8960c;--high:#c0392b;--mh:#e67e22;--lm:#2980b9;--low:#27ae60;--bg:#f4f6f9;--card:#fff;--border:#dde2ea;--text:#2c3e50;--muted:#7f8c8d}\n'
     +'  *{box-sizing:border-box;margin:0;padding:0}\n'
@@ -16039,6 +16049,7 @@ function generateIssuedReport(){
     +'<nav class="topnav">'
     +'<div class="brand">Beaconhouse &nbsp;<span>Systems &amp; Audit</span></div>'
     +'<div style="display:flex;align-items:center;gap:.5rem"><a href="#synopsis">Synopsis</a><a href="#repeated-syn">Repeated</a><a href="#new-syn">New Findings</a>'+(annexures.length?'<a href="#annexures">Annexures</a>':'')+'<a href="#methodology">Methodology</a>'
+    +(forROCopy?'</div><button onclick="saveDraftResponses()" style="padding:.35rem 1rem;background:#c8960c;color:#fff;border:none;border-radius:20px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.3px">&#128190; Save My Responses</button>':'')
     +'</div>'
     +'</nav>\n'
 
@@ -16046,7 +16057,10 @@ function generateIssuedReport(){
     +'<div class="cover" id="top">'
     +'<div style="display:flex;align-items:center;gap:.7rem;flex-wrap:wrap">'
     +'<div class="badge">Confidential &nbsp;|&nbsp; Internal Audit</div>'
-    +'<div style="background:#c8960c;color:#fff;display:inline-flex;align-items:center;gap:.4rem;padding:.22rem .9rem;border-radius:20px;font-size:.75rem;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;border:2px solid rgba(255,255,255,.35);box-shadow:0 2px 8px rgba(0,0,0,.25)">&#10003;&nbsp;OFFICIALLY&nbsp;ISSUED</div>'
+    +(forROCopy
+      ?'<div style="background:#c8960c;color:#fff;display:inline-flex;align-items:center;gap:.4rem;padding:.22rem .9rem;border-radius:20px;font-size:.75rem;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;border:2px solid rgba(255,255,255,.35)">&#9997;&nbsp;RO MANAGER REVIEW COPY</div>'
+      :'<div style="background:#c8960c;color:#fff;display:inline-flex;align-items:center;gap:.4rem;padding:.22rem .9rem;border-radius:20px;font-size:.75rem;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;border:2px solid rgba(255,255,255,.35);box-shadow:0 2px 8px rgba(0,0,0,.25)">&#10003;&nbsp;OFFICIALLY&nbsp;ISSUED</div>'
+    )
     +'</div>'
     +'<h1>Issued Audit Report — '+e(brDisp)+(H.rno?'<br><small style="font-weight:400;font-size:1rem;color:#a8c8e0">Report No. '+e(H.rno)+' &nbsp;|&nbsp; Systems &amp; Audit Department</small>':'')+'</h1>'
     +'<div class="confidential">&#9888; Confidential &amp; Proprietary Document</div>'
@@ -16520,9 +16534,17 @@ function generateIssuedReport(){
     +'});\n'
 
     +'<\/script>\n'
-    +'<script id="bhs-session-data" type="application/json">'+JSON.stringify((function(){var s=captureSession();s.ts=new Date().toISOString();s.ver=0;return s;})())+'<\/script>\n'
+    +(forROCopy?'':'<script id="bhs-session-data" type="application/json">'+JSON.stringify((function(){var s=captureSession();s.ts=new Date().toISOString();s.ver=0;return s;})())+'<\/script>\n')
+    +(forROCopy
+      ?'<div style="text-align:center;padding:2rem 1rem 3rem;border-top:2px solid #c8960c;margin-top:2rem">'
+        +'<button onclick="saveDraftResponses()" style="padding:14px 40px;background:#1a3557;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 3px 12px rgba(0,0,0,.2)">&#128190; Save My Responses</button>'
+        +'<div id="_roAutolbl" style="margin-top:8px;font-size:12px;color:#2a6040;min-height:16px"></div>'
+        +'<div style="margin-top:5px;font-size:11px;color:#888">Auto-saves every 2 seconds. Click to generate the file to send back to the auditor.</div>'
+        +'</div>'
+      :'')
     +'</body>\n</html>';
 
+  if(forROCopy){ return html; }
   saveFileAs(new Blob([html],{type:'text/html'}), fname);
   toast('Issued report saved as '+fname);
 }
