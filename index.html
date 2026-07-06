@@ -13504,24 +13504,31 @@ function downloadDraft(individual){
   }
 
   var saveScript='<script>'+
+    'function _roLegacySave(blob,name){'+
+      'var url=URL.createObjectURL(blob),a=document.createElement("a");'+
+      'a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);'+
+      'setTimeout(function(){URL.revokeObjectURL(url);},2000);'+
+    '}'+
     'function saveDraftResponses(){'+
       'var tas=document.querySelectorAll("textarea[name]");'+
       'var data={};'+
       'for(var i=0;i<tas.length;i++){if(tas[i].name)data[tas[i].name]=tas[i].value;}'+
       'var json=JSON.stringify(data).replace(/<\\/script>/gi,"<\\\\/script>");'+
-      'var out="<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>Auditee Responses<\\/title>"'+
+      'var out="<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>RO\\/HO Responses<\\/title>"'+
       '+\'<script id="bhs-resp-data" type="application/json">\'+json+\'<\\/script>\''+
       '+"<\\/head><body style=\\"font-family:Arial,sans-serif;padding:30px;color:#333\\">'+
-      '<h2>&#128203; Auditee Response File<\\/h2>'+
-      '<p>Please email this file back to the auditor to load via the Load Response button.<\\/p>'+
+      '<h2>&#128203; RO\\/HO Response File<\\/h2>'+
+      '<p>Please email this file back to the auditor to load via the Load Auditee Response button.<\\/p>'+
       '<p style=\\"color:#888;font-size:12px\\">Observations responded: "+Object.keys(data).length+"<\\/p>'+
       '<\\/body><\\/html>";'+
       'var blob=new Blob([out],{type:"text/html"});'+
-      'var a=document.createElement("a");'+
-      'a.href=URL.createObjectURL(blob);'+
-      'a.download=document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_Responded.html";'+
-      'a.click();'+
-      'setTimeout(function(){URL.revokeObjectURL(a.href);},2000);'+
+      'var fname=document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_RO_HO_Responded.html";'+
+      'if(window.showSaveFilePicker){'+
+        'window.showSaveFilePicker({suggestedName:fname,types:[{description:"HTML Document",accept:{"text/html":[".html"]}}]})'+
+        '.then(function(h){return h.createWritable();})'+
+        '.then(function(w){w.write(blob).then(function(){w.close();});})'+
+        '.catch(function(e){if(e&&e.name!=="AbortError")_roLegacySave(blob,fname);});'+
+      '}else{_roLegacySave(blob,fname);}'+
     '}'+
     '<\/script>';
 
@@ -13544,13 +13551,13 @@ function downloadDraft(individual){
 
   if(!individual){
     // One combined file with all selected categories
-    triggerDownload(buildDraftHtml(selCats), 'Draft_Report_'+brSlug);
+    triggerDownload(buildDraftHtml(selCats), 'Draft_Report_'+brSlug+'_RO_HO');
   } else {
     // One file per category
     for(var sci=0;sci<selCats.length;sci++){
       (function(cat){
         var catSlug=cat.replace(/[^a-zA-Z0-9]+/g,'_').substring(0,30);
-        triggerDownload(buildDraftHtml([cat]), 'Draft_'+brSlug+'_'+catSlug);
+        triggerDownload(buildDraftHtml([cat]), 'Draft_'+brSlug+'_'+catSlug+'_RO_HO');
       })(selCats[sci]);
     }
   }
@@ -13878,7 +13885,7 @@ function downloadSoftCopy(){
   softHtml+='  var blank=checkComplete();\n';
   softHtml+='  if(blank.length){alert("Please complete all Auditee Response fields before submitting.\\n\\nIncomplete:\\n"+blank.join(", "));return;}\n';
   softHtml+='  var blob=new Blob([buildHtml(collectData(),false)],{type:"text/html"});\n';
-  softHtml+='  saveFileAs(blob,document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_Responded.html");\n';
+  softHtml+='  saveFileAs(blob,document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_BH_Responded.html");\n';
   softHtml+='  try{localStorage.removeItem(_KEY);}catch(e){}\n';
   softHtml+='}\n';
   // Wire up all events on load
