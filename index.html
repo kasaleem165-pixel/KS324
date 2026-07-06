@@ -10333,8 +10333,11 @@ function queuePending(id, checked) {
 
 function injectTypePill(id, div){
   if(!div || document.getElementById('ax-'+id)) return;
-  var curType = obsTypeMap[id] || 'New';
-  if(!obsTypeMap[id]) obsTypeMap[id]='New';
+  // Respect user override first, then DB-level type tag, then default to New
+  var dbType='New';
+  for(var _di=0;_di<DB.observations.length;_di++){ if(DB.observations[_di].id===id){ dbType=DB.observations[_di].type||'New'; break; } }
+  var curType = obsTypeMap[id] || dbType;
+  if(!obsTypeMap[id]) obsTypeMap[id]=curType;
   var row = document.createElement('div');
   row.style.cssText='display:flex;gap:6px;margin-top:6px;padding-top:6px;border-top:1px solid #eef2f7';
   row.id='ax-'+id;
@@ -18247,27 +18250,33 @@ function ra_handleFilePick(input){
         r.readAsText(file);
       } else if(ext==='docx'||ext==='doc'){
         var r2=new FileReader();
+        var _fd2=file.lastModified?new Date(file.lastModified):'';
+        var _fdate2=_fd2?((_fd2.getFullYear())+'-'+String(_fd2.getMonth()+1).padStart(2,'0')+'-'+String(_fd2.getDate()).padStart(2,'0')):'';
         r2.onload=function(e){
           ra_parseDocxFile(e.target.result,function(text,docxSens,docxObsList,docxOutstanding){
             var sb2=(document.getElementById('ra-sel_branch')||{}).value||'';
-            ra_addLoadedReport(file.name,'',null,text||'',ra_detectBranchInText(text,sb2),false,docxSens||null,docxObsList||null,docxOutstanding||null);
+            ra_addLoadedReport(file.name,_fdate2,null,text||'',ra_detectBranchInText(text,sb2),false,docxSens||null,docxObsList||null,docxOutstanding||null);
             if(!text) ra_toast('Warning: could not extract text from '+file.name);
           });
         };
         r2.readAsArrayBuffer(file);
       } else if(ext==='xlsx'||ext==='xls'){
         var r4=new FileReader();
+        var _fd4=file.lastModified?new Date(file.lastModified):'';
+        var _fdate4=_fd4?((_fd4.getFullYear())+'-'+String(_fd4.getMonth()+1).padStart(2,'0')+'-'+String(_fd4.getDate()).padStart(2,'0')):'';
         r4.onload=function(e){
           ra_parseXlsxFile(e.target.result,function(text){
             var sb3=(document.getElementById('ra-sel_branch')||{}).value||'';
-            ra_addLoadedReport(file.name,'',null,text||'',ra_detectBranchInText(text,sb3),false);
+            ra_addLoadedReport(file.name,_fdate4,null,text||'',ra_detectBranchInText(text,sb3),false);
             if(!text) ra_toast('Warning: could not extract text from '+file.name);
           });
         };
         r4.readAsArrayBuffer(file);
       } else {
         var r3=new FileReader();
-        r3.onload=function(e){ var sb4=(document.getElementById('ra-sel_branch')||{}).value||''; ra_addLoadedReport(file.name,'',null,e.target.result||'',ra_detectBranchInText(e.target.result,sb4),false); };
+        var _fd3=file.lastModified?new Date(file.lastModified):'';
+        var _fdate3=_fd3?((_fd3.getFullYear())+'-'+String(_fd3.getMonth()+1).padStart(2,'0')+'-'+String(_fd3.getDate()).padStart(2,'0')):'';
+        r3.onload=function(e){ var sb4=(document.getElementById('ra-sel_branch')||{}).value||''; ra_addLoadedReport(file.name,_fdate3,null,e.target.result||'',ra_detectBranchInText(e.target.result,sb4),false); };
         r3.readAsText(file);
       }
     })(files[fi]);
@@ -18537,9 +18546,12 @@ function _updateRepeatDetectPanel(){
     }
   }
   if(!best){
-    body.innerHTML='<div style="display:flex;align-items:flex-start;gap:8px;background:rgba(255,255,255,.04);border:1px dashed rgba(160,180,200,.25);border-radius:7px;padding:10px 11px">'
+    body.innerHTML='<div style="background:rgba(255,255,255,.04);border:1px dashed rgba(160,180,200,.25);border-radius:7px;padding:10px 11px">'
+      +'<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">'
       +'<span style="font-size:18px;line-height:1">&#128196;</span>'
-      +'<div style="font-size:11px;color:#8aa0b8;line-height:1.55">Load the <strong style="color:#c8d8ea">previous audit report</strong> (Word file) in the <strong style="color:#c8d8ea">Risk Assessment</strong> panel to enable repeat detection.</div>'
+      +'<div style="font-size:11px;color:#8aa0b8;line-height:1.55">To detect repeated observations, upload the <strong style="color:#c8d8ea">latest previous audit report</strong> (Word file) in the Risk Assessment panel first.</div>'
+      +'</div>'
+      +'<button onclick="toggleRAPanel()" style="width:100%;padding:7px;background:rgba(100,140,200,.15);color:#a8c8ea;border:1px solid rgba(100,160,220,.3);border-radius:5px;font-family:\'Inter\',sans-serif;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.2px">&#128202; Open Risk Assessment Panel</button>'
       +'</div>';
   } else {
     var shortName=best.name.replace(/\.[^.]+$/,'');
@@ -18561,6 +18573,10 @@ function detectRepeatsFromPrevReport(){
   var best=bestStr||bestAny;
   if(!best){ alert('No previous report loaded in Risk Assessment.\n\nPlease load the previous audit report (Word file) in the Risk Assessment panel first.'); return; }
   if(!best.docxObsList&&!best.text){ alert('The loaded report file could not be read (text extraction failed).\n\nPlease try re-loading the Word file in Risk Assessment.'); return; }
+  // Warn if the selected report has no date — user should confirm it is the latest issued report
+  if(!best.date&&ra_loadedReports.length>1){
+    if(!confirm('Note: The report selected for repeat detection ("'+best.name+'") has no date set.\n\nSince multiple reports are loaded, the system cannot confirm this is the latest issued report.\n\nPlease set the report dates in the Risk Assessment panel to ensure the correct report is used.\n\nClick OK to continue with this report anyway, or Cancel to set the dates first.')) return;
+  }
 
   var selList=Object.keys(selIds).filter(function(k){return selIds[k];});
   if(!selList.length){ alert('No observations are selected in the current report yet.\n\nPlease select observations first, then run repeat detection.'); return; }
@@ -18676,7 +18692,8 @@ function detectRepeatsFromPrevReport(){
   // Sort by score descending — highest confidence first
   matches.sort(function(a,b){ return b.score-a.score; });
   // Store in global so Apply button can read without JSON-in-HTML issues
-  window._rdMatches = matches.map(function(m){ return {obsId:m.obsId,ref:m.prev.ref||''}; });
+  var _bestReportName=(best.name||'').replace(/\.[^.]+$/,''); // strip extension for LARR label
+  window._rdMatches = matches.map(function(m){ return {obsId:m.obsId,ref:m.prev.ref||'',reportName:_bestReportName}; });
 
   // Build unified review list — all pre-ticked, auditor unticks false positives
   var mh='<div style="font-family:Inter,sans-serif">';
@@ -18734,13 +18751,19 @@ function _applyRepeatSelections(){
     var chk=document.getElementById('rdchk-'+i);
     if(chk&&chk.checked){
       obsTypeMap[items[i].obsId]='Repeated';
-      setLastRef(items[i].obsId,items[i].ref);
+      // Build a meaningful LARR: "Para X.X — Report Name (please verify reference)"
+      var larrVal='';
+      if(items[i].ref) larrVal='Para '+items[i].ref;
+      if(items[i].reportName) larrVal+=(larrVal?' — ':'')+items[i].reportName;
+      if(larrVal) larrVal+=' (please verify full report reference)';
+      setLastRef(items[i].obsId, larrVal||items[i].ref);
       applied++;
     }
   }
   var modal=document.getElementById('rd-modal');
   if(modal) modal.remove();
   doSearch();
+  autoSaveNow(); // persist Repeated markings and LARR values immediately
   if(applied) ra_toast(applied+' observation(s) marked as Repeated with LARR filled.');
   else ra_toast('No observations marked — all were unticked.');
 }
