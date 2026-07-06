@@ -16656,8 +16656,35 @@ function showSaveDialog(){
       _assign(_nw,'2');
     }());
 
+    // ── Report-level: check for unlinked annexures ───────────────────────────
+    var _pfAnnexRows='';
+    var _pfAnnexAdvisory=0;
+    if(annexures&&annexures.length){
+      for(var _ani=0;_ani<annexures.length;_ani++){
+        var _an=annexures[_ani];
+        if(!_an.linkedObs||!_an.linkedObs.length){
+          _pfAnnexAdvisory++;
+          var _anLabel=_an.label||('Annexure-'+(_ani+1));
+          if(_an.title) _anLabel+=(' — '+_an.title);
+          _pfAnnexRows+='<div style="border:1px solid #f0d060;border-radius:7px;margin-bottom:10px;overflow:hidden">'
+            +'<div style="background:#fffbe8;padding:7px 10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #ede8a0;flex-wrap:wrap">'
+            +'<span style="background:#c07000;color:#fff;padding:2px 8px;font-size:10px;font-weight:800;border-radius:5px;white-space:nowrap">&#128203; Annexure</span>'
+            +'<span style="font-size:11.5px;font-weight:700;color:#5a3800;flex:1">'+esc(_anLabel)+'</span>'
+            +'<span style="font-size:10px;font-weight:700;background:#e6a020;color:#fff;border-radius:10px;padding:2px 8px;white-space:nowrap">&#9432; 1 Advisory</span>'
+            +'</div>'
+            +'<div style="padding:5px 10px 3px">'
+            +'<div style="display:flex;align-items:flex-start;gap:6px;padding:5px 0">'
+            +'<span style="color:#c08000;font-size:13px;line-height:1;margin-top:1px;flex-shrink:0">&#9432;</span>'
+            +'<span style="color:#9a6000;font-weight:700;font-size:11px;white-space:nowrap;min-width:110px;padding-top:1px;flex-shrink:0">No Linked Obs.</span>'
+            +'<span style="color:#5a4010;font-size:11px;line-height:1.45;flex:1">This annexure has no observation linked to it. Open the Annexures section in the left panel and link it to the relevant observation — otherwise it will be omitted from distributed copies.</span>'
+            +'</div>'
+            +'</div></div>';
+        }
+      }
+    }
+
     // Run readiness on all observations in report order
-    var _pfIssues=[], _pfBlocking=0, _pfAdvisory=0;
+    var _pfIssues=[], _pfBlocking=0, _pfAdvisory=_pfAnnexAdvisory;
     for(var _pfi=0;_pfi<_pfOrdered.length;_pfi++){
       var _pfo=_pfOrdered[_pfi];
       var _pfr=getObsReadiness(_pfo);
@@ -16675,9 +16702,9 @@ function showSaveDialog(){
       return s!==0?s:parseInt(pa[2],10)-parseInt(pb[2],10);
     });
 
-    if(_pfIssues.length){
-      // Build checklist rows
-      var _pfRows='';
+    if(_pfIssues.length||_pfAnnexAdvisory){
+      // Build checklist rows — annexure issues first, then observation issues
+      var _pfRows=_pfAnnexRows;
       for(var _pfi2=0;_pfi2<_pfIssues.length;_pfi2++){
         var _pfItem=_pfIssues[_pfi2];
         var _pfHasBlk=_pfItem.r.blocking.length>0;
