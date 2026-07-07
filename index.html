@@ -13422,51 +13422,65 @@ function showDraftModal() {
 function closeDraftModal(){var m=document.getElementById('draftModal');if(m)m.parentNode.removeChild(m);}
 
 function _roFmtSave(filename){
-  var html=document.getElementById('rof-html')&&document.getElementById('rof-html').checked;
-  var word=document.getElementById('rof-word')&&document.getElementById('rof-word').checked;
-  var pdf =document.getElementById('rof-pdf') &&document.getElementById('rof-pdf').checked;
-  if(!html&&!word&&!pdf){alert('Please select at least one format.');return;}
+  var doHtml=document.getElementById('rof-html')&&document.getElementById('rof-html').checked;
+  var doWord=document.getElementById('rof-word')&&document.getElementById('rof-word').checked;
+  var doPdf =document.getElementById('rof-pdf') &&document.getElementById('rof-pdf').checked;
+  if(!doHtml&&!doWord&&!doPdf){alert('Please select at least one format.');return;}
   var m=document.getElementById('roFmtModal');if(m)m.remove();
-  var fullHtml=window._roFmtHtml||'';
-  if(!fullHtml){alert('File content missing. Please try again.');return;}
-  var delay=0;
-  if(html){
-    (function(d){setTimeout(function(){
-      if(window.showSaveFilePicker){
-        window.showSaveFilePicker({suggestedName:filename+'.html',types:[{description:'HTML Document',accept:{'text/html':['.html']}}]})
-          .then(function(h){return h.createWritable();})
-          .then(function(w){w.write(new Blob([fullHtml],{type:'text/html'})).then(function(){w.close();toast('HTML saved: '+filename+'.html');});})
-          .catch(function(e){if(e&&e.name!=='AbortError')_saveFileAsLegacy(new Blob([fullHtml],{type:'text/html'}),filename+'.html');});
-      } else {
-        _saveFileAsLegacy(new Blob([fullHtml],{type:'text/html'}),filename+'.html');
-        toast('HTML saved: '+filename+'.html');
-      }
-    },d);})(delay);
-    delay+=600;
-  }
-  if(word){
-    var wordHtml='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'+
+
+  // Use _roFmtItems array (works for both combined=1 item and individual=N items)
+  var items=window._roFmtItems||[];
+  if(!items.length){alert('File content missing. Please try again.');return;}
+
+  function makeWordHtml(fh){
+    return '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'+
       '<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->'+
       '<style>body{font-family:Calibri,sans-serif;font-size:11pt;margin:2cm}h1{font-size:16pt;color:#1a3a5c}h2{font-size:13pt;color:#2a5080}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;font-size:10pt}textarea{width:100%;min-height:60px;border:1px solid #ccc;padding:4px}</style>'+
       '</head><body>'+
-      fullHtml.replace(/<!DOCTYPE[^>]*>/i,'').replace(/<html[^>]*>/i,'').replace(/<\/html>/i,'')
+      fh.replace(/<!DOCTYPE[^>]*>/i,'').replace(/<html[^>]*>/i,'').replace(/<\/html>/i,'')
         .replace(/<head>[\s\S]*?<\/head>/i,'').replace(/<body[^>]*>/i,'').replace(/<\/body>/i,'')
       +'</body></html>';
-    (function(d,wh){setTimeout(function(){
-      _saveFileAsLegacy(new Blob([wh],{type:'application/msword'}),filename+'.doc');
-      toast('Word saved: '+filename+'.doc');
-    },d);})(delay,wordHtml);
-    delay+=600;
   }
-  if(pdf){
-    (function(d){setTimeout(function(){
-      var pblob=new Blob([fullHtml],{type:'text/html'});
-      var purl=URL.createObjectURL(pblob);
-      var pw=window.open(purl,'_blank');
-      if(pw){pw.onload=function(){pw.focus();pw.print();};}
-      setTimeout(function(){URL.revokeObjectURL(purl);},30000);
-      toast('Report opened — use Print → Save as PDF');
-    },d);})(delay);
+
+  var delay=0;
+  for(var ix=0;ix<items.length;ix++){
+    (function(item, baseDelay){
+      var fh=item.html;
+      var fn=item.fname;
+      if(doHtml){
+        (function(d){setTimeout(function(){
+          if(window.showSaveFilePicker){
+            window.showSaveFilePicker({suggestedName:fn+'.html',types:[{description:'HTML Document',accept:{'text/html':['.html']}}]})
+              .then(function(h){return h.createWritable();})
+              .then(function(w){w.write(new Blob([fh],{type:'text/html'})).then(function(){w.close();toast('Saved: '+fn+'.html');});})
+              .catch(function(e){if(e&&e.name!=='AbortError')_saveFileAsLegacy(new Blob([fh],{type:'text/html'}),fn+'.html');});
+          } else {
+            _saveFileAsLegacy(new Blob([fh],{type:'text/html'}),fn+'.html');
+            toast('Saved: '+fn+'.html');
+          }
+        },d);})(baseDelay);
+        baseDelay+=700;
+      }
+      if(doWord){
+        (function(d,wh){setTimeout(function(){
+          _saveFileAsLegacy(new Blob([wh],{type:'application/msword'}),fn+'.doc');
+          toast('Saved: '+fn+'.doc');
+        },d);})(baseDelay, makeWordHtml(fh));
+        baseDelay+=700;
+      }
+      if(doPdf){
+        (function(d){setTimeout(function(){
+          var pblob=new Blob([fh],{type:'text/html'});
+          var purl=URL.createObjectURL(pblob);
+          var pw=window.open(purl,'_blank');
+          if(pw){pw.onload=function(){pw.focus();pw.print();};}
+          setTimeout(function(){URL.revokeObjectURL(purl);},30000);
+          toast('Opened for PDF: '+fn);
+        },d);})(baseDelay);
+        baseDelay+=700;
+      }
+    })(items[ix], delay);
+    delay += (doHtml?700:0)+(doWord?700:0)+(doPdf?700:0);
   }
 }
 
@@ -13753,32 +13767,23 @@ function downloadDraft(individual){
   if(!individual){
     // Combined — all selected categories in one file
     var parts=buildDraftHtml(selCats);
+    window._roFmtItems=[{html:buildFullHtml(parts,'RO_HO_Copy_'+brSlug), fname:'RO_HO_Copy_'+brSlug}];
     showRoFormatModal(parts, 'RO_HO_Copy_'+brSlug);
   } else {
-    // Individual file per category — show modal for first, chain rest after save
-    var _indParts=[];
+    // Individual files per category — build all, then show format modal once
+    var _indItems=[];
     for(var ii=0;ii<selCats.length;ii++){
       var _icat=selCats[ii];
       var _islug=_icat.replace(/[^a-zA-Z0-9]+/g,'_').substring(0,25);
-      _indParts.push({parts:buildDraftHtml([_icat]), fname:'RO_HO_Copy_'+brSlug+'_'+_islug});
+      var _ifname='RO_HO_Copy_'+brSlug+'_'+_islug;
+      var _iparts=buildDraftHtml([_icat]);
+      _indItems.push({html:buildFullHtml(_iparts,_ifname), fname:_ifname});
     }
-    // Download all individual files one by one with delay
-    for(var ij=0;ij<_indParts.length;ij++){
-      (function(item,delay){
-        setTimeout(function(){
-          var fh=buildFullHtml(item.parts, item.fname);
-          if(window.showSaveFilePicker){
-            window.showSaveFilePicker({suggestedName:item.fname+'.html',types:[{description:'HTML Document',accept:{'text/html':['.html']}}]})
-              .then(function(h){return h.createWritable();})
-              .then(function(w){w.write(new Blob([fh],{type:'text/html'})).then(function(){w.close();});})
-              .catch(function(e){if(e&&e.name!=='AbortError')_saveFileAsLegacy(new Blob([fh],{type:'text/html'}),item.fname+'.html');});
-          } else {
-            _saveFileAsLegacy(new Blob([fh],{type:'text/html'}),item.fname+'.html');
-          }
-        }, delay);
-      })(_indParts[ij], ij*900);
-    }
-    toast('RO/HO Copy — '+_indParts.length+' file(s) queued for download.');
+    window._roFmtItems=_indItems;
+    // Show format modal using first item's data (filename shown in title)
+    showRoFormatModal({html:'',annexHead:'',annexData:''}, 'RO_HO_Copy_'+brSlug+' ('+_indItems.length+' files)');
+    // Override _roFmtHtml so single-item path isn't used — _roFmtSave checks _roFmtItems
+    window._roFmtHtml=null;
   }
 }
 
