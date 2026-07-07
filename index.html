@@ -10419,6 +10419,65 @@ function esc(s){
   return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Paste-from-Word table handler ─────────────────────────────────────────
+// Converts an HTML <table> (from Word/Excel clipboard) to pipe-table format
+// so _renderText can render it as a proper table in reports.
+function _tableNodeToMarkdown(tbl){
+  var rows=tbl.querySelectorAll('tr');
+  if(!rows.length) return '';
+  var allRows=[]; var maxCols=0;
+  for(var ri=0;ri<rows.length;ri++){
+    var cells=rows[ri].querySelectorAll('td,th');
+    var r=[];
+    for(var ci=0;ci<cells.length;ci++){
+      // collapse inner whitespace/newlines from Word's XML
+      r.push((cells[ci].innerText||cells[ci].textContent).replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim());
+    }
+    if(r.length>maxCols) maxCols=r.length;
+    if(r.some(function(c){return c!=='';})) allRows.push(r);
+  }
+  if(!allRows.length||!maxCols) return '';
+  var out='';
+  for(var i=0;i<allRows.length;i++){
+    var row=allRows[i].slice();
+    while(row.length<maxCols) row.push('');
+    out+='|'+row.join('|')+'|\n';
+    if(i===0) out+='|'+Array(maxCols).fill('-----').join('|')+'|\n';
+  }
+  return out;
+}
+function _domNodeToText(node){
+  var out='';
+  var ch=node.childNodes;
+  for(var i=0;i<ch.length;i++){
+    var c=ch[i];
+    if(c.nodeType===3){ out+=c.textContent; }
+    else if(c.tagName==='TABLE'){ out+='\n'+_tableNodeToMarkdown(c)+'\n'; }
+    else if(c.tagName==='BR'){ out+='\n'; }
+    else if(/^(P|DIV|LI|H[1-6])$/.test(c.tagName||'')){
+      var inner=_domNodeToText(c);
+      if(inner.trim()) out+=inner+'\n';
+    } else { out+=_domNodeToText(c); }
+  }
+  return out;
+}
+function _pasteTableHandler(e,el){
+  var cb=e.clipboardData||window.clipboardData;
+  if(!cb) return;
+  var html=cb.getData('text/html');
+  if(!html) return; // no HTML on clipboard — let browser handle plain paste
+  var div=document.createElement('div');
+  div.innerHTML=html;
+  if(!div.querySelector('table')) return; // no table — let normal paste proceed
+  e.preventDefault();
+  var text=_domNodeToText(div).replace(/\n{3,}/g,'\n\n').trim();
+  var s=el.selectionStart||0; var en=el.selectionEnd||0;
+  el.value=el.value.substring(0,s)+text+el.value.substring(en);
+  el.selectionStart=el.selectionEnd=s+text.length;
+  el.dispatchEvent(new Event('input',{bubbles:true}));
+  el.dispatchEvent(new Event('change',{bubbles:true}));
+}
+
 // Renders plain text, converting markdown pipe tables to HTML <table> elements.
 // Non-table lines are wrapped in a pre-wrap div. Handles mixed content.
 function _renderText(text, opts){
@@ -12125,7 +12184,7 @@ function renderRpt(){
       // 1. Observation (editable)
       var obsText=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:o.observation||'';
       h+='<div class="osl">Observation</div>';
-      h+='<textarea class="oedit" id="oe-'+o.id+'" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].observation=this.value;WC_detect(\''+o.id+'\')">'+esc(obsText)+'</textarea>';
+      h+='<textarea class="oedit" id="oe-'+o.id+'" onpaste="_pasteTableHandler(event,this)" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].observation=this.value;WC_detect(\''+o.id+'\')">'+esc(obsText)+'</textarea>';
       // Auto-detect materiality from inline table or linked annexure
       autoDetectMateriality(o.id, obsText, getLinkedAnnexures(o.id));
       // 2b. Risk Framework — Instances & Financial Impact fields (after Observation, before Recommendation)
@@ -12151,7 +12210,7 @@ function renderRpt(){
       // 3. Recommendation (editable)
       var recText=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
       h+='<div class="osl">Recommendation</div>';
-      h+='<textarea class="oedit" id="re-'+o.id+'" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].recommendation=this.value;WC_detect(\''+o.id+'\')">'+esc(recText)+'</textarea>';
+      h+='<textarea class="oedit" id="re-'+o.id+'" onpaste="_pasteTableHandler(event,this)" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].recommendation=this.value;WC_detect(\''+o.id+'\')">'+esc(recText)+'</textarea>';
       // 3b. Last Audit Report Reference (LARR) (editable, repeated obs only)
       if(tc==='repeated'){
         var curLrRef=lastRefMap[o.id]||'';
@@ -14389,7 +14448,7 @@ function renderAnnexList(){
     // Text content area
     h+='<div style="margin-bottom:8px">';
     h+='<div style="font-size:10px;font-weight:700;color:var(--gtxt);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">&#9997; Text Content (type or paste)</div>';
-    h+='<textarea id="anxtxt-'+a.id+'" style="width:100%;box-sizing:border-box;min-height:80px;resize:vertical;font-family:Inter,sans-serif;font-size:12px;border:1px dashed #b0c4de;border-radius:4px;padding:6px 8px;background:#fafcff;outline:none" placeholder="Type or paste text here..." oninput="updateAnx(\''+a.id+'\',\'text\',this.value)" onchange="updateAnx(\''+a.id+'\',\'text\',this.value)">'+esc(a.text||'')+'</textarea>';
+    h+='<textarea id="anxtxt-'+a.id+'" style="width:100%;box-sizing:border-box;min-height:80px;resize:vertical;font-family:Inter,sans-serif;font-size:12px;border:1px dashed #b0c4de;border-radius:4px;padding:6px 8px;background:#fafcff;outline:none" placeholder="Type or paste text here..." onpaste="_pasteTableHandler(event,this)" oninput="updateAnx(\''+a.id+'\',\'text\',this.value)" onchange="updateAnx(\''+a.id+'\',\'text\',this.value)">'+esc(a.text||'')+'</textarea>';
     h+='<button class="mib" style="margin-top:4px" onclick="insertAnnexTable(\''+a.id+'\')">&#8862; Insert Table</button>';
     h+='</div>';
     if(a.files&&a.files.length){
