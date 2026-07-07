@@ -11766,6 +11766,9 @@ function confirmAndGenerate(){
   var ids = Object.keys(window.pendingSel);
   if(!ids.length){
     flushObsEditsToDb();
+    var _aie=true;
+    for(var _ii=0;_ii<INTRO_SECTION_IDS.length;_ii++){var _ie=document.getElementById(INTRO_SECTION_IDS[_ii]);if(_ie&&_ie.value.trim()){_aie=false;break;}}
+    if(_aie&&DB.intro_sections) autoFillIntroSections();
     renderRpt();
     return;
   }
@@ -11814,6 +11817,14 @@ function confirmAndGenerate(){
 
   // Flush obsEdits back into DB (in-memory + localStorage)
   flushObsEditsToDb();
+
+  // Auto-fill Report Introduction from databank if all sections are still empty
+  var _allIntroEmpty=true;
+  for(var ii=0;ii<INTRO_SECTION_IDS.length;ii++){
+    var _iel=document.getElementById(INTRO_SECTION_IDS[ii]);
+    if(_iel&&_iel.value.trim()){_allIntroEmpty=false;break;}
+  }
+  if(_allIntroEmpty&&DB.intro_sections) autoFillIntroSections();
 
   renderRpt();
 }
