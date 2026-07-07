@@ -9541,8 +9541,8 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
 
   <div class="sec">
     <div class="sh">&#128200; Sensitivity &amp; COSO Analysis</div>
-    <div style="font-size:10px;color:var(--gtxt);margin-bottom:8px;line-height:1.5">Toggle the Sensitivity Matrix and COSO Framework Analysis table inside the report preview. Generate the report first before enabling.</div>
-    <button id="analysis-btn-lp" onclick="toggleAnalysis()" style="width:100%;padding:8px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.2px;transition:background .2s">&#128200; Show Sensitivity &amp; COSO Analysis</button>
+    <div style="font-size:10px;color:var(--gtxt);margin-bottom:8px;line-height:1.5">Sensitivity Matrix &amp; COSO Framework Analysis are always included in all report versions. Use the button below to show or hide this section in the draft preview.</div>
+    <button id="analysis-btn-lp" onclick="toggleAnalysis()" style="width:100%;padding:8px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.2px;transition:background .2s">&#128200; Hide in Draft Preview</button>
   </div>
 
   <div class="sec">
@@ -11731,7 +11731,7 @@ function hasAnyData(){
   }
   return false;
 }
-var _showAnalysis = false;
+var _showAnalysis = true;
 
 // ============================================================
 // PENDING SELECTION & GENERATE CONFIRM
@@ -11769,7 +11769,6 @@ function confirmAndGenerate(){
     var _aie=true;
     for(var _ii=0;_ii<INTRO_SECTION_IDS.length;_ii++){var _ie=document.getElementById(INTRO_SECTION_IDS[_ii]);if(_ie&&_ie.value.trim()){_aie=false;break;}}
     if(_aie&&DB.intro_sections) autoFillIntroSections();
-    if(!_showAnalysis){ _showAnalysis=true; _syncAnalysisBtn(); }
     renderRpt();
     return;
   }
@@ -11826,7 +11825,6 @@ function confirmAndGenerate(){
     if(_iel&&_iel.value.trim()){_allIntroEmpty=false;break;}
   }
   if(_allIntroEmpty&&DB.intro_sections) autoFillIntroSections();
-  if(!_showAnalysis){ _showAnalysis=true; _syncAnalysisBtn(); }
 
   renderRpt();
 }
@@ -12131,8 +12129,8 @@ function renderRpt(){
   // Introduction sections (from left panel textareas)
   h += buildIntroHtml(getIntroSectionVals(), false);
 
-  // Analysis panel placeholder — populated by toggleAnalysis()
-  h += '<div id="analysis-inline">' + (_showAnalysis ? buildAnalysisHtml() : '') + '</div>';
+  // Analysis always part of draft report (toggle still hides/shows in preview)
+  h += '<div id="analysis-inline">' + buildAnalysisHtml() + '</div>';
 
   if(!all.length){
     h+='<p style="color:var(--gtxt);text-align:center;padding:26px">No observations selected. Tick observations in the left panel.</p>';
@@ -14436,10 +14434,10 @@ function _syncAnalysisBtn(){
   var btnLP=document.getElementById('analysis-btn-lp');
   if(_showAnalysis){
     if(btn){ btn.style.background='#c9962a'; btn.style.color='#111'; btn.style.borderColor='#f0c040'; }
-    if(btnLP){ btnLP.style.background='#c9962a'; btnLP.style.color='#111'; btnLP.innerHTML='&#128200; Hide Sensitivity &amp; COSO Analysis'; }
+    if(btnLP){ btnLP.style.background='#c9962a'; btnLP.style.color='#111'; btnLP.innerHTML='&#128200; Hide in Draft Preview'; }
   } else {
     if(btn){ btn.style.background=''; btn.style.color=''; btn.style.borderColor=''; }
-    if(btnLP){ btnLP.style.background='#1a3a5c'; btnLP.style.color='#fff'; btnLP.innerHTML='&#128200; Show Sensitivity &amp; COSO Analysis'; }
+    if(btnLP){ btnLP.style.background='#1a3a5c'; btnLP.style.color='#fff'; btnLP.innerHTML='&#128200; Show in Draft Preview'; }
   }
 }
 
