@@ -11946,7 +11946,11 @@ function renderRpt(){
     else sections[1].obs.push(all[a]);
   }
 
-  // Build category sub-groups within each section in canonical DEF_CA order
+  // Compute one global category order from ALL observations so both sections use the same sequence
+  var _allCatsObj={};
+  for(var _gi=0;_gi<all.length;_gi++){_allCatsObj[all[_gi].category||'Others']=true;}
+  var _globalCatOrder=catOrderByDef(_allCatsObj);
+
   function buildCatGroups(obsList){
     var cats={};
     for(var i=0;i<obsList.length;i++){
@@ -11954,7 +11958,9 @@ function renderRpt(){
       if(!cats[c]) cats[c]=[];
       cats[c].push(obsList[i]);
     }
-    return {cats:cats,catOrder:catOrderByDef(cats)};
+    // Filter global order to only categories present in this section
+    var catOrder=_globalCatOrder.filter(function(c){return !!cats[c];});
+    return {cats:cats,catOrder:catOrder};
   }
 
   var h='';
