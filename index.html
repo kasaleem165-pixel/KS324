@@ -13647,7 +13647,7 @@ function downloadDraft(individual){
     var annexHead=parts.annexHead||'';
     var annexData=parts.annexData||'';
     var notice='<div style="background:#fff8e1;border:1px solid #f0c040;border-radius:6px;padding:12px 16px;margin-bottom:24px;font-family:Arial,sans-serif;font-size:13px;color:#5a4000">'+
-      '<strong>&#9432; Instructions for Auditee:</strong> Please read each observation carefully and type your response in the yellow-highlighted <em>Auditee Response</em> fields. '+
+      '<strong>&#9432; Instructions:</strong> Please read each observation carefully. Enter your formal response in the <em>RO/HO Auditee Response</em> fields and any correction instructions in the <em>RO Manager Review Notes</em> fields. '+
       'When complete, click the <strong>"Save My Responses"</strong> button below.</div>';
     var saveBtn='<div style="text-align:center;margin-top:30px;padding:20px 0;border-top:2px solid #1a3a5c">'+
       '<button onclick="saveDraftResponses()" style="padding:12px 32px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;font-family:Arial,sans-serif;box-shadow:0 3px 10px rgba(0,0,0,.2)">&#128190; Save My Responses</button>'+
@@ -13656,18 +13656,29 @@ function downloadDraft(individual){
       '</div>';
     var full='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+filename+'</title>'+saveScript+annexHead+'</head><body>'+notice+html+saveBtn+annexData+'</body></html>';
     var blob=new Blob([full],{type:'text/html'});
-    saveFileAs(blob, filename+'.html');
+    _saveFileAsLegacy(blob, filename+'.html');
   }
 
   var brSlug=(H.brname||'Branch').replace(/[^a-zA-Z0-9]+/g,'_').substring(0,30);
 
-  // Generate full issued-report format for RO Manager (with input fields)
-  var roHtml;
-  try { roHtml=generateIssuedReport(true); } catch(ex){ alert('RO/HO Copy error: '+ex.message); return; }
-  if(!roHtml){alert('Could not generate RO/HO Copy. Please ensure observations are selected and a Referral Note is set on at least one observation.');return;}
-  var roFname='RO_Review_Copy_'+brSlug+'.html';
-  try { _saveFileAsLegacy(new Blob([roHtml],{type:'text/html'}), roFname); } catch(ex2){ alert('Save error: '+ex2.message); return; }
-  toast('RO Manager review copy saved: '+roFname);
+  if(!individual){
+    // Combined — all selected categories in one file
+    var parts=buildDraftHtml(selCats);
+    triggerDownload(parts, 'RO_HO_Copy_'+brSlug);
+    toast('RO/HO Copy saved.');
+  } else {
+    // Individual file per category
+    for(var ii=0;ii<selCats.length;ii++){
+      (function(cat,delay){
+        setTimeout(function(){
+          var parts=buildDraftHtml([cat]);
+          var slug=cat.replace(/[^a-zA-Z0-9]+/g,'_').substring(0,25);
+          triggerDownload(parts, 'RO_HO_Copy_'+brSlug+'_'+slug);
+        }, delay);
+      })(selCats[ii], ii*800);
+    }
+    toast('RO/HO Copy — '+selCats.length+' file(s) downloading.');
+  }
 }
 
 // ============================================================
