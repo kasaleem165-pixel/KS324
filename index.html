@@ -11252,6 +11252,7 @@ function restoreSession(sess) {
             linkedObs:a.linkedObs||[],open:a.open||false,
             files:(a.files||[]).map(function(f){return {name:f.name,type:f.type,dataUrl:f.dataUrl};})};
   });
+  resequenceAnnexLabels(); // ensure labels are in correct format after restore
   srr_files = (sess.srrFiles||[]).map(function(f){return {name:f.name,type:f.type,dataUrl:f.dataUrl};});
   srrRenderFilesBar();
   // Restore intro sections
@@ -14323,8 +14324,8 @@ function renderAnnexList(){
     h+='<button class="odl" onclick="event.stopPropagation();delAnnex(\''+a.id+'\')">&#10005;</button></div>';
     h+='<div class="anxbody" id="anxb-'+a.id+'" style="display:'+(a.open?'block':'none')+'">';
     h+='<div class="g2" style="margin-bottom:8px">';
-    h+='<div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">Label</div>';
-    h+='<input type="text" style="width:100%;border:1px solid var(--gbor);border-radius:3px;padding:4px 7px;font-family:Inter,sans-serif;font-size:12px;outline:none" value="'+esc(a.label)+'" placeholder="e.g. Annexure-A" oninput="updateAnx(\''+a.id+'\',\'label\',this.value)"></div>';
+    h+='<div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">Label <span style="color:#2a8a5c;font-weight:700">(auto-assigned)</span></div>';
+    h+='<input type="text" readonly style="width:100%;border:1px solid var(--gbor);border-radius:3px;padding:4px 7px;font-family:Inter,sans-serif;font-size:12px;background:#f0f4f0;color:#2a6040;font-weight:700;cursor:default" value="'+esc(a.label)+'"></div>';
     h+='<div><div style="font-size:10px;color:var(--gtxt);margin-bottom:2px">Title / Description</div>';
     h+='<input type="text" style="width:100%;border:1px solid var(--gbor);border-radius:3px;padding:4px 7px;font-family:Inter,sans-serif;font-size:12px;outline:none" value="'+esc(a.title)+'" placeholder="e.g. Detail of overdue books" oninput="updateAnx(\''+a.id+'\',\'title\',this.value)"></div>';
     h+='</div>';
@@ -14394,14 +14395,9 @@ function renderAnnexList(){
 }
 
 function resequenceAnnexLabels(){
-  // Only auto-rename entries whose label matches the default pattern "Annexure-X"
-  var seq=0;
+  // Always auto-assign sequential labels to all annexures
   for(var i=0;i<annexures.length;i++){
-    var lbl=annexures[i].label||'';
-    if(/^Annexure-[A-Z0-9]+$/i.test(lbl)||lbl===''){
-      annexures[i].label='Annexure-'+(ANX_LABELS[seq]||String(seq+1));
-    }
-    seq++;
+    annexures[i].label='Annexure '+(ANX_LABELS[i]||String(i+1));
   }
 }
 
