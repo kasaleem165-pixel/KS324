@@ -13421,6 +13421,55 @@ function showDraftModal() {
 
 function closeDraftModal(){var m=document.getElementById('draftModal');if(m)m.parentNode.removeChild(m);}
 
+function _roFmtSave(filename){
+  var html=document.getElementById('rof-html')&&document.getElementById('rof-html').checked;
+  var word=document.getElementById('rof-word')&&document.getElementById('rof-word').checked;
+  var pdf =document.getElementById('rof-pdf') &&document.getElementById('rof-pdf').checked;
+  if(!html&&!word&&!pdf){alert('Please select at least one format.');return;}
+  var m=document.getElementById('roFmtModal');if(m)m.remove();
+  var fullHtml=window._roFmtHtml||'';
+  if(!fullHtml){alert('File content missing. Please try again.');return;}
+  var delay=0;
+  if(html){
+    (function(d){setTimeout(function(){
+      if(window.showSaveFilePicker){
+        window.showSaveFilePicker({suggestedName:filename+'.html',types:[{description:'HTML Document',accept:{'text/html':['.html']}}]})
+          .then(function(h){return h.createWritable();})
+          .then(function(w){w.write(new Blob([fullHtml],{type:'text/html'})).then(function(){w.close();toast('HTML saved: '+filename+'.html');});})
+          .catch(function(e){if(e&&e.name!=='AbortError')_saveFileAsLegacy(new Blob([fullHtml],{type:'text/html'}),filename+'.html');});
+      } else {
+        _saveFileAsLegacy(new Blob([fullHtml],{type:'text/html'}),filename+'.html');
+        toast('HTML saved: '+filename+'.html');
+      }
+    },d);})(delay);
+    delay+=600;
+  }
+  if(word){
+    var wordHtml='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'+
+      '<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->'+
+      '<style>body{font-family:Calibri,sans-serif;font-size:11pt;margin:2cm}h1{font-size:16pt;color:#1a3a5c}h2{font-size:13pt;color:#2a5080}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;font-size:10pt}textarea{width:100%;min-height:60px;border:1px solid #ccc;padding:4px}</style>'+
+      '</head><body>'+
+      fullHtml.replace(/<!DOCTYPE[^>]*>/i,'').replace(/<html[^>]*>/i,'').replace(/<\/html>/i,'')
+        .replace(/<head>[\s\S]*?<\/head>/i,'').replace(/<body[^>]*>/i,'').replace(/<\/body>/i,'')
+      +'</body></html>';
+    (function(d,wh){setTimeout(function(){
+      _saveFileAsLegacy(new Blob([wh],{type:'application/msword'}),filename+'.doc');
+      toast('Word saved: '+filename+'.doc');
+    },d);})(delay,wordHtml);
+    delay+=600;
+  }
+  if(pdf){
+    (function(d){setTimeout(function(){
+      var pblob=new Blob([fullHtml],{type:'text/html'});
+      var purl=URL.createObjectURL(pblob);
+      var pw=window.open(purl,'_blank');
+      if(pw){pw.onload=function(){pw.focus();pw.print();};}
+      setTimeout(function(){URL.revokeObjectURL(purl);},30000);
+      toast('Report opened — use Print → Save as PDF');
+    },d);})(delay);
+  }
+}
+
 function draftToggleAll(){
   var checks=document.querySelectorAll('#draftModal input[type=checkbox]');
   var anyUnchecked=false;
@@ -13642,7 +13691,7 @@ function downloadDraft(individual){
     '}'+
     '<\/script>';
 
-  function triggerDownload(parts, filename){
+  function buildFullHtml(parts, filename){
     var html=parts.html||parts;
     var annexHead=parts.annexHead||'';
     var annexData=parts.annexData||'';
@@ -13654,9 +13703,49 @@ function downloadDraft(individual){
       '<div id="_roAutolbl" style="margin-top:8px;font-size:11.5px;color:#2a6040;min-height:16px"></div>'+
       '<div style="margin-top:6px;font-size:11px;color:#888">Auto-saves every 2 seconds. Use this button to generate the final file to send back to the auditor.</div>'+
       '</div>';
-    var full='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+filename+'</title>'+saveScript+annexHead+'</head><body>'+notice+html+saveBtn+annexData+'</body></html>';
-    var blob=new Blob([full],{type:'text/html'});
-    _saveFileAsLegacy(blob, filename+'.html');
+    return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+filename+'</title>'+saveScript+annexHead+'</head><body>'+notice+html+saveBtn+annexData+'</body></html>';
+  }
+
+  function showRoFormatModal(parts, filename){
+    var fullHtml=buildFullHtml(parts, filename);
+    var el=document.createElement('div');
+    el.id='roFmtModal';
+    el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center';
+    el.innerHTML=
+      '<div style="background:#fff;border-radius:12px;padding:0;width:420px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.3);overflow:hidden">'+
+      '<div style="background:#1a3a5c;color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">'+
+        '<span style="font-size:15px;font-weight:700">&#128229; Save RO/HO Copy</span>'+
+        '<button onclick="document.getElementById(\'roFmtModal\').remove()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1">&#10005;</button>'+
+      '</div>'+
+      '<div style="padding:18px">'+
+        '<p style="font-size:12.5px;color:#555;margin-bottom:14px">Select format(s) to save, then click <strong>Save Selected</strong>.</p>'+
+        '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">'+
+          '<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid #dde;border-radius:7px;cursor:pointer" for="rof-html">'+
+            '<input type="checkbox" id="rof-html" checked style="width:15px;height:15px;margin-top:2px;flex-shrink:0">'+
+            '<span style="font-size:22px">&#128196;</span>'+
+            '<div><strong style="font-size:13px;display:block">HTML (Interactive)</strong><span style="font-size:11.5px;color:#777">Interactive file with response fields. Recommended for distribution to RO/HO.</span></div>'+
+          '</label>'+
+          '<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid #dde;border-radius:7px;cursor:pointer" for="rof-word">'+
+            '<input type="checkbox" id="rof-word" style="width:15px;height:15px;margin-top:2px;flex-shrink:0">'+
+            '<span style="font-size:22px">&#128462;</span>'+
+            '<div><strong style="font-size:13px;display:block">Word Document (.doc)</strong><span style="font-size:11.5px;color:#777">Opens in Microsoft Word or LibreOffice for printing.</span></div>'+
+          '</label>'+
+          '<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid #dde;border-radius:7px;cursor:pointer" for="rof-pdf">'+
+            '<input type="checkbox" id="rof-pdf" style="width:15px;height:15px;margin-top:2px;flex-shrink:0">'+
+            '<span style="font-size:22px">&#128443;</span>'+
+            '<div><strong style="font-size:13px;display:block">PDF (Print / Save as PDF)</strong><span style="font-size:11.5px;color:#777">Opens print dialog — choose Save as PDF. Always opens separately.</span></div>'+
+          '</label>'+
+        '</div>'+
+        '<div style="display:flex;gap:10px">'+
+          '<button onclick="_roFmtSave(\''+filename+'\')" style="flex:1;padding:10px;background:#1a7a4a;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Save Selected</button>'+
+          '<button onclick="document.getElementById(\'roFmtModal\').remove()" style="padding:10px 16px;background:#e8edf5;color:#444;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>'+
+        '</div>'+
+        '<p style="font-size:11px;color:#888;margin-top:10px">&#9432;&nbsp; PDF always opens a separate print dialog and cannot be downloaded directly by the browser.</p>'+
+      '</div></div>';
+    // Store the generated HTML for use by _roFmtSave
+    window._roFmtHtml=fullHtml;
+    document.body.appendChild(el);
+    el.addEventListener('click',function(e){if(e.target===el)el.remove();});
   }
 
   var brSlug=(H.brname||'Branch').replace(/[^a-zA-Z0-9]+/g,'_').substring(0,30);
@@ -13664,20 +13753,32 @@ function downloadDraft(individual){
   if(!individual){
     // Combined — all selected categories in one file
     var parts=buildDraftHtml(selCats);
-    triggerDownload(parts, 'RO_HO_Copy_'+brSlug);
-    toast('RO/HO Copy saved.');
+    showRoFormatModal(parts, 'RO_HO_Copy_'+brSlug);
   } else {
-    // Individual file per category
+    // Individual file per category — show modal for first, chain rest after save
+    var _indParts=[];
     for(var ii=0;ii<selCats.length;ii++){
-      (function(cat,delay){
-        setTimeout(function(){
-          var parts=buildDraftHtml([cat]);
-          var slug=cat.replace(/[^a-zA-Z0-9]+/g,'_').substring(0,25);
-          triggerDownload(parts, 'RO_HO_Copy_'+brSlug+'_'+slug);
-        }, delay);
-      })(selCats[ii], ii*800);
+      var _icat=selCats[ii];
+      var _islug=_icat.replace(/[^a-zA-Z0-9]+/g,'_').substring(0,25);
+      _indParts.push({parts:buildDraftHtml([_icat]), fname:'RO_HO_Copy_'+brSlug+'_'+_islug});
     }
-    toast('RO/HO Copy — '+selCats.length+' file(s) downloading.');
+    // Download all individual files one by one with delay
+    for(var ij=0;ij<_indParts.length;ij++){
+      (function(item,delay){
+        setTimeout(function(){
+          var fh=buildFullHtml(item.parts, item.fname);
+          if(window.showSaveFilePicker){
+            window.showSaveFilePicker({suggestedName:item.fname+'.html',types:[{description:'HTML Document',accept:{'text/html':['.html']}}]})
+              .then(function(h){return h.createWritable();})
+              .then(function(w){w.write(new Blob([fh],{type:'text/html'})).then(function(){w.close();});})
+              .catch(function(e){if(e&&e.name!=='AbortError')_saveFileAsLegacy(new Blob([fh],{type:'text/html'}),item.fname+'.html');});
+          } else {
+            _saveFileAsLegacy(new Blob([fh],{type:'text/html'}),item.fname+'.html');
+          }
+        }, delay);
+      })(_indParts[ij], ij*900);
+    }
+    toast('RO/HO Copy — '+_indParts.length+' file(s) queued for download.');
   }
 }
 
