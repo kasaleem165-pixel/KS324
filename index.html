@@ -13662,11 +13662,11 @@ function downloadDraft(individual){
   var brSlug=(H.brname||'Branch').replace(/[^a-zA-Z0-9]+/g,'_').substring(0,30);
 
   // Generate full issued-report format for RO Manager (with input fields)
-  var roHtml=generateIssuedReport(true);
-  if(!roHtml){alert('Please generate the report first.');return;}
+  var roHtml;
+  try { roHtml=generateIssuedReport(true); } catch(ex){ alert('RO/HO Copy error: '+ex.message); return; }
+  if(!roHtml){alert('Could not generate RO/HO Copy. Please ensure observations are selected and a Referral Note is set on at least one observation.');return;}
   var roFname='RO_Review_Copy_'+brSlug+'.html';
-  // Use legacy <a download> directly — showSaveFilePicker loses user-gesture by this point
-  _saveFileAsLegacy(new Blob([roHtml],{type:'text/html'}), roFname);
+  try { _saveFileAsLegacy(new Blob([roHtml],{type:'text/html'}), roFname); } catch(ex2){ alert('Save error: '+ex2.message); return; }
   toast('RO Manager review copy saved: '+roFname);
 }
 
@@ -15484,7 +15484,7 @@ function generateIssuedReport(forROCopy){
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
   var all=dbObs.concat(cuObs);
   if(!all.length){toast('No observations selected. Please select observations first.');return;}
-  if(!isReview){
+  if(!isReview && !forROCopy){
     var missingRef=_checkPriorRefs(all);
     if(missingRef.length){
       var names=missingRef.map(function(o,i){return (i+1)+'. '+o.title;}).join('\n');
