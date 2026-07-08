@@ -18699,19 +18699,33 @@ function ra_detectBranchInText(text, selectedBranch){
     }
   }
 
-  // Step 2: scan first 8000 chars for any known branch name (longest first)
+  // Step 2: scan first 8000 chars — city-filtered first, then global fallback
   var sorted=RA_BRANCHES.slice().sort(function(a,b){return b.name.length-a.name.length;});
-  for(var i=0;i<sorted.length;i++){
-    var b=sorted[i];
-    if(lower8k.indexOf(b.name.toLowerCase())!==-1) return b.name;
+  var selCity='';
+  if(selectedBranch){
+    for(var si=0;si<RA_BRANCHES.length;si++){
+      if(RA_BRANCHES[si].name===selectedBranch){ selCity=(RA_BRANCHES[si].city||'').toLowerCase(); break; }
+    }
+  }
+  // Step 2a: if selected branch city known, only look for branches in same city
+  if(selCity){
+    for(var i=0;i<sorted.length;i++){
+      var b=sorted[i];
+      if((b.city||'').toLowerCase()===selCity && lower8k.indexOf(b.name.toLowerCase())!==-1) return b.name;
+    }
+  }
+  // Step 2b: no city-restricted match found — scan for any branch (cross-city fallback)
+  for(var i2=0;i2<sorted.length;i2++){
+    var b2=sorted[i2];
+    if(lower8k.indexOf(b2.name.toLowerCase())!==-1) return b2.name;
   }
 
   // Step 3: branch code fallback — require the code to be surrounded by non-digits
   for(var j=0;j<RA_BRANCHES.length;j++){
-    var b2=RA_BRANCHES[j];
-    if(b2.code){
-      var re=new RegExp('(?:^|\\D)'+b2.code+'(?:\\D|$)');
-      if(re.test(lower8k)) return b2.name;
+    var b3=RA_BRANCHES[j];
+    if(b3.code){
+      var re=new RegExp('(?:^|\\D)'+b3.code+'(?:\\D|$)');
+      if(re.test(lower8k)) return b3.name;
     }
   }
   return null;
