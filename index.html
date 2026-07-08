@@ -10484,9 +10484,25 @@ function _pasteTableHandler(e,el){
   el.dispatchEvent(new Event('change',{bubbles:true}));
 }
 
+// Strips Word/Office HTML markup (style blocks, comments, tags) from stored text
+function _stripWordMarkup(text){
+  if(!text) return text;
+  // Remove HTML comment blocks (Word embeds CSS inside <!-- ... -->)
+  text=text.replace(/<!--[\s\S]*?-->/g,'');
+  // Remove <style>...</style> blocks
+  text=text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'');
+  // Remove any remaining HTML tags
+  text=text.replace(/<[^>]+>/g,'');
+  // Clean up excessive blank lines left behind
+  text=text.replace(/\n{3,}/g,'\n\n').trim();
+  return text;
+}
+
 // Renders plain text, converting markdown pipe tables to HTML <table> elements.
 // Non-table lines are wrapped in a pre-wrap div. Handles mixed content.
 function _renderText(text, opts){
+  if(!text) return '';
+  text=_stripWordMarkup(text);
   if(!text) return '';
   opts=opts||{};
   var fs=opts.fontSize||'13px';
@@ -13963,8 +13979,8 @@ function downloadSoftCopy(){
     var scRecText=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
     var scOeEl=document.getElementById('oe-'+o.id); if(scOeEl) scObsText=scOeEl.value;
     var scReEl=document.getElementById('re-'+o.id); if(scReEl) scRecText=scReEl.value;
-    if(scObsText) h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Observation</div><div style="font-size:12.5px;line-height:1.65;color:#2a3a50;margin-bottom:10px">'+esc(scObsText)+'</div>';
-    if(scRecText) h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Recommendation</div><div style="font-size:12.5px;line-height:1.65;color:#2a3a50;margin-bottom:10px">'+esc(scRecText)+'</div>';
+    if(scObsText){h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Observation</div>';h+=_renderText(scObsText,{fontSize:'12.5px',lineHeight:'1.65',color:'#2a3a50',marginBottom:'10px'});}
+    if(scRecText){h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Recommendation</div>';h+=_renderText(scRecText,{fontSize:'12.5px',lineHeight:'1.65',color:'#2a3a50',marginBottom:'10px'});}
     if(ax) h+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> '+esc(ax)+'</div>';
     // Auditee Response — always blank in soft copy, with ETR as sub-section inside
     h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Auditee Response <span style="color:#c0392b;font-size:9px">(Required)</span></div>';
