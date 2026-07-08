@@ -18677,21 +18677,22 @@ function _ra_checkBranchMismatch(){
 
 function ra_detectBranchInText(text, selectedBranch){
   if(!text||!RA_BRANCHES.length) return null;
-  var lower=text.toLowerCase().substring(0,8000);
-  // Step 1: if the selected branch name appears in the text, that is definitive
-  if(selectedBranch && lower.indexOf(selectedBranch.toLowerCase())!==-1) return selectedBranch;
-  // Step 2: scan for any branch name (longest first to prefer more-specific names)
+  var lowerFull=text.toLowerCase();
+  var lower8k=lowerFull.substring(0,8000);
+  // Step 1: search ENTIRE text for selected branch — definitive match if found anywhere
+  if(selectedBranch && lowerFull.indexOf(selectedBranch.toLowerCase())!==-1) return selectedBranch;
+  // Step 2: scan first 8000 chars for any known branch name (longest first)
   var sorted=RA_BRANCHES.slice().sort(function(a,b){return b.name.length-a.name.length;});
   for(var i=0;i<sorted.length;i++){
     var b=sorted[i];
-    if(lower.indexOf(b.name.toLowerCase())!==-1) return b.name;
+    if(lower8k.indexOf(b.name.toLowerCase())!==-1) return b.name;
   }
   // Step 3: branch code fallback — require the code to be surrounded by non-digits
   for(var j=0;j<RA_BRANCHES.length;j++){
     var b2=RA_BRANCHES[j];
     if(b2.code){
       var re=new RegExp('(?:^|\\D)'+b2.code+'(?:\\D|$)');
-      if(re.test(lower)) return b2.name;
+      if(re.test(lower8k)) return b2.name;
     }
   }
   return null;
