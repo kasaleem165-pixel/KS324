@@ -18679,45 +18679,66 @@ function ra_detectBranchInText(text, selectedBranch){
   if(!text||!RA_BRANCHES.length) return null;
   var lowerFull=text.toLowerCase();
   var lower8k=lowerFull.substring(0,8000);
+  var sorted=RA_BRANCHES.slice().sort(function(a,b){return b.name.length-a.name.length;});
+
+  // Step 0: Priority search — "Document Information" section and first page (~2000 chars)
+  // These are the most authoritative locations for the branch name in a report
+  var docInfoZone='';
+  var diIdx=lowerFull.indexOf('document information');
+  if(diIdx!==-1) docInfoZone=lowerFull.substring(diIdx, diIdx+1500);
+  var firstPageZone=lowerFull.substring(0,2000);
+  var priorityZone=firstPageZone+(docInfoZone?'\n'+docInfoZone:'');
+  // Check selected branch name in priority zone first
+  if(selectedBranch && priorityZone.indexOf(selectedBranch.toLowerCase())!==-1) return selectedBranch;
+  // Scan priority zone for any known branch (city-filtered)
+  var selCityP='';
+  if(selectedBranch){
+    for(var pi=0;pi<RA_BRANCHES.length;pi++){
+      if(RA_BRANCHES[pi].name===selectedBranch){ selCityP=(RA_BRANCHES[pi].city||'').toLowerCase(); break; }
+    }
+  }
+  if(selCityP){
+    for(var pj=0;pj<sorted.length;pj++){
+      if((sorted[pj].city||'').toLowerCase()===selCityP && priorityZone.indexOf(sorted[pj].name.toLowerCase())!==-1) return sorted[pj].name;
+    }
+  }
+  for(var pk=0;pk<sorted.length;pk++){
+    if(priorityZone.indexOf(sorted[pk].name.toLowerCase())!==-1) return sorted[pk].name;
+  }
 
   // Step 1: exact full name anywhere in entire text — definitive
   if(selectedBranch && lowerFull.indexOf(selectedBranch.toLowerCase())!==-1) return selectedBranch;
 
-  // Step 1b: partial match — split selected branch by comma, check all significant parts found in full text
+  // Step 1b: partial match — core name + any one other comma-part found anywhere in full text
   if(selectedBranch){
     var parts=selectedBranch.split(',').map(function(p){return p.trim().toLowerCase();}).filter(function(p){return p.length>2;});
     if(parts.length>=2){
       var allFound=true;
-      for(var pi=0;pi<parts.length;pi++){ if(lowerFull.indexOf(parts[pi])===-1){allFound=false;break;} }
+      for(var ai=0;ai<parts.length;ai++){ if(lowerFull.indexOf(parts[ai])===-1){allFound=false;break;} }
       if(allFound) return selectedBranch;
-      // Try at least core name (first part) + any one other part
-      if(parts.length>=2 && lowerFull.indexOf(parts[0])!==-1){
-        for(var qi=1;qi<parts.length;qi++){
-          if(lowerFull.indexOf(parts[qi])!==-1) return selectedBranch;
+      if(lowerFull.indexOf(parts[0])!==-1){
+        for(var bi=1;bi<parts.length;bi++){
+          if(lowerFull.indexOf(parts[bi])!==-1) return selectedBranch;
         }
       }
     }
   }
 
   // Step 2: scan first 8000 chars — city-filtered first, then global fallback
-  var sorted=RA_BRANCHES.slice().sort(function(a,b){return b.name.length-a.name.length;});
   var selCity='';
   if(selectedBranch){
     for(var si=0;si<RA_BRANCHES.length;si++){
       if(RA_BRANCHES[si].name===selectedBranch){ selCity=(RA_BRANCHES[si].city||'').toLowerCase(); break; }
     }
   }
-  // Step 2a: if selected branch city known, only look for branches in same city
   if(selCity){
     for(var i=0;i<sorted.length;i++){
       var b=sorted[i];
       if((b.city||'').toLowerCase()===selCity && lower8k.indexOf(b.name.toLowerCase())!==-1) return b.name;
     }
   }
-  // Step 2b: no city-restricted match found — scan for any branch (cross-city fallback)
   for(var i2=0;i2<sorted.length;i2++){
-    var b2=sorted[i2];
-    if(lower8k.indexOf(b2.name.toLowerCase())!==-1) return b2.name;
+    if(lower8k.indexOf(sorted[i2].name.toLowerCase())!==-1) return sorted[i2].name;
   }
 
   // Step 3: branch code fallback — require the code to be surrounded by non-digits
