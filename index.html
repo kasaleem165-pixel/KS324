@@ -18679,14 +18679,33 @@ function ra_detectBranchInText(text, selectedBranch){
   if(!text||!RA_BRANCHES.length) return null;
   var lowerFull=text.toLowerCase();
   var lower8k=lowerFull.substring(0,8000);
-  // Step 1: search ENTIRE text for selected branch — definitive match if found anywhere
+
+  // Step 1: exact full name anywhere in entire text — definitive
   if(selectedBranch && lowerFull.indexOf(selectedBranch.toLowerCase())!==-1) return selectedBranch;
+
+  // Step 1b: partial match — split selected branch by comma, check all significant parts found in full text
+  if(selectedBranch){
+    var parts=selectedBranch.split(',').map(function(p){return p.trim().toLowerCase();}).filter(function(p){return p.length>2;});
+    if(parts.length>=2){
+      var allFound=true;
+      for(var pi=0;pi<parts.length;pi++){ if(lowerFull.indexOf(parts[pi])===-1){allFound=false;break;} }
+      if(allFound) return selectedBranch;
+      // Try at least core name (first part) + any one other part
+      if(parts.length>=2 && lowerFull.indexOf(parts[0])!==-1){
+        for(var qi=1;qi<parts.length;qi++){
+          if(lowerFull.indexOf(parts[qi])!==-1) return selectedBranch;
+        }
+      }
+    }
+  }
+
   // Step 2: scan first 8000 chars for any known branch name (longest first)
   var sorted=RA_BRANCHES.slice().sort(function(a,b){return b.name.length-a.name.length;});
   for(var i=0;i<sorted.length;i++){
     var b=sorted[i];
     if(lower8k.indexOf(b.name.toLowerCase())!==-1) return b.name;
   }
+
   // Step 3: branch code fallback — require the code to be surrounded by non-digits
   for(var j=0;j<RA_BRANCHES.length;j++){
     var b2=RA_BRANCHES[j];
