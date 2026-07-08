@@ -10469,6 +10469,9 @@ function _pasteTableHandler(e,el){
   if(!cb) return;
   var html=cb.getData('text/html');
   if(!html) return; // no HTML on clipboard — let browser handle plain paste
+  // Strip Word/Office CSS style blocks and HTML comments before parsing
+  html=html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'');
+  html=html.replace(/<!--[\s\S]*?-->/g,'');
   var div=document.createElement('div');
   div.innerHTML=html;
   if(!div.querySelector('table')) return; // no table — let normal paste proceed
