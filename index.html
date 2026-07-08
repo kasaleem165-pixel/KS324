@@ -12313,6 +12313,35 @@ function renderRpt(){
       h+='<option value="Referred to Head Office"'+selHO+'>Referred to Head Office</option>';
       h+='</select>';
       h+='</div></div>';
+      // Risk Assessment Matrix strip
+      var _fw=getFw(o);
+      var _mx=_fw.mx;
+      var _sensKey=sensitivityMap[o.id]||'';
+      var _sensBg=_sensKey==='High'?'#c0392b':_sensKey==='M to H'?'#e67e22':_sensKey==='L to M'?'#f1c40f':'#27ae60';
+      var _sensFg=_sensKey==='L to M'?'#333':'#fff';
+      function _rChip(lbl,val){
+        var bg='#95a5a6';
+        if(val==='High')bg='#c0392b'; else if(val==='Medium-High')bg='#e67e22';
+        else if(val==='Medium')bg='#2980b9'; else if(val==='Low-Medium')bg='#2e86ab';
+        else if(val==='Low')bg='#27ae60';
+        var fg=(val==='Medium-High'||val==='Low-Medium')?'#fff':'#fff';
+        return '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#555;white-space:nowrap">'
+          +'<span style="font-size:9px;font-weight:600;color:#888">'+lbl+'</span>'
+          +'<span style="background:'+bg+';color:'+fg+';border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700">'+esc(val)+'</span>'
+        +'</span>';
+      }
+      var _cosoLabels={'CE':'Control Env.','RA':'Risk Assessment','CA':'Control Activities','IC':'Info & Comm.','M':'Monitoring'};
+      var _cosoLbl=_cosoLabels[cosoMap[o.id]||'']||'Not Mapped';
+      h+='<div style="margin-top:8px;border-top:1px dashed #c8d8ec;padding-top:7px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:#f7faff;border-radius:0 0 4px 4px;padding:6px 10px">';
+      h+='<span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#1a3a5c;white-space:nowrap">&#9632; Risk Matrix</span>';
+      if(_sensKey) h+='<span style="background:'+_sensBg+';color:'+_sensFg+';border-radius:3px;padding:1px 8px;font-size:10px;font-weight:700">'+esc(_sensKey==='M to H'?'Med-High':_sensKey==='L to M'?'Low-Med':_sensKey)+'</span>';
+      h+=_rChip('Likelihood',_mx.likelihood);
+      h+=_rChip('Impact',_mx.impact);
+      h+=_rChip('Inherent',_mx.inherent);
+      h+=_rChip('Residual',_mx.residual);
+      h+=_rChip('Appetite',_mx.appetite);
+      h+='<span style="font-size:10px;font-weight:700;color:#555;white-space:nowrap"><span style="font-size:9px;font-weight:600;color:#888">COSO</span> <span style="background:#1a3a5c;color:#fff;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700">'+esc(_cosoLbl)+'</span></span>';
+      h+='</div>';
       h+='</div></div>';
       }
       h+='</div>';
