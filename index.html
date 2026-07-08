@@ -12313,35 +12313,9 @@ function renderRpt(){
       h+='<option value="Referred to Head Office"'+selHO+'>Referred to Head Office</option>';
       h+='</select>';
       h+='</div></div>';
-      // Risk Assessment Matrix strip
-      var _fw=getFw(o);
-      var _mx=_fw.mx;
-      var _sensKey=sensitivityMap[o.id]||'';
-      var _sensBg=_sensKey==='High'?'#c0392b':_sensKey==='M to H'?'#e67e22':_sensKey==='L to M'?'#f1c40f':'#27ae60';
-      var _sensFg=_sensKey==='L to M'?'#333':'#fff';
-      function _rChip(lbl,val){
-        var bg='#95a5a6';
-        if(val==='High')bg='#c0392b'; else if(val==='Medium-High')bg='#e67e22';
-        else if(val==='Medium')bg='#2980b9'; else if(val==='Low-Medium')bg='#2e86ab';
-        else if(val==='Low')bg='#27ae60';
-        var fg=(val==='Medium-High'||val==='Low-Medium')?'#fff':'#fff';
-        return '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#555;white-space:nowrap">'
-          +'<span style="font-size:9px;font-weight:600;color:#888">'+lbl+'</span>'
-          +'<span style="background:'+bg+';color:'+fg+';border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700">'+esc(val)+'</span>'
-        +'</span>';
-      }
-      var _cosoLabels={'CE':'Control Env.','RA':'Risk Assessment','CA':'Control Activities','IC':'Info & Comm.','M':'Monitoring'};
-      var _cosoLbl=_cosoLabels[cosoMap[o.id]||'']||'Not Mapped';
-      h+='<div style="margin-top:8px;border-top:1px dashed #c8d8ec;padding-top:7px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:#f7faff;border-radius:0 0 4px 4px;padding:6px 10px">';
-      h+='<span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#1a3a5c;white-space:nowrap">&#9632; Risk Matrix</span>';
-      if(_sensKey) h+='<span style="background:'+_sensBg+';color:'+_sensFg+';border-radius:3px;padding:1px 8px;font-size:10px;font-weight:700">'+esc(_sensKey==='M to H'?'Med-High':_sensKey==='L to M'?'Low-Med':_sensKey)+'</span>';
-      h+=_rChip('Likelihood',_mx.likelihood);
-      h+=_rChip('Impact',_mx.impact);
-      h+=_rChip('Inherent',_mx.inherent);
-      h+=_rChip('Residual',_mx.residual);
-      h+=_rChip('Appetite',_mx.appetite);
-      h+='<span style="font-size:10px;font-weight:700;color:#555;white-space:nowrap"><span style="font-size:9px;font-weight:600;color:#888">COSO</span> <span style="background:#1a3a5c;color:#fff;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700">'+esc(_cosoLbl)+'</span></span>';
-      h+='</div>';
+      // Risk Assessment Matrix — same layout as Finalized Report
+      var _riskObsText=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:o.observation||'';
+      h+=buildObsRiskPanel(o, _riskObsText);
       h+='</div></div>';
       }
       h+='</div>';
@@ -15240,6 +15214,77 @@ function fwChip(label,val,extra){
 function upliftRisk(base, steps){
   var idx=FW_RISK_TIERS.indexOf(base); if(idx===-1)idx=2;
   return FW_RISK_TIERS[Math.min(idx+steps,FW_RISK_TIERS.length-1)];
+}
+function buildObsRiskPanel(o, obsText){
+  var fw=getFw(o);
+  var inst=parseObsInstances(o.id, obsText||'');
+  var adjInherent=inst.uplift>0?upliftRisk(fw.mx.inherent,inst.uplift):fw.mx.inherent;
+  var adjResidual=inst.uplift>0?upliftRisk(fw.mx.residual,inst.uplift):fw.mx.residual;
+  var wasUplifted=(adjInherent!==fw.mx.inherent);
+  var instBadgeColor=inst.label==='Systemic / Pervasive'?'#c0392b':inst.label==='Significant'?'#e67e22':inst.label==='Isolated / Limited'?'#2980b9':'#95a5a6';
+  var dlgHtml='';
+  if(fw.rr.diligentId){
+    var dlgCov=fw.rr.diligentCovered,dlgGap=fw.rr.diligentGap,dlgTot=fw.rr.diligentTotal;
+    var dlgPct=dlgTot>0?Math.round(dlgCov/dlgTot*100):0;
+    var dlgBarColor=dlgPct>=85?'#1a7a4a':dlgPct>=60?'#e67e22':'#c0392b';
+    var dlgGapAlert=dlgGap>0?'<div style="margin-top:5px;padding:4px 8px;background:#fff3cd;border:1px solid #ffc107;border-radius:4px;font-size:10px;color:#7a5000;font-weight:600">&#9888; '+dlgGap+' risk'+(dlgGap!==1?'s':'')+' in this area are not yet covered in the audit databank</div>':'<div style="margin-top:5px;padding:4px 8px;background:#d4edda;border:1px solid #5a9a6a;border-radius:4px;font-size:10px;color:#1a5a2a;font-weight:600">&#10003; All risks in this area are covered in the audit databank</div>';
+    dlgHtml='<div style="background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;padding:7px 10px;margin-top:7px">'
+      +'<div style="font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#1a3557;margin-bottom:4px">&#128203; Risk Register Coverage</div>'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px"><span style="font-size:.7rem;color:#555;min-width:80px">Area:</span><span style="font-size:.72rem;font-weight:700;color:#1a3557">'+esc(fw.rr.diligentArea)+'</span></div>'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="font-size:.7rem;color:#555;min-width:80px">Coverage:</span><div style="flex:1;height:7px;background:#e8ecf0;border-radius:4px;overflow:hidden"><div style="height:100%;width:'+dlgPct+'%;background:'+dlgBarColor+';border-radius:4px"></div></div><span style="font-size:.75rem;font-weight:700;color:'+dlgBarColor+';min-width:36px;text-align:right">'+dlgPct+'%</span></div>'
+      +'<div style="font-size:.68rem;color:#555;margin-bottom:3px">&#10003; <strong>'+dlgCov+'</strong> covered &nbsp;|&nbsp; &#9888; <strong>'+dlgGap+'</strong> gap &nbsp;|&nbsp; <strong>'+dlgTot+'</strong> total</div>'
+      +dlgGapAlert+'</div>';
+  }
+  var instBox='<div style="background:#f7f9fc;border:1px solid #dde2ea;border-radius:6px;padding:.55rem .75rem;margin-top:.55rem;font-size:.77rem">'
+    +'<div style="font-size:.63rem;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#555;margin-bottom:.3rem">&#128202; Materiality Analysis</div>'
+    +(inst.count>0?'<div>Instances: <strong>'+inst.count+'</strong></div>':'')
+    +(inst.amount>0?'<div>Financial Impact: <strong>Rs. '+inst.amount.toLocaleString()+'</strong></div>':'')
+    +(inst.sources.length?'<div style="color:#777;font-size:.72rem;margin-top:.2rem">Sources: '+inst.sources.join(' &bull; ')+'</div>':'')
+    +'<div style="margin-top:.3rem">Materiality: <span style="display:inline-block;background:'+instBadgeColor+';color:#fff;border-radius:20px;padding:.1rem .6rem;font-size:.7rem;font-weight:700">'+inst.label+'</span>'
+    +(wasUplifted?' <span style="color:#c0392b;font-size:.7rem;font-weight:700">&uarr; Inherent Risk uplifted</span>':'')
+    +'</div></div>';
+  return '<div style="margin-top:12px;border:2px solid #1a3557;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(26,53,87,.10)">'
+    +'<div style="background:linear-gradient(90deg,#1a3557 0%,#2a5080 100%);color:#fff;padding:7px 14px;font-size:11.5px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:8px">'
+      +'<span style="font-size:14px">&#128203;</span><span>Risk-Based Audit Framework</span>'
+      +'<span style="margin-left:auto;font-size:10px;font-weight:400;opacity:.8">'+esc(o.title)+'</span>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;font-size:11.5px;border-top:1px solid #d0e0f0">'
+    +'<div style="padding:11px 13px;border-right:1px solid #d0e4f0;background:#fff">'
+      +'<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#1a3557;margin-bottom:5px;border-bottom:2px solid #1a3557;padding-bottom:3px">&#9656; Risk Register</div>'
+      +'<span style="display:inline-block;background:#1a3557;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;margin-bottom:4px">'+esc(fw.rr.id)+'</span>'
+      +'<div style="font-weight:700;color:#c0392b;font-size:11.5px;margin-bottom:4px;line-height:1.3">'+esc(fw.rr.name)+'</div>'
+      +'<div style="color:#555;font-size:10.5px;margin-bottom:6px;line-height:1.4">'+esc(fw.rr.desc)+'</div>'
+      +dlgHtml
+      +'<div style="margin-top:7px;font-size:10px;color:#666;border-top:1px solid #dde8f0;padding-top:5px;font-style:italic"><strong style="color:#1a3557;font-style:normal">Control Objective:</strong> '+esc(fw.rr.obj)+'</div>'
+    +'</div>'
+    +'<div style="padding:11px 13px;border-right:1px solid #d0e4f0;background:#fafcff">'
+      +'<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#8e44ad;margin-bottom:5px;border-bottom:2px solid #8e44ad;padding-bottom:3px">&#9656; Risk Matrix</div>'
+      +'<table style="width:100%;border-collapse:collapse;margin-bottom:8px">'
+      +fwChip('Likelihood',fw.mx.likelihood)
+      +fwChip('Impact',fw.mx.impact)
+      +'<tr><td colspan="2" style="padding:2px 0"><hr style="border:none;border-top:1px solid #e0e8f0;margin:2px 0"></td></tr>'
+      +fwChip('Inherent Risk',adjInherent,(wasUplifted?'<span style="color:#c0392b;font-size:9px;font-weight:700;margin-left:4px">&uarr; uplifted</span>':''))
+      +fwChip('Residual Risk',adjResidual)
+      +fwChip('Risk Appetite',fw.mx.appetite)
+      +'</table>'
+      +instBox
+    +'</div>'
+    +'<div style="padding:11px 13px;background:#f5fdf8">'
+      +'<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#1a7a4a;margin-bottom:5px;border-bottom:2px solid #1a7a4a;padding-bottom:3px">&#9656; Control Activity</div>'
+      +'<span style="display:inline-block;background:#1a7a4a;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;margin-bottom:4px">'+esc(fw.ca.id)+'</span>'
+      +'<div style="font-weight:700;color:#1a7a4a;font-size:11.5px;margin-bottom:4px;line-height:1.3">'+esc(fw.ca.name)+'</div>'
+      +'<div style="color:#555;font-size:10.5px;margin-bottom:8px;line-height:1.4">'+esc(fw.ca.desc)+'</div>'
+      +'<div style="background:#fff;border:1px solid #b8ddc8;border-left:4px solid #1a7a4a;border-radius:0 5px 5px 0;padding:7px 10px;font-size:10.5px;color:#1a3a22;line-height:1.45">'
+        +'<div style="font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#1a7a4a;margin-bottom:4px">Audit Conclusion</div>'
+        +'Based on application of <em>'+esc(fw.ca.name)+'</em>, '
+        +(fw.mx.likelihood==='Low'
+          ?'the audit team found the control to be <strong>operating with deficiencies</strong>. While the likelihood is assessed as low, lapses in compliance with control requirements were observed. '
+          :'the audit team found that the applicable control is <strong>not being effectively implemented</strong>. Non-compliance with established control requirements was observed. ')
+        +(inst.count>0?'A total of <strong>'+inst.count+' instance'+(inst.count!==1?'s':'')+' were identified</strong>, indicating a <strong>'+inst.label.toLowerCase()+'</strong> control failure. ':' ')
+        +'Detailed findings and recommendations are documented in the observation above.'
+      +'</div>'
+    +'</div>'
+    +'</div></div>';
 }
 function parseObsInstances(obsId, text){
   var sources=[], instanceCount=0, totalAmount=0;
