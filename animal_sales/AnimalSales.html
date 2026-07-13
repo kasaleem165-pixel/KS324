@@ -407,6 +407,7 @@ input[readonly]{background:#f8fafc}
   <!-- Sales Collection sub-tab -->
   <div id="rsect-payments" class="rpt-section" style="display:none">
     <div class="card">
+      <div id="pay-flash"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
         <div class="card-title" style="margin:0">Sales Collection</div>
         <div style="display:flex;gap:8px">
@@ -2858,6 +2859,7 @@ function renderPayments(){
     <td style="white-space:nowrap" onclick="event.stopPropagation()">
       <button class="btn btn-primary btn-sm" onclick="showPayReceipt('${p.receipt_no}')">Receipt</button>
       <button class="btn btn-light btn-sm" style="margin-left:4px" onclick="openPaymentEdit('${p.receipt_no}')">&#9998; Edit</button>
+      <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="deletePayment('${p.receipt_no}')">&#128465; Del</button>
     </td>
   </tr>`).join('')+`<tr style="font-weight:700;background:#e0f2fe"><td colspan="8" style="text-align:right;color:#1a3a5c">Grand Total (${list.length})</td><td style="color:#059669">${Rs(totAmt)}</td><td style="color:#7c3aed">${Rs(totDisc)}</td><td></td></tr>`;
 }
@@ -2942,6 +2944,17 @@ function savePaymentEdit(){
   closeModal('editpay-overlay');
   refreshCurrentView();
   flash('','','');
+}
+
+function deletePayment(rno){
+  const p=DB.payments.find(x=>x.receipt_no===rno); if(!p) return;
+  const c=DB.customers.find(x=>x.id===p.customer_id);
+  const cName_=c?c.name:'Unknown';
+  if(!confirm(`⚠️ WARNING: Delete Collection Receipt ${rno}?\n\nCustomer: ${cName_}\nAmount: ${Rs(p.amount)}${p.discount?'\nDiscount: '+Rs(p.discount):''}\n\nThis will permanently remove this payment record and increase the customer's outstanding balance accordingly. This action cannot be undone.\n\nAre you sure?`)) return;
+  DB.payments=DB.payments.filter(x=>x.receipt_no!==rno);
+  save();
+  refreshCurrentView();
+  flash('pay-flash','Collection receipt '+rno+' deleted.','ok');
 }
 
 // ══════════════════════════ ANIMAL DETAIL MODAL ══════════════════════════
@@ -3296,7 +3309,7 @@ function renderInlineLedger(){
     function thP(label,col){return `<th class="sortable${SORT.custledger_p.col===col?' sort-'+SORT.custledger_p.dir:''}" onclick="sortToggle('custledger_p','${col}')" style="cursor:pointer">${label}</th>`;}
     html+=`<div class="tbl-wrap"><table><thead><tr><th>S#</th>${thP('Receipt#','receipt_no')}${thP('Date','pay_date')}${thP('Method','type')}${thP('Bank','bank_name')}${thP('Sender','sender_name')}${thP('Place','place')}${thP('Amount','amount')}${thP('Discount','discount')}<th></th></tr></thead><tbody>`;
     sortedPays.forEach((p,i)=>{
-      html+=`<tr><td style="color:#94a3b8;font-size:.75rem">${i+1}</td><td>${p.receipt_no||'-'}</td><td>${fmtD(p.pay_date)}</td><td>${p.type||'Cash'}</td><td>${p.bank_name||'-'}</td><td>${p.sender_name||'-'}</td><td>${p.place||'-'}</td><td style="color:#059669"><strong>${Rs(p.amount)}</strong></td><td style="color:#7c3aed">${p.discount?Rs(p.discount):'-'}</td><td><button class="btn btn-primary btn-sm" onclick="showPayReceipt('${p.receipt_no}')">Receipt</button> <button class="btn btn-light btn-sm" onclick="openPaymentEdit('${p.receipt_no}')">&#9998;</button></td></tr>`;
+      html+=`<tr><td style="color:#94a3b8;font-size:.75rem">${i+1}</td><td>${p.receipt_no||'-'}</td><td>${fmtD(p.pay_date)}</td><td>${p.type||'Cash'}</td><td>${p.bank_name||'-'}</td><td>${p.sender_name||'-'}</td><td>${p.place||'-'}</td><td style="color:#059669"><strong>${Rs(p.amount)}</strong></td><td style="color:#7c3aed">${p.discount?Rs(p.discount):'-'}</td><td><button class="btn btn-primary btn-sm" onclick="showPayReceipt('${p.receipt_no}')">Receipt</button> <button class="btn btn-light btn-sm" onclick="openPaymentEdit('${p.receipt_no}')">&#9998;</button> <button class="btn btn-danger btn-sm" onclick="deletePayment('${p.receipt_no}')">&#128465;</button></td></tr>`;
     });
     html+=`<tr style="font-weight:700;background:#e0f2fe"><td colspan="7" style="text-align:right;color:#1a3a5c">Total (${sortedPays.length})</td><td style="color:#059669">${Rs(grandAmt)}</td><td style="color:#7c3aed">${Rs(grandDisc)}</td><td></td></tr></tbody></table></div>`;
   } else html+=`<p style="color:#aaa;font-style:italic">No payments yet.</p>`;
