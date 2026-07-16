@@ -790,7 +790,7 @@
   </div>
   <!-- Common base fields -->
   <div class="grid-2">
-    <div class="form-group"><label>Animal (Tag No) *</label><select class="form-control" id="healthTag"></select></div>
+    <div class="form-group"><label>Animal (Tag No) *</label><select class="form-control" id="healthTag" onchange="autoFillCalvingDate()"></select></div>
     <div class="form-group"><label>Date *</label><input type="date" class="form-control" id="healthDate" onchange="autoFillCalvingDate()"></div>
   </div>
   <!-- Treatment-specific -->
@@ -2733,8 +2733,9 @@ function clearMilkFilters(){['filterMilkTag','filterMilkShift','filterMilkFrom',
 let _healthTypeFilter = '';
 
 // Gestation periods in days by animal type
-const GESTATION_DAYS = {
-  'Cow': 283, 'Buffalo': 310, 'Goat': 150, 'Sheep': 147
+// Gestation periods in months by animal type (used for Expected Date auto-fill)
+const GESTATION_MONTHS = {
+  'Cow': 9, 'Buffalo': 10, 'Goat': 5, 'Sheep': 5
 };
 
 // Events that trigger auto-fill of expected/calving date
@@ -2762,10 +2763,11 @@ function autoFillCalvingDate() {
   const animals = dbGet('animals');
   const animal = animals.find(a => a.tagNo === tagNo);
   const animalType = animal ? animal.animalType : '';
-  const days = GESTATION_DAYS[animalType] || 283;
+  const months = GESTATION_MONTHS[animalType] || 9;
 
+  // Add months (not days) — e.g. Jan 15 + 9 months = Oct 15
   const baseDate = new Date(date);
-  baseDate.setDate(baseDate.getDate() + days);
+  baseDate.setMonth(baseDate.getMonth() + months);
   const yyyy = baseDate.getFullYear();
   const mm   = String(baseDate.getMonth() + 1).padStart(2, '0');
   const dd   = String(baseDate.getDate()).padStart(2, '0');
@@ -2773,7 +2775,7 @@ function autoFillCalvingDate() {
 
   const expectedEl = document.getElementById('hExpectedDate');
   if (expectedEl && !expectedEl.value) { expectedEl.value = expectedStr; autoSetReminderDate(); }
-  if (hint) hint.textContent = `(auto: +${days} days for ${animalType||'Cow'})`;
+  if (hint) hint.textContent = `(auto: ${months} months for ${animalType||'Cow'})`;
 }
 
 function autoSetReminderDate() {
