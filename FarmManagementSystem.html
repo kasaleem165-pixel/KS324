@@ -2733,9 +2733,9 @@ function clearMilkFilters(){['filterMilkTag','filterMilkShift','filterMilkFrom',
 let _healthTypeFilter = '';
 
 // Gestation periods in days by animal type
-// Gestation periods in months by animal type (used for Expected Date auto-fill)
-const GESTATION_MONTHS = {
-  'Cow': 9, 'Buffalo': 10, 'Goat': 5, 'Sheep': 5
+// Gestation periods in days by animal type (Cow=283, Buffalo=310, Goat=150, Sheep=147)
+const GESTATION_DAYS = {
+  'Cow': 283, 'Buffalo': 310, 'Goat': 150, 'Sheep': 147
 };
 
 // Events that trigger auto-fill of expected/calving date
@@ -2763,11 +2763,10 @@ function autoFillCalvingDate() {
   const animals = dbGet('animals');
   const animal = animals.find(a => a.tagNo === tagNo);
   const animalType = animal ? animal.animalType : '';
-  const months = GESTATION_MONTHS[animalType] || 9;
+  const days = GESTATION_DAYS[animalType] || 283;
 
-  // Add months (not days) — e.g. Jan 15 + 9 months = Oct 15
   const baseDate = new Date(date);
-  baseDate.setMonth(baseDate.getMonth() + months);
+  baseDate.setDate(baseDate.getDate() + days);
   const yyyy = baseDate.getFullYear();
   const mm   = String(baseDate.getMonth() + 1).padStart(2, '0');
   const dd   = String(baseDate.getDate()).padStart(2, '0');
@@ -2775,7 +2774,7 @@ function autoFillCalvingDate() {
 
   const expectedEl = document.getElementById('hExpectedDate');
   if (expectedEl && !expectedEl.value) { expectedEl.value = expectedStr; autoSetReminderDate(); }
-  if (hint) hint.textContent = `(auto: ${months} months for ${animalType||'Cow'})`;
+  if (hint) hint.textContent = `(auto: ${days} days for ${animalType||'Cow'})`;
 }
 
 function autoSetReminderDate() {
