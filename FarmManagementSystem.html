@@ -1401,7 +1401,7 @@ function populateAllDropdowns() {
   populateSel('hMedicineName', ['--Select--',...(lk.medicineNames||[])], null);
   populateSel('hVaccineName', ['--Select--',...(lk.vaccineNames||[])], null);
   populateSel('hDewormMed', ['--Select--',...(lk.medicineNames||[])], null);
-  populateSel('hReproEvent', lk.reproductiveEvents||[], null);
+  populateSel('hReproEvent', lk.reproductiveEvents||[], 'Select Event...');
   populateSel('hSemenName', lk.semenNames||[], null, null, 'Select / type semen name...');
 
   const allStages = getAllStages();
@@ -2773,7 +2773,7 @@ function autoFillCalvingDate() {
   const expectedStr = `${yyyy}-${mm}-${dd}`;
 
   const expectedEl = document.getElementById('hExpectedDate');
-  if (expectedEl && !expectedEl.value) { expectedEl.value = expectedStr; autoSetReminderDate(); }
+  if (expectedEl) { expectedEl.value = expectedStr; autoSetReminderDate(); }
   if (hint) hint.textContent = `(auto: ${days} days for ${animalType||'Cow'})`;
 }
 
@@ -2853,6 +2853,7 @@ function setHealthType(type) {
   const el = document.getElementById('hf-' + type.toLowerCase());
   if (el) el.style.display = 'block';
   document.getElementById('nextDueGroup').style.display = type === 'Mortality' ? 'none' : 'block';
+  if (type === 'Reproductive') autoFillCalvingDate();
 }
 
 function filterHealthByType(type) {
