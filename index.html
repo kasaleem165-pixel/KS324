@@ -9144,7 +9144,12 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <button class="tb-dd-item rpt-btn" onclick="downloadSoftCopy();tbDDClose()"><span class="di">&#128233;</span> Auditee Copy</button>
         <button class="tb-dd-item rpt-btn" onclick="triggerLoad();tbDDClose()"><span class="di">&#128194;</span> Load Auditee Response</button>
         <div class="tb-dd-sep"></div>
-        <button class="tb-dd-item rpt-btn" onclick="showDraftModal();tbDDClose()"><span class="di">&#128196;</span> RO / HO Copy</button>
+        <button class="tb-dd-item rpt-btn" onclick="showDraftModal('ro');tbDDClose()"><span class="di">&#128196;</span> RO Copy</button>
+        <button class="tb-dd-item rpt-btn" onclick="showDraftModal('ho');tbDDClose()"><span class="di">&#128196;</span> HO Copy</button>
+        <div class="tb-dd-sep"></div>
+        <button class="tb-dd-item rpt-btn" onclick="triggerLoadSectResponse('ro');tbDDClose()"><span class="di">&#128194;</span> Load RO Response</button>
+        <button class="tb-dd-item rpt-btn" onclick="triggerLoadSectResponse('ho');tbDDClose()"><span class="di">&#128194;</span> Load HO Response</button>
+        <div class="tb-dd-sep"></div>
         <button class="tb-dd-item rpt-btn" onclick="showSaveDialog();tbDDClose()"><span class="di">&#9989;</span> Finalize Report</button>
       </div>
     </div>
@@ -9152,11 +9157,11 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
     <div class="tb-dd" id="dd-review">
       <button class="tb-dd-tab" onclick="tbDDToggle('dd-review')">Review <span class="arr">&#9660;</span></button>
       <div class="tb-dd-menu">
-        <button class="tb-dd-item rpt-btn" onclick="generateReviewerHtml('ro');tbDDClose()"><span class="di">&#128228;</span> Send to RO Manager</button>
-        <button class="tb-dd-item rpt-btn" onclick="triggerLoadReviewerHtml('ro');tbDDClose()"><span class="di">&#128194;</span> Load RO Review</button>
+        <button class="tb-dd-item rpt-btn" onclick="generateReviewerHtml('ro');tbDDClose()"><span class="di">&#128228;</span> Send to RO Audit Supervisor</button>
+        <button class="tb-dd-item rpt-btn" onclick="triggerLoadReviewerHtml('ro');tbDDClose()"><span class="di">&#128194;</span> Load RO Supervisor Review</button>
         <div class="tb-dd-sep"></div>
-        <button class="tb-dd-item rpt-btn" onclick="generateReviewerHtml('ho');tbDDClose()"><span class="di">&#128228;</span> Send to HO</button>
-        <button class="tb-dd-item rpt-btn" onclick="triggerLoadReviewerHtml('ho');tbDDClose()"><span class="di">&#128194;</span> Load HO Review</button>
+        <button class="tb-dd-item rpt-btn" onclick="generateReviewerHtml('ho');tbDDClose()"><span class="di">&#128228;</span> Send to HO Audit Supervisor</button>
+        <button class="tb-dd-item rpt-btn" onclick="triggerLoadReviewerHtml('ho');tbDDClose()"><span class="di">&#128194;</span> Load HO Supervisor Review</button>
         <div class="tb-dd-sep"></div>
         <button class="tb-dd-item rpt-btn" onclick="generateIssuedReport();tbDDClose()"><span class="di">&#10003;</span> Issue Report</button>
       </div>
@@ -9184,6 +9189,8 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
 
     <input type="file" id="ro-review-fileinp" accept=".html" style="display:none" onchange="loadReviewerHtml(event,'ro')">
     <input type="file" id="ho-review-fileinp" accept=".html" style="display:none" onchange="loadReviewerHtml(event,'ho')">
+    <input type="file" id="ro-sect-resp-fileinp" accept=".html" style="display:none" onchange="loadSectResponseFile(event,'ro')">
+    <input type="file" id="ho-sect-resp-fileinp" accept=".html" style="display:none" onchange="loadSectResponseFile(event,'ho')">
 
     <button id="panel-back-btn" style="display:none" onclick="_closePanelBack()">&#8592; Back to Report</button>
 
@@ -9890,7 +9897,9 @@ var avMap    = {};   // {obsId: manual audit view text}
 var actMap   = {};   // {obsId: action taken text}
 var respMap  = {};   // {obsId: auditee response text}
 var respBHMap= {};   // {obsId: Branch Head response}
-var respROMap= {};   // {obsId: RO/HO response}
+var respROMap= {};   // {obsId: RO/HO Supervisor response (formal review chain)}
+var respSectROMap={};// {obsId: RO section head response (from RO Copy)}
+var respSectHOMap={};// {obsId: HO section head response (from HO Copy)}
 var assessMap= {};   // {obsId: 'agreed'|'resolved'|'partial'|'notresolved'}
 var refMap   = {};   // {obsId: referral note text, '' means no referral}
 var obsEdits = {};   // {obsId: {observation, recommendation}} — auditor edits to obs text
@@ -11328,6 +11337,8 @@ function captureSession() {
     respMap  : respMap,
     respBHMap: respBHMap,
     respROMap: respROMap,
+    respSectROMap: respSectROMap,
+    respSectHOMap: respSectHOMap,
     assessMap: assessMap,
     sensitivityMap: sensitivityMap,
     cosoMap  : cosoMap,
@@ -11376,8 +11387,10 @@ function restoreSession(sess) {
   avMap     = sess.avMap     || {};
   actMap    = sess.actMap    || {};
   respMap   = sess.respMap   || {};
-  respBHMap = sess.respBHMap || {};
-  respROMap = sess.respROMap || {};
+  respBHMap     = sess.respBHMap     || {};
+  respROMap     = sess.respROMap     || {};
+  respSectROMap = sess.respSectROMap || {};
+  respSectHOMap = sess.respSectHOMap || {};
   assessMap      = sess.assessMap      || {};
   sensitivityMap = sess.sensitivityMap || {};
   cosoMap        = sess.cosoMap        || {};
@@ -12297,6 +12310,17 @@ function renderRpt(){
           h+='<div class="osl">Auditee Response</div>';
           h+='<textarea class="oresp" id="r-'+o.id+'" readonly style="background:#f0f4f8;color:#3a4a5c;cursor:default;border-color:#b0c0d8" title="Auditee response is locked after loading">'+esc(resp)+'</textarea>';
         }
+        // Section head responses
+        var sectROResp=respSectROMap[o.id]||null;
+        var sectHOResp=respSectHOMap[o.id]||null;
+        if(sectROResp){
+          h+='<div class="osl" style="color:#1a5c3a">RO Section Response</div>';
+          h+='<textarea class="oresp" readonly style="background:#f0fff8;color:#1a3a2a;cursor:default;border-color:#80c8a0" title="RO Section Head response">'+esc(sectROResp)+'</textarea>';
+        }
+        if(sectHOResp){
+          h+='<div class="osl" style="color:#1a3a5c">HO Section Response</div>';
+          h+='<textarea class="oresp" readonly style="background:#f0f4ff;color:#1a2a5a;cursor:default;border-color:#90b0e8" title="HO Section Head response">'+esc(sectHOResp)+'</textarea>';
+        }
       }
       // 5 & 6: Assessment-driven (after response load) or original mode
       if(responseLoaded){
@@ -12526,7 +12550,7 @@ function doCopy(){
 
 function _performFullClear(){
   // Data maps
-  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
   // SRR / Risk Mapping state
   if(typeof srr_flagged!=='undefined') srr_flagged={};
   if(typeof srr_reassigned!=='undefined') srr_reassigned={};
@@ -12576,7 +12600,7 @@ function _performFullClear(){
 function doClear(){
   if(!confirm('Clear all selected observations and reset the report draft? Branch information will be kept.'))return;
   // Clear only observation selections and report content — keep branch/header fields intact
-  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
   if(typeof srr_flagged!=='undefined') srr_flagged={};
   if(typeof srr_reassigned!=='undefined') srr_reassigned={};
   if(typeof srr_files!=='undefined') srr_files=[];
@@ -13544,18 +13568,20 @@ function exportCmpReport(mode){
 // ============================================================
 // DRAFT BY CATEGORY
 // ============================================================
-function showDraftModal() {
+function showDraftModal(role) {
+  var roleLabel=role==='ro'?'Regional Office':'Head Office';
+  var refValue=role==='ro'?'Referred to Regional Office':'Referred to Head Office';
   var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
   var all=dbObs.concat(cuObs);
   if(!all.length){alert('No observations selected. Please select observations first.');return;}
 
-  // Filter to only observations with a referral note (RO or HO)
+  // Filter to only observations referred to this specific office (RO or HO)
   var referred=[];
   for(var ri=0;ri<all.length;ri++){
-    if(refMap[all[ri].id]) referred.push(all[ri]);
+    if(refMap[all[ri].id]===refValue) referred.push(all[ri]);
   }
-  if(!referred.length){alert('No observations have a Referral Note set.\n\nPlease tick "Add Referral Note" on the observations you wish to refer before using RO/HO Copy.');return;}
+  if(!referred.length){alert('No observations have been referred to '+roleLabel+'.\n\nPlease tick "Add Referral Note" on relevant observations and select "'+refValue+'" before generating the copy.');return;}
 
   // Collect unique categories preserving order — stored globally for button access
   window._draftCats=[];
@@ -13573,13 +13599,14 @@ function showDraftModal() {
     checks+='<label><input type="checkbox" id="dcat-'+ci+'" checked><span>'+esc(window._draftCats[ci])+'</span></label>';
   }
 
+  window._draftRole=role;
   var el=document.createElement('div');
   el.className='dmodal-bg';
   el.id='draftModal';
   el.innerHTML=
     '<div class="dmodal">'+
-    '<h3>&#128196; Observations Referred to RO/HO</h3>'+
-    '<p>Showing only observations with a Referral Note (RO/HO). Select categories to include.</p>'+
+    '<h3>&#128196; '+roleLabel+' Copy — Referred Observations</h3>'+
+    '<p>Showing observations referred to <strong>'+roleLabel+'</strong>. Select categories to include.</p>'+
     '<div class="cat-check-list">'+checks+'</div>'+
     '<div class="dmodal-row">'+
     '<button class="dm-sel-all" onclick="draftToggleAll()">Toggle All</button>'+
@@ -13791,8 +13818,9 @@ function downloadDraft(individual){
             h+='<div style="font-size:11.5px;font-weight:700;color:#2a6040;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">&#128172; Branch Head Response</div>';
             h+='<div style="font-size:12.5px;line-height:1.6;color:#1a3a2a;background:#f0fff4;border:1px solid #80c8a0;border-radius:4px;padding:7px 9px;margin-bottom:10px;white-space:pre-wrap">'+esc(bhResp)+'</div>';
           }
-          h+='<div style="font-size:11.5px;font-weight:700;color:'+navy+';text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">&#128172; RO/HO Auditee Response <span style="font-size:10px;font-weight:400;color:#888;text-transform:none">(formal response to observation)</span></div>';
-          h+='<textarea name="resp_'+o.id+'" style="width:100%;box-sizing:border-box;border:1px dashed #b0c0d8;border-radius:4px;padding:7px 9px;font-family:Inter,sans-serif;font-size:12.5px;color:#2a3a50;background:#fffef0;resize:vertical;min-height:70px;outline:none" placeholder="Enter RO/HO formal response to this observation..."></textarea>';
+          var _existingSectResp=(_dRole==='ro'?(respSectROMap[o.id]||''):(respSectHOMap[o.id]||''));
+          h+='<div style="font-size:11.5px;font-weight:700;color:'+navy+';text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">&#128172; '+_dRoleLabel+' Section Response <span style="font-size:10px;font-weight:400;color:#888;text-transform:none">(section head response to this observation)</span></div>';
+          h+='<textarea name="sectresp_'+o.id+'" style="width:100%;box-sizing:border-box;border:1px dashed #b0c0d8;border-radius:4px;padding:7px 9px;font-family:Inter,sans-serif;font-size:12.5px;color:#2a3a50;background:#fffef0;resize:vertical;min-height:70px;outline:none" placeholder="Enter section response to this observation...">'+esc(_existingSectResp)+'</textarea>';
           h+='</div>';
         }
       }
@@ -13806,8 +13834,12 @@ function downloadDraft(individual){
     return {html:h, annexHead:annexParts.head, annexData:annexParts.data};
   }
 
+  var _dRole=window._draftRole||'ro';
+  var _dRoleLabel=_dRole==='ro'?'Regional Office':'Head Office';
   var saveScript='<script>'+
-    'var _roAutoKey="bhs_ro_draft_"+location.pathname;'+
+    'var _sectRole="'+_dRole+'";'+
+    'var _sectRoleLabel="'+_dRoleLabel+'";'+
+    'var _roAutoKey="bhs_ro_draft_'+_dRole+'_"+location.pathname;'+
     'var _roUnsaved=false;'+
     'function _roCollect(){'+
       'var tas=document.querySelectorAll("textarea[name]");'+
@@ -13847,15 +13879,16 @@ function downloadDraft(individual){
     'function saveDraftResponses(){'+
       'var data=_roCollect();'+
       'var json=JSON.stringify(data).replace(/<\\/script>/gi,"<\\\\/script>");'+
-      'var respCount=Object.keys(data).filter(function(k){return k.indexOf("resp_")===0&&data[k];}).length;'+
-      'var noteCount=Object.keys(data).filter(function(k){return k.indexOf("ro_note_")===0&&data[k];}).length;'+
-      'var out="<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>RO\\/HO Responses<\\/title>"'+
+      'var respCount=Object.keys(data).filter(function(k){return k.indexOf("sectresp_")===0&&data[k];}).length;'+
+      'var noteCount=0;'+
+      'var out="<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>"+_sectRoleLabel+" Responses<\\/title>"'+
+      '+\'<script id="bhs-sect-role" type="application/json">\'+JSON.stringify(_sectRole)+\'<\\/script>\''+
       '+\'<script id="bhs-resp-data" type="application/json">\'+json+\'<\\/script>\''+
       '+"<\\/head><body style=\\"font-family:Arial,sans-serif;padding:30px;color:#333\\">'+
-      '<h2>&#128203; RO\\/HO Response File<\\/h2>'+
-      '<p>Please email this file back to the auditor to load via the <strong>Load Auditee Response<\\/strong> button.<\\/p>'+
-      '<p style=\\"color:#555;font-size:12px\\">Auditee responses: "+respCount+" &nbsp;|&nbsp; RO review notes: "+noteCount+"<\\/p>'+
-      '<p style=\\"color:#888;font-size:11px\\">This file was generated by the BSS Branch Audit Management System.<\\/p>'+
+      '<h2>&#128203; "+_sectRoleLabel+" Response File<\\/h2>'+
+      '<p>Please email this file back to the auditor to load via the <strong>Load '+(_sectRole==="ro"?"RO":"HO")+' Response<\\/strong> button in the Distribute tab.<\\/p>'+
+      '<p style=\\"color:#555;font-size:12px\\">Responses: "+respCount+"<\\/p>'+
+      '<p style=\\"color:#888;font-size:11px\\">This file was generated by BRAINS — Beaconhouse Branch Audit Management System.<\\/p>'+
       '<\\/body><\\/html>";'+
       'var blob=new Blob([out],{type:"text/html"});'+
       'var fname=document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_RO_HO_Responded.html";'+
@@ -15497,6 +15530,10 @@ function finalizeReport(){
     if(bhFin!==null) h+=sl('Auditee Response – BH')+st(bhFin);
     if(roFin!==null) h+='<div style="font-size:11.5px;font-weight:700;color:#5b3fa0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Auditee Response – RO/HO</div>'+'<div style="font-size:13px;line-height:1.6;color:#3a2a70;margin-bottom:10px;white-space:pre-wrap;background:#f8f5ff;padding:6px 10px;border-radius:4px;border-left:3px solid #9b6fd0">'+esc(roFin)+'</div>';
     if(bhFin===null&&roFin===null&&respStored) h+=sl('Auditee Response')+st(respStored);
+    var sectROFin=respSectROMap[o.id]||null;
+    var sectHOFin=respSectHOMap[o.id]||null;
+    if(sectROFin) h+='<div style="font-size:11.5px;font-weight:700;color:#1a5c3a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">RO Section Response</div>'+'<div style="font-size:13px;line-height:1.6;color:#1a3a2a;margin-bottom:10px;white-space:pre-wrap;background:#f0fff8;padding:6px 10px;border-radius:4px;border-left:3px solid #3a9a6a">'+esc(sectROFin)+'</div>';
+    if(sectHOFin) h+='<div style="font-size:11.5px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">HO Section Response</div>'+'<div style="font-size:13px;line-height:1.6;color:#1a2a5a;margin-bottom:10px;white-space:pre-wrap;background:#f0f4ff;padding:6px 10px;border-radius:4px;border-left:3px solid #4a6ab0">'+esc(sectHOFin)+'</div>';
     if(responseLoaded&&aStatus){
       h+='<div style="margin:8px 0;padding:6px 10px;background:#eef4ff;border:1px solid #4a7fc1;border-radius:4px;font-size:11px;font-weight:700;color:#1a3a5c">Auditor Assessment: '+(aStatus==='agreed'?'Agreed by Auditee':aStatus==='resolved'?'Resolved':aStatus==='partial'?'Partially Resolved':'Not Resolved')+'</div>';
       if(aStatus==='agreed') h+='<div style="padding:8px 12px;background:#e6f7e6;border-left:3px solid #3a8a3a;border-radius:0 4px 4px 0;font-size:12px;color:#2a5a2a;font-weight:600;margin-bottom:6px">&#10003; Accepted by Auditee</div>';
@@ -19996,7 +20033,7 @@ function generateReviewerHtml(role){
 
   var H      = getHdrVals();
   var branch = H.brname||'Branch';
-  var stageLabel = role==='ro' ? 'RO Manager Review' : 'HO Final Review';
+  var stageLabel = role==='ro' ? 'RO Audit Supervisor Review' : 'HO Audit Supervisor Review';
   var dt     = new Date().toISOString().slice(0,10);
   var sessJson = JSON.stringify(sess).replace(/<\/script>/gi,'<\\/script>');
 
@@ -20332,7 +20369,52 @@ function generateReviewerHtml(role){
   var url=URL.createObjectURL(blob);
   var a=document.createElement('a'); a.href=url; a.download=fname; a.click();
   URL.revokeObjectURL(url);
-  showToast('Reviewer HTML generated: '+fname+'\nSend this file directly to the '+(role==='ro'?'RO Manager':'HO')+'. No separate viewer app needed.', 3500);
+  showToast('Reviewer HTML generated: '+fname+'\nSend this file directly to the '+(role==='ro'?'RO Audit Supervisor':'HO Audit Supervisor')+'. No separate viewer app needed.', 3500);
+}
+
+function triggerLoadSectResponse(role){
+  document.getElementById(role+'-sect-resp-fileinp').click();
+}
+
+function loadSectResponseFile(evt, role){
+  var file=evt.target.files[0]; evt.target.value=''; if(!file) return;
+  var roleLabel=role==='ro'?'RO':'HO';
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var html=e.target.result;
+    var parser=new DOMParser();
+    var doc=parser.parseFromString(html,'text/html');
+    // Verify role tag matches
+    var roleEl=doc.getElementById('bhs-sect-role');
+    if(roleEl){
+      var fileRole=''; try{fileRole=JSON.parse(roleEl.textContent||'');}catch(ex){}
+      if(fileRole&&fileRole!==role){
+        alert('This file is a '+(fileRole==='ro'?'RO':'HO')+' Response file.\nPlease use "Load '+(fileRole==='ro'?'RO':'HO')+' Response" to load it.');
+        return;
+      }
+    }
+    var respDataEl=doc.getElementById('bhs-resp-data');
+    if(!respDataEl||!(respDataEl.textContent||'').trim()||respDataEl.textContent.trim()==='null'){
+      alert('This file does not contain section responses.\nPlease load a file saved after the section head entered their responses.');
+      return;
+    }
+    var data; try{data=JSON.parse(respDataEl.textContent);}catch(ex){alert('Could not read response data from this file.');return;}
+    var targetMap=role==='ro'?respSectROMap:respSectHOMap;
+    var count=0;
+    var keys=Object.keys(data);
+    for(var ki=0;ki<keys.length;ki++){
+      var k=keys[ki]; var v=data[k];
+      if(k.indexOf('sectresp_')===0&&v){
+        var oid=k.slice(9);
+        targetMap[oid]=v;
+        count++;
+      }
+    }
+    if(!count){ alert('No responses found in this file.'); return; }
+    showToast('✅ '+roleLabel+' section responses loaded ('+count+' observation'+(count!==1?'s':'')+').', 3000);
+    renderRpt();
+  };
+  reader.readAsText(file);
 }
 
 function triggerLoadReviewerHtml(role){
