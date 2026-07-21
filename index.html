@@ -19333,7 +19333,8 @@ function detectRepeatsFromPrevReport(){
       var obsId=selList[si];
       var cur=getCurObs(obsId); if(!cur||!cur.title) continue;
       var nTitle=norm(cur.title); var nBody=norm(cur.body);
-      var bestScore=0; var bestPrev=null; var bestMatchType='';
+      // Collect ALL candidates >= 60% so user can pick if ambiguous
+      var allCands=[];
       for(var pi=0;pi<prevObs.length;pi++){
         var p=prevObs[pi];
         var nPT=norm(p.title||''); var nPC=norm(p.content||'');
@@ -19343,9 +19344,13 @@ function detectRepeatsFromPrevReport(){
         var s4=(nBody&&nPT)?overlap(nBody,nPT):0;
         var bs=Math.max(s1,s2,s3,s4);
         var mt=s1>=s2&&s1>=s3&&s1>=s4?'heading':(s2>=s3&&s2>=s4?'content':(s3>=s4?'heading in prev content':'content vs prev heading'));
-        if(bs>bestScore){ bestScore=bs; bestPrev=p; bestMatchType=mt; }
+        if(bs>=0.60) allCands.push({ref:p.ref,title:p.title,score:bs,matchType:mt});
       }
-      if(bestScore>=0.60) matches.push({obsId:obsId,title:cur.title,prev:bestPrev,score:bestScore,matchType:bestMatchType});
+      if(allCands.length){
+        allCands.sort(function(a,b){return b.score-a.score;});
+        var bc=allCands[0];
+        matches.push({obsId:obsId,title:cur.title,prev:{ref:bc.ref,title:bc.title},score:bc.score,matchType:bc.matchType,candidates:allCands});
+      }
     }
   } else {
     // ── Text-search fallback (no structured obs list) ──
@@ -19407,7 +19412,7 @@ function detectRepeatsFromPrevReport(){
   // Store in global so Apply button can read without JSON-in-HTML issues
   var _bestReportName=(best.name||'').replace(/\.[^.]+$/,''); // strip extension for LARR label
   var _bestYear=best.date?best.date.slice(0,4):'';
-  window._rdMatches = matches.map(function(m){ return {obsId:m.obsId,ref:m.prev.ref||'',reportName:_bestReportName,year:_bestYear}; });
+  window._rdMatches = matches.map(function(m){ return {obsId:m.obsId,ref:m.prev.ref||'',candidates:(m.candidates||[]).map(function(c){return {ref:c.ref,title:c.title,score:c.score};}),reportName:_bestReportName,year:_bestYear}; });
 
   // Build unified review list — all pre-ticked, auditor unticks false positives
   var mh='<div style="font-family:Inter,sans-serif">';
@@ -19426,6 +19431,18 @@ function detectRepeatsFromPrevReport(){
     mh+='<div style="flex:1;min-width:0">';
     mh+='<div style="font-size:12px;font-weight:700;color:#e8f4ff;margin-bottom:3px">'+ra_esc(m2.title)+'</div>';
     mh+='<div style="font-size:10px;color:#8ab0cc;margin-bottom:5px">&#128197; Previous: <strong style="color:#f0d070">'+ra_esc(m2.prev.ref)+'</strong> &mdash; '+ra_esc(m2.prev.title)+'</div>';
+    // Obs ref picker — shown when multiple candidates exist so user can confirm/override
+    var _cands=window._rdMatches&&window._rdMatches[mi]?window._rdMatches[mi].candidates:[];
+    if(_cands.length>1){
+      mh+='<div style="margin-bottom:6px;display:flex;align-items:center;gap:6px">';
+      mh+='<span style="font-size:10px;color:#f0c060;white-space:nowrap;font-weight:600">Obs. No.:</span>';
+      mh+='<select id="rdref-'+mi+'" onchange="window._rdMatches['+mi+'].ref=this.value" style="flex:1;font-size:11px;padding:3px 6px;border:1px solid #f0d070;border-radius:4px;background:#1e2f40;color:#f0e8c0;font-family:Inter,sans-serif">';
+      for(var _ci=0;_ci<_cands.length;_ci++){
+        var _pc=Math.round(_cands[_ci].score*100);
+        mh+='<option value="'+ra_esc(_cands[_ci].ref||'')+'"'+(_ci===0?' selected':'')+'>'+ra_esc(_cands[_ci].ref||'—')+' — '+ra_esc((_cands[_ci].title||'').substring(0,45))+' ('+_pc+'%)</option>';
+      }
+      mh+='</select></div>';
+    }
     mh+='<div style="display:flex;align-items:center;gap:7px">';
     mh+='<div style="flex:1;height:4px;background:#0d1a2a;border-radius:2px"><div style="width:'+pct+'%;height:4px;background:'+barCol+';border-radius:2px"></div></div>';
     mh+='<span style="font-size:10px;font-weight:700;color:'+labelCol+';white-space:nowrap">'+pct+'% — '+m2.matchType+'</span>';
@@ -19465,11 +19482,13 @@ function _applyRepeatSelections(){
     var chk=document.getElementById('rdchk-'+i);
     if(chk&&chk.checked){
       obsTypeMap[items[i].obsId]='Repeated';
-      // Build LARR: "Observation No. X.X - Last Audit Report YYYY (Please refer for full last query reference)"
-      var larrVal='';
-      if(items[i].ref) larrVal='Observation No. '+items[i].ref;
-      larrVal+=' - Last Audit Report'+(items[i].year?' '+items[i].year:'');
-      larrVal+=' (Please refer for full last query reference)';
+      // Read ref from picker if shown (multiple candidates), else use stored best match ref
+      var refSel=document.getElementById('rdref-'+i);
+      var chosenRef=refSel?refSel.value:(items[i].ref||'');
+      // Build LARR sentence (agreed wording)
+      var larrVal='For prior audit history of this finding, please refer to Observation No.'
+        +(chosenRef?' '+chosenRef:' —')
+        +' of the last issued Branch Audit Report of this branch.';
       setLastRef(items[i].obsId, larrVal);
       applied++;
     }
@@ -19477,8 +19496,9 @@ function _applyRepeatSelections(){
   var modal=document.getElementById('rd-modal');
   if(modal) modal.remove();
   doSearch();
-  autoSaveNow(); // persist Repeated markings and LARR values immediately
-  if(applied) ra_toast(applied+' observation(s) marked as Repeated with LARR filled.');
+  if(typeof renderRpt==='function') renderRpt(); // refresh draft so LARR box appears immediately
+  autoSaveNow();
+  if(applied) ra_toast(applied+' observation(s) marked as Repeated with LARR auto-filled.');
   else ra_toast('No observations marked — all were unticked.');
 }
 
