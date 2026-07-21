@@ -10640,6 +10640,7 @@ function setObsType(id, val) {
 
 function setLastRef(id, val) {
   if(val) lastRefMap[id]=val; else delete lastRefMap[id];
+  _refreshObsBadge(id);
 }
 
 // ============================================================
@@ -10715,11 +10716,21 @@ function validateDates() {
 // ============================================================
 // AUDITOR ASSESSMENT
 // ============================================================
+function _refreshObsBadge(id){
+  var badge=document.getElementById('rbadge-'+id);
+  if(!badge) return;
+  var obsObj=null;
+  for(var _i=0;_i<DB.observations.length;_i++){if(DB.observations[_i].id===id){obsObj=DB.observations[_i];break;}}
+  if(!obsObj) for(var _j=0;_j<customs.length;_j++){if(customs[_j].id===id){obsObj=customs[_j];break;}}
+  if(obsObj) badge.innerHTML=obsReadinessBadge(obsObj);
+}
+
 function setSensitivity(id, sel){
   var val = sel.value;
   if(val) sensitivityMap[id]=val; else delete sensitivityMap[id];
   sel.className = 'sens-sel'+(val==='High'?' s-high':val==='M to H'?' s-mh':val==='L to M'?' s-lm':val==='Low'?' s-low':'');
   updateFwSuggestion(id); // refresh suggestion badge after manual change
+  _refreshObsBadge(id);
 }
 
 // ── Part 2: System Recommendation Engine ─────────────────────────────────
@@ -11038,6 +11049,7 @@ function setCoso(id, sel){
   sel.className = 'coso-sel'+(val==='CE'?' c-ce':val==='RA'?' c-ra':val==='CA'?' c-ca':val==='IC'?' c-ic':val==='M'?' c-m':'');
   // Log COSO change to audit trail if it changed
   if(val && val !== prev) AT_log({type:'coso', obsId:id, obsTitle:_getObsTitle(id), prev:prev, auditorSel:val});
+  _refreshObsBadge(id);
 }
 
 function findDbAssessText(id, type){
