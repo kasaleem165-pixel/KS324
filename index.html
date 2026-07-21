@@ -18774,13 +18774,13 @@ function ra_detectBranchInText(text, selectedBranch){
   var lower8k=lowerFull.substring(0,8000);
   var sorted=RA_BRANCHES.slice().sort(function(a,b){return b.name.length-a.name.length;});
 
-  // Step 0: Priority search — "Document Information" section and first page (~2000 chars)
-  // These are the most authoritative locations for the branch name in a report
-  var docInfoZone='';
-  var diIdx=lowerFull.indexOf('document information');
-  if(diIdx!==-1) docInfoZone=lowerFull.substring(diIdx, diIdx+1500);
-  var firstPageZone=lowerFull.substring(0,2000);
-  var priorityZone=firstPageZone+(docInfoZone?'\n'+docInfoZone:'');
+  // Step 0: Priority search — first 3000 chars + any section with known heading keywords
+  var priorityZone=lowerFull.substring(0,3000);
+  var _pHeadings=['document information','branch information','branch name','branch details','branch:','school name','campus name','audit branch','name of branch','institution name'];
+  for(var _phi=0;_phi<_pHeadings.length;_phi++){
+    var _phIdx=lowerFull.indexOf(_pHeadings[_phi]);
+    if(_phIdx!==-1) priorityZone+='\n'+lowerFull.substring(_phIdx,_phIdx+1500);
+  }
   // Check selected branch name in priority zone first
   if(selectedBranch && priorityZone.indexOf(selectedBranch.toLowerCase())!==-1) return selectedBranch;
   // Scan priority zone for any known branch (city-filtered)
@@ -18843,6 +18843,37 @@ function ra_detectBranchInText(text, selectedBranch){
     }
   }
   return null;
+}
+
+// Returns {detected, candidates} — candidates = all same-city matches found in priority zone
+// Used to give user an informed choice when same-city ambiguity exists (e.g. multiple Islamabad branches)
+function ra_detectWithCandidates(text, selectedBranch){
+  var res={detected:ra_detectBranchInText(text,selectedBranch),candidates:[]};
+  if(!text||!RA_BRANCHES.length||!selectedBranch) return res;
+  var lowerFull=text.toLowerCase();
+  var sorted=RA_BRANCHES.slice().sort(function(a,b){return b.name.length-a.name.length;});
+  // Build same priority zone
+  var priorityZone=lowerFull.substring(0,3000);
+  var _pHeadings=['document information','branch information','branch name','branch details','branch:','school name','campus name','audit branch','name of branch','institution name'];
+  for(var hi=0;hi<_pHeadings.length;hi++){
+    var hIdx=lowerFull.indexOf(_pHeadings[hi]);
+    if(hIdx!==-1) priorityZone+='\n'+lowerFull.substring(hIdx,hIdx+1500);
+  }
+  // Get selected branch city
+  var selCity='';
+  for(var si=0;si<RA_BRANCHES.length;si++){
+    if(RA_BRANCHES[si].name===selectedBranch){ selCity=(RA_BRANCHES[si].city||'').toLowerCase(); break; }
+  }
+  if(!selCity) return res;
+  // Collect all same-city branches found in priority zone
+  var seen={};
+  for(var i=0;i<sorted.length;i++){
+    if((sorted[i].city||'').toLowerCase()===selCity && priorityZone.indexOf(sorted[i].name.toLowerCase())!==-1 && !seen[sorted[i].name]){
+      seen[sorted[i].name]=true;
+      res.candidates.push(sorted[i].name);
+    }
+  }
+  return res;
 }
 
 function ra_branchMatch(selected, detected){
@@ -18941,7 +18972,19 @@ function ra_addLoadedReport(name,date,sess,text,detectedBranch,isCertain,docxSen
       return;
     } else {
       // Text/docx — detection is based on text scan and may be imperfect; let user decide
-      var proceed=confirm('Possible Branch Mismatch\n\nThe system detected a possible reference to:\n"'+detectedBranch+'"\n\nSelected branch is:\n"'+selectedBranch+'"\n\nIf this file IS for '+selectedBranch+', click OK to load it anyway.\nIf it belongs to a different branch, click Cancel.');
+      // Collect same-city candidates to give user more context for their decision
+      var _dwc=ra_detectWithCandidates(text,selectedBranch);
+      var _candidates=_dwc.candidates.filter(function(c){ return !ra_branchMatch(selectedBranch,c); });
+      var _msg='Possible Branch Mismatch\n\nSelected branch:\n  "'+selectedBranch+'"';
+      if(_candidates.length>1){
+        _msg+='\n\nThe system found these branches referenced in this file:\n';
+        for(var _ci=0;_ci<_candidates.length;_ci++) _msg+='  • '+_candidates[_ci]+'\n';
+        _msg+='\nIf this file IS for "'+selectedBranch+'", click OK to load it anyway.\nOtherwise click Cancel, then select the correct branch above and reload the file.';
+      } else {
+        _msg+='\n\nThe system detected a possible reference to:\n  "'+detectedBranch+'"';
+        _msg+='\n\nIf this file IS for "'+selectedBranch+'", click OK to load it anyway.\nIf it belongs to a different branch, click Cancel and select the correct branch above.';
+      }
+      var proceed=confirm(_msg);
       if(!proceed) return;
     }
   }
