@@ -18978,10 +18978,16 @@ function ra_addLoadedReport(name,date,sess,text,detectedBranch,isCertain,docxSen
       var _msg='Possible Branch Mismatch\n\nSelected branch:\n  "'+selectedBranch+'"';
       if(_candidates.length>1){
         _msg+='\n\nThe system found these branches referenced in this file:\n';
-        for(var _ci=0;_ci<_candidates.length;_ci++) _msg+='  • '+_candidates[_ci]+'\n';
+        for(var _ci=0;_ci<_candidates.length;_ci++){
+          var _cCode='';
+          for(var _cj=0;_cj<RA_BRANCHES.length;_cj++){ if(RA_BRANCHES[_cj].name===_candidates[_ci]){ _cCode=RA_BRANCHES[_cj].code||''; break; } }
+          _msg+='  • '+_candidates[_ci]+(_cCode?' ['+_cCode+']':'')+'\n';
+        }
         _msg+='\nIf this file IS for "'+selectedBranch+'", click OK to load it anyway.\nOtherwise click Cancel, then select the correct branch above and reload the file.';
       } else {
-        _msg+='\n\nThe system detected a possible reference to:\n  "'+detectedBranch+'"';
+        var _detCode='';
+        for(var _dj=0;_dj<RA_BRANCHES.length;_dj++){ if(RA_BRANCHES[_dj].name===detectedBranch){ _detCode=RA_BRANCHES[_dj].code||''; break; } }
+        _msg+='\n\nThe system detected a possible reference to:\n  "'+detectedBranch+'"'+(_detCode?' ['+_detCode+']':'');
         _msg+='\n\nIf this file IS for "'+selectedBranch+'", click OK to load it anyway.\nIf it belongs to a different branch, click Cancel and select the correct branch above.';
       }
       var proceed=confirm(_msg);
