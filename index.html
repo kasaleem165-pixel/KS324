@@ -604,7 +604,7 @@ function pwCheck(){
           <input type="radio" name="chpw-acct" value="user" checked onchange="chpwAcctChange()" style="accent-color:#1a3a5c"> User (S&amp;A)
         </label>
         <label style="flex:1;cursor:pointer;border:2px solid #c8d8ec;border-radius:6px;padding:9px 10px;font-size:13px;display:flex;align-items:center;gap:7px;transition:border .15s" id="chpw-lbl-ho">
-          <input type="radio" name="chpw-acct" value="ho" onchange="chpwAcctChange()" style="accent-color:#1a3a5c"> Head Office
+          <input type="radio" name="chpw-acct" value="ho" onchange="chpwAcctChange()" style="accent-color:#1a3a5c"> Administrator
         </label>
       </div>
     </div>
@@ -716,7 +716,7 @@ function doChangePw(){
     return;
   }
   hideChangePwModal();
-  var label=acct==='ho'?'Head Office':'User';
+  var label=acct==='ho'?'Administrator':'User';
   setTimeout(function(){ alert('Password for '+label+' account updated successfully.'); },100);
 }
 // Close modal on backdrop click
@@ -9922,7 +9922,7 @@ function _hoActivateBtns(){
   if(updb){ updb.style.opacity='1'; updb.style.filter='none'; updb.innerHTML='&#128194; Update DB'; }
   if(cmp){  cmp.style.opacity='1';  cmp.style.filter='none';  cmp.innerHTML='&#128269; Compare'; }
   if(demo){ demo.style.opacity='1'; demo.style.filter='none'; demo.innerHTML='&#127919; Demo'; demo.onclick=function(){ loadDemoData(); }; }
-  if(chpw){ chpw.disabled=false; chpw.style.opacity='1'; chpw.style.filter='none'; chpw.style.cursor='pointer'; chpw.style.background='#1a3a5c'; chpw.style.borderColor='#c9962a'; chpw.setAttribute('data-tip-title','Change Password (HO)'); chpw.setAttribute('data-tip','Change the User or Head Office login password. Available to authenticated HO users only.'); chpw.innerHTML='&#128272; Change PW'; }
+  if(chpw){ chpw.disabled=false; chpw.style.opacity='1'; chpw.style.filter='none'; chpw.style.cursor='pointer'; chpw.style.background='#1a3a5c'; chpw.style.borderColor='#c9962a'; chpw.setAttribute('data-tip-title','Change Password'); chpw.setAttribute('data-tip','Change the User or Administrator login password. Available to authenticated Administrators only.'); chpw.innerHTML='&#128272; Change PW'; }
   // Risk Mapping Editor — HO-only buttons
   var srrReset  = document.getElementById('srr-reset-btn');
   var srrSubmit = document.getElementById('srr-submit-btn');
@@ -12634,7 +12634,7 @@ function doNewReport(){
 // ============================================================
 var _updbCandidates = []; // observations pending approval
 
-// HO password — built from char codes to avoid any source-encoding issues
+// Administrator password — built from char codes to avoid any source-encoding issues
 var _HO_PW = (function(){
   return [72,79,64,83,38,65,50,48,50,54].map(function(c){return String.fromCharCode(c);}).join('');
 })();
@@ -12653,7 +12653,7 @@ function showHOAuthModal(callback, showFieldOption){
 
   var hdr = document.createElement('div');
   hdr.style.cssText = 'background:#1a3a5c;color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between';
-  hdr.innerHTML = '<strong style="font-size:14px">🔒 Head Office Access</strong>';
+  hdr.innerHTML = '<strong style="font-size:14px">🔒 Administrator Access</strong>';
   var closeHdr = document.createElement('button');
   closeHdr.innerHTML = '✕';
   closeHdr.style.cssText = 'background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:14px;line-height:1';
@@ -12662,14 +12662,14 @@ function showHOAuthModal(callback, showFieldOption){
 
   var body = document.createElement('div');
   body.style.cssText = 'padding:18px 20px';
-  body.innerHTML = '<p style="font-size:13px;color:#444;margin-bottom:12px">This feature is restricted to Head Office. Enter the HO password to continue.</p>';
+  body.innerHTML = '<p style="font-size:13px;color:#444;margin-bottom:12px">This feature is restricted to Administrators. Enter the Administrator password to continue.</p>';
 
   var pwWrap = document.createElement('div');
   pwWrap.style.cssText = 'position:relative;margin-bottom:6px';
   var inp = document.createElement('input');
   inp.id = 'ho-pw-input';
   inp.type = 'password';
-  inp.placeholder = 'HO Password';
+  inp.placeholder = 'Administrator Password';
   inp.autocomplete = 'new-password';
   inp.style.cssText = 'width:100%;padding:9px 36px 9px 12px;border:1px solid #c8d8ec;border-radius:6px;font-size:14px;font-family:inherit;box-sizing:border-box';
   var cntDiv = document.createElement('div');
@@ -21088,7 +21088,7 @@ function srrUndoReassign(){
 
 // ── Reset all ──
 function srrResetAll(){
-  if(!window._hoAuthed){ alert('This action requires HO authentication.'); return; }
+  if(!window._hoAuthed){ alert('This action requires Administrator authentication.'); return; }
   if(!confirm('Reset all flags and reassignments? This cannot be undone.')) return;
   srr_flagged={};  srr_reassigned={}; srr_files=[]; srrRenderFilesBar();
   srrBuildTable();
@@ -21198,7 +21198,7 @@ function srrClearFiles(){
 
 // ── SRR Import from Session File ─────────────────────────────────────────────
 function srrImportSession(input){
-  if(!window._hoAuthed){ alert('This action requires HO authentication.'); input.value=''; return; }
+  if(!window._hoAuthed){ alert('This action requires Administrator authentication.'); input.value=''; return; }
   var file = input.files && input.files[0];
   if(!file){ input.value=''; return; }
 
@@ -21496,7 +21496,7 @@ function srrApplyImport(changes){
 
 // ── SRR Submit ───────────────────────────────────────────────────────────────
 function srrShowSubmit(){
-  if(!window._hoAuthed){ alert('This action requires HO authentication.'); return; }
+  if(!window._hoAuthed){ alert('This action requires Administrator authentication.'); return; }
   var all=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
   if(!all.length){ _srrToast('No observations to submit.'); return; }
 
@@ -24556,7 +24556,7 @@ function _w2rBuildHtml(d){
             <span style="background:#1a5c8c;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0">1</span>
             <span><strong>Auditor</strong> makes changes in Databank Manager (suppress, edit or merge observations), then clicks <strong>"📤 Export Proposed Changes"</strong>. This downloads a small <em>dbm-proposed-changes.json</em> file and sends it to HO.</span>
             <span style="background:#c07000;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0">2</span>
-            <span><strong>HO</strong> opens the system, goes to Databank Manager, and clicks <strong>"🔒 Import &amp; Review (HO)"</strong> (requires HO password). A review screen opens showing every proposed change with Approve / Reject checkboxes.</span>
+            <span><strong>Administrator</strong> opens the system, goes to Databank Manager, and clicks <strong>"🔒 Import &amp; Review (HO)"</strong> (requires Administrator password). A review screen opens showing every proposed change with Approve / Reject checkboxes.</span>
             <span style="background:#c07000;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0">3</span>
             <span><strong>HO</strong> reviews each change, ticks or unticks as required, then clicks <strong>"Apply Approved Changes"</strong>. The approved changes are now active in HO's browser session.</span>
             <span style="background:#1e5c3a;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0">4</span>
@@ -25426,10 +25426,10 @@ function dbmExportCSV(){
       <input type="file" id="srr-file-input" multiple style="display:none" onchange="srrHandleFiles(this.files)">
       <button onclick="srrExport()" title="Export the current risk mapping table as a CSV file for records or review" style="padding:5px 11px;background:#1e5c3a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit">&#11123; Export CSV</button>
       <div style="width:1px;height:24px;background:#dde6f0;flex-shrink:0"></div>
-      <button id="srr-import-btn" onclick="if(window._hoAuthed)document.getElementById('srr-import-input').click();else alert('This action requires HO authentication.')" disabled title="&#128274; HO access required — Load a saved session file (.json) or an issued HTML audit report (.html) to extract and review any SRR reassignments or category changes, then selectively apply them to the databank." style="padding:5px 11px;background:#4a1a7a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:inherit;opacity:.4">&#128274; Import Risk Map Updates</button>
+      <button id="srr-import-btn" onclick="if(window._hoAuthed)document.getElementById('srr-import-input').click();else alert('This action requires Administrator authentication.')" disabled title="&#128274; Administrator access required — Load a saved session file (.json) or an issued HTML audit report (.html) to extract and review any SRR reassignments or category changes, then selectively apply them to the databank." style="padding:5px 11px;background:#4a1a7a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:inherit;opacity:.4">&#128274; Import Risk Map Updates</button>
       <input type="file" id="srr-import-input" accept=".json,.html,.htm" style="display:none" onchange="srrImportSession(this)">
-      <button id="srr-submit-btn" onclick="if(window._hoAuthed)srrShowSubmit();else alert('This action requires HO authentication.')" disabled title="&#128274; HO access required — Submit the reviewed and approved risk map changes to Head Office for databank update." style="padding:5px 14px;background:#c07000;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:inherit;opacity:.4">&#128274; Submit Risk Map</button>
-      <button id="srr-reset-btn" onclick="if(window._hoAuthed)srrResetAll();else alert('This action requires HO authentication.')" disabled title="&#128274; HO access required — Reset all flags and SRR reassignments back to the original databank defaults." style="padding:5px 11px;background:#8b1a1a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:not-allowed;font-family:inherit;opacity:.4">&#128274; Reset All</button>
+      <button id="srr-submit-btn" onclick="if(window._hoAuthed)srrShowSubmit();else alert('This action requires Administrator authentication.')" disabled title="&#128274; Administrator access required — Submit the reviewed and approved risk map changes to Head Office for databank update." style="padding:5px 14px;background:#c07000;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:inherit;opacity:.4">&#128274; Submit Risk Map</button>
+      <button id="srr-reset-btn" onclick="if(window._hoAuthed)srrResetAll();else alert('This action requires Administrator authentication.')" disabled title="&#128274; Administrator access required — Reset all flags and SRR reassignments back to the original databank defaults." style="padding:5px 11px;background:#8b1a1a;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:not-allowed;font-family:inherit;opacity:.4">&#128274; Reset All</button>
       <span style="font-size:11px;color:#888;margin-left:4px" id="srr-count-lbl"></span>
     </div>
   </div>
