@@ -19110,8 +19110,8 @@ function ra_buildTextFromSession(sess){
 // Extract observation list from docx Observations Summary table
 // Returns array of {ref:'1.1', title:'Budget for...', catKey:'Finance', sens:'M to H'}
 function ra_extractDocxObsList(xml){
-  // ref pattern: 1.1  1.01  1.1.1  (digits separated by dots, at least two parts)
-  var obsRefRe=/^\d+\.\d[\d.]*$/;
+  // ref pattern: 1.1  1.24  2.11 — section 1-9, observation 1-99; excludes financial figures like 412.34
+  var obsRefRe=/^[1-9]\d?\.[1-9]\d?(\.[1-9]\d?)?$/;
   var SENS_NORM={'high':'High','medium to high':'M to H','m to h':'M to H','mth':'M to H','low to medium':'L to M','l to m':'L to M','ltm':'L to M','low':'Low'};
 
   var rowRe=/<w:tr[\s>][\s\S]*?<\/w:tr>/gi; var rows=[]; var rm;
@@ -19414,7 +19414,8 @@ function detectRepeatsFromPrevReport(){
     var rTextLow=rText.toLowerCase();
     // Collect all ref positions from original lowercase text (dots preserved)
     var refPositions=[];
-    var refScanRe=/\b(\d+\.\d[\d.]*)\b/g; var rm2;
+    // Tightened: section 1-9, observation 1-99 only — excludes financial figures like 412.34 or 25,327.34
+    var refScanRe=/\b([1-9]\d?\.[1-9]\d?)\b/g; var rm2;
     while((rm2=refScanRe.exec(rTextLow))!==null){
       refPositions.push({ref:rm2[1],pos:rm2.index});
     }
@@ -19603,7 +19604,7 @@ function ra_extractDocxSens(xml){
     return null;
   }
 
-  var obsRefRe=/^\d+\.\d+$/;
+  var obsRefRe=/^[1-9]\d?\.[1-9]\d?(\.[1-9]\d?)?$/;
   var currentCat=null;
   var inObsSection=false;
 
