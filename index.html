@@ -9900,6 +9900,7 @@ var respBHMap= {};   // {obsId: Branch Head response}
 var respROMap= {};   // {obsId: RO/HO Supervisor response (formal review chain)}
 var respSectROMap={};// {obsId: RO section head response (from RO Copy)}
 var respSectHOMap={};// {obsId: HO section head response (from HO Copy)}
+var obsNotesMap={};  // {obsId: branch-specific notes/tables text}
 var assessMap= {};   // {obsId: 'agreed'|'resolved'|'partial'|'notresolved'}
 var refMap   = {};   // {obsId: referral note text, '' means no referral}
 var obsEdits = {};   // {obsId: {observation, recommendation}} — auditor edits to obs text
@@ -11339,6 +11340,7 @@ function captureSession() {
     respROMap: respROMap,
     respSectROMap: respSectROMap,
     respSectHOMap: respSectHOMap,
+    obsNotesMap: obsNotesMap,
     assessMap: assessMap,
     sensitivityMap: sensitivityMap,
     cosoMap  : cosoMap,
@@ -11391,6 +11393,7 @@ function restoreSession(sess) {
   respROMap     = sess.respROMap     || {};
   respSectROMap = sess.respSectROMap || {};
   respSectHOMap = sess.respSectHOMap || {};
+  obsNotesMap     = sess.obsNotesMap     || {};
   assessMap      = sess.assessMap      || {};
   sensitivityMap = sess.sensitivityMap || {};
   cosoMap        = sess.cosoMap        || {};
@@ -12275,6 +12278,12 @@ function renderRpt(){
       var recText=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
       h+='<div class="osl">Recommendation</div>';
       h+='<textarea class="oedit" id="re-'+o.id+'" onpaste="_pasteTableHandler(event,this)" oninput="if(!obsEdits[\''+o.id+'\'])obsEdits[\''+o.id+'\']={}; obsEdits[\''+o.id+'\'].recommendation=this.value;WC_detect(\''+o.id+'\')">'+esc(recText)+'</textarea>';
+      // Branch-Specific Notes / Tables (outside wording change workflow)
+      var bsNotes=obsNotesMap[o.id]||'';
+      h+='<div style="margin:6px 0 4px;padding:8px 10px;background:#fffdf0;border:1px solid #e0d080;border-radius:6px">';
+      h+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#6a5a00;margin-bottom:4px">&#128203; Branch-Specific Notes / Tables <span style="font-size:9px;font-weight:400;color:#999;text-transform:none">(branch data, instances, tables — not part of standard finding)</span></div>';
+      h+='<textarea class="oedit" id="bsn-'+o.id+'" style="background:#fffef5;border-color:#d8c860;min-height:60px" placeholder="Enter branch-specific data, tables, or instances here..." oninput="obsNotesMap[\''+o.id+'\']=this.value">'+esc(bsNotes)+'</textarea>';
+      h+='</div>';
       // 3b. Last Audit Report Reference (LARR) (editable, repeated obs only)
       if(tc==='repeated'){
         var curLrRef=lastRefMap[o.id]||'';
@@ -12550,7 +12559,7 @@ function doCopy(){
 
 function _performFullClear(){
   // Data maps
-  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
   // SRR / Risk Mapping state
   if(typeof srr_flagged!=='undefined') srr_flagged={};
   if(typeof srr_reassigned!=='undefined') srr_reassigned={};
@@ -12600,7 +12609,7 @@ function _performFullClear(){
 function doClear(){
   if(!confirm('Clear all selected observations and reset the report draft? Branch information will be kept.'))return;
   // Clear only observation selections and report content — keep branch/header fields intact
-  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
   if(typeof srr_flagged!=='undefined') srr_flagged={};
   if(typeof srr_reassigned!=='undefined') srr_reassigned={};
   if(typeof srr_files!=='undefined') srr_files=[];
@@ -13812,6 +13821,8 @@ function downloadDraft(individual){
           h+=_renderText(obsText,{fontSize:'13px',lineHeight:'1.6',color:'#2a3a50',marginBottom:'10px'});
           h+='<div style="font-size:11.5px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Recommendation</div>';
           h+=_renderText(recText,{fontSize:'13px',lineHeight:'1.6',color:'#2a3a50',marginBottom:'10px'});
+          var sectBsNotes=obsNotesMap[o.id]||'';
+          if(sectBsNotes) h+='<div style="margin:6px 0 8px;padding:8px 10px;background:#fffdf0;border:1px solid #e0d080;border-radius:6px"><div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#6a5a00;margin-bottom:4px">&#128203; Branch-Specific Notes / Tables</div><div style="font-size:12.5px;line-height:1.6;color:#2a3a00;white-space:pre-wrap">'+esc(sectBsNotes)+'</div></div>';
           // Show BH response (read-only) if available
           var bhResp=respBHMap[o.id]!=null?respBHMap[o.id]:'';
           if(bhResp){
@@ -14032,6 +14043,8 @@ function downloadSoftCopy(){
     var scReEl=document.getElementById('re-'+o.id); if(scReEl) scRecText=scReEl.value;
     if(scObsText){h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Observation</div>';h+=_renderText(scObsText,{fontSize:'12.5px',lineHeight:'1.65',color:'#2a3a50',marginBottom:'10px'});}
     if(scRecText){h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Recommendation</div>';h+=_renderText(scRecText,{fontSize:'12.5px',lineHeight:'1.65',color:'#2a3a50',marginBottom:'10px'});}
+    var scBsNotes=obsNotesMap[o.id]||'';
+    if(scBsNotes){h+='<div style="margin:6px 0 8px;padding:8px 10px;background:#fffdf0;border:1px solid #e0d080;border-radius:6px"><div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#6a5a00;margin-bottom:4px">&#128203; Branch-Specific Notes</div><div style="font-size:12.5px;line-height:1.6;color:#2a3a00;white-space:pre-wrap">'+esc(scBsNotes)+'</div></div>';}
     if(ax) h+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> '+esc(ax)+'</div>';
     // Auditee Response — always blank in soft copy, with ETR as sub-section inside
     h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Auditee Response <span style="color:#c0392b;font-size:9px">(Required)</span></div>';
@@ -15524,6 +15537,8 @@ function finalizeReport(){
     h+='</div><div style="padding:11px 13px">';
     if(obsText) h+=sl('Observation')+st(obsText);
     if(recText) h+=sl('Recommendation')+st(recText);
+    var finBsNotes=obsNotesMap[o.id]||'';
+    if(finBsNotes) h+='<div style="margin:6px 0 8px;padding:8px 10px;background:#fffdf0;border:1px solid #e0d080;border-radius:6px"><div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#6a5a00;margin-bottom:4px">&#128203; Branch-Specific Notes</div><div style="font-size:12.5px;line-height:1.6;color:#2a3a00;white-space:pre-wrap">'+esc(finBsNotes)+'</div></div>';
     if(ax)               h+='<div style="display:flex;align-items:center;gap:7px;margin:8px 0;padding:7px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> '+esc(ax)+'</div>';
     var bhFin=respBHMap[o.id]!=null?respBHMap[o.id]:null;
     var roFin=respROMap[o.id]!=null?respROMap[o.id]:null;
@@ -20207,6 +20222,8 @@ function generateReviewerHtml(role){
 
     rv+='<div class="sec-lbl">Observation</div><div class="sec-txt">'+esc(o.observation)+'</div>';
     rv+='<div class="sec-lbl">Recommendation</div><div class="sec-txt">'+esc(o.recommendation)+'</div>';
+    var rvBsNotes=obsNotesMap[o.id]||'';
+    if(rvBsNotes) rv+='<div style="margin:8px 0;padding:8px 10px;background:#fffdf0;border:1px solid #e0d080;border-radius:6px"><div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#6a5a00;margin-bottom:4px">&#128203; Branch-Specific Notes / Tables <span style="font-size:9px;font-weight:400;color:#999;text-transform:none">(informational — not part of wording change workflow)</span></div><div style="font-size:12.5px;line-height:1.6;color:#2a3a00;white-space:pre-wrap">'+esc(rvBsNotes)+'</div></div>';
     if(o.response){
       rv+='<div class="sec-lbl">Auditee Response</div>';
       rv+='<div class="sec-txt" style="background:#fffef0;border-left:3px solid #d4b400">'+esc(o.response)+'</div>';
