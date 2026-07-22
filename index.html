@@ -676,7 +676,8 @@ function pwCheck(){
             <label style="font-size:11px;font-weight:600;color:#1a3a5c;display:block;margin-bottom:4px">Access Level</label>
             <select id="mu-role" style="width:100%;padding:8px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:13px;font-family:inherit;box-sizing:border-box;background:#fff">
               <option value="auditor">Auditor — Standard access (no HO/Tools/Admin)</option>
-              <option value="senior_auditor">Senior Auditor — Includes HO review &amp; Issue Report</option>
+              <option value="ro_supervisor">Audit Supervisor RO — Can forward to HO Audit Supervisor</option>
+              <option value="ho_supervisor">Audit Supervisor HO — Can load HO review &amp; Issue Report</option>
               <option value="administrator">Administrator — Full access</option>
             </select>
           </div>
@@ -733,13 +734,12 @@ function showAboutModal(){
   el.addEventListener('click',function(e){ if(e.target===el) el.remove(); });
 }
 
-function _canHOReview(){
-  try{
-    var cu=JSON.parse(sessionStorage.getItem('sa_current_user')||'null');
-    if(cu&&(cu.role==='administrator'||cu.role==='senior_auditor')) return true;
-  }catch(e){}
-  return window._hoAuthed===true;
+function _userRole(){
+  try{ var cu=JSON.parse(sessionStorage.getItem('sa_current_user')||'null'); if(cu&&cu.role) return cu.role; }catch(e){}
+  return window._hoAuthed?'administrator':'auditor';
 }
+function _canSendHO(){ var r=_userRole(); return r==='administrator'||r==='ro_supervisor'||r==='ho_supervisor'; }
+function _canIssue(){  var r=_userRole(); return r==='administrator'||r==='ho_supervisor'; }
 
 function showManageUsersModal(){
   muRenderList();
@@ -763,9 +763,9 @@ function muRenderList(){
   var list=document.getElementById('mu-user-list');
   if(!list) return;
   var users=muGetUsers();
-  var roleLabel={'auditor':'Auditor','senior_auditor':'Senior Auditor','administrator':'Administrator'};
-  var roleColor={'auditor':'#2070b8','senior_auditor':'#7a3a00','administrator':'#1a6030'};
-  var roleBg={'auditor':'#e8f0ff','senior_auditor':'#fff4e0','administrator':'#e8fff0'};
+  var roleLabel={'auditor':'Auditor','ro_supervisor':'Audit Supervisor RO','ho_supervisor':'Audit Supervisor HO','administrator':'Administrator'};
+  var roleColor={'auditor':'#2070b8','ro_supervisor':'#7a3a00','ho_supervisor':'#4a1a7a','administrator':'#1a6030'};
+  var roleBg={'auditor':'#e8f0ff','ro_supervisor':'#fff4e0','ho_supervisor':'#f4e8ff','administrator':'#e8fff0'};
   if(!users.length){
     list.innerHTML='<div style="font-size:12px;color:#888;padding:12px;background:#f8fafc;border:1px solid #e0e8f0;border-radius:6px;text-align:center">No custom users yet. Built-in accounts (User &amp; Administrator) always exist.</div>';
     return;
@@ -9317,10 +9317,10 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <button class="tb-dd-item rpt-btn" onclick="generateReviewerHtml('ro');tbDDClose()"><span class="di">&#128228;</span> Send to RO Audit Supervisor</button>
         <button class="tb-dd-item rpt-btn" onclick="triggerLoadReviewerHtml('ro');tbDDClose()"><span class="di">&#128194;</span> Load RO Supervisor Review</button>
         <div class="tb-dd-sep"></div>
-        <button class="tb-dd-item rpt-btn" onclick="if(_canHOReview()){generateReviewerHtml('ho');tbDDClose();}else{tbDDClose();showHOAuthModal(function(){generateReviewerHtml('ho');});}"><span class="di">&#128228;</span> Send to HO Audit Supervisor</button>
-        <button class="tb-dd-item rpt-btn" onclick="if(_canHOReview()){triggerLoadReviewerHtml('ho');tbDDClose();}else{tbDDClose();showHOAuthModal(function(){triggerLoadReviewerHtml('ho');});}"><span class="di">&#128194;</span> Load HO Supervisor Review</button>
+        <button class="tb-dd-item rpt-btn" onclick="if(_canSendHO()){generateReviewerHtml('ho');tbDDClose();}else{tbDDClose();showHOAuthModal(function(){generateReviewerHtml('ho');});}"><span class="di">&#128228;</span> Send to HO Audit Supervisor</button>
+        <button class="tb-dd-item rpt-btn" onclick="if(_canIssue()){triggerLoadReviewerHtml('ho');tbDDClose();}else{tbDDClose();showHOAuthModal(function(){triggerLoadReviewerHtml('ho');});}"><span class="di">&#128194;</span> Load HO Supervisor Review</button>
         <div class="tb-dd-sep"></div>
-        <button class="tb-dd-item rpt-btn" onclick="if(_canHOReview()){generateIssuedReport();tbDDClose();}else{tbDDClose();showHOAuthModal(function(){generateIssuedReport();});}"><span class="di">&#10003;</span> Issue Report</button>
+        <button class="tb-dd-item rpt-btn" onclick="if(_canIssue()){generateIssuedReport();tbDDClose();}else{tbDDClose();showHOAuthModal(function(){generateIssuedReport();});}"><span class="di">&#10003;</span> Issue Report</button>
       </div>
     </div>
 
