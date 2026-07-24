@@ -12966,8 +12966,12 @@ function showUpdateDbModal(){
 
     '<div class="updb-section">' +
     '<h4>&#128203; Approved Custom Observations in Databank</h4>' +
-    '<p style="font-size:12px;color:#555;margin-bottom:8px">Observations approved by HO and added to the databank extension. These are available to all users on this Netlify deployment immediately upon next refresh.</p>' +
+    '<p style="font-size:12px;color:#555;margin-bottom:8px">Observations approved and added to the databank on this machine. To distribute to all users, click <strong>Export Updated App</strong> and upload the downloaded file to Netlify.</p>' +
     '<div id="updb-ext-area">' + buildUpdbExtList(extObs) + '</div>' +
+    '<div style="margin-top:12px;padding-top:10px;border-top:1px solid #dde3ee">' +
+    '<button onclick="updbExportApp()" style="background:#1a3a5c;color:#fff;border:none;border-radius:5px;padding:8px 18px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Export Updated App</button>' +
+    '<span style="font-size:11px;color:#777;margin-left:10px">Downloads a fresh index.html with all approved observations baked in — upload this file to Netlify to update all users.</span>' +
+    '</div>' +
     '</div>' +
 
     '</div></div>';
@@ -13249,6 +13253,58 @@ function updbDiscardDraft(){
   var foot = document.getElementById('updb-approve-foot');
   if(foot) foot.style.display = 'none';
   showToast('Draft discarded.', 2000);
+}
+
+function updbExportApp(){
+  var ext = sg(DB_EXT_KEY, []);
+  if(!ext.length){
+    if(!confirm('No approved observations in the databank extension yet.\nExport the app file anyway (it will be identical to the current version)?')) return;
+  }
+  // Fetch the current page HTML source
+  fetch(location.href)
+    .then(function(r){ return r.text(); })
+    .then(function(html){
+      // Read the current audit-data JSON from the live DOM (includes any runtime patches)
+      var dbJson = document.getElementById('audit-data').textContent;
+      var db;
+      try{ db = JSON.parse(dbJson); }catch(e){ alert('Could not parse core databank JSON: '+e.message); return; }
+
+      // Merge approved extension observations into db.observations (avoid duplicates)
+      if(!db.observations) db.observations = [];
+      var existingIds = {};
+      for(var i=0;i<db.observations.length;i++) existingIds[db.observations[i].id]=true;
+      var added=0;
+      for(var j=0;j<ext.length;j++){
+        if(!existingIds[ext[j].id]){
+          db.observations.push(ext[j]);
+          added++;
+        }
+      }
+
+      // Replace the audit-data block in the fetched HTML
+      var updated = html.replace(
+        /(<script[^>]+id="audit-data"[^>]*>)([\s\S]*?)(<\/script>)/,
+        function(match, open, _old, close){
+          return open + '\n' + JSON.stringify(db, null, 2) + '\n' + close;
+        }
+      );
+
+      if(updated === html){
+        alert('Could not locate the audit-data block in the app source. Export aborted.');
+        return;
+      }
+
+      var blob = new Blob([updated], {type:'text/html'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'index.html';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
+      showToast('✅ Updated app exported — '+added+' new observation(s) baked in. Upload index.html to Netlify to update all users.', 5000);
+    })
+    .catch(function(e){ alert('Could not fetch app source: '+e.message+'\n\nTry running from the deployed Netlify URL, not a local file.'); });
 }
 
 function updbReadDraftFile(inp){
