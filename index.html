@@ -12955,6 +12955,16 @@ function showUpdateDbModal(){
     '</div>' +
 
     '<div class="updb-section">' +
+    '<h4>&#128228; Administrator: Load a Saved Draft File</h4>' +
+    '<p style="font-size:12px;color:#555;margin-bottom:8px">If a reviewer saved a draft and sent you the file, load it here. You can review, edit, approve, or reject each observation before adding to the databank.</p>' +
+    '<div class="updb-drop" onclick="document.getElementById(\'updb-draft-file-input\').click()" style="border-color:#c07000;background:#fffdf5">' +
+    '&#128190; <strong>Click to load a Draft File (.json)</strong>' +
+    '<p style="margin:4px 0 0;font-size:11px;color:#888">File exported via Save Draft — BRAINS_DataMgmt_Draft_*.json</p>' +
+    '</div>' +
+    '<input type="file" id="updb-draft-file-input" accept=".json" style="display:none" onchange="updbReadDraftFile(this)">' +
+    '</div>' +
+
+    '<div class="updb-section">' +
     '<h4>&#128203; Approved Custom Observations in Databank</h4>' +
     '<p style="font-size:12px;color:#555;margin-bottom:8px">Observations approved by HO and added to the databank extension. These are available to all users on this Netlify deployment immediately upon next refresh.</p>' +
     '<div id="updb-ext-area">' + buildUpdbExtList(extObs) + '</div>' +
@@ -13149,20 +13159,28 @@ function updbSaveDraft(){
     return;
   }
   // Capture current checkbox states and any edits
-  var draft = { savedAt: new Date().toISOString(), candidates: [] };
+  var draft = { type: 'brains_updb_draft', savedAt: new Date().toISOString(), candidates: [] };
   for(var i=0;i<_updbCandidates.length;i++){
-    var chk = document.getElementById('updb-cand-chk') || document.querySelector('.updb-cand-chk[data-idx="'+i+'"]');
     var chkEl = document.querySelector('.updb-cand-chk[data-idx="'+i+'"]');
     draft.candidates.push({
       data: _updbCandidates[i],
       checked: chkEl ? chkEl.checked : true
     });
   }
+  // Export as downloadable file (Scenario B)
   try{
-    localStorage.setItem(_UPDB_DRAFT_KEY, JSON.stringify(draft));
-    showToast('✅ Draft saved — '+draft.candidates.length+' observation(s) saved. The Administrator can resume this review from Update Databank.', 3500);
+    var blob = new Blob([JSON.stringify(draft, null, 2)], {type:'application/json'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    var ts = new Date().toISOString().slice(0,16).replace('T','_').replace(':','');
+    a.download = 'BRAINS_DataMgmt_Draft_'+ts+'.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
+    showToast('✅ Draft exported — '+draft.candidates.length+' observation(s). Email this file to the Administrator to load and approve.', 4500);
   }catch(e){
-    alert('Could not save draft (storage unavailable).');
+    alert('Could not export draft: '+e.message);
   }
 }
 
@@ -13231,6 +13249,79 @@ function updbDiscardDraft(){
   var foot = document.getElementById('updb-approve-foot');
   if(foot) foot.style.display = 'none';
   showToast('Draft discarded.', 2000);
+}
+
+function updbReadDraftFile(inp){
+  var file = inp.files && inp.files[0];
+  inp.value = '';
+  if(!file){ return; }
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var draft = JSON.parse(e.target.result);
+      if(!draft || draft.type !== 'brains_updb_draft'){
+        alert('Invalid file — this does not appear to be a BRAINS Data Management draft file.');
+        return;
+      }
+      if(!draft.candidates || !draft.candidates.length){
+        alert('The draft file contains no observations.');
+        return;
+      }
+      // Populate candidates from draft
+      _updbCandidates = draft.candidates.map(function(d){ return d.data; });
+      var candArea = document.getElementById('updb-cand-area');
+      var foot = document.getElementById('updb-approve-foot');
+      var dt = draft.savedAt ? new Date(draft.savedAt).toLocaleString() : '—';
+      // Build full candidate review UI reusing the same render helper updbRenderCandidates
+      var h = '<div style="background:#fff8e0;border:1px solid #c07000;border-radius:6px;padding:10px 14px;font-size:12px;color:#5a4000;margin-bottom:10px">'
+        +'&#128228; Draft file loaded — saved <strong>'+dt+'</strong> &nbsp;|&nbsp; <strong>'+draft.candidates.length+' observation(s)</strong>. '
+        +'Review below and approve when ready.</div>';
+      // Candidate list header
+      h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+        +'<input type="checkbox" id="updb-sel-all" checked onchange="updbToggleAll(this.checked)" style="width:16px;height:16px">'
+        +'<label for="updb-sel-all" style="font-size:12px;font-weight:700;color:#1a3a5c;cursor:pointer">Select / Deselect All</label>'
+        +'</div>';
+      h += '<div class="updb-cand-list">';
+      for(var m=0;m<_updbCandidates.length;m++){
+        var c = _updbCandidates[m];
+        var wasChecked = draft.candidates[m] ? draft.candidates[m].checked : true;
+        h += '<div class="updb-cand-row">'
+          + '<input type="checkbox" class="updb-cand-chk" data-idx="'+m+'"'+(wasChecked?' checked':'')+' style="margin-top:3px;flex-shrink:0">'
+          + '<div style="flex:1;min-width:0">'
+          + '<div class="updb-cand-title" id="updb-title-disp-'+m+'">'+esc(c.title||'—')+'</div>'
+          + '<div class="updb-cand-meta">'+esc(c.category||'Others')
+          + (c.riskTag?' &nbsp;&#8226;&nbsp; <span style="color:#8b1a1a">'+esc(c.riskTag)+'</span>':'')
+          + (c.controlTag?' &nbsp;&#8226;&nbsp; <span style="color:#1a5c2a">'+esc(c.controlTag)+'</span>':'')+'</div>'
+          + '</div>'
+          + '<button id="updb-edit-btn-'+m+'" onclick="updbToggleEdit('+m+')" style="background:#1a3a5c;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0">&#9998; Edit</button>'
+          + '</div>'
+          + '<div class="updb-edit-panel" id="updb-edit-'+m+'">'
+          + '<label style="font-size:11px;font-weight:700;color:#1a3a5c">Title / Heading</label>'
+          + '<input type="text" value="'+esc(c.title||'')
+          +'" oninput="updbEditField('+m+',\'title\',this.value)" style="width:100%;box-sizing:border-box;padding:5px 8px;border:1px solid #b0b8c8;border-radius:4px;font-size:12px;margin-bottom:6px;font-family:inherit">'
+          + '<label style="font-size:11px;font-weight:700;color:#1a3a5c">Category</label>'
+          + '<input type="text" value="'+esc(c.category||'Others')
+          +'" oninput="updbEditField('+m+',\'category\',this.value)" style="width:100%;box-sizing:border-box;padding:5px 8px;border:1px solid #b0b8c8;border-radius:4px;font-size:12px;margin-bottom:6px;font-family:inherit">'
+          + '<label style="font-size:11px;font-weight:700;color:#1a3a5c">Observation Text</label>'
+          + '<textarea rows="4" oninput="updbEditField('+m+',\'obs\',this.value)" style="width:100%;box-sizing:border-box;padding:5px 8px;border:1px solid #b0b8c8;border-radius:4px;font-size:12px;font-family:inherit;resize:vertical">'+esc(c.obs||'')+'</textarea>'
+          + '<div style="display:flex;gap:8px;margin-top:4px">'
+          + '<div style="flex:1"><label style="font-size:11px;font-weight:700;color:#8b1a1a">Risk Tag</label>'
+          + '<input type="text" value="'+esc(c.riskTag||'')
+          +'" oninput="updbEditField('+m+',\'riskTag\',this.value)" style="width:100%;box-sizing:border-box;padding:5px 8px;border:1px solid #c8b0b0;border-radius:4px;font-size:12px;font-family:inherit"></div>'
+          + '<div style="flex:1"><label style="font-size:11px;font-weight:700;color:#1a5c2a">Control Tag</label>'
+          + '<input type="text" value="'+esc(c.controlTag||'')
+          +'" oninput="updbEditField('+m+',\'controlTag\',this.value)" style="width:100%;box-sizing:border-box;padding:5px 8px;border:1px solid #b0c8b4;border-radius:4px;font-size:12px;font-family:inherit"></div>'
+          + '</div>'
+          + '</div>';
+      }
+      h += '</div>';
+      if(candArea){ candArea.innerHTML = h; }
+      if(foot){ foot.style.display = 'flex'; }
+    }catch(err){
+      alert('Could not read draft file: '+err.message);
+    }
+  };
+  reader.readAsText(file);
 }
 
 function updbToggleEdit(m){
