@@ -13023,8 +13023,22 @@ function closeUpdbModal(){
 }
 
 // ── Duplicate Observations scanner ───────────────────────────
+var _DUPOBS_STOPWORDS = {
+  'not':1,'the':1,'and':1,'for':1,'are':1,'was':1,'has':1,'have':1,'had':1,'been':1,
+  'that':1,'this':1,'with':1,'from':1,'per':1,'also':1,'any':1,'all':1,'its':1,'than':1,
+  'but':1,'yet':1,'nor':1,'both':1,'each':1,'such':1,'only':1,'even':1,'due':1,'duly':1,
+  'available':1,'unavailable':1,'maintained':1,'unmaintained':1,'maintain':1,
+  'record':1,'records':1,'copy':1,'copies':1,'file':1,'files':1,'document':1,'documents':1,
+  'approved':1,'approval':1,'unapproved':1,'properly':1,'proper':1,'improper':1,'improperly':1,
+  'audit':1,'auditor':1,'audited':1,'during':1,'period':1,'branch':1,'office':1,
+  'found':1,'noted':1,'observed':1,'observation':1,'verified':1,'checked':1,
+  'staff':1,'provided':1,'submitted':1,'submitted':1,'produced':1,'review':1,'reviewed':1,
+  'regarding':1,'related':1,'about':1,'being':1,'their':1,'there':1,'these':1,'those':1
+};
 function _dupobsTokens(str){
-  return (str||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(function(w){ return w.length>2; });
+  return (str||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(function(w){
+    return w.length > 2 && !_DUPOBS_STOPWORDS[w];
+  });
 }
 function _dupobsSimilarity(a, b){
   var ta = _dupobsTokens(a), tb = _dupobsTokens(b);
@@ -13032,6 +13046,7 @@ function _dupobsSimilarity(a, b){
   var setA = {}, common = 0;
   for(var i=0;i<ta.length;i++) setA[ta[i]]=true;
   for(var j=0;j<tb.length;j++) if(setA[tb[j]]) common++;
+  if(common < 2) return 0; // require at least 2 meaningful words in common
   return Math.round(common * 2 / (ta.length + tb.length) * 100);
 }
 
@@ -13047,7 +13062,14 @@ function dupobsScan(){
       if(used[j]) continue;
       var ts = _dupobsSimilarity(allObs[i].title, allObs[j].title);
       var os = _dupobsSimilarity(allObs[i].observation||allObs[i].obs||'', allObs[j].observation||allObs[j].obs||'');
-      if(ts >= threshold || os >= threshold){ grp.push(allObs[j]); used[j]=true; }
+      // both title AND body must indicate similarity (not just one)
+      if(ts < 20 || os < 20) continue;
+      var combined = Math.round((ts + os) / 2);
+      // category mismatch penalty: reduce by 25 points if categories differ
+      var catI = allObs[i].category||allObs[i].cat||'';
+      var catJ = allObs[j].category||allObs[j].cat||'';
+      if(catI && catJ && catI !== catJ) combined = Math.max(0, combined - 25);
+      if(combined >= threshold){ grp.push(allObs[j]); used[j]=true; }
     }
     if(grp.length > 1){ used[i]=true; groups.push(grp); }
   }
