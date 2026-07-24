@@ -12948,6 +12948,8 @@ function showUpdateDbModal(){
     '<div id="updb-cand-area"></div>' +
     '<div class="updb-foot" id="updb-approve-foot" style="display:none">' +
     '<button style="background:#2e7d32;color:#fff" onclick="updbApproveSelected()">&#10003; Approve &amp; Add Selected to Databank</button>' +
+    '<button style="background:#1a3a5c;color:#fff" onclick="updbKeepAllAsIs()" title="Select all and approve all candidates without any edits">&#9654;&#9654; Keep All As Is</button>' +
+    '<button style="background:#c07000;color:#fff" onclick="updbSaveDraft()" title="Save current review state to resume later or send to Administrator">&#128190; Save Draft</button>' +
     '<button style="background:#e8edf5;color:#444" onclick="updbClearCandidates()">&#10005; Cancel</button>' +
     '</div>' +
     '</div>' +
@@ -12962,6 +12964,7 @@ function showUpdateDbModal(){
 
   document.body.appendChild(modal);
   modal.addEventListener('click', function(e){ if(e.target===modal) closeUpdbModal(); });
+  updbCheckResumeDraft();
 }
 
 function closeUpdbModal(){
@@ -13130,6 +13133,106 @@ function updbToggleAll(checked){
   for(var i=0;i<chks.length;i++) chks[i].checked = checked;
 }
 
+var _UPDB_DRAFT_KEY = 'sa_updb_draft';
+
+function updbKeepAllAsIs(){
+  // Select all then approve — no edits applied
+  updbToggleAll(true);
+  var selAll = document.getElementById('updb-sel-all');
+  if(selAll) selAll.checked = true;
+  updbApproveSelected();
+}
+
+function updbSaveDraft(){
+  if(!_updbCandidates || !_updbCandidates.length){
+    alert('Nothing to save — load a session file first.');
+    return;
+  }
+  // Capture current checkbox states and any edits
+  var draft = { savedAt: new Date().toISOString(), candidates: [] };
+  for(var i=0;i<_updbCandidates.length;i++){
+    var chk = document.getElementById('updb-cand-chk') || document.querySelector('.updb-cand-chk[data-idx="'+i+'"]');
+    var chkEl = document.querySelector('.updb-cand-chk[data-idx="'+i+'"]');
+    draft.candidates.push({
+      data: _updbCandidates[i],
+      checked: chkEl ? chkEl.checked : true
+    });
+  }
+  try{
+    localStorage.setItem(_UPDB_DRAFT_KEY, JSON.stringify(draft));
+    showToast('✅ Draft saved — '+draft.candidates.length+' observation(s) saved. The Administrator can resume this review from Update Databank.', 3500);
+  }catch(e){
+    alert('Could not save draft (storage unavailable).');
+  }
+}
+
+function updbLoadDraft(){
+  try{
+    var raw = localStorage.getItem(_UPDB_DRAFT_KEY);
+    if(!raw) return false;
+    var draft = JSON.parse(raw);
+    if(!draft || !draft.candidates || !draft.candidates.length) return false;
+    _updbCandidates = draft.candidates.map(function(d){ return d.data; });
+    // Re-render the candidate area — re-use existing read path by simulating the render
+    // Notify user and re-open
+    return draft;
+  }catch(e){ return false; }
+}
+
+function updbCheckResumeDraft(){
+  try{
+    var raw = localStorage.getItem(_UPDB_DRAFT_KEY);
+    if(!raw) return;
+    var draft = JSON.parse(raw);
+    if(!draft || !draft.candidates || !draft.candidates.length) return;
+    var dt = draft.savedAt ? new Date(draft.savedAt).toLocaleString() : '—';
+    var candArea = document.getElementById('updb-cand-area');
+    if(candArea){
+      candArea.innerHTML = '<div style="background:#fff8e0;border:1px solid #f0c040;border-radius:6px;padding:12px 14px;font-size:12px;color:#5a4000;display:flex;align-items:center;gap:12px;margin-top:8px">'
+        +'<span>&#128190; A saved draft exists from <strong>'+dt+'</strong> with <strong>'+draft.candidates.length+' observation(s)</strong>.</span>'
+        +'<button onclick="updbResumeDraft()" style="background:#c07000;color:#fff;border:none;border-radius:4px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">&#9654; Resume Draft</button>'
+        +'<button onclick="updbDiscardDraft()" style="background:#8b1a1a;color:#fff;border:none;border-radius:4px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">&#10005; Discard</button>'
+        +'</div>';
+    }
+  }catch(e){}
+}
+
+function updbResumeDraft(){
+  var draft = updbLoadDraft();
+  if(!draft){ alert('Could not load saved draft.'); return; }
+  // Close and reopen to trigger fresh render with candidates
+  // Simulate what updbReadFile does after parsing
+  var candArea = document.getElementById('updb-cand-area');
+  var foot = document.getElementById('updb-approve-foot');
+  // Use the loaded candidates — re-render by calling the render portion
+  // We abuse the fact that _updbCandidates is now set; trigger a minimal re-render notice
+  var alreadyIn = 0;
+  var h = '<div style="font-size:12px;font-weight:700;color:#c07000;margin:8px 0 6px">&#9654; Resuming saved draft — '+_updbCandidates.length+' observation(s). Load the same session file again to restore full edit view, or approve as-is below.</div>';
+  h += '<div class="updb-cand-list">';
+  for(var m=0;m<_updbCandidates.length;m++){
+    var c=_updbCandidates[m];
+    var wasChecked = draft.candidates[m] ? draft.candidates[m].checked : true;
+    h += '<div class="updb-cand-row">'
+       + '<input type="checkbox" class="updb-cand-chk" data-idx="'+m+'"'+(wasChecked?' checked':'')+' style="margin-top:3px;flex-shrink:0">'
+       + '<div style="flex:1;min-width:0"><div class="updb-cand-title">'+esc(c.title||'—')+'</div>'
+       + '<div class="updb-cand-meta">'+esc(c.category||'Others')+'</div></div>'
+       + '</div>';
+  }
+  h += '</div>';
+  if(candArea) candArea.innerHTML = h;
+  if(foot) foot.style.display = 'flex';
+}
+
+function updbDiscardDraft(){
+  if(!confirm('Discard the saved draft? This cannot be undone.')) return;
+  try{ localStorage.removeItem(_UPDB_DRAFT_KEY); }catch(e){}
+  var candArea = document.getElementById('updb-cand-area');
+  if(candArea) candArea.innerHTML = '';
+  var foot = document.getElementById('updb-approve-foot');
+  if(foot) foot.style.display = 'none';
+  showToast('Draft discarded.', 2000);
+}
+
 function updbToggleEdit(m){
   var panel = document.getElementById('updb-edit-'+m);
   var btn   = document.getElementById('updb-edit-btn-'+m);
@@ -13237,6 +13340,7 @@ function updbApproveSelected(){
 
   var extArea = document.getElementById('updb-ext-area');
   if(extArea) extArea.innerHTML = buildUpdbExtList(ext);
+  try{ localStorage.removeItem(_UPDB_DRAFT_KEY); }catch(e){}
   updbClearCandidates();
 }
 
