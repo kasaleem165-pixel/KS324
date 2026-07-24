@@ -9352,7 +9352,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
     </div>
 
     <div class="tb-dd dd-right" id="dd-admin">
-      <button class="tb-dd-tab" onclick="if(window._hoAuthed){tbDDToggle('dd-admin');}else{showHOAuthModal(function(){tbDDToggle('dd-admin');});}">Admin <span class="arr">&#9660;</span></button>
+      <button class="tb-dd-tab" onclick="if(window._hoAuthed){tbDDToggle('dd-admin');}else{showHOAuthModal(function(){tbDDToggle('dd-admin');});}">Admin <span id="admin-export-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px;vertical-align:middle">Export Pending</span> <span class="arr">&#9660;</span></button>
       <div class="tb-dd-menu">
         <button class="tb-dd-item locked" id="chpw-btn" onclick="showChangePwModal();tbDDClose()" disabled><span class="di">&#128274;</span> Change Password</button>
         <button class="tb-dd-item" onclick="showManageUsersModal();tbDDClose()"><span class="di">&#128101;</span> Manage Users</button>
@@ -10122,6 +10122,7 @@ window.onload = function() {
   _ensureRADrawerToggle();
   buildObsSrrCache();
   if(_hoAuthed) _hoActivateBtns();
+  _updateExportBadge();
   buildSel('spb', PREPBY);
   buildSel('scat', CATS);
   buildCatSel();
@@ -13146,6 +13147,24 @@ function updbToggleAll(checked){
 }
 
 var _UPDB_DRAFT_KEY = 'sa_updb_draft';
+var _EXPORT_PENDING_KEY = 'sa_export_pending';
+
+function _setExportPending(){
+  try{ localStorage.setItem(_EXPORT_PENDING_KEY,'1'); }catch(e){}
+  _updateExportBadge();
+}
+function _clearExportPending(){
+  try{ localStorage.removeItem(_EXPORT_PENDING_KEY); }catch(e){}
+  _updateExportBadge();
+}
+function _isExportPending(){
+  try{ return localStorage.getItem(_EXPORT_PENDING_KEY)==='1'; }catch(e){ return false; }
+}
+function _updateExportBadge(){
+  var badge = document.getElementById('admin-export-badge');
+  if(!badge) return;
+  badge.style.display = _isExportPending() ? 'inline-block' : 'none';
+}
 
 function updbKeepAllAsIs(){
   // Select all then approve — no edits applied
@@ -13300,6 +13319,7 @@ function updbExportApp(){
       document.body.appendChild(a);
       a.click();
       setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
+      _clearExportPending();
       showToast('✅ Updated app exported — '+added+' new observation(s) baked in. Upload index.html to Netlify to update all users.', 5000);
     })
     .catch(function(e){ alert('Could not fetch app source: '+e.message+'\n\nTry running from the deployed Netlify URL, not a local file.'); });
@@ -13479,6 +13499,7 @@ function updbApproveSelected(){
   }
   ss(DB_EXT_KEY, ext);
   buildObsSrrCache(); // rebuild cache so new obs appear in Workload tab
+  if(added>0) _setExportPending();
 
   toast(added+' observation(s) approved and added to the databank with Risk & Control linkage.');
   _updbCandidates = [];
@@ -13495,6 +13516,7 @@ function updbRemoveExt(obsId){
   ext = ext.filter(function(o){ return o.id !== obsId; });
   ss(DB_EXT_KEY, ext);
   DB.observations = DB.observations.filter(function(o){ return o.id !== obsId; });
+  _setExportPending();
   var extArea = document.getElementById('updb-ext-area');
   if(extArea) extArea.innerHTML = buildUpdbExtList(ext);
   toast('Observation removed from databank extension.');
@@ -13545,6 +13567,7 @@ function updbImportExt(input){
         added++;
       }
       ss(DB_EXT_KEY, ext);
+      if(added>0) _setExportPending();
 
       var impArea = document.getElementById('updb-imp-area');
       if(impArea){
@@ -13618,6 +13641,7 @@ function impDbReadFile(input){
         added++;
       }
       ss(DB_EXT_KEY, ext);
+      if(added>0) _setExportPending();
 
       var resultArea = document.getElementById('impdb-result-area');
       if(resultArea){
