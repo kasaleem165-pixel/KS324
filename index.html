@@ -9352,6 +9352,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <div class="tb-dd-sep"></div>
         <div class="tb-dd-group-label">&#128230; Databank Management</div>
         <button class="tb-dd-item tb-dd-sub" id="updb-btn" onclick="showUpdateDbModal();tbDDClose()"><span class="di">&#128203;</span> Duplicate Observations</button>
+
       </div>
     </div>
 
@@ -11622,6 +11623,8 @@ function restoreSession(sess) {
   lockBrInfo();
   renderAnnexList();
   renderRpt();
+  // If Duplicate Observations modal is open, refresh scan with newly loaded session
+  if(document.getElementById('updbModal')) updbScanLiveSession(true);
 }
 
 function saveVersion(cb) {
@@ -12921,16 +12924,6 @@ function showHOAuthModal(callback, showFieldOption){
 }
 
 function showUpdateDbModal(){
-  if(!_hoAuthed){
-    showHOAuthModal(function(granted){
-      if(!granted){ showImportDbModal(); return; }
-      _hoAuthed = true;
-      _hoActivateBtns();
-      showUpdateDbModal();
-    }, true);
-    return;
-  }
-
   _updbCandidates = [];
   var el = document.getElementById('updbModal');
   if(el) el.remove();
@@ -12945,19 +12938,19 @@ function showUpdateDbModal(){
     '<div class="updb-body">' +
 
     '<div class="updb-section">' +
-    '<h4>&#128203; Load a Final Report Session File to Review New Observations</h4>' +
-    '<p>Select a final issued report session file (.json). The system will identify any observations not yet in the core databank, auto-suggest their Risk and Control linkage, and present them for your review and approval before they are added.</p>' +
-    '<div class="updb-drop" onclick="document.getElementById(\'updb-file-input\').click()">' +
-    '&#128229; <strong>Click to select a Final Report Session File (.json)</strong>' +
-    '<p style="margin:4px 0 0;font-size:11px;color:#888">The session file saved via Save / Versions &rarr; Export</p>' +
-    '</div>' +
-    '<input type="file" id="updb-file-input" accept=".json" style="display:none" onchange="updbReadFile(this)">' +
-    '<div id="updb-cand-area"></div>' +
+    '<h4>&#128203; Duplicate Observations Review</h4>' +
+    '<p style="font-size:12px;color:#555;margin-bottom:10px">The system has scanned the current session and listed below any custom observations not yet in the core databank. Review, edit if needed, then approve to add them.</p>' +
+    '<div id="updb-cand-area"><div style="padding:14px;text-align:center;color:#aaa;font-size:12px">Scanning current session&hellip;</div></div>' +
     '<div class="updb-foot" id="updb-approve-foot" style="display:none">' +
     '<button style="background:#2e7d32;color:#fff" onclick="updbApproveSelected()">&#10003; Approve &amp; Add Selected to Databank</button>' +
     '<button style="background:#1a3a5c;color:#fff" onclick="updbKeepAllAsIs()" title="Select all and approve all candidates without any edits">&#9654;&#9654; Keep All As Is</button>' +
-    '<button style="background:#c07000;color:#fff" onclick="updbSaveDraft()" title="Save current review state to resume later or send to Administrator">&#128190; Save Draft</button>' +
+    '<button style="background:#c07000;color:#fff" onclick="updbSaveDraft()" title="Export current review state as a file for Administrator">&#128190; Save Draft</button>' +
     '<button style="background:#e8edf5;color:#444" onclick="updbClearCandidates()">&#10005; Cancel</button>' +
+    '</div>' +
+    '<div style="margin-top:10px;border-top:1px solid #dde3ee;padding-top:8px">' +
+    '<span style="font-size:11px;color:#888">&#128228; Scan a different session file instead: </span>' +
+    '<label style="font-size:11px;color:#1a3a5c;font-weight:700;cursor:pointer;text-decoration:underline" onclick="document.getElementById(\'updb-file-input\').click()">Browse&hellip;</label>' +
+    '<input type="file" id="updb-file-input" accept=".json" style="display:none" onchange="updbReadFile(this)">' +
     '</div>' +
     '</div>' +
 
@@ -12981,7 +12974,8 @@ function showUpdateDbModal(){
 
   document.body.appendChild(modal);
   modal.addEventListener('click', function(e){ if(e.target===modal) closeUpdbModal(); });
-  updbCheckResumeDraft();
+  // Auto-scan live session — check for saved state first, then scan
+  setTimeout(function(){ updbScanLiveSession(false); }, 80);
 }
 
 function closeUpdbModal(){
@@ -13027,116 +13021,39 @@ function updbReadFile(input){
   reader.onload = function(e){
     try{
       var data = JSON.parse(e.target.result);
-      // Accept both a raw session object and a version-history entry
       var sess = data;
-      if(Array.isArray(data) && data.length && data[0].customs) sess = data[data.length-1]; // version array
+      if(Array.isArray(data) && data.length && data[0].customs) sess = data[data.length-1];
       var reportCustoms = sess.customs || [];
       if(!reportCustoms.length){
         toast('No custom observations found in this report file.');
-        input.value='';
-        return;
+        input.value=''; return;
       }
-
-      // Build full set of existing IDs (built-in DB + ext already merged into DB.observations)
-      var existingIds = {};
-      for(var i=0;i<DB.observations.length;i++) existingIds[DB.observations[i].id]=true;
-
-      // Also match by title (case-insensitive) to catch re-numbered duplicates
-      var existingTitles = {};
-      for(var j=0;j<DB.observations.length;j++) existingTitles[DB.observations[j].title.toLowerCase().trim()]=true;
-
+      var existingIds = {}, existingTitles = {};
+      for(var i=0;i<DB.observations.length;i++){
+        existingIds[DB.observations[i].id]=true;
+        existingTitles[(DB.observations[i].title||'').toLowerCase().trim()]=true;
+      }
       _updbCandidates = [];
       var alreadyIn = 0;
       for(var k=0;k<reportCustoms.length;k++){
         var o = reportCustoms[k];
-        if(existingIds[o.id] || existingTitles[(o.title||'').toLowerCase().trim()]){
-          alreadyIn++;
-          continue;
-        }
+        if(existingIds[o.id] || existingTitles[(o.title||'').toLowerCase().trim()]){ alreadyIn++; continue; }
         _updbCandidates.push(o);
       }
-
       var candArea = document.getElementById('updb-cand-area');
       var foot = document.getElementById('updb-approve-foot');
       if(!_updbCandidates.length){
-        candArea.innerHTML = '<div style="padding:12px 14px;background:#e8f5e9;border-radius:6px;font-size:12px;color:#2e7d32;font-weight:600">&#10003; All '+reportCustoms.length+' observation(s) in this report already exist in the databank'+(alreadyIn?' ('+alreadyIn+' matched)':'')+'.</div>';
-        foot.style.display='none';
-        input.value='';
-        return;
+        candArea.innerHTML = '<div style="padding:12px 14px;background:#e8f5e9;border-radius:6px;font-size:12px;color:#2e7d32;font-weight:600">&#10003; All '+reportCustoms.length+' observation(s) in this file already exist in the databank'+(alreadyIn?' ('+alreadyIn+' matched)':'')+'.</div>';
+        foot.style.display='none'; input.value=''; return;
       }
-
-      var h = '<div style="font-size:12px;font-weight:700;color:#2e7d32;margin:8px 0 6px">'+_updbCandidates.length+' new observation(s) found — review Risk &amp; Control linkage and select which to approve'+(alreadyIn?' ('+alreadyIn+' already in databank — skipped)':'')+':</div>';
+      var rows = _updbCandidates.map(function(c){ return {cand:c, checked:true}; });
+      var h = '<div style="font-size:12px;font-weight:700;color:#2e7d32;margin:8px 0 6px">'+_updbCandidates.length+' new observation(s) found from file'+(alreadyIn?' ('+alreadyIn+' already in databank — skipped)':'')+'</div>';
       h += '<div style="margin-bottom:8px"><label style="font-size:11px;cursor:pointer"><input type="checkbox" id="updb-sel-all" onchange="updbToggleAll(this.checked)" checked> <strong>Select All</strong></label></div>';
-      h += '<div class="updb-cand-list">';
-      for(var m=0;m<_updbCandidates.length;m++){
-        var c = _updbCandidates[m];
-        // Auto-suggest risk & control linkage
-        var srrId = _getObsSrr(c);
-        var srrDef = srrId ? SRR_DEF[srrId] : null;
-        var riskBlock = '';
-        if(srrDef){
-          riskBlock =
-            '<div style="margin-top:7px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;padding:7px 10px" id="updb-risk-block-'+m+'">' +
-            '<div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#1a3a5c;margin-bottom:5px">System-Suggested Risk &amp; Control Linkage</div>' +
-            '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start">' +
-            '<div style="flex:1;min-width:160px">' +
-            '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-bottom:2px">Sub-Risk</div>' +
-            '<span style="display:inline-block;background:'+srrDef.col+';color:#fff;border-radius:3px;padding:1px 7px;font-size:10px;font-weight:700;margin-bottom:3px">'+srrId+'</span>' +
-            '<div style="font-size:11.5px;font-weight:700;color:#1a2d44">'+esc(srrDef.name)+'</div>' +
-            '<div style="font-size:10.5px;color:#4a6a8a;margin-top:1px">&#9656; '+esc(srrDef.rr)+' &mdash; '+esc(srrDef.rrName)+'</div>' +
-            '</div>' +
-            '<div style="flex:1;min-width:160px">' +
-            '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#888;margin-bottom:2px">Key Control</div>' +
-            '<span style="display:inline-block;background:#1a6030;color:#fff;border-radius:3px;padding:1px 7px;font-size:10px;font-weight:700;margin-bottom:3px">'+esc(srrDef.ca)+'</span>' +
-            '<div style="font-size:11.5px;font-weight:700;color:#0a3020">'+esc(srrDef.caName)+'</div>' +
-            '</div>' +
-            '</div></div>';
-        }
-        // Build SRR dropdown options
-        var srrOpts = '<option value="">-- No risk linkage --</option>';
-        var srrAreas=[['fin','Financial'],['cash','Cash & Bank'],['hr','Human Resources'],['fa','Fixed Assets'],['lib','Library'],['stu','Student Records'],['sec','Safety & Security'],['lab','Laboratory'],['gen','General Operations']];
-        for(var ai=0;ai<srrAreas.length;ai++){
-          var aKey=srrAreas[ai][0], aLbl=srrAreas[ai][1];
-          var aOrder=SRR_AREA_ORDER[aKey]||[];
-          if(!aOrder.length) continue;
-          srrOpts+='<optgroup label="'+aLbl+'">';
-          for(var si2=0;si2<aOrder.length;si2++){
-            var sid=aOrder[si2],sd=SRR_DEF[sid];
-            if(!sd) continue;
-            srrOpts+='<option value="'+sid+'"'+(srrId===sid?' selected':'')+'>'+sid+' — '+sd.name+'</option>';
-          }
-          srrOpts+='</optgroup>';
-        }
-        var caInitial = srrDef ? '<span style="font-weight:700">'+esc(srrDef.ca)+'</span> — '+esc(srrDef.caName) : '<span style="color:#aaa">Select a sub-risk above to auto-fill control</span>';
-
-        h += '<div class="updb-cand-row" style="flex-direction:column;align-items:stretch">' +
-             '<div style="display:flex;align-items:flex-start;gap:10px">' +
-             '<input type="checkbox" class="updb-cand-chk" data-idx="'+m+'" checked style="margin-top:3px;flex-shrink:0">' +
-             '<div style="flex:1;min-width:0">' +
-             '<div class="updb-cand-title" id="updb-title-disp-'+m+'">'+esc(c.title)+'</div>' +
-             '<div class="updb-cand-meta">'+esc(c.category||'Others')+(c.type?' &nbsp;|&nbsp; '+esc(c.type):'')+'</div>' +
-             (c.observation ? '<div style="font-size:11px;color:#555;margin-top:3px;line-height:1.4">'+esc(c.observation).substring(0,180)+(c.observation.length>180?'&hellip;':'')+'</div>' : '') +
-             riskBlock +
-             '</div>' +
-             '<button onclick="updbToggleEdit('+m+')" id="updb-edit-btn-'+m+'" style="flex-shrink:0;padding:3px 10px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#9998; Edit</button>' +
-             '</div>' +
-             '<div class="updb-edit-panel" id="updb-edit-'+m+'">' +
-               '<div class="updb-edit-lbl">Title</div>' +
-               '<input class="updb-edit-input" type="text" value="'+esc(c.title)+'" oninput="updbEditField('+m+',\'title\',this.value)" style="resize:none">' +
-               '<div class="updb-edit-lbl">Observation / Finding</div>' +
-               '<textarea class="updb-edit-input" rows="3" oninput="updbEditField('+m+',\'observation\',this.value)">'+esc(c.observation||'')+'</textarea>' +
-               '<div class="updb-edit-lbl">Recommendation</div>' +
-               '<textarea class="updb-edit-input" rows="3" oninput="updbEditField('+m+',\'recommendation\',this.value)">'+esc(c.recommendation||'')+'</textarea>' +
-               '<div class="updb-edit-lbl">Risk Linkage — Sub-Risk</div>' +
-               '<select class="updb-srr-sel" id="updb-srr-sel-'+m+'" onchange="updbEditSrr('+m+',this.value)">'+srrOpts+'</select>' +
-               '<div class="updb-edit-lbl">Key Control (auto-filled from sub-risk)</div>' +
-               '<div class="updb-ca-display" id="updb-ca-disp-'+m+'">'+caInitial+'</div>' +
-             '</div>' +
-             '</div>';
-      }
-      h += '</div>';
+      h += updbBuildCandList(rows);
       candArea.innerHTML = h;
       foot.style.display = 'flex';
+      updbSaveState();
+      updbAttachStateListeners();
     } catch(ex){
       toast('Could not read file. Please select a valid session JSON file.');
     }
@@ -13151,7 +13068,101 @@ function updbToggleAll(checked){
 }
 
 var _UPDB_DRAFT_KEY = 'sa_updb_draft';
+var _UPDB_STATE_KEY  = 'sa_dupobs_state';
 var _EXPORT_PENDING_KEY = 'sa_export_pending';
+
+// Auto-save checkbox state so auditor can resume after re-login
+function updbSaveState(){
+  try{
+    var state = [];
+    for(var i=0;i<_updbCandidates.length;i++){
+      var chkEl = document.querySelector('.updb-cand-chk[data-idx="'+i+'"]');
+      state.push({ id: _updbCandidates[i].id, checked: chkEl ? chkEl.checked : true, data: _updbCandidates[i] });
+    }
+    localStorage.setItem(_UPDB_STATE_KEY, JSON.stringify({ ts: new Date().toISOString(), state: state }));
+  }catch(e){}
+}
+
+function updbScanLiveSession(isReload){
+  // On reload (new session file loaded), always re-scan fresh
+  // On first open, try to restore saved state first
+  var candArea = document.getElementById('updb-cand-area');
+  var foot     = document.getElementById('updb-approve-foot');
+  if(!candArea) return;
+
+  // Try restoring saved state (skip on reload)
+  if(!isReload){
+    try{
+      var raw = localStorage.getItem(_UPDB_STATE_KEY);
+      if(raw){
+        var saved = JSON.parse(raw);
+        if(saved && saved.state && saved.state.length){
+          _updbCandidates = saved.state.map(function(s){ return s.data; });
+          var dt = saved.ts ? new Date(saved.ts).toLocaleString() : '—';
+          var h = '<div style="background:#e8f0fb;border:1px solid #b0c4e8;border-radius:6px;padding:8px 12px;font-size:11px;color:#1a3a5c;margin-bottom:8px;display:flex;align-items:center;gap:10px">'
+            +'<span>&#128257; Resuming your last session from <strong>'+dt+'</strong>.</span>'
+            +'<button onclick="updbScanLiveSession(true)" style="background:#1a3a5c;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">&#8635; Fresh Scan</button>'
+            +'</div>';
+          h += updbBuildCandList(saved.state.map(function(s){ return {cand:s.data, checked:s.checked}; }));
+          candArea.innerHTML = h;
+          if(foot) foot.style.display = _updbCandidates.length ? 'flex' : 'none';
+          // Re-attach state-save listeners
+          updbAttachStateListeners();
+          return;
+        }
+      }
+    }catch(e){}
+  }
+
+  // Fresh scan from live customs array
+  var reportCustoms = (typeof customs !== 'undefined') ? customs : [];
+  if(!reportCustoms.length){
+    candArea.innerHTML = '<div style="padding:14px;background:#fff8e1;border-radius:6px;font-size:12px;color:#7a6000;font-weight:600">No custom observations in the current session. Add custom observations to the report first, then return here to review them.</div>';
+    if(foot) foot.style.display = 'none';
+    return;
+  }
+
+  var existingIds = {};
+  var existingTitles = {};
+  for(var i=0;i<DB.observations.length;i++){
+    existingIds[DB.observations[i].id] = true;
+    existingTitles[(DB.observations[i].title||'').toLowerCase().trim()] = true;
+  }
+
+  _updbCandidates = [];
+  var alreadyIn = 0;
+  for(var k=0;k<reportCustoms.length;k++){
+    var o = reportCustoms[k];
+    if(existingIds[o.id] || existingTitles[(o.title||'').toLowerCase().trim()]){ alreadyIn++; continue; }
+    _updbCandidates.push(o);
+  }
+
+  if(!_updbCandidates.length){
+    candArea.innerHTML = '<div style="padding:12px 14px;background:#e8f5e9;border-radius:6px;font-size:12px;color:#2e7d32;font-weight:600">&#10003; All '+reportCustoms.length+' custom observation(s) in this session already exist in the databank'+(alreadyIn?' ('+alreadyIn+' matched)':'')+'.</div>';
+    if(foot) foot.style.display = 'none';
+    return;
+  }
+
+  var rows = _updbCandidates.map(function(c){ return {cand:c, checked:true}; });
+  var h = '<div style="font-size:12px;font-weight:700;color:#2e7d32;margin:8px 0 6px">'+_updbCandidates.length+' new observation(s) found'+(alreadyIn?' ('+alreadyIn+' already in databank — skipped)':'')+'</div>';
+  h += '<div style="margin-bottom:8px"><label style="font-size:11px;cursor:pointer"><input type="checkbox" id="updb-sel-all" onchange="updbToggleAll(this.checked)" checked> <strong>Select All</strong></label></div>';
+  h += updbBuildCandList(rows);
+  candArea.innerHTML = h;
+  if(foot) foot.style.display = 'flex';
+  updbAttachStateListeners();
+  // Save initial state
+  updbSaveState();
+}
+
+function updbAttachStateListeners(){
+  // Attach onchange to every checkbox so state is saved on each tick
+  setTimeout(function(){
+    var chks = document.querySelectorAll('.updb-cand-chk');
+    for(var i=0;i<chks.length;i++){
+      chks[i].addEventListener('change', updbSaveState);
+    }
+  }, 50);
+}
 
 function _setExportPending(){
   try{ localStorage.setItem(_EXPORT_PENDING_KEY,'1'); }catch(e){}
@@ -13168,6 +13179,71 @@ function _updateExportBadge(){
   var badge = document.getElementById('admin-export-badge');
   if(!badge) return;
   badge.style.display = _isExportPending() ? 'inline-block' : 'none';
+}
+
+// Shared candidate list HTML builder used by both live scan and file upload paths
+function updbBuildCandList(rows){
+  var h = '<div class="updb-cand-list">';
+  for(var m=0;m<rows.length;m++){
+    var c = rows[m].cand;
+    var wasChecked = rows[m].checked !== false;
+    var srrId  = _getObsSrr(c);
+    var srrDef = srrId ? SRR_DEF[srrId] : null;
+    var riskBlock = '';
+    if(srrDef){
+      riskBlock =
+        '<div style="margin-top:7px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;padding:7px 10px" id="updb-risk-block-'+m+'">' +
+        '<div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#1a3a5c;margin-bottom:5px">System-Suggested Risk &amp; Control Linkage</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+        '<div style="flex:1;min-width:160px">' +
+        '<div style="font-size:9px;text-transform:uppercase;color:#888;margin-bottom:2px">Sub-Risk</div>' +
+        '<span style="display:inline-block;background:'+srrDef.col+';color:#fff;border-radius:3px;padding:1px 7px;font-size:10px;font-weight:700;margin-bottom:3px">'+srrId+'</span>' +
+        '<div style="font-size:11.5px;font-weight:700;color:#1a2d44">'+esc(srrDef.name)+'</div>' +
+        '<div style="font-size:10.5px;color:#4a6a8a;margin-top:1px">&#9656; '+esc(srrDef.rr)+' &mdash; '+esc(srrDef.rrName)+'</div>' +
+        '</div>' +
+        '<div style="flex:1;min-width:160px">' +
+        '<div style="font-size:9px;text-transform:uppercase;color:#888;margin-bottom:2px">Key Control</div>' +
+        '<span style="display:inline-block;background:#1a6030;color:#fff;border-radius:3px;padding:1px 7px;font-size:10px;font-weight:700;margin-bottom:3px">'+esc(srrDef.ca)+'</span>' +
+        '<div style="font-size:11.5px;font-weight:700;color:#0a3020">'+esc(srrDef.caName)+'</div>' +
+        '</div></div></div>';
+    }
+    var srrOpts = '<option value="">-- No risk linkage --</option>';
+    var srrAreas=[['fin','Financial'],['cash','Cash & Bank'],['hr','Human Resources'],['fa','Fixed Assets'],['lib','Library'],['stu','Student Records'],['sec','Safety & Security'],['lab','Laboratory'],['gen','General Operations']];
+    for(var ai=0;ai<srrAreas.length;ai++){
+      var aKey=srrAreas[ai][0], aLbl=srrAreas[ai][1];
+      var aOrder=SRR_AREA_ORDER[aKey]||[];
+      if(!aOrder.length) continue;
+      srrOpts+='<optgroup label="'+aLbl+'">';
+      for(var si2=0;si2<aOrder.length;si2++){
+        var sid=aOrder[si2],sd=SRR_DEF[sid];
+        if(!sd) continue;
+        srrOpts+='<option value="'+sid+'"'+(srrId===sid?' selected':'')+'>'+sid+' — '+sd.name+'</option>';
+      }
+      srrOpts+='</optgroup>';
+    }
+    var caInitial = srrDef ? '<span style="font-weight:700">'+esc(srrDef.ca)+'</span> — '+esc(srrDef.caName) : '<span style="color:#aaa">Select a sub-risk above to auto-fill control</span>';
+    h += '<div class="updb-cand-row" style="flex-direction:column;align-items:stretch">' +
+         '<div style="display:flex;align-items:flex-start;gap:10px">' +
+         '<input type="checkbox" class="updb-cand-chk" data-idx="'+m+'"'+(wasChecked?' checked':'')+' style="margin-top:3px;flex-shrink:0">' +
+         '<div style="flex:1;min-width:0">' +
+         '<div class="updb-cand-title" id="updb-title-disp-'+m+'">'+esc(c.title||'—')+'</div>' +
+         '<div class="updb-cand-meta">'+esc(c.category||'Others')+(c.type?' &nbsp;|&nbsp; '+esc(c.type):'')+'</div>' +
+         (c.observation ? '<div style="font-size:11px;color:#555;margin-top:3px;line-height:1.4">'+esc(c.observation).substring(0,180)+(c.observation.length>180?'&hellip;':'')+'</div>' : '') +
+         riskBlock +
+         '</div>' +
+         '<button onclick="updbToggleEdit('+m+')" id="updb-edit-btn-'+m+'" style="flex-shrink:0;padding:3px 10px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#9998; Edit</button>' +
+         '</div>' +
+         '<div class="updb-edit-panel" id="updb-edit-'+m+'">' +
+         '<label style="font-size:11px;font-weight:700;color:#1a3a5c">Title / Heading</label>' +
+         '<input type="text" value="'+esc(c.title||'')+'" oninput="updbEditField('+m+',\'title\',this.value)" style="width:100%;box-sizing:border-box;padding:5px 8px;border:1px solid #b0b8c8;border-radius:4px;font-size:12px;margin-bottom:6px;font-family:inherit">' +
+         '<label style="font-size:11px;font-weight:700;color:#1a3a5c">Sub-Risk Linkage</label>' +
+         '<select onchange="updbChangeSrr('+m+',this.value)" style="width:100%;padding:5px 8px;border:1px solid #b0b8c8;border-radius:4px;font-size:11px;margin-bottom:5px;font-family:inherit">'+srrOpts+'</select>' +
+         '<div id="updb-ca-disp-'+m+'" style="font-size:11px;color:#1a6030;margin-bottom:6px;padding:4px 8px;background:#f0faf4;border-radius:4px">'+caInitial+'</div>' +
+         '</div>' +
+         '</div>';
+  }
+  h += '</div>';
+  return h;
 }
 
 function updbKeepAllAsIs(){
@@ -13511,6 +13587,7 @@ function updbApproveSelected(){
   var extArea = document.getElementById('updb-ext-area');
   if(extArea) extArea.innerHTML = buildUpdbExtList(ext);
   try{ localStorage.removeItem(_UPDB_DRAFT_KEY); }catch(e){}
+  try{ localStorage.removeItem(_UPDB_STATE_KEY); }catch(e){}
   updbClearCandidates();
 }
 
