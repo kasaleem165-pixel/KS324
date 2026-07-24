@@ -9341,7 +9341,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
     </div>
 
     <div class="tb-dd" id="dd-tools">
-      <button class="tb-dd-tab" onclick="if(window._hoAuthed){tbDDToggle('dd-tools');}else{showHOAuthModal(function(){tbDDToggle('dd-tools');});}">Tools <span class="arr">&#9660;</span></button>
+      <button class="tb-dd-tab" onclick="tbDDToggle('dd-tools')">Tools <span class="arr">&#9660;</span></button>
       <div class="tb-dd-menu">
         <button class="tb-dd-item" id="srr-tab-btn" onclick="toggleSRRPanel();tbDDClose()"><span class="di">&#128279;</span> Risk Mapping Editor</button>
         <button class="tb-dd-item" id="dbm-tab-btn" onclick="toggleDBMPanel();tbDDClose()"><span class="di">&#128196;</span> Databank Manager</button>
@@ -12923,39 +12923,54 @@ function showHOAuthModal(callback, showFieldOption){
   setTimeout(function(){ inp.focus(); }, 80);
 }
 
-function showUpdateDbModal(){
-  if(!_hoAuthed){
-    showHOAuthModal(function(granted){
-      if(!granted) return;
-      _hoAuthed = true; _hoActivateBtns();
-      showUpdateDbModal();
-    }, false);
-    return;
-  }
+var _dupobsGroups = [];   // [{obs:[...], decision:null|'keep_both'|'select_one'|'skip', keepIdx:null|number}]
+var _DUPOBS_STATE_KEY = 'sa_dupobs_review';
 
+function showUpdateDbModal(){
   var el = document.getElementById('updbModal');
   if(el) el.remove();
+
+  var isAdmin = !!window._hoAuthed;
 
   var modal = document.createElement('div');
   modal.className = 'updb-bg'; modal.id = 'updbModal';
   modal.innerHTML =
     '<div class="updb-box">' +
-    '<div class="updb-head"><h3>&#128203; Databank Management &mdash; Duplicate Observations</h3><button onclick="closeUpdbModal()">&#10005;</button></div>' +
+    '<div class="updb-head"><h3>&#128270; Databank Management &mdash; Duplicate Observations</h3><button onclick="closeUpdbModal()">&#10005;</button></div>' +
     '<div class="updb-body">' +
-    '<div class="updb-section">' +
-    '<h4>&#128270; Similarity Scan Results</h4>' +
-    '<p style="font-size:12px;color:#555;margin-bottom:6px">The system has scanned all databank observations for duplicates and near-duplicates. Groups below share a high degree of similarity in their title or text. Review each group and remove the redundant entries to keep the databank clean.</p>' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
-    '<label style="font-size:12px;color:#444">Sensitivity:</label>' +
-    '<select id="dupobs-threshold" onchange="dupobsScan()" style="padding:4px 8px;border:1px solid #b0b8c8;border-radius:4px;font-size:12px;font-family:inherit">' +
+
+    // Controls row
+    '<div class="updb-section" style="padding-bottom:10px">' +
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
+    '<label style="font-size:12px;color:#444;font-weight:600">Sensitivity:</label>' +
+    '<select id="dupobs-threshold" style="padding:4px 8px;border:1px solid #b0b8c8;border-radius:4px;font-size:12px;font-family:inherit">' +
     '<option value="80">High — very close matches only</option>' +
     '<option value="60" selected>Medium — similar wording</option>' +
     '<option value="40">Low — broad similarity</option>' +
     '</select>' +
-    '<button onclick="dupobsScan()" style="background:#1a3a5c;color:#fff;border:none;border-radius:4px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128270; Re-scan</button>' +
+    '<button onclick="dupobsScan()" style="background:#1a3a5c;color:#fff;border:none;border-radius:4px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128270; Scan</button>' +
+    '<span id="dupobs-progress" style="font-size:11px;color:#555;margin-left:auto"></span>' +
     '</div>' +
-    '<div id="dupobs-results"><div style="padding:14px;text-align:center;color:#aaa;font-size:12px">Scanning&hellip;</div></div>' +
     '</div>' +
+
+    // Results
+    '<div class="updb-section">' +
+    '<div id="dupobs-results"><div style="padding:14px;text-align:center;color:#aaa;font-size:12px">Click Scan to begin&hellip;</div></div>' +
+    '</div>' +
+
+    // Footer actions
+    '<div style="padding:12px 16px;border-top:1px solid #dde3ee;display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#f8fafd">' +
+    '<button onclick="dupobsSaveDraft()" style="background:#c07000;color:#fff;border:none;border-radius:5px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128190; Save Draft</button>' +
+    '<span style="font-size:11px;color:#888">Export your review decisions to send to the Administrator for approval.</span>' +
+    (isAdmin ?
+      '<div style="margin-left:auto;display:flex;gap:8px;align-items:center">' +
+      '<button onclick="document.getElementById(\'dupobs-draft-inp\').click()" style="background:#1a5c2a;color:#fff;border:none;border-radius:5px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128228; Load Draft</button>' +
+      '<input type="file" id="dupobs-draft-inp" accept=".json" style="display:none" onchange="dupobsLoadDraft(this)">' +
+      '<button onclick="dupobsApproveRemovals()" style="background:#8b1a1a;color:#fff;border:none;border-radius:5px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Approve &amp; Apply</button>' +
+      '</div>'
+    : '') +
+    '</div>' +
+
     '</div></div>';
 
   document.body.appendChild(modal);
@@ -12983,71 +12998,170 @@ function _dupobsSimilarity(a, b){
 }
 
 function dupobsScan(){
-  var el = document.getElementById('dupobs-threshold');
-  var threshold = el ? parseInt(el.value) : 60;
+  var thEl = document.getElementById('dupobs-threshold');
+  var threshold = thEl ? parseInt(thEl.value) : 60;
   var allObs = DB.observations || [];
-  // Find groups of similar observations
   var used = {}, groups = [];
   for(var i=0;i<allObs.length;i++){
     if(used[i]) continue;
-    var group = [i];
+    var grp = [allObs[i]];
     for(var j=i+1;j<allObs.length;j++){
       if(used[j]) continue;
-      var titleSim = _dupobsSimilarity(allObs[i].title, allObs[j].title);
-      var obsSim   = _dupobsSimilarity(allObs[i].observation||allObs[i].obs||'', allObs[j].observation||allObs[j].obs||'');
-      if(titleSim >= threshold || obsSim >= threshold){
-        group.push(j);
-        used[j] = true;
-      }
+      var ts = _dupobsSimilarity(allObs[i].title, allObs[j].title);
+      var os = _dupobsSimilarity(allObs[i].observation||allObs[i].obs||'', allObs[j].observation||allObs[j].obs||'');
+      if(ts >= threshold || os >= threshold){ grp.push(allObs[j]); used[j]=true; }
     }
-    if(group.length > 1){
-      used[i] = true;
-      groups.push(group);
-    }
+    if(grp.length > 1){ used[i]=true; groups.push(grp); }
   }
+  // Preserve prior decisions where group IDs still match
+  var priorMap = {};
+  for(var p=0;p<_dupobsGroups.length;p++){
+    var key = _dupobsGroups[p].obs.map(function(o){ return o.id; }).sort().join('|');
+    priorMap[key] = _dupobsGroups[p];
+  }
+  _dupobsGroups = groups.map(function(grp){
+    var key = grp.map(function(o){ return o.id; }).sort().join('|');
+    return priorMap[key] || { obs: grp, decision: null, keepIdx: null };
+  });
+  dupobsRender();
+}
 
+function dupobsRender(){
   var res = document.getElementById('dupobs-results');
+  var prog = document.getElementById('dupobs-progress');
   if(!res) return;
-  if(!groups.length){
+  if(!_dupobsGroups.length){
     res.innerHTML = '<div style="padding:16px;background:#e8f5e9;border-radius:6px;font-size:12px;color:#2e7d32;font-weight:600">&#10003; No duplicate or near-duplicate observations found at this sensitivity level.</div>';
+    if(prog) prog.textContent = '';
     return;
   }
+  var decided = _dupobsGroups.filter(function(g){ return g.decision !== null; }).length;
+  if(prog) prog.textContent = decided+' / '+_dupobsGroups.length+' groups decided';
 
-  var h = '<div style="font-size:12px;color:#7a1a1a;font-weight:700;margin-bottom:10px">&#9888; '+groups.length+' group(s) of similar observations found. Keep one from each group and remove the rest.</div>';
-  for(var g=0;g<groups.length;g++){
-    h += '<div style="border:1px solid #e0c0c0;border-radius:6px;margin-bottom:12px;overflow:hidden">';
-    h += '<div style="background:#fdf0f0;padding:7px 12px;font-size:11px;font-weight:700;color:#7a1a1a;border-bottom:1px solid #e0c0c0">Group '+(g+1)+' — '+groups[g].length+' similar observations</div>';
-    for(var gi=0;gi<groups[g].length;gi++){
-      var obs = allObs[groups[g][gi]];
+  var h = '<div style="font-size:12px;color:#7a1a1a;font-weight:700;margin-bottom:10px">&#9888; '+_dupobsGroups.length+' group(s) of similar observations found — review each group below.</div>';
+  for(var g=0;g<_dupobsGroups.length;g++){
+    var grp = _dupobsGroups[g];
+    var dec = grp.decision;
+    var borderCol = dec==='keep_both'?'#2e7d32': dec==='select_one'?'#c07000': dec==='skip'?'#888':'#c8d0dc';
+    var bgHead    = dec==='keep_both'?'#e8f5e9':  dec==='select_one'?'#fff8e0':  dec==='skip'?'#f4f4f4':'#f0f4fa';
+    h += '<div style="border:1px solid '+borderCol+';border-radius:6px;margin-bottom:14px;overflow:hidden">';
+    // Group header
+    h += '<div style="background:'+bgHead+';padding:7px 12px;font-size:11px;font-weight:700;color:#1a2d44;border-bottom:1px solid '+borderCol+';display:flex;align-items:center;gap:8px">';
+    h += '<span>Group '+(g+1)+' &mdash; '+grp.obs.length+' similar observations</span>';
+    if(dec) h += '<span style="margin-left:auto;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:'+(dec==='keep_both'?'#2e7d32':dec==='select_one'?'#c07000':'#888')+'">&#10003; '+(dec==='keep_both'?'Keep Both':dec==='select_one'?'Select One':'Skipped')+'</span>';
+    h += '</div>';
+    // Observations
+    for(var gi=0;gi<grp.obs.length;gi++){
+      var obs = grp.obs[gi];
       var isCustom = !!obs.custom;
-      h += '<div style="padding:10px 12px;'+(gi>0?'border-top:1px solid #eee;':'')+'">';
+      var isKept = (dec==='select_one' && grp.keepIdx===gi);
+      var isRemoved = (dec==='select_one' && grp.keepIdx!==null && grp.keepIdx!==gi);
+      var rowBg = isKept?'#f0fff4': isRemoved?'#fff0f0':'';
+      h += '<div style="padding:10px 12px;'+(gi>0?'border-top:1px solid #eee;':'')+(rowBg?'background:'+rowBg+';':'') +'">';
       h += '<div style="display:flex;align-items:flex-start;gap:10px">';
-      h += '<div style="flex:1;min-width:0">';
-      h += '<div style="font-size:12px;font-weight:700;color:#1a2d44">'+esc(obs.title||'—')+'</div>';
-      if(obs.observation||obs.obs) h += '<div style="font-size:11px;color:#555;margin-top:3px;line-height:1.5">'+esc((obs.observation||obs.obs||'').substring(0,200))+'&hellip;</div>';
-      h += '<div style="font-size:10px;color:#888;margin-top:4px">ID: '+esc(obs.id||'—')+(isCustom?' &nbsp;&#128203; <em>Custom / Extension</em>':'')+'</div>';
-      h += '</div>';
-      if(isCustom){
-        h += '<button onclick="dupobsRemove(\''+esc(obs.id)+'\')" style="flex-shrink:0;background:#8b1a1a;color:#fff;border:none;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">&#10005; Remove</button>';
-      } else {
-        h += '<span style="flex-shrink:0;font-size:10px;color:#aaa;font-style:italic;white-space:nowrap">Core (read-only)</span>';
+      // Radio (select_one mode)
+      if(dec==='select_one'){
+        h += '<input type="radio" name="dupobs-keep-'+g+'" data-g="'+g+'" data-gi="'+gi+'" '+(isKept?'checked':'')+' onchange="dupobsSetKeep('+g+','+gi+')" style="margin-top:4px;flex-shrink:0">';
       }
-      h += '</div></div>';
+      h += '<div style="flex:1;min-width:0">';
+      h += '<div style="font-size:12px;font-weight:700;color:'+(isRemoved?'#aaa':'#1a2d44')+'">'+(isRemoved?'<s>':'')+esc(obs.title||'—')+(isRemoved?'</s>':'')+'</div>';
+      var obsText = obs.observation||obs.obs||'';
+      if(obsText) h += '<div style="font-size:11px;color:'+(isRemoved?'#bbb':'#555')+';margin-top:3px;line-height:1.5">'+esc(obsText.substring(0,180))+(obsText.length>180?'&hellip;':'')+'</div>';
+      h += '<div style="font-size:10px;color:#aaa;margin-top:3px">'+(isCustom?'&#128203; Custom':'&#128218; Core')+'</div>';
+      h += '</div></div></div>';
     }
+    // Decision buttons
+    h += '<div style="padding:8px 12px;background:#f8fafd;border-top:1px solid #e8edf5;display:flex;gap:6px;flex-wrap:wrap">';
+    h += '<button onclick="dupobsDecide('+g+',\'keep_both\')" style="'+(dec==='keep_both'?'background:#2e7d32;color:#fff':'background:#e8f5e9;color:#2e7d32')+';border:1px solid #2e7d32;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#9654;&#9654; Keep Both</button>';
+    h += '<button onclick="dupobsDecide('+g+',\'select_one\')" style="'+(dec==='select_one'?'background:#c07000;color:#fff':'background:#fff8e0;color:#c07000')+';border:1px solid #c07000;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#9673; Select One to Keep</button>';
+    h += '<button onclick="dupobsDecide('+g+',\'skip\')" style="'+(dec==='skip'?'background:#555;color:#fff':'background:#f4f4f4;color:#555')+';border:1px solid #aaa;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#9654; Skip for Now</button>';
+    if(dec==='select_one' && grp.keepIdx===null) h += '<span style="font-size:11px;color:#c07000;font-style:italic;align-self:center">&#9670; Select which observation to keep using the radio buttons above.</span>';
+    h += '</div>';
     h += '</div>';
   }
   res.innerHTML = h;
 }
 
-function dupobsRemove(obsId){
-  if(!confirm('Remove this observation from the databank extension?\n\nThis cannot be undone.')) return;
+function dupobsDecide(g, decision){
+  if(!_dupobsGroups[g]) return;
+  _dupobsGroups[g].decision = decision;
+  if(decision !== 'select_one') _dupobsGroups[g].keepIdx = null;
+  dupobsRender();
+}
+
+function dupobsSetKeep(g, gi){
+  if(!_dupobsGroups[g]) return;
+  _dupobsGroups[g].keepIdx = gi;
+  dupobsRender();
+}
+
+function dupobsSaveDraft(){
+  if(!_dupobsGroups.length){ alert('Run a scan first before saving a draft.'); return; }
+  var draft = {
+    type: 'brains_dupobs_draft',
+    savedAt: new Date().toISOString(),
+    groups: _dupobsGroups.map(function(g){
+      return { obs: g.obs, decision: g.decision, keepIdx: g.keepIdx };
+    })
+  };
+  var blob = new Blob([JSON.stringify(draft, null, 2)], {type:'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  var ts = new Date().toISOString().slice(0,16).replace('T','_').replace(':','');
+  a.download = 'BRAINS_DupObs_Draft_'+ts+'.json';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
+  showToast('&#128190; Draft saved — send this file to the Administrator for approval.', 4000);
+}
+
+function dupobsLoadDraft(inp){
+  var file = inp.files && inp.files[0];
+  inp.value = '';
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var draft = JSON.parse(e.target.result);
+      if(!draft || draft.type !== 'brains_dupobs_draft' || !Array.isArray(draft.groups)){
+        alert('Invalid file — this does not appear to be a BRAINS Duplicate Observations draft.'); return;
+      }
+      _dupobsGroups = draft.groups.map(function(g){
+        return { obs: g.obs||[], decision: g.decision||null, keepIdx: g.keepIdx!=null?g.keepIdx:null };
+      });
+      var dt = draft.savedAt ? new Date(draft.savedAt).toLocaleString() : '—';
+      showToast('&#128228; Draft loaded from '+dt+'. Review decisions and click Approve & Apply.', 4000);
+      dupobsRender();
+    }catch(err){ alert('Could not read draft file: '+err.message); }
+  };
+  reader.readAsText(file);
+}
+
+function dupobsApproveRemovals(){
+  // Collect observations to remove: those in 'select_one' groups where keepIdx is set and the obs is custom
+  var toRemove = [];
+  for(var g=0;g<_dupobsGroups.length;g++){
+    var grp = _dupobsGroups[g];
+    if(grp.decision !== 'select_one' || grp.keepIdx === null) continue;
+    for(var gi=0;gi<grp.obs.length;gi++){
+      if(gi !== grp.keepIdx && grp.obs[gi].custom) toRemove.push(grp.obs[gi].id);
+    }
+  }
+  if(!toRemove.length){
+    alert('Nothing to remove. Make sure you have used "Select One to Keep" for each group and that the observations marked for removal are custom (extension) entries — core observations cannot be removed.');
+    return;
+  }
+  if(!confirm('Remove '+toRemove.length+' observation(s) from the databank extension?\n\nThis cannot be undone. Core observations are not affected.')) return;
   var ext = sg(DB_EXT_KEY, []);
-  ext = ext.filter(function(o){ return o.id !== obsId; });
+  var removeSet = {};
+  for(var r=0;r<toRemove.length;r++) removeSet[toRemove[r]]=true;
+  ext = ext.filter(function(o){ return !removeSet[o.id]; });
   ss(DB_EXT_KEY, ext);
-  DB.observations = DB.observations.filter(function(o){ return o.id !== obsId; });
+  DB.observations = DB.observations.filter(function(o){ return !removeSet[o.id]; });
   _setExportPending();
-  showToast('Observation removed. Re-scanning&hellip;', 2000);
-  setTimeout(dupobsScan, 400);
+  _dupobsGroups = [];
+  showToast('&#10003; '+toRemove.length+' observation(s) removed. Use Admin → Export Updated App to distribute changes.', 5000);
+  setTimeout(dupobsScan, 300);
 }
 
 function buildUpdbExtList(extObs){
