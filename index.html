@@ -12924,11 +12924,17 @@ function showHOAuthModal(callback, showFieldOption){
 }
 
 function showUpdateDbModal(){
-  _updbCandidates = [];
+  if(!_hoAuthed){
+    showHOAuthModal(function(granted){
+      if(!granted) return;
+      _hoAuthed = true; _hoActivateBtns();
+      showUpdateDbModal();
+    }, false);
+    return;
+  }
+
   var el = document.getElementById('updbModal');
   if(el) el.remove();
-
-  var extObs = sg(DB_EXT_KEY, []);
 
   var modal = document.createElement('div');
   modal.className = 'updb-bg'; modal.id = 'updbModal';
@@ -12936,52 +12942,112 @@ function showUpdateDbModal(){
     '<div class="updb-box">' +
     '<div class="updb-head"><h3>&#128203; Databank Management &mdash; Duplicate Observations</h3><button onclick="closeUpdbModal()">&#10005;</button></div>' +
     '<div class="updb-body">' +
-
     '<div class="updb-section">' +
-    '<h4>&#128203; Duplicate Observations Review</h4>' +
-    '<p style="font-size:12px;color:#555;margin-bottom:10px">The system has scanned the current session and listed below any custom observations not yet in the core databank. Review, edit if needed, then approve to add them.</p>' +
-    '<div id="updb-cand-area"><div style="padding:14px;text-align:center;color:#aaa;font-size:12px">Scanning current session&hellip;</div></div>' +
-    '<div class="updb-foot" id="updb-approve-foot" style="display:none">' +
-    '<button style="background:#2e7d32;color:#fff" onclick="updbApproveSelected()">&#10003; Approve &amp; Add Selected to Databank</button>' +
-    '<button style="background:#1a3a5c;color:#fff" onclick="updbKeepAllAsIs()" title="Select all and approve all candidates without any edits">&#9654;&#9654; Keep All As Is</button>' +
-    '<button style="background:#c07000;color:#fff" onclick="updbSaveDraft()" title="Export current review state as a file for Administrator">&#128190; Save Draft</button>' +
-    '<button style="background:#e8edf5;color:#444" onclick="updbClearCandidates()">&#10005; Cancel</button>' +
+    '<h4>&#128270; Similarity Scan Results</h4>' +
+    '<p style="font-size:12px;color:#555;margin-bottom:6px">The system has scanned all databank observations for duplicates and near-duplicates. Groups below share a high degree of similarity in their title or text. Review each group and remove the redundant entries to keep the databank clean.</p>' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+    '<label style="font-size:12px;color:#444">Sensitivity:</label>' +
+    '<select id="dupobs-threshold" onchange="dupobsScan()" style="padding:4px 8px;border:1px solid #b0b8c8;border-radius:4px;font-size:12px;font-family:inherit">' +
+    '<option value="80">High — very close matches only</option>' +
+    '<option value="60" selected>Medium — similar wording</option>' +
+    '<option value="40">Low — broad similarity</option>' +
+    '</select>' +
+    '<button onclick="dupobsScan()" style="background:#1a3a5c;color:#fff;border:none;border-radius:4px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128270; Re-scan</button>' +
     '</div>' +
-    '<div style="margin-top:10px;border-top:1px solid #dde3ee;padding-top:8px">' +
-    '<span style="font-size:11px;color:#888">&#128228; Scan a different session file instead: </span>' +
-    '<label style="font-size:11px;color:#1a3a5c;font-weight:700;cursor:pointer;text-decoration:underline" onclick="document.getElementById(\'updb-file-input\').click()">Browse&hellip;</label>' +
-    '<input type="file" id="updb-file-input" accept=".json" style="display:none" onchange="updbReadFile(this)">' +
+    '<div id="dupobs-results"><div style="padding:14px;text-align:center;color:#aaa;font-size:12px">Scanning&hellip;</div></div>' +
     '</div>' +
-    '</div>' +
-
-    '<div class="updb-section">' +
-    '<h4>&#128228; Administrator: Load a Saved Draft File</h4>' +
-    '<p style="font-size:12px;color:#555;margin-bottom:8px">If a reviewer saved a draft and sent you the file, load it here. You can review, edit, approve, or reject each observation before adding to the databank.</p>' +
-    '<div class="updb-drop" onclick="document.getElementById(\'updb-draft-file-input\').click()" style="border-color:#c07000;background:#fffdf5">' +
-    '&#128190; <strong>Click to load a Draft File (.json)</strong>' +
-    '<p style="margin:4px 0 0;font-size:11px;color:#888">File exported via Save Draft — BRAINS_DataMgmt_Draft_*.json</p>' +
-    '</div>' +
-    '<input type="file" id="updb-draft-file-input" accept=".json" style="display:none" onchange="updbReadDraftFile(this)">' +
-    '</div>' +
-
-    '<div class="updb-section">' +
-    '<h4>&#128203; Approved Custom Observations in Databank</h4>' +
-    '<p style="font-size:12px;color:#555;margin-bottom:8px">Observations approved and added to the databank on this machine. Once done, use <strong>Admin &rarr; Export Updated App</strong> to download the updated application file and upload it to Netlify so all users receive the changes.</p>' +
-    '<div id="updb-ext-area">' + buildUpdbExtList(extObs) + '</div>' +
-    '</div>' +
-
     '</div></div>';
 
   document.body.appendChild(modal);
   modal.addEventListener('click', function(e){ if(e.target===modal) closeUpdbModal(); });
-  // Auto-scan live session — check for saved state first, then scan
-  setTimeout(function(){ updbScanLiveSession(false); }, 80);
+  setTimeout(dupobsScan, 80);
 }
 
 function closeUpdbModal(){
   var el = document.getElementById('updbModal');
   if(el) el.remove();
   _updbCandidates = [];
+}
+
+// ── Duplicate Observations scanner ───────────────────────────
+function _dupobsTokens(str){
+  return (str||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(function(w){ return w.length>2; });
+}
+function _dupobsSimilarity(a, b){
+  var ta = _dupobsTokens(a), tb = _dupobsTokens(b);
+  if(!ta.length || !tb.length) return 0;
+  var setA = {}, common = 0;
+  for(var i=0;i<ta.length;i++) setA[ta[i]]=true;
+  for(var j=0;j<tb.length;j++) if(setA[tb[j]]) common++;
+  return Math.round(common * 2 / (ta.length + tb.length) * 100);
+}
+
+function dupobsScan(){
+  var el = document.getElementById('dupobs-threshold');
+  var threshold = el ? parseInt(el.value) : 60;
+  var allObs = DB.observations || [];
+  // Find groups of similar observations
+  var used = {}, groups = [];
+  for(var i=0;i<allObs.length;i++){
+    if(used[i]) continue;
+    var group = [i];
+    for(var j=i+1;j<allObs.length;j++){
+      if(used[j]) continue;
+      var titleSim = _dupobsSimilarity(allObs[i].title, allObs[j].title);
+      var obsSim   = _dupobsSimilarity(allObs[i].observation||allObs[i].obs||'', allObs[j].observation||allObs[j].obs||'');
+      if(titleSim >= threshold || obsSim >= threshold){
+        group.push(j);
+        used[j] = true;
+      }
+    }
+    if(group.length > 1){
+      used[i] = true;
+      groups.push(group);
+    }
+  }
+
+  var res = document.getElementById('dupobs-results');
+  if(!res) return;
+  if(!groups.length){
+    res.innerHTML = '<div style="padding:16px;background:#e8f5e9;border-radius:6px;font-size:12px;color:#2e7d32;font-weight:600">&#10003; No duplicate or near-duplicate observations found at this sensitivity level.</div>';
+    return;
+  }
+
+  var h = '<div style="font-size:12px;color:#7a1a1a;font-weight:700;margin-bottom:10px">&#9888; '+groups.length+' group(s) of similar observations found. Keep one from each group and remove the rest.</div>';
+  for(var g=0;g<groups.length;g++){
+    h += '<div style="border:1px solid #e0c0c0;border-radius:6px;margin-bottom:12px;overflow:hidden">';
+    h += '<div style="background:#fdf0f0;padding:7px 12px;font-size:11px;font-weight:700;color:#7a1a1a;border-bottom:1px solid #e0c0c0">Group '+(g+1)+' — '+groups[g].length+' similar observations</div>';
+    for(var gi=0;gi<groups[g].length;gi++){
+      var obs = allObs[groups[g][gi]];
+      var isCustom = !!obs.custom;
+      h += '<div style="padding:10px 12px;'+(gi>0?'border-top:1px solid #eee;':'')+'">';
+      h += '<div style="display:flex;align-items:flex-start;gap:10px">';
+      h += '<div style="flex:1;min-width:0">';
+      h += '<div style="font-size:12px;font-weight:700;color:#1a2d44">'+esc(obs.title||'—')+'</div>';
+      if(obs.observation||obs.obs) h += '<div style="font-size:11px;color:#555;margin-top:3px;line-height:1.5">'+esc((obs.observation||obs.obs||'').substring(0,200))+'&hellip;</div>';
+      h += '<div style="font-size:10px;color:#888;margin-top:4px">ID: '+esc(obs.id||'—')+(isCustom?' &nbsp;&#128203; <em>Custom / Extension</em>':'')+'</div>';
+      h += '</div>';
+      if(isCustom){
+        h += '<button onclick="dupobsRemove(\''+esc(obs.id)+'\')" style="flex-shrink:0;background:#8b1a1a;color:#fff;border:none;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">&#10005; Remove</button>';
+      } else {
+        h += '<span style="flex-shrink:0;font-size:10px;color:#aaa;font-style:italic;white-space:nowrap">Core (read-only)</span>';
+      }
+      h += '</div></div>';
+    }
+    h += '</div>';
+  }
+  res.innerHTML = h;
+}
+
+function dupobsRemove(obsId){
+  if(!confirm('Remove this observation from the databank extension?\n\nThis cannot be undone.')) return;
+  var ext = sg(DB_EXT_KEY, []);
+  ext = ext.filter(function(o){ return o.id !== obsId; });
+  ss(DB_EXT_KEY, ext);
+  DB.observations = DB.observations.filter(function(o){ return o.id !== obsId; });
+  _setExportPending();
+  showToast('Observation removed. Re-scanning&hellip;', 2000);
+  setTimeout(dupobsScan, 400);
 }
 
 function buildUpdbExtList(extObs){
