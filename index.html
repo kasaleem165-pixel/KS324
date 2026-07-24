@@ -10069,6 +10069,7 @@ var selIds   = {};   // {obsId: true}
 var annexMap = {};   // {obsId: "text"}
 var obsTypeMap = {}; // {obsId: 'New'|'Repeated'} — per-report type override
 var lastRefMap = {}; // {obsId: 'string'} — prior audit report reference for Repeated obs
+var obsOrder   = { repeated: [], new: [] }; // user-defined sequence within each section
 var firstTimeAudit = false; // true = branch being audited for the first time; no previous report exists
 var sensitivityMap = {}; // {obsId: 'High'|'M to H'|'L to M'|'Low'}
 var cosoMap        = {}; // {obsId: 'CE'|'RA'|'CA'|'IC'|'M'}
@@ -10564,8 +10565,52 @@ function injectTypePill(id, div){
   }
 }
 
+// Ensure obsOrder arrays reflect current selIds (called at render time as safety net)
+function _obsOrderSync(allObs){
+  // allObs: full ordered list from DB + customs filtered by selIds
+  var inOrder = {};
+  obsOrder.repeated.forEach(function(id){ inOrder[id]=true; });
+  obsOrder.new.forEach(function(id){ inOrder[id]=true; });
+  // Append any selected obs not yet in obsOrder (preserves existing user order)
+  for(var i=0;i<allObs.length;i++){
+    var o = allObs[i];
+    if(!inOrder[o.id]){
+      var sec = (obsTypeMap[o.id]||o.type||'New').toLowerCase()==='repeated'?'repeated':'new';
+      obsOrder[sec].push(o.id);
+      inOrder[o.id]=true;
+    }
+  }
+  // Remove any IDs no longer selected
+  obsOrder.repeated = obsOrder.repeated.filter(function(id){ return !!selIds[id]; });
+  obsOrder.new      = obsOrder.new.filter(function(id){ return !!selIds[id]; });
+}
+
+function obsMoveTo(obsId, section, newPos){
+  var arr = obsOrder[section];
+  var cur = arr.indexOf(obsId);
+  if(cur === -1) return;
+  var target = Math.max(0, Math.min(arr.length - 1, parseInt(newPos, 10) - 1));
+  if(cur === target) return;
+  arr.splice(cur, 1);
+  arr.splice(target, 0, obsId);
+  renderRpt();
+}
+
+function _obsOrderSection(id){
+  var t = (obsTypeMap[id] || 'new').toLowerCase();
+  return t === 'repeated' ? 'repeated' : 'new';
+}
+function _obsOrderAdd(id){
+  var sec = _obsOrderSection(id);
+  if(obsOrder[sec].indexOf(id) === -1) obsOrder[sec].push(id);
+}
+function _obsOrderRemove(id){
+  obsOrder.repeated = obsOrder.repeated.filter(function(x){ return x !== id; });
+  obsOrder.new      = obsOrder.new.filter(function(x){ return x !== id; });
+}
+
 function handleSel(id, checked, div) {
-  if(checked){ selIds[id]=true; } else { delete selIds[id]; }
+  if(checked){ selIds[id]=true; _obsOrderAdd(id); } else { delete selIds[id]; _obsOrderRemove(id); }
   if(div){
     div.className = 'ri' + (checked?' on':'');
     var ax = document.getElementById('ax-'+id);
@@ -10788,6 +10833,9 @@ function getSnippet(raw, toks) {
 
 function setObsType(id, val) {
   obsTypeMap[id] = val;
+  // Move between section order arrays when type changes
+  _obsOrderRemove(id);
+  if(selIds[id]) _obsOrderAdd(id);
   // Update pill colours in-place without re-rendering the list
   var axRow = document.getElementById('ax-'+id);
   if(axRow){
@@ -11353,7 +11401,7 @@ function addCustom(){
     _addedAt:new Date().toISOString()
   };
   customs.push(o);
-  selIds[o.id]=true;
+  selIds[o.id]=true; _obsOrderAdd(o.id);
   if(o._annex) annexMap[o.id]=o._annex;
   ['ctit','cobs','crec','cav','cannex'].forEach(function(id){document.getElementById(id).value='';});
   toast('Custom observation added.');
@@ -11511,6 +11559,7 @@ function captureSession() {
     formData : formData,
     selIds   : selIds,
     obsTypeMap: obsTypeMap,
+    obsOrder   : { repeated: obsOrder.repeated.slice(), new: obsOrder.new.slice() },
     lastRefMap: lastRefMap,
     annexMap : annexMap,
     avMap    : avMap,
@@ -11598,6 +11647,8 @@ function restoreSession(sess) {
   _wfReceivedBack = sess.wfReceivedBack || false;
   _wfSentRO       = sess.wfSentRO       || false;
   customs   = sess.customs   || [];
+  if(sess.obsOrder){ obsOrder.repeated = sess.obsOrder.repeated||[]; obsOrder.new = sess.obsOrder.new||[]; }
+  else { obsOrder = { repeated:[], new:[] }; }
   // Restore annexures (files are preserved as dataUrls if they were saved)
   annexures = (sess.annexures||[]).map(function(a){
     return {id:a.id,label:a.label||'',title:a.title||'',text:a.text||'',
@@ -12289,6 +12340,10 @@ function renderRpt(){
   var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
   var all=dbObs.concat(cuObs);
+  _obsOrderSync(all);
+  // Build id→obs lookup for ordered rendering
+  var obsById={};
+  for(var _li=0;_li<all.length;_li++) obsById[all[_li].id]=all[_li];
 
 
 
@@ -12301,33 +12356,13 @@ function renderRpt(){
   _reportEverGenerated = true;  // unlock dirty popup from this point on
   renderStepGuide();
 
-  // Group by section (Repeated first, then New), then by category within each section
+  // Build ordered section lists from obsOrder (user-defined sequence)
   var sections = [
     {key:'repeated', label:'1. Repeated Observations', obs:[]},
-    {key:'new',      label:'2. New Observations',                    obs:[]}
+    {key:'new',      label:'2. New Observations',      obs:[]}
   ];
-  for(var a=0;a<all.length;a++){
-    var effT=(obsTypeMap[all[a].id]||all[a].type||'New').toLowerCase();
-    if(effT==='repeated') sections[0].obs.push(all[a]);
-    else sections[1].obs.push(all[a]);
-  }
-
-  // Compute one global category order from ALL observations so both sections use the same sequence
-  var _allCatsObj={};
-  for(var _gi=0;_gi<all.length;_gi++){_allCatsObj[all[_gi].category||'Others']=true;}
-  var _globalCatOrder=catOrderByDef(_allCatsObj);
-
-  function buildCatGroups(obsList){
-    var cats={};
-    for(var i=0;i<obsList.length;i++){
-      var c=obsList[i].category||'Others';
-      if(!cats[c]) cats[c]=[];
-      cats[c].push(obsList[i]);
-    }
-    // Filter global order to only categories present in this section
-    var catOrder=_globalCatOrder.filter(function(c){return !!cats[c];});
-    return {cats:cats,catOrder:catOrder};
-  }
+  for(var _ri=0;_ri<obsOrder.repeated.length;_ri++){ var _ro=obsById[obsOrder.repeated[_ri]]; if(_ro) sections[0].obs.push(_ro); }
+  for(var _ni=0;_ni<obsOrder.new.length;_ni++){      var _no=obsById[obsOrder.new[_ni]];      if(_no) sections[1].obs.push(_no); }
 
   var h='';
   var curStage=H.rptStage||'draft_bh';
@@ -12378,13 +12413,11 @@ function renderRpt(){
   for(var si=0;si<sections.length;si++){
     if(!sections[si].obs.length) continue;
     var num=0; var secPfx=si===0?'1':'2';
+    var secKey=si===0?'repeated':'new';
+    var secTotal=sections[si].obs.length;
     h+='<div class="sectitle">'+esc(sections[si].label)+'</div>';
-    var grp=buildCatGroups(sections[si].obs);
-    for(var ci=0;ci<grp.catOrder.length;ci++){
-      var cat=grp.catOrder[ci];
-      h+='<div class="catg"><div class="cattl">'+esc(cat)+'</div>';
-      var obs=grp.cats[cat];
-      for(var oi=0;oi<obs.length;oi++){
+    var obs=sections[si].obs;
+    for(var oi=0;oi<obs.length;oi++){
         num++;
         var o=obs[oi];
       var effType=obsTypeMap[o.id]||o.type||'New';
@@ -12397,6 +12430,13 @@ function renderRpt(){
       var cosoClass=curCoso==='CE'?'c-ce':curCoso==='RA'?'c-ra':curCoso==='CA'?'c-ca':curCoso==='IC'?'c-ic':curCoso==='M'?'c-m':'';
       h+='<div class="oc '+tc+'" id="oc-'+o.id+'">';
       h+='<div class="och"><span class="onum">Obs. '+secPfx+'.'+num+'</span>';
+      h+='<span style="display:inline-flex;align-items:center;gap:3px;margin-left:4px;flex-shrink:0">'
+        +'<input type="number" min="1" max="'+secTotal+'" value="'+num+'" title="Move to position" '
+        +'style="width:38px;padding:2px 4px;font-size:10px;border:1px solid #b0b8c8;border-radius:4px;font-family:inherit;text-align:center;background:#f4f7fb" '
+        +'onchange="obsMoveTo(\''+o.id+'\',\''+secKey+'\',this.value)" '
+        +'onclick="event.stopPropagation()" onkeydown="if(event.key===\'Enter\'){obsMoveTo(\''+o.id+'\',\''+secKey+'\',this.value);event.preventDefault();}">'
+        +'<span style="font-size:9px;color:#888;white-space:nowrap">/ '+secTotal+'</span>'
+        +'</span>';
       var priorRefDraft=lastRefMap[o.id]||'';
       var _W=window._pfWaivers||{};
       var _fiWaived=!!_W[o.id+'|Financial Impact'];
@@ -12570,8 +12610,6 @@ function renderRpt(){
       h+=buildObsRiskPanel(o, _riskObsText);
       h+='</div></div>';
       }
-      h+='</div>';
-    }
   }
 
   // Build obsNumMap for annexure back-references (per-section R-/N- numbering)
@@ -12741,7 +12779,7 @@ function doCopy(){
 
 function _performFullClear(){
   // Data maps
-  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
   // SRR / Risk Mapping state
   if(typeof srr_flagged!=='undefined') srr_flagged={};
   if(typeof srr_reassigned!=='undefined') srr_reassigned={};
@@ -12791,7 +12829,7 @@ function _performFullClear(){
 function doClear(){
   if(!confirm('Clear all selected observations and reset the report draft? Branch information will be kept.'))return;
   // Clear only observation selections and report content — keep branch/header fields intact
-  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
   if(typeof srr_flagged!=='undefined') srr_flagged={};
   if(typeof srr_reassigned!=='undefined') srr_reassigned={};
   if(typeof srr_files!=='undefined') srr_files=[];
@@ -15058,28 +15096,11 @@ function downloadSoftCopy(){
 // ============================================================
 var ANX_LABELS=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T'];
 
-// Returns {obsId: "R-1"|"N-2"} labels matching the section+category order used in renderRpt()
+// Returns {obsId: "1.1"|"2.3"} labels matching the obsOrder-based sequence used in renderRpt()
 function getObsReportLabels(){
-  var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
-  var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
-  var all=dbObs.concat(cuObs);
-  var secs=[
-    {prefix:'1', obs:[]},
-    {prefix:'2', obs:[]}
-  ];
-  for(var a=0;a<all.length;a++){
-    var effT=(obsTypeMap[all[a].id]||all[a].type||'New').toLowerCase();
-    if(effT==='repeated') secs[0].obs.push(all[a]); else secs[1].obs.push(all[a]);
-  }
   var labels={};
-  for(var si=0;si<secs.length;si++){
-    var grp=buildCatGroupsFor(secs[si].obs);
-    var num=0;
-    for(var ci=0;ci<grp.catOrder.length;ci++){
-      var obs=grp.cats[grp.catOrder[ci]];
-      for(var oi=0;oi<obs.length;oi++){ num++; labels[obs[oi].id]=secs[si].prefix+'.'+num; }
-    }
-  }
+  for(var ri=0;ri<obsOrder.repeated.length;ri++) labels[obsOrder.repeated[ri]]='1.'+(ri+1);
+  for(var ni=0;ni<obsOrder.new.length;ni++)      labels[obsOrder.new[ni]]='2.'+(ni+1);
   return labels;
 }
 function buildCatGroupsFor(obsList){
