@@ -576,6 +576,10 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
     if(cu&&cu.role==='administrator'){
       window._hoAuthed=true;
     }
+    // Apply role-based UI restrictions for supervisors on page reload
+    if(cu&&(cu.role==='ro_supervisor'||cu.role==='ho_supervisor')){
+      setTimeout(_applyRoleUI, 0);
+    }
   }}catch(e){}
 })();
 function pwCheck(){
@@ -598,6 +602,7 @@ function pwCheck(){
   if(v===_curHOSup){
     try{sessionStorage.setItem('sa_auth_2026','1'); sessionStorage.setItem('sa_current_user', JSON.stringify({role:'ho_supervisor'}));}catch(e){}
     document.getElementById('pw-screen').style.display='none';
+    setTimeout(_applyRoleUI, 0);
     return;
   }
 
@@ -607,6 +612,7 @@ function pwCheck(){
   if(v===_curROSup){
     try{sessionStorage.setItem('sa_auth_2026','1'); sessionStorage.setItem('sa_current_user', JSON.stringify({role:'ro_supervisor'}));}catch(e){}
     document.getElementById('pw-screen').style.display='none';
+    setTimeout(_applyRoleUI, 0);
     return;
   }
 
@@ -712,6 +718,33 @@ function _userRole(){
 }
 function _canSendHO(){ var r=_userRole(); return r==='administrator'||r==='ro_supervisor'||r==='ho_supervisor'; }
 function _canIssue(){  var r=_userRole(); return r==='administrator'||r==='ho_supervisor'; }
+
+// Apply toolbar visibility based on logged-in role.
+// Called after login and on page startup if already authenticated.
+function _applyRoleUI(){
+  var r = _userRole();
+  var isRO  = r === 'ro_supervisor';
+  var isHO  = r === 'ho_supervisor';
+  if(!isRO && !isHO) return; // Auditor and Administrator see everything
+
+  function hide(id){ var el=document.getElementById(id); if(el) el.style.display='none'; }
+
+  // Both supervisors: hide Build, Distribute, Tools, Admin tabs
+  ['dd-build','dd-dist','dd-tools','dd-admin'].forEach(hide);
+
+  // Both supervisors: hide New Report and Clear Draft from File tab
+  ['file-new','file-sep','file-clear'].forEach(hide);
+
+  if(isRO){
+    // RO sees: Load Report, Save/Versions, Load RO Supervisor Review, Send to HO
+    // RO hides: Send to RO, sep1, Load HO Review, sep2, Issue Report
+    ['rev-send-ro','rev-sep-1','rev-load-ho','rev-sep-2','rev-issue'].forEach(hide);
+  } else {
+    // HO sees: Load Report, Save/Versions, Load HO Supervisor Review, Issue Report
+    // HO hides: Send to RO, Load RO Review, sep1, Send to HO, sep2
+    ['rev-send-ro','rev-load-ro','rev-sep-1','rev-send-ho','rev-sep-2'].forEach(hide);
+  }
+}
 
 function showChangePwModal(){
   ['chpw-cur','chpw-new','chpw-cfm'].forEach(function(id){ document.getElementById(id).value=''; });
@@ -9177,11 +9210,11 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
     <div class="tb-dd" id="dd-file">
       <button class="tb-dd-tab" onclick="tbDDToggle('dd-file')">File <span class="arr">&#9660;</span></button>
       <div class="tb-dd-menu">
-        <button class="tb-dd-item rpt-btn" onclick="doNewReport();tbDDClose()"><span class="di">&#43;</span> New Report</button>
-        <button class="tb-dd-item rpt-btn" onclick="triggerLoadReport();tbDDClose()"><span class="di">&#128228;</span> Load Report</button>
-        <button class="tb-dd-item rpt-btn" onclick="showVersionHistory();tbDDClose()"><span class="di">&#128190;</span> Save / Versions</button>
-        <div class="tb-dd-sep"></div>
-        <button class="tb-dd-item rpt-btn" onclick="doClear();tbDDClose()"><span class="di">&#10005;</span> Clear Draft</button>
+        <button id="file-new" class="tb-dd-item rpt-btn" onclick="doNewReport();tbDDClose()"><span class="di">&#43;</span> New Report</button>
+        <button id="file-load" class="tb-dd-item rpt-btn" onclick="triggerLoadReport();tbDDClose()"><span class="di">&#128228;</span> Load Report</button>
+        <button id="file-versions" class="tb-dd-item rpt-btn" onclick="showVersionHistory();tbDDClose()"><span class="di">&#128190;</span> Save / Versions</button>
+        <div id="file-sep" class="tb-dd-sep"></div>
+        <button id="file-clear" class="tb-dd-item rpt-btn" onclick="doClear();tbDDClose()"><span class="di">&#10005;</span> Clear Draft</button>
       </div>
     </div>
 
@@ -9213,13 +9246,13 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
     <div class="tb-dd" id="dd-review">
       <button class="tb-dd-tab" onclick="tbDDToggle('dd-review')">Review <span class="arr">&#9660;</span></button>
       <div class="tb-dd-menu">
-        <button class="tb-dd-item rpt-btn" onclick="generateReviewerHtml('ro');tbDDClose()"><span class="di">&#128228;</span> Send to RO Audit Supervisor</button>
-        <button class="tb-dd-item rpt-btn" onclick="triggerLoadReviewerHtml('ro');tbDDClose()"><span class="di">&#128194;</span> Load RO Supervisor Review</button>
-        <div class="tb-dd-sep"></div>
-        <button class="tb-dd-item rpt-btn" onclick="if(_canSendHO()){generateReviewerHtml('ho');tbDDClose();}else{tbDDClose();showHOAuthModal(function(){generateReviewerHtml('ho');});}"><span class="di">&#128228;</span> Send to HO Audit Supervisor</button>
-        <button class="tb-dd-item rpt-btn" onclick="if(_canIssue()){triggerLoadReviewerHtml('ho');tbDDClose();}else{tbDDClose();showHOAuthModal(function(){triggerLoadReviewerHtml('ho');});}"><span class="di">&#128194;</span> Load HO Supervisor Review</button>
-        <div class="tb-dd-sep"></div>
-        <button class="tb-dd-item rpt-btn" onclick="if(_canIssue()){generateIssuedReport();tbDDClose();}else{tbDDClose();showHOAuthModal(function(){generateIssuedReport();});}"><span class="di">&#10003;</span> Issue Report</button>
+        <button id="rev-send-ro" class="tb-dd-item rpt-btn" onclick="generateReviewerHtml('ro');tbDDClose()"><span class="di">&#128228;</span> Send to RO Audit Supervisor</button>
+        <button id="rev-load-ro" class="tb-dd-item rpt-btn" onclick="triggerLoadReviewerHtml('ro');tbDDClose()"><span class="di">&#128194;</span> Load RO Supervisor Review</button>
+        <div id="rev-sep-1" class="tb-dd-sep"></div>
+        <button id="rev-send-ho" class="tb-dd-item rpt-btn" onclick="generateReviewerHtml('ho');tbDDClose()"><span class="di">&#128228;</span> Send to HO Audit Supervisor</button>
+        <button id="rev-load-ho" class="tb-dd-item rpt-btn" onclick="if(_canIssue()){triggerLoadReviewerHtml('ho');tbDDClose();}else{tbDDClose();showHOAuthModal(function(){triggerLoadReviewerHtml('ho');});}"><span class="di">&#128194;</span> Load HO Supervisor Review</button>
+        <div id="rev-sep-2" class="tb-dd-sep"></div>
+        <button id="rev-issue" class="tb-dd-item rpt-btn" onclick="if(_canIssue()){generateIssuedReport();tbDDClose();}else{tbDDClose();showHOAuthModal(function(){generateIssuedReport();});}"><span class="di">&#10003;</span> Issue Report</button>
       </div>
     </div>
 
