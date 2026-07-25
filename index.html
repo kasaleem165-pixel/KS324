@@ -592,24 +592,31 @@ function pwCheck(){
     return;
   }
 
-  // Built-in User account
+  // Built-in HO Supervisor account
+  var _defHOSup='HOSA2026';
+  var _curHOSup=''; try{_curHOSup=localStorage.getItem('sa_pw_ho_sup')||_defHOSup;}catch(e){_curHOSup=_defHOSup;}
+  if(v===_curHOSup){
+    try{sessionStorage.setItem('sa_auth_2026','1'); sessionStorage.setItem('sa_current_user', JSON.stringify({role:'ho_supervisor'}));}catch(e){}
+    document.getElementById('pw-screen').style.display='none';
+    return;
+  }
+
+  // Built-in RO Supervisor account
+  var _defROSup='ROSA2026';
+  var _curROSup=''; try{_curROSup=localStorage.getItem('sa_pw_ro')||_defROSup;}catch(e){_curROSup=_defROSup;}
+  if(v===_curROSup){
+    try{sessionStorage.setItem('sa_auth_2026','1'); sessionStorage.setItem('sa_current_user', JSON.stringify({role:'ro_supervisor'}));}catch(e){}
+    document.getElementById('pw-screen').style.display='none';
+    return;
+  }
+
+  // Built-in Auditor account
   var _defUser='S&A2026';
   var _curUser=''; try{_curUser=localStorage.getItem('sa_pw_user')||_defUser;}catch(e){_curUser=_defUser;}
   if(v===_curUser){
     try{sessionStorage.setItem('sa_auth_2026','1'); sessionStorage.setItem('sa_current_user', JSON.stringify({role:'auditor'}));}catch(e){}
     document.getElementById('pw-screen').style.display='none';
     return;
-  }
-
-  // Custom users stored in localStorage
-  var cusers=[]; try{cusers=JSON.parse(localStorage.getItem('sa_custom_users')||'[]');}catch(e){}
-  for(var i=0;i<cusers.length;i++){
-    if(cusers[i].password===v){
-      try{sessionStorage.setItem('sa_auth_2026','1'); sessionStorage.setItem('sa_current_user', JSON.stringify({role:cusers[i].role,id:cusers[i].id}));}catch(e){}
-      if(cusers[i].role==='administrator'){ window._hoAuthed=true; try{_hoActivateBtns();}catch(e){} }
-      document.getElementById('pw-screen').style.display='none';
-      return;
-    }
   }
 
   var err=document.getElementById('pw-err');
@@ -624,14 +631,20 @@ function pwCheck(){
 <div id="chpw-modal" style="display:none;position:fixed;inset:0;z-index:999998;background:rgba(0,0,0,.55);align-items:center;justify-content:center;font-family:Inter,Arial,sans-serif">
   <div style="background:#fff;border-radius:10px;padding:36px 40px;max-width:400px;width:92%;box-shadow:0 8px 40px rgba(0,0,0,.4)">
     <div style="font-size:16px;font-weight:700;color:#1a3a5c;margin-bottom:4px">&#128272; Change Password</div>
-    <div style="font-size:12px;color:#666;margin-bottom:20px">Select the account whose password you want to change.</div>
+    <div style="font-size:12px;color:#666;margin-bottom:20px">Select the role account whose password you want to change. Only Administrator can change any password.</div>
     <div style="margin-bottom:14px">
-      <label style="font-size:12px;font-weight:600;color:#1a3a5c;display:block;margin-bottom:6px">Account</label>
-      <div style="display:flex;gap:10px">
-        <label style="flex:1;cursor:pointer;border:2px solid #c8d8ec;border-radius:6px;padding:9px 10px;font-size:13px;display:flex;align-items:center;gap:7px;transition:border .15s" id="chpw-lbl-user">
-          <input type="radio" name="chpw-acct" value="user" checked onchange="chpwAcctChange()" style="accent-color:#1a3a5c"> User (S&amp;A)
+      <label style="font-size:12px;font-weight:600;color:#1a3a5c;display:block;margin-bottom:6px">Role Account</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <label style="cursor:pointer;border:2px solid #c8d8ec;border-radius:6px;padding:8px 10px;font-size:12px;display:flex;align-items:center;gap:6px;transition:border .15s" id="chpw-lbl-user">
+          <input type="radio" name="chpw-acct" value="user" checked onchange="chpwAcctChange()" style="accent-color:#1a3a5c"> Auditor
         </label>
-        <label style="flex:1;cursor:pointer;border:2px solid #c8d8ec;border-radius:6px;padding:9px 10px;font-size:13px;display:flex;align-items:center;gap:7px;transition:border .15s" id="chpw-lbl-ho">
+        <label style="cursor:pointer;border:2px solid #c8d8ec;border-radius:6px;padding:8px 10px;font-size:12px;display:flex;align-items:center;gap:6px;transition:border .15s" id="chpw-lbl-ro">
+          <input type="radio" name="chpw-acct" value="ro" onchange="chpwAcctChange()" style="accent-color:#1a3a5c"> RO Supervisor
+        </label>
+        <label style="cursor:pointer;border:2px solid #c8d8ec;border-radius:6px;padding:8px 10px;font-size:12px;display:flex;align-items:center;gap:6px;transition:border .15s" id="chpw-lbl-ho_sup">
+          <input type="radio" name="chpw-acct" value="ho_sup" onchange="chpwAcctChange()" style="accent-color:#1a3a5c"> HO Supervisor
+        </label>
+        <label style="cursor:pointer;border:2px solid #c8d8ec;border-radius:6px;padding:8px 10px;font-size:12px;display:flex;align-items:center;gap:6px;transition:border .15s" id="chpw-lbl-ho">
           <input type="radio" name="chpw-acct" value="ho" onchange="chpwAcctChange()" style="accent-color:#1a3a5c"> Administrator
         </label>
       </div>
@@ -655,50 +668,7 @@ function pwCheck(){
     </div>
   </div>
 </div>
-<!-- MANAGE USERS MODAL -->
-<div id="mu-modal" style="display:none;position:fixed;inset:0;z-index:999998;background:rgba(0,0,0,.55);align-items:center;justify-content:center;font-family:Inter,Arial,sans-serif">
-  <div style="background:#fff;border-radius:10px;padding:0;max-width:560px;width:95%;box-shadow:0 8px 40px rgba(0,0,0,.4);max-height:90vh;display:flex;flex-direction:column">
-    <div style="background:#1a3a5c;color:#fff;padding:14px 20px;border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
-      <div style="font-size:15px;font-weight:700">&#128101; Manage Users</div>
-      <button onclick="document.getElementById('mu-modal').style.display='none'" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px;line-height:1">&#10005;</button>
-    </div>
-    <div style="padding:18px 20px;overflow-y:auto;flex:1">
-      <div style="font-size:12px;color:#555;margin-bottom:14px;line-height:1.5">Create and manage user accounts. Each user logs in with their own username and password. Access level determines which features they can use.</div>
-      <div id="mu-user-list" style="margin-bottom:18px"></div>
-      <div style="background:#f0f4ff;border:1px solid #b0c8e8;border-radius:8px;padding:14px 16px">
-        <div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:12px">&#10010; Add New User</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-          <div>
-            <label style="font-size:11px;font-weight:600;color:#1a3a5c;display:block;margin-bottom:4px">Full Name</label>
-            <input id="mu-name" type="text" placeholder="e.g. Ali Hassan" style="width:100%;padding:8px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:13px;font-family:inherit;box-sizing:border-box">
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:600;color:#1a3a5c;display:block;margin-bottom:4px">Access Level</label>
-            <select id="mu-role" style="width:100%;padding:8px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:13px;font-family:inherit;box-sizing:border-box;background:#fff">
-              <option value="auditor">Auditor — Standard access (no HO/Tools/Admin)</option>
-              <option value="ro_supervisor">Audit Supervisor RO — Can forward to HO Audit Supervisor</option>
-              <option value="ho_supervisor">Audit Supervisor HO — Can load HO review &amp; Issue Report</option>
-              <option value="administrator">Administrator — Full access</option>
-            </select>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-          <div>
-            <label style="font-size:11px;font-weight:600;color:#1a3a5c;display:block;margin-bottom:4px">Password</label>
-            <input id="mu-pw" type="password" placeholder="Min 6 characters" style="width:100%;padding:8px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:13px;font-family:inherit;box-sizing:border-box">
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:600;color:#1a3a5c;display:block;margin-bottom:4px">Confirm Password</label>
-            <input id="mu-pw2" type="password" placeholder="Repeat password" style="width:100%;padding:8px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:13px;font-family:inherit;box-sizing:border-box">
-          </div>
-        </div>
-        <div id="mu-err" style="font-size:12px;color:#c0392b;min-height:16px;margin-bottom:8px"></div>
-        <button onclick="muAddUser()" style="background:#1a3a5c;color:#fff;border:none;border-radius:5px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Create User</button>
-      </div>
-    </div>
-  </div>
-</div>
-<!-- END MANAGE USERS MODAL -->
+<!-- Manage Users removed — replaced by shared role-based passwords -->
 <script>
 function showAboutModal(){
   var el=document.createElement('div');
@@ -743,100 +713,6 @@ function _userRole(){
 function _canSendHO(){ var r=_userRole(); return r==='administrator'||r==='ro_supervisor'||r==='ho_supervisor'; }
 function _canIssue(){  var r=_userRole(); return r==='administrator'||r==='ho_supervisor'; }
 
-function showManageUsersModal(){
-  muRenderList();
-  var m=document.getElementById('mu-modal');
-  m.style.display='flex';
-  document.getElementById('mu-name').value='';
-  document.getElementById('mu-pw').value='';
-  document.getElementById('mu-pw2').value='';
-  document.getElementById('mu-err').textContent='';
-}
-
-function muGetUsers(){
-  try{ return JSON.parse(localStorage.getItem('sa_custom_users')||'[]'); }catch(e){ return []; }
-}
-
-function muSaveUsers(arr){
-  try{ localStorage.setItem('sa_custom_users', JSON.stringify(arr)); }catch(e){}
-}
-
-function muRenderList(){
-  var list=document.getElementById('mu-user-list');
-  if(!list) return;
-  var users=muGetUsers();
-  var roleLabel={'auditor':'Auditor','ro_supervisor':'Audit Supervisor RO','ho_supervisor':'Audit Supervisor HO','administrator':'Administrator'};
-  var roleColor={'auditor':'#2070b8','ro_supervisor':'#7a3a00','ho_supervisor':'#4a1a7a','administrator':'#1a6030'};
-  var roleBg={'auditor':'#e8f0ff','ro_supervisor':'#fff4e0','ho_supervisor':'#f4e8ff','administrator':'#e8fff0'};
-  var h='';
-  // Always show built-in accounts first
-  h+='<div style="font-size:11px;font-weight:700;color:#555;margin-bottom:6px">Built-in Accounts (permanent)</div>';
-  h+='<div style="border:1px solid #d0dcea;border-radius:6px;overflow:hidden;margin-bottom:14px">';
-  h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#fff;border-bottom:1px solid #e8eef6">';
-  h+='<div style="font-size:13px;font-weight:600;color:#1e2d40;flex:1">User Account</div>';
-  h+='<span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;background:#e8f0ff;color:#2070b8">Auditor</span>';
-  h+='<span style="font-size:10px;color:#aaa">Password changeable via Change Password</span>';
-  h+='</div>';
-  h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#f8fafc">';
-  h+='<div style="font-size:13px;font-weight:600;color:#1e2d40;flex:1">Administrator Account</div>';
-  h+='<span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;background:#e8fff0;color:#1a6030">Administrator</span>';
-  h+='<span style="font-size:10px;color:#aaa">Password changeable via Change Password</span>';
-  h+='</div>';
-  h+='</div>';
-  // Custom users
-  if(!users.length){
-    h+='<div style="font-size:12px;color:#888;padding:12px;background:#f8fafc;border:1px solid #e0e8f0;border-radius:6px;text-align:center">No additional users created yet.</div>';
-  } else {
-    h+='<div style="font-size:11px;font-weight:700;color:#555;margin-bottom:6px">Additional Users ('+users.length+')</div>';
-    h+='<div style="border:1px solid #d0dcea;border-radius:6px;overflow:hidden">';
-    for(var i=0;i<users.length;i++){
-      var u=users[i];
-      var rl=roleLabel[u.role]||u.role;
-      var rc=roleColor[u.role]||'#555';
-      var rb=roleBg[u.role]||'#f0f0f0';
-      h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:'+(i%2===0?'#fff':'#f8fafc')+';border-bottom:1px solid #e8eef6">';
-      h+='<div style="font-size:13px;font-weight:600;color:#1e2d40;flex:1">'+_mu_esc(u.name||'—')+'</div>';
-      h+='<span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;background:'+rb+';color:'+rc+'">'+rl+'</span>';
-      h+='<span style="font-size:10px;color:#aaa">Added: '+(u.created||'—')+'</span>';
-      h+='<button onclick="muDeleteUser(\''+_mu_esc(u.id)+'\')" style="background:#c0392b;color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Remove</button>';
-      h+='</div>';
-    }
-    h+='</div>';
-  }
-  list.innerHTML=h;
-}
-
-function _mu_esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-function muAddUser(){
-  var name=document.getElementById('mu-name').value.trim();
-  var role=document.getElementById('mu-role').value;
-  var pw=document.getElementById('mu-pw').value;
-  var pw2=document.getElementById('mu-pw2').value;
-  var errEl=document.getElementById('mu-err');
-  errEl.textContent='';
-  if(!name){ errEl.textContent='Please enter a full name.'; return; }
-  if(pw.length<6){ errEl.textContent='Password must be at least 6 characters.'; return; }
-  if(pw!==pw2){ errEl.textContent='Passwords do not match.'; return; }
-  var users=muGetUsers();
-  var id='u_'+Date.now();
-  var today=new Date().toISOString().slice(0,10);
-  users.push({id:id,name:name,role:role,password:pw,created:today});
-  muSaveUsers(users);
-  document.getElementById('mu-name').value='';
-  document.getElementById('mu-pw').value='';
-  document.getElementById('mu-pw2').value='';
-  muRenderList();
-  showToast('User "'+name+'" created successfully.',2500);
-}
-
-function muDeleteUser(id){
-  if(!confirm('Remove this user? They will no longer be able to log in.')) return;
-  var users=muGetUsers().filter(function(u){ return u.id!==id; });
-  muSaveUsers(users);
-  muRenderList();
-}
-
 function showChangePwModal(){
   ['chpw-cur','chpw-new','chpw-cfm'].forEach(function(id){ document.getElementById(id).value=''; });
   document.getElementById('chpw-err').textContent='';
@@ -850,16 +726,20 @@ function hideChangePwModal(){
 }
 function chpwAcctChange(){
   var v=document.querySelector('input[name="chpw-acct"]:checked').value;
-  document.getElementById('chpw-lbl-user').style.borderColor=(v==='user'?'#1a3a5c':'#c8d8ec');
-  document.getElementById('chpw-lbl-ho').style.borderColor=(v==='ho'?'#1a3a5c':'#c8d8ec');
+  ['user','ro','ho_sup','ho'].forEach(function(k){
+    var el=document.getElementById('chpw-lbl-'+k);
+    if(el) el.style.borderColor=(v===k?'#1a3a5c':'#c8d8ec');
+  });
 }
 function _getActivePw(type){
-  // Returns the currently active password for 'user' or 'ho'
+  // Returns the currently active password for each role key
   var stored=null;
   try{ stored=localStorage.getItem('sa_pw_'+type); }catch(e){}
   if(stored) return stored;
-  if(type==='user') return 'S&A2026';
-  if(type==='ho') return [72,79,64,83,38,65,50,48,50,54].map(function(c){return String.fromCharCode(c);}).join('');
+  if(type==='user')   return 'S&A2026';
+  if(type==='ro')     return 'ROSA2026';
+  if(type==='ho_sup') return 'HOSA2026';
+  if(type==='ho')     return [72,79,64,83,38,65,50,48,50,54].map(function(c){return String.fromCharCode(c);}).join('');
   return '';
 }
 function doChangePw(){
@@ -891,7 +771,8 @@ function doChangePw(){
     return;
   }
   hideChangePwModal();
-  var label=acct==='ho'?'Administrator':'User';
+  var _lblMap={user:'Auditor',ro:'RO Supervisor',ho_sup:'HO Supervisor',ho:'Administrator'};
+  var label=_lblMap[acct]||acct;
   setTimeout(function(){ alert('Password for '+label+' account updated successfully.'); },100);
 }
 // Close modal on backdrop click
@@ -9362,7 +9243,6 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       <button class="tb-dd-tab" onclick="if(window._hoAuthed){tbDDToggle('dd-admin');}else{showHOAuthModal(function(){tbDDToggle('dd-admin');});}">Admin <span id="admin-export-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px;vertical-align:middle">Export Pending</span> <span class="arr">&#9660;</span></button>
       <div class="tb-dd-menu">
         <button class="tb-dd-item locked" id="chpw-btn" onclick="showChangePwModal();tbDDClose()" disabled><span class="di">&#128274;</span> Change Password</button>
-        <button class="tb-dd-item" onclick="showManageUsersModal();tbDDClose()"><span class="di">&#128101;</span> Manage Users</button>
         <div class="tb-dd-sep"></div>
         <button class="tb-dd-item" onclick="updbExportApp();tbDDClose()"><span class="di">&#128229;</span> Export Updated App</button>
       </div>
@@ -13657,6 +13537,31 @@ function updbExportApp(){
       if(updated === html){
         alert('Could not locate the audit-data block in the app source. Export aborted.');
         return;
+      }
+
+      // Bake current role passwords into the exported file so all users get them
+      // Replace each default password literal with the currently active one
+      var _pwMap = {
+        'S&A2026':    _getActivePw('user'),
+        'ROSA2026':   _getActivePw('ro'),
+        'HOSA2026':   _getActivePw('ho_sup')
+      };
+      for(var _pk in _pwMap){
+        if(_pwMap[_pk] && _pwMap[_pk] !== _pk){
+          // Only replace exact quoted occurrences to avoid partial matches
+          updated = updated.split("'"+_pk+"'").join("'"+_pwMap[_pk]+"'");
+          updated = updated.split('"'+_pk+'"').join('"'+_pwMap[_pk]+'"');
+        }
+      }
+      // Administrator password (encoded array) — rebuild with current password if changed
+      var _curAdminPw = _getActivePw('ho');
+      var _defAdminPw = [72,79,64,83,38,65,50,48,50,54].map(function(c){return String.fromCharCode(c);}).join('');
+      if(_curAdminPw !== _defAdminPw){
+        var _newArr = '['+_curAdminPw.split('').map(function(c){return c.charCodeAt(0);}).join(',')+']';
+        updated = updated.replace(
+          /\[72,79,64,83,38,65,50,48,50,54\]/,
+          _newArr
+        );
       }
 
       var blob = new Blob([updated], {type:'text/html'});
