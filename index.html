@@ -10866,15 +10866,28 @@ function setObsType(id, val) {
   var lrx=document.getElementById('lrx-'+id);
   var lrInp=document.getElementById('lr-'+id);
   if(val==='Repeated'){
+    // Auto-fill LARR from prior detection results if not already set
+    if(!lastRefMap[id]){
+      var _rdm=window._rdMatches||[];
+      for(var _rmi=0;_rmi<_rdm.length;_rmi++){
+        if(_rdm[_rmi].obsId===id){
+          setLastRef(id, _buildLarrSentence(_rdm[_rmi].ref||'', _rdm[_rmi].year||''));
+          break;
+        }
+      }
+    }
     if(!lrx){
       var newRow=document.createElement('div');
       newRow.id='lrx-'+id;
       newRow.style.cssText='margin-top:4px;display:flex;align-items:center;gap:5px';
       newRow.onclick=function(e){e.stopPropagation();};
       newRow.innerHTML='<span style="font-size:10px;font-weight:700;color:#d06020;white-space:nowrap">LARR:</span>'
-        +'<input type="text" id="lr-'+id+'" placeholder="e.g. Report No. SAB-2024-07" value="'+(lastRefMap[id]||'')+'" style="flex:1;font-size:11px;padding:3px 8px;border:1px solid #f0b080;border-radius:6px;font-family:inherit;color:#5a2000;background:#fff8f2" onclick="event.stopPropagation()" oninput="setLastRef(\''+id+'\',this.value)">';
-      var axRow=document.getElementById('ax-'+id);
-      if(axRow&&axRow.parentNode) axRow.parentNode.insertBefore(newRow, axRow.nextSibling);
+        +'<input type="text" id="lr-'+id+'" placeholder="For prior audit history of this finding, please refer to Observation No. — of the last issued Branch Audit Report of this branch." value="'+(lastRefMap[id]||'')+'" style="flex:1;font-size:11px;padding:3px 8px;border:1px solid #f0b080;border-radius:6px;font-family:inherit;color:#5a2000;background:#fff8f2" onclick="event.stopPropagation()" oninput="setLastRef(\''+id+'\',this.value)">';
+      var _axRow=document.getElementById('ax-'+id);
+      if(_axRow&&_axRow.parentNode) _axRow.parentNode.insertBefore(newRow, _axRow.nextSibling);
+    } else if(lrInp && !lrInp.value && lastRefMap[id]){
+      // Row already exists but input was empty — update it (e.g. toggled back and forth)
+      lrInp.value = lastRefMap[id];
     }
   } else {
     if(lrx) lrx.parentNode.removeChild(lrx);
@@ -10885,6 +10898,19 @@ function setObsType(id, val) {
 function setLastRef(id, val) {
   if(val) lastRefMap[id]=val; else delete lastRefMap[id];
   _refreshObsBadge(id);
+}
+
+// Builds the agreed LARR auto-fill sentence.
+// obsRef: observation number from prior report e.g. "1.1" (may be empty)
+// year:   4-digit year of the prior report (may be empty)
+function _buildLarrSentence(obsRef, year){
+  var ref = (obsRef||'').trim();
+  var yr  = (year||'').trim();
+  return 'For prior audit history of this finding, please refer to Observation No.'
+    +(ref?' '+ref:' —')
+    +' of the last issued Branch Audit Report'
+    +(yr?' ('+yr+')':'')
+    +' of this branch.';
 }
 
 // ============================================================
@@ -20305,11 +20331,8 @@ function _applyRepeatSelections(){
       // Read ref from picker if shown (multiple candidates), else use stored best match ref
       var refSel=document.getElementById('rdref-'+i);
       var chosenRef=refSel?refSel.value:(items[i].ref||'');
-      // Build LARR sentence (agreed wording)
-      var larrVal='For prior audit history of this finding, please refer to Observation No.'
-        +(chosenRef?' '+chosenRef:' —')
-        +' of the last issued Branch Audit Report of this branch.';
-      setLastRef(items[i].obsId, larrVal);
+      // Build LARR sentence using shared helper (includes year when available)
+      setLastRef(items[i].obsId, _buildLarrSentence(chosenRef, items[i].year||''));
       applied++;
     }
   }
