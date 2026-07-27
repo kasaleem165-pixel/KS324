@@ -12940,7 +12940,8 @@ function showUpdateDbModal(){
     // Footer actions
     '<div style="padding:12px 16px;border-top:1px solid #dde3ee;display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#f8fafd">' +
     '<button onclick="dupobsSaveDraft()" style="background:#c07000;color:#fff;border:none;border-radius:5px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128190; Save Draft</button>' +
-    '<span style="font-size:11px;color:#888">Export your review decisions to send to the Administrator for approval.</span>' +
+    '<button onclick="dupobsResume()" id="dupobs-resume-btn" style="background:#2a5c8a;color:#fff;border:none;border-radius:5px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#9654; Resume Session</button>' +
+    '<span id="dupobs-resume-lbl" style="font-size:11px;color:#888"></span>' +
     (isAdmin ?
       '<div style="margin-left:auto;display:flex;gap:8px;align-items:center">' +
       '<button onclick="document.getElementById(\'dupobs-draft-inp\').click()" style="background:#1a5c2a;color:#fff;border:none;border-radius:5px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128228; Load Draft</button>' +
@@ -12954,10 +12955,30 @@ function showUpdateDbModal(){
 
   document.body.appendChild(modal);
   modal.addEventListener('click', function(e){ if(e.target===modal) closeUpdbModal(); });
-  setTimeout(dupobsScan, 80);
+
+  // If a saved session exists, show resume prompt instead of auto-scanning
+  if(_dupobsHasSave()){
+    var raw = localStorage.getItem(_DUPOBS_STATE_KEY);
+    var snap = raw ? JSON.parse(raw) : null;
+    var dt = (snap && snap.ts) ? new Date(snap.ts).toLocaleString() : '—';
+    var res = document.getElementById('dupobs-results');
+    if(res) res.innerHTML =
+      '<div style="padding:20px;text-align:center;background:#f0f6ff;border-radius:6px;border:1px solid #b0c8e8;margin:8px">' +
+      '<div style="font-size:15px;font-weight:700;color:#1a3a5c;margin-bottom:8px">&#9654; Previous Session Found</div>' +
+      '<div style="font-size:12px;color:#555;margin-bottom:14px">Last saved: <strong>'+dt+'</strong></div>' +
+      '<div style="display:flex;gap:10px;justify-content:center">' +
+      '<button onclick="dupobsResume()" style="background:#2a5c8a;color:#fff;border:none;border-radius:5px;padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">&#9654; Resume Previous Session</button>' +
+      '<button onclick="_dupobsClearSave();dupobsScan()" style="background:#555;color:#fff;border:none;border-radius:5px;padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">&#128270; Start Fresh Scan</button>' +
+      '</div></div>';
+    var lbl = document.getElementById('dupobs-resume-lbl');
+    if(lbl) lbl.textContent = 'Saved session available — ' + dt;
+  } else {
+    setTimeout(dupobsScan, 80);
+  }
 }
 
 function closeUpdbModal(){
+  _dupobsClearSave();
   var el = document.getElementById('updbModal');
   if(el) el.remove();
   _updbCandidates = [];
@@ -13088,12 +13109,67 @@ function dupobsDecide(g, decision){
   _dupobsGroups[g].decision = decision;
   if(decision !== 'select_one') _dupobsGroups[g].keepIdx = null;
   dupobsRender();
+  _dupobsAutoSave();
 }
 
 function dupobsSetKeep(g, gi){
   if(!_dupobsGroups[g]) return;
   _dupobsGroups[g].keepIdx = gi;
   dupobsRender();
+  _dupobsAutoSave();
+}
+
+function _dupobsAutoSave(){
+  if(!_dupobsGroups.length) return;
+  try{
+    var thEl = document.getElementById('dupobs-threshold');
+    var snap = {
+      ts: new Date().toISOString(),
+      threshold: thEl ? parseInt(thEl.value) : 60,
+      groups: _dupobsGroups.map(function(g){
+        return { obs: g.obs, decision: g.decision, keepIdx: g.keepIdx };
+      })
+    };
+    localStorage.setItem(_DUPOBS_STATE_KEY, JSON.stringify(snap));
+    var lbl = document.getElementById('dupobs-resume-lbl');
+    if(lbl) lbl.textContent = 'Auto-saved ' + new Date().toLocaleTimeString();
+  }catch(e){}
+}
+
+function _dupobsClearSave(){
+  try{ localStorage.removeItem(_DUPOBS_STATE_KEY); }catch(e){}
+  var lbl = document.getElementById('dupobs-resume-lbl');
+  if(lbl) lbl.textContent = '';
+}
+
+function _dupobsHasSave(){
+  try{
+    var raw = localStorage.getItem(_DUPOBS_STATE_KEY);
+    if(!raw) return false;
+    var snap = JSON.parse(raw);
+    return !!(snap && snap.groups && snap.groups.length);
+  }catch(e){ return false; }
+}
+
+function dupobsResume(){
+  try{
+    var raw = localStorage.getItem(_DUPOBS_STATE_KEY);
+    if(!raw){ alert('No saved session found.'); return; }
+    var snap = JSON.parse(raw);
+    if(!snap || !snap.groups || !snap.groups.length){ alert('Saved session is empty.'); return; }
+    _dupobsGroups = snap.groups.map(function(g){
+      return { obs: g.obs||[], decision: g.decision||null, keepIdx: g.keepIdx!=null?g.keepIdx:null };
+    });
+    // Restore threshold
+    var thEl = document.getElementById('dupobs-threshold');
+    if(thEl && snap.threshold) thEl.value = snap.threshold;
+    dupobsRender();
+    // Update resume label
+    var lbl = document.getElementById('dupobs-resume-lbl');
+    var dt = snap.ts ? new Date(snap.ts).toLocaleString() : '—';
+    if(lbl) lbl.textContent = 'Resumed from ' + dt;
+    showToast('&#9654; Session resumed — '+snap.groups.length+' group(s) restored with your previous decisions.', 4000);
+  }catch(e){ alert('Could not restore saved session: '+e.message); }
 }
 
 function dupobsSaveDraft(){
@@ -13161,6 +13237,7 @@ function dupobsApproveRemovals(){
   DB.observations = DB.observations.filter(function(o){ return !removeSet[o.id]; });
   _setExportPending();
   _dupobsGroups = [];
+  _dupobsClearSave();
   showToast('&#10003; '+toRemove.length+' observation(s) removed. Use Admin → Export Updated App to distribute changes.', 5000);
   setTimeout(dupobsScan, 300);
 }
