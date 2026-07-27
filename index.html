@@ -12902,7 +12902,7 @@ function showHOAuthModal(callback, showFieldOption){
   setTimeout(function(){ inp.focus(); }, 80);
 }
 
-var _dupobsGroups = [];   // [{obs:[...], decision:null|'keep_both'|'select_one'|'skip', keepIdx:null|number}]
+var _dupobsGroups = [];   // [{obs:[...], decision:null|'keep_both'|'select_one'|'skip', keepIdxSet:[]}]
 var _DUPOBS_STATE_KEY = 'sa_dupobs_review';
 
 function showUpdateDbModal(){
@@ -12939,8 +12939,10 @@ function showUpdateDbModal(){
 
     // Footer actions
     '<div style="padding:12px 16px;border-top:1px solid #dde3ee;display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#f8fafd">' +
-    '<button onclick="dupobsSaveDraft()" style="background:#c07000;color:#fff;border:none;border-radius:5px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128190; Save Draft</button>' +
-    '<button onclick="dupobsResume()" id="dupobs-resume-btn" style="background:#2a5c8a;color:#fff;border:none;border-radius:5px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#9654; Resume Session</button>' +
+    '<button onclick="dupobsSaveDraft()" style="background:#c07000;color:#fff;border:none;border-radius:5px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128190; Save Session</button>' +
+    '<button onclick="document.getElementById(\'dupobs-load-sess-inp\').click()" style="background:#2a5c8a;color:#fff;border:none;border-radius:5px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128228; Load Session</button>' +
+    '<input type="file" id="dupobs-load-sess-inp" accept=".json" style="display:none" onchange="dupobsLoadDraft(this)">' +
+    '<button onclick="dupobsResume()" id="dupobs-resume-btn" style="background:#1a5c3a;color:#fff;border:none;border-radius:5px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#9654; Resume Auto-Save</button>' +
     '<span id="dupobs-resume-lbl" style="font-size:11px;color:#888"></span>' +
     (isAdmin ?
       '<div style="margin-left:auto;display:flex;gap:8px;align-items:center">' +
@@ -13043,7 +13045,7 @@ function dupobsScan(){
   }
   _dupobsGroups = groups.map(function(grp){
     var key = grp.map(function(o){ return o.id; }).sort().join('|');
-    return priorMap[key] || { obs: grp, decision: null, keepIdx: null };
+    return priorMap[key] || { obs: grp, decision: null, keepIdxSet: [] };
   });
   dupobsRender();
 }
@@ -13064,26 +13066,35 @@ function dupobsRender(){
   for(var g=0;g<_dupobsGroups.length;g++){
     var grp = _dupobsGroups[g];
     var dec = grp.decision;
-    var borderCol = dec==='keep_both'?'#2e7d32': dec==='select_one'?'#c07000': dec==='skip'?'#888':'#c8d0dc';
-    var bgHead    = dec==='keep_both'?'#e8f5e9':  dec==='select_one'?'#fff8e0':  dec==='skip'?'#f4f4f4':'#f0f4fa';
+    var keepSet = grp.keepIdxSet || [];
+    var selDone = dec==='select_one' && keepSet.length>0;
+    var borderCol = dec==='keep_both'?'#2e7d32': selDone?'#c07000': dec==='skip'?'#888':'#c8d0dc';
+    var bgHead    = dec==='keep_both'?'#e8f5e9':  selDone?'#fff8e0':  dec==='skip'?'#f4f4f4':'#f0f4fa';
     h += '<div style="border:1px solid '+borderCol+';border-radius:6px;margin-bottom:14px;overflow:hidden">';
     // Group header
     h += '<div style="background:'+bgHead+';padding:7px 12px;font-size:11px;font-weight:700;color:#1a2d44;border-bottom:1px solid '+borderCol+';display:flex;align-items:center;gap:8px">';
     h += '<span>Group '+(g+1)+' &mdash; '+grp.obs.length+' similar observations</span>';
-    if(dec) h += '<span style="margin-left:auto;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:'+(dec==='keep_both'?'#2e7d32':dec==='select_one'?'#c07000':'#888')+'">&#10003; '+(dec==='keep_both'?'Keep Both':dec==='select_one'?'Select One':'Skipped')+'</span>';
+    if(dec){
+      var decLabel = dec==='keep_both'?'Keep Both': dec==='select_one'?(selDone?'Keeping '+keepSet.length:'Select to Keep'): 'Skipped';
+      var decColor = dec==='keep_both'?'#2e7d32': dec==='select_one'?(selDone?'#c07000':'#999'): '#888';
+      h += '<span style="margin-left:auto;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:'+decColor+'">&#10003; '+decLabel+'</span>';
+    }
     h += '</div>';
     // Observations
     for(var gi=0;gi<grp.obs.length;gi++){
       var obs = grp.obs[gi];
       var isCustom = !!obs.custom;
-      var isKept = (dec==='select_one' && grp.keepIdx===gi);
-      var isRemoved = (dec==='select_one' && grp.keepIdx!==null && grp.keepIdx!==gi);
+      var isKept    = dec==='select_one' && keepSet.indexOf(gi)>=0;
+      var isRemoved = dec==='select_one' && keepSet.length>0 && keepSet.indexOf(gi)<0;
       var rowBg = isKept?'#f0fff4': isRemoved?'#fff0f0':'';
       h += '<div style="padding:10px 12px;'+(gi>0?'border-top:1px solid #eee;':'')+(rowBg?'background:'+rowBg+';':'') +'">';
       h += '<div style="display:flex;align-items:flex-start;gap:10px">';
-      // Radio (select_one mode)
+      // Checkbox (select_one mode — allows keeping 1, 2, or more)
       if(dec==='select_one'){
-        h += '<input type="radio" name="dupobs-keep-'+g+'" data-g="'+g+'" data-gi="'+gi+'" '+(isKept?'checked':'')+' onchange="dupobsSetKeep('+g+','+gi+')" style="margin-top:4px;flex-shrink:0">';
+        h += '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;flex-shrink:0;margin-top:3px">';
+        h += '<input type="checkbox" data-g="'+g+'" data-gi="'+gi+'" '+(isKept?'checked':'')+' onchange="dupobsToggleKeep('+g+','+gi+',this.checked)" style="width:15px;height:15px;cursor:pointer">';
+        h += '<span style="font-size:11px;font-weight:700;color:'+(isKept?'#2e7d32':isRemoved?'#b71c1c':'#555')+'">'+(isKept?'Keep':isRemoved?'Remove':'?')+'</span>';
+        h += '</label>';
       }
       h += '<div style="flex:1;min-width:0">';
       h += '<div style="font-size:12px;font-weight:700;color:'+(isRemoved?'#aaa':'#1a2d44')+'">'+(isRemoved?'<s>':'')+esc(obs.title||'—')+(isRemoved?'</s>':'')+'</div>';
@@ -13094,10 +13105,11 @@ function dupobsRender(){
     }
     // Decision buttons
     h += '<div style="padding:8px 12px;background:#f8fafd;border-top:1px solid #e8edf5;display:flex;gap:6px;flex-wrap:wrap">';
-    h += '<button onclick="dupobsDecide('+g+',\'keep_both\')" style="'+(dec==='keep_both'?'background:#2e7d32;color:#fff':'background:#e8f5e9;color:#2e7d32')+';border:1px solid #2e7d32;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#9654;&#9654; Keep Both</button>';
-    h += '<button onclick="dupobsDecide('+g+',\'select_one\')" style="'+(dec==='select_one'?'background:#c07000;color:#fff':'background:#fff8e0;color:#c07000')+';border:1px solid #c07000;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#9673; Select One to Keep</button>';
+    h += '<button onclick="dupobsDecide('+g+',\'keep_both\')" style="'+(dec==='keep_both'?'background:#2e7d32;color:#fff':'background:#e8f5e9;color:#2e7d32')+';border:1px solid #2e7d32;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#9654;&#9654; Keep All</button>';
+    h += '<button onclick="dupobsDecide('+g+',\'select_one\')" style="'+(dec==='select_one'?'background:#c07000;color:#fff':'background:#fff8e0;color:#c07000')+';border:1px solid #c07000;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#9673; Select Which to Keep</button>';
     h += '<button onclick="dupobsDecide('+g+',\'skip\')" style="'+(dec==='skip'?'background:#555;color:#fff':'background:#f4f4f4;color:#555')+';border:1px solid #aaa;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#9654; Skip for Now</button>';
-    if(dec==='select_one' && grp.keepIdx===null) h += '<span style="font-size:11px;color:#c07000;font-style:italic;align-self:center">&#9670; Select which observation to keep using the radio buttons above.</span>';
+    if(dec==='select_one' && keepSet.length===0) h += '<span style="font-size:11px;color:#c07000;font-style:italic;align-self:center">&#9670; Tick the checkbox(es) next to each observation you want to keep.</span>';
+    if(dec==='select_one' && keepSet.length>0) h += '<span style="font-size:11px;color:#2e7d32;font-style:italic;align-self:center">&#10003; Keeping '+keepSet.length+' — unchecked observation(s) will be removed.</span>';
     h += '</div>';
     h += '</div>';
   }
@@ -13107,14 +13119,17 @@ function dupobsRender(){
 function dupobsDecide(g, decision){
   if(!_dupobsGroups[g]) return;
   _dupobsGroups[g].decision = decision;
-  if(decision !== 'select_one') _dupobsGroups[g].keepIdx = null;
+  if(decision !== 'select_one') _dupobsGroups[g].keepIdxSet = [];
   dupobsRender();
   _dupobsAutoSave();
 }
 
-function dupobsSetKeep(g, gi){
+function dupobsToggleKeep(g, gi, checked){
   if(!_dupobsGroups[g]) return;
-  _dupobsGroups[g].keepIdx = gi;
+  var s = _dupobsGroups[g].keepIdxSet || [];
+  if(checked){ if(s.indexOf(gi)<0) s.push(gi); }
+  else { s = s.filter(function(x){ return x!==gi; }); }
+  _dupobsGroups[g].keepIdxSet = s;
   dupobsRender();
   _dupobsAutoSave();
 }
@@ -13127,7 +13142,7 @@ function _dupobsAutoSave(){
       ts: new Date().toISOString(),
       threshold: thEl ? parseInt(thEl.value) : 60,
       groups: _dupobsGroups.map(function(g){
-        return { obs: g.obs, decision: g.decision, keepIdx: g.keepIdx };
+        return { obs: g.obs, decision: g.decision, keepIdxSet: g.keepIdxSet||[] };
       })
     };
     localStorage.setItem(_DUPOBS_STATE_KEY, JSON.stringify(snap));
@@ -13158,7 +13173,9 @@ function dupobsResume(){
     var snap = JSON.parse(raw);
     if(!snap || !snap.groups || !snap.groups.length){ alert('Saved session is empty.'); return; }
     _dupobsGroups = snap.groups.map(function(g){
-      return { obs: g.obs||[], decision: g.decision||null, keepIdx: g.keepIdx!=null?g.keepIdx:null };
+      // support old keepIdx format for backwards compat
+      var ks = g.keepIdxSet || (g.keepIdx!=null ? [g.keepIdx] : []);
+      return { obs: g.obs||[], decision: g.decision||null, keepIdxSet: ks };
     });
     // Restore threshold
     var thEl = document.getElementById('dupobs-threshold');
@@ -13178,7 +13195,7 @@ function dupobsSaveDraft(){
     type: 'brains_dupobs_draft',
     savedAt: new Date().toISOString(),
     groups: _dupobsGroups.map(function(g){
-      return { obs: g.obs, decision: g.decision, keepIdx: g.keepIdx };
+      return { obs: g.obs, decision: g.decision, keepIdxSet: g.keepIdxSet||[] };
     })
   };
   var blob = new Blob([JSON.stringify(draft, null, 2)], {type:'application/json'});
@@ -13204,7 +13221,8 @@ function dupobsLoadDraft(inp){
         alert('Invalid file — this does not appear to be a BRAINS Duplicate Observations draft.'); return;
       }
       _dupobsGroups = draft.groups.map(function(g){
-        return { obs: g.obs||[], decision: g.decision||null, keepIdx: g.keepIdx!=null?g.keepIdx:null };
+        var ks = g.keepIdxSet || (g.keepIdx!=null ? [g.keepIdx] : []);
+        return { obs: g.obs||[], decision: g.decision||null, keepIdxSet: ks };
       });
       var dt = draft.savedAt ? new Date(draft.savedAt).toLocaleString() : '—';
       showToast('&#128228; Draft loaded from '+dt+'. Review decisions and click Approve & Apply.', 4000);
@@ -13219,9 +13237,10 @@ function dupobsApproveRemovals(){
   var toRemove = [];
   for(var g=0;g<_dupobsGroups.length;g++){
     var grp = _dupobsGroups[g];
-    if(grp.decision !== 'select_one' || grp.keepIdx === null) continue;
+    var ks = grp.keepIdxSet || [];
+    if(grp.decision !== 'select_one' || ks.length === 0) continue;
     for(var gi=0;gi<grp.obs.length;gi++){
-      if(gi !== grp.keepIdx && grp.obs[gi].custom) toRemove.push(grp.obs[gi].id);
+      if(ks.indexOf(gi) < 0 && grp.obs[gi].custom) toRemove.push(grp.obs[gi].id);
     }
   }
   if(!toRemove.length){
