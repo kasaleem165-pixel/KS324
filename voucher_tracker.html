@@ -173,6 +173,13 @@
     font-family: inherit; line-height: 1.4;
   }
   .bank-item-btn:hover { background: #eef4fb; border-color: #1a3a5c; }
+  .bank-item-row { display: flex; gap: 6px; align-items: stretch; }
+  .bank-item-row .bank-item-btn { flex: 1; }
+  .bank-item-remove {
+    background: #f3d9d9; color: #8f1d1d; border: 1px solid #e3c1c1; border-radius: 6px;
+    width: 30px; flex-shrink: 0; cursor: pointer; font-size: 14px; margin-bottom: 6px;
+  }
+  .bank-item-remove:hover { background: #e9baba; }
   .bank-pick-hint {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
     background: #eef4fb; border: 1px solid #cfe0f2; border-radius: 6px; padding: 8px 12px;
@@ -356,8 +363,9 @@
       </ul>
 
       <h4>Selecting an Observation from the Data Bank</h4>
-      <p>Clicking <b>+ New Observation</b> first opens the <b>Observation Data Bank</b> — the audit's standard list of 70 pre-written observations across the 8 categories below, taken from the "Top Observations" reference sheet. Search or filter by category and pick the one that matches; its wording and category are carried straight into the observation form (still fully editable).</p>
+      <p>Clicking <b>+ New Observation</b> first opens the <b>Observation Data Bank</b> — 70 pre-written observations from the "Top Observations" reference sheet, regrouped into the 11 focused categories below (in place of the sheet's original 8, one of which was a large catch-all). Each item shows a short label in the list — hover over it, or check the full wording once picked, since it's carried straight into the observation description (still fully editable).</p>
       <p>If nothing in the bank fits, click <b>None of these — Write a New Observation</b> to open the same form with a blank description, so a brand-new observation can be defined from scratch.</p>
+      <p>Writing one from scratch? Tick <b>Save this wording to the Observation Bank for future reuse</b> in the form, optionally give it a short label, and it's added to a <b>★ My Saved Observations</b> section at the top of the picker — so the bank grows with your own recurring wording over time. Remove any saved entry with the <b>&times;</b> next to it in the picker.</p>
 
       <h4>Raising, Replying To &amp; Re-referring an Observation</h4>
       <p>Whether picked from the bank or written fresh, every observation lands in one form modelled on the "Audit Observation / Receiving" memo: it captures who it was sent <b>To</b> (the voucher's company), a <b>Reference No.</b>, the <b>Voucher #</b>, receiving and bill-forwarding dates, the amount involved, who <b>checked</b> it, and the observation text itself.</p>
@@ -373,16 +381,19 @@
       <p>Remember to click <b>Save Observation</b> afterwards so the change is kept.</p>
 
       <h4>OBS Code</h4>
-      <p>OBS Code mirrors the audit's standard observation categories (2–9 below); selecting an <b>Observation Type</b> auto-fills the matching code, which can still be overridden.</p>
+      <p>OBS Code mirrors the observation bank's 11 categories below; selecting an <b>Observation Type</b> auto-fills the matching code, which can still be overridden.</p>
       <ul>
-        <li>2 — PMC Discrepancies Regarding Vendor Registration, RFQs and Budgetary Matters</li>
-        <li>3 — Timelines of Execution, Incomplete, Erroneous or Missing Supporting Data</li>
-        <li>4 — Late Payments</li>
-        <li>5 — Tax Related Issues</li>
-        <li>6 — Expense Booked Against Wrong Head</li>
-        <li>7 — Errors in Data Entry, Typing and Calculation</li>
-        <li>8 — Discrepancies in Employee Advances and Allowances</li>
-        <li>9 — Miscellaneous Observations</li>
+        <li>1 — Vendor Selection &amp; CSQ Compliance</li>
+        <li>2 — Rate &amp; Quantity Discrepancies</li>
+        <li>3 — Specifications &amp; Design Compliance</li>
+        <li>4 — Missing / Incomplete Supporting Documents</li>
+        <li>5 — Payment Delays</li>
+        <li>6 — Tax &amp; Withholding Issues</li>
+        <li>7 — Wrong Expense Head / Classification</li>
+        <li>8 — Data Entry &amp; Calculation Errors</li>
+        <li>9 — Employee Advances, Allowances &amp; Benefits</li>
+        <li>10 — Contracts, Agreements &amp; Asset Records</li>
+        <li>11 — Other / Administrative</li>
       </ul>
 
       <h4>Deduction Reasons</h4>
@@ -505,6 +516,17 @@
 
         <div class="fld span3"><label>Observation(s)</label><textarea id="o-description" placeholder="Describe the observation raised"></textarea></div>
 
+        <div class="fld span3" style="margin-top:-4px">
+          <label style="text-transform:none; font-weight:500; display:flex; align-items:center; gap:6px; font-size:12.5px; color:#334;">
+            <input type="checkbox" id="o-saveToBank" style="width:auto;" onchange="document.getElementById('o-bankLabelWrap').style.display = this.checked ? '' : 'none'">
+            Save this wording to the Observation Bank for future reuse
+          </label>
+        </div>
+        <div class="fld span3" id="o-bankLabelWrap" style="display:none">
+          <label>Short Label for Bank <span style="text-transform:none;font-weight:400;color:#889">(optional — auto-generated if left blank)</span></label>
+          <input type="text" id="o-bankLabel" placeholder="e.g. Vendor rate higher than quoted price">
+        </div>
+
         <div class="fld"><label>No. of Instances</label><input type="number" id="o-instances" min="1" value="1"></div>
         <div class="fld"><label>Amount Involved (Rs.)</label><input type="number" id="o-amount" step="0.01"></div>
         <div class="fld"><label>Status</label><select id="o-status"></select></div>
@@ -552,93 +574,106 @@ const VTYPES = ['BP','JV'];
 const NATURES = ['Advance','Payment','Adjustment','Reimbursement','Receipt'];
 const STATUSES = ['In Hand','Sample Out','Observation','Checked - In Hand','Released','Post Audit','Post Audit - In Hand','Mudasir / Chugtai Sb','Cancel Payment'];
 
-/* Observation data bank — transcribed from the "Top Observations" reference sheet, grouped by its 8 standard categories. */
+/*
+ * Observation data bank — the 70 observations from the "Top Observations" reference sheet,
+ * regrouped into 11 focused categories (the sheet's original 8 included one large
+ * "Miscellaneous" catch-all and a couple of categories that mixed unrelated issues).
+ * Each item has a short scannable "label" for the picker list and the full "text" that
+ * gets used as the observation description once picked (shown in full via the label's
+ * tooltip too).
+ */
 const OBS_BANK = [
-  { code:2, name:'PMC Discrepancies Regarding Vendor Registration, RFQs and Budgetary Matters', items: [
-    'The pattern printed on the Dori bag does not conform to the approved design guidelines.',
-    'As per the attached GRN, replacement of the defective Baby Grinder (8mm) is required. Kindly provide a formal statement from the concerned person confirming the defect.',
-    'Qamar Brothers was selected over Universal Overseas — an authorized TOA distributor — despite a marginal cost difference of Rs 7,000. Kindly share the rationale for this vendor selection.',
-    'Kindly confirm whether Qamar Brothers will repair the damaged parts using locally sourced components or imported ones.',
-    'The rates charged for certain items appear to be on the higher side. Kindly review and clarify.',
-    "The quantities delivered do not correspond with the hotel's actual requirement as communicated by Supply Chain (Annexure A refers).",
-    'A discrepancy exists between the GRN and the quantity of items actually delivered by the vendor.',
-    'Per policy, a CSQ is valid for one year. The CSQ on record, issued 17-Apr-25, has since expired. Kindly provide an updated CSQ.',
-    'Kindly provide complete specifications, including Make and Model, for all items purchased and repaired.',
-    'The rates charged by Sidra Printcom are higher than those quoted by M/s Amin Copier & Bookshop and M/s Momin Photostate for comparable services. Kindly clarify the basis of vendor selection.',
-    'The CSQ approved on 01-Apr-2022 is incomplete, reflecting only one vendor. A comparative CSQ with multiple vendors is required.',
-    'The revised per-unit rates are higher than the previous rates without adequate justification. Kindly clarify.',
+  { code:1, name:'Vendor Selection & CSQ Compliance', items: [
+    { label:'Vendor selected despite marginal cost difference — rationale required', text:'Qamar Brothers was selected over Universal Overseas — an authorized TOA distributor — despite a marginal cost difference of Rs 7,000. Kindly share the rationale for this vendor selection.' },
+    { label:'Confirm sourcing of repair parts (local vs imported)', text:'Kindly confirm whether Qamar Brothers will repair the damaged parts using locally sourced components or imported ones.' },
+    { label:'CSQ on record has expired — updated CSQ required', text:'Per policy, a CSQ is valid for one year. The CSQ on record, issued 17-Apr-25, has since expired. Kindly provide an updated CSQ.' },
+    { label:"Vendor's rates higher than other quotes — selection basis unclear", text:'The rates charged by Sidra Printcom are higher than those quoted by M/s Amin Copier & Bookshop and M/s Momin Photostate for comparable services. Kindly clarify the basis of vendor selection.' },
+    { label:'CSQ reflects only one vendor — comparative CSQ required', text:'The CSQ approved on 01-Apr-2022 is incomplete, reflecting only one vendor. A comparative CSQ with multiple vendors is required.' },
   ]},
-  { code:3, name:'Timelines of Execution, Incomplete, Erroneous or Missing Supporting Data', items: [
-    "Units of measurement recorded in the system are inconsistent — for instance, bananas are recorded in 'each' while mint is recorded in 'kg'. Kindly standardize.",
-    'Kindly share the PR, Quotations, CSQ and PO in support of this transaction.',
-    'Kindly share the inspection report duly vetted and endorsed by the Engineering Department.',
-    'The original invoice has not been provided; kindly share the same for verification.',
-    'Kindly share the Guest Refund Ledger to substantiate this transaction.',
-    "Guest refund transactions of PKR 36,100, PKR 25,126 and PKR 107,556 remain unsubstantiated in the absence of the FHS bank statement/ledger and the guest's CNIC copy. Kindly provide the supporting documentation.",
-    'Kindly share the inventory record in support of this transaction.',
-    'Kindly provide the reason for the significant delay in payment.',
-    'The UAT has still not been formally handed over by the Finance Department despite repeated verbal requests. Kindly provide the signed UAT to enable release of payment.',
-    'Kindly provide the vehicle log book in support of this expense.',
-    'Kindly provide the Fixed Asset Register for verification.',
-    'Kindly provide the Repair & Maintenance/AMC contract, or details of any special maintenance arrangement, along with the rental agreement.',
+  { code:2, name:'Rate & Quantity Discrepancies', items: [
+    { label:'Defective item replacement — formal defect statement required', text:'As per the attached GRN, replacement of the defective Baby Grinder (8mm) is required. Kindly provide a formal statement from the concerned person confirming the defect.' },
+    { label:'Rates charged appear on the higher side', text:'The rates charged for certain items appear to be on the higher side. Kindly review and clarify.' },
+    { label:"Quantity delivered doesn't match actual requirement", text:"The quantities delivered do not correspond with the hotel's actual requirement as communicated by Supply Chain (Annexure A refers)." },
+    { label:'GRN vs delivered quantity discrepancy', text:'A discrepancy exists between the GRN and the quantity of items actually delivered by the vendor.' },
+    { label:'Revised per-unit rates higher without justification', text:'The revised per-unit rates are higher than the previous rates without adequate justification. Kindly clarify.' },
   ]},
-  { code:4, name:'Late Payments', items: [
-    'Kindly provide the reason for the delay in submission of the voucher to Systems & Audit.',
-    'The vendor invoice is dated 05-Sep-22 and the GRN 08-Sep-22; kindly clarify the reason for the delay in releasing payment to the vendor.',
-    'The vendor invoice is dated 12-May-2022, with payment scheduled only in Dec-2022. Kindly clarify the reason for this delay.',
-    'Kindly clarify the reason for the undue delay in releasing this payment.',
-    'Kindly confirm the list of employees against whom late-sitting food charges have been claimed.',
-    'Kindly state the reason for the delay in obtaining payment approval.',
-    'Five utility bills were paid after the due date, resulting in a late-payment surcharge of Rs 3,444. No response has been received despite repeated reminders; kindly look into the matter.',
-    'An electricity bill was paid after the due date, resulting in a late-payment surcharge of Rs 491. Kindly provide the reason.',
+  { code:3, name:'Specifications & Design Compliance', items: [
+    { label:"Product design/pattern doesn't conform to approved guidelines", text:'The pattern printed on the Dori bag does not conform to the approved design guidelines.' },
+    { label:'Complete Make/Model specifications required', text:'Kindly provide complete specifications, including Make and Model, for all items purchased and repaired.' },
   ]},
-  { code:5, name:'Tax Related Issues', items: [
-    'FHS is registered for sales tax; kindly clarify the reason for not withholding sales tax on this transaction.',
-    'Income tax on internet services is applicable at 6%, whereas withholding is being applied at 4%. Kindly rectify.',
-    'Input tax booked against invoice No. 514800 has been recorded incorrectly. Kindly review and correct.',
-    'Kindly provide the reason for not deducting ICT tax on this transaction.',
-    'Kindly clarify why the input tax for SRB has not been booked.',
-    'The 20% ICT tax withholding rule is not applicable to ISLB; kindly review the treatment applied.',
-    'Kindly share the written policy governing the treatment of sales tax on room-service food on behalf of Xanders.',
-    'The vendor is not registered for sales tax but has charged 18% GST on the invoice; sales tax is being withheld at 5% on the gross amount inclusive of GST. In our view, the 5% should be withheld on the base amount only. Kindly review.',
-    'Kindly confirm the applicable withholding rate under Section 153(1)(b) of the ITO and Schedule 2 (S.No. 34) of the PSTS Act 2012, given the nature of services rendered (Engineering/Architectural).',
-    "The vendor's status is inactive; kindly adjust the withholding tax treatment accordingly.",
-    'The withholding tax rate applied requires revision from 3% to 4%. Kindly rectify.',
-    'Kindly clarify the nature of the advance tax and the applicable section of the Income Tax Ordinance.',
+  { code:4, name:'Missing / Incomplete Supporting Documents', items: [
+    { label:'PR, Quotations, CSQ & PO required', text:'Kindly share the PR, Quotations, CSQ and PO in support of this transaction.' },
+    { label:'Engineering-endorsed inspection report required', text:'Kindly share the inspection report duly vetted and endorsed by the Engineering Department.' },
+    { label:'Original invoice not provided', text:'The original invoice has not been provided; kindly share the same for verification.' },
+    { label:'Guest Refund Ledger required', text:'Kindly share the Guest Refund Ledger to substantiate this transaction.' },
+    { label:'Guest refund transactions unsubstantiated — bank statement/CNIC required', text:"Guest refund transactions of PKR 36,100, PKR 25,126 and PKR 107,556 remain unsubstantiated in the absence of the FHS bank statement/ledger and the guest's CNIC copy. Kindly provide the supporting documentation." },
+    { label:'Inventory record required', text:'Kindly share the inventory record in support of this transaction.' },
+    { label:'Signed UAT not yet handed over', text:'The UAT has still not been formally handed over by the Finance Department despite repeated verbal requests. Kindly provide the signed UAT to enable release of payment.' },
+    { label:'Vehicle log book required', text:'Kindly provide the vehicle log book in support of this expense.' },
+    { label:'Fixed Asset Register required', text:'Kindly provide the Fixed Asset Register for verification.' },
+    { label:'AMC/rental contract or maintenance arrangement required', text:'Kindly provide the Repair & Maintenance/AMC contract, or details of any special maintenance arrangement, along with the rental agreement.' },
+    { label:'Advance vs payment unclear — no supporting documentation', text:'Kindly clarify whether the amount represents an advance or payment for completed work, as no supporting documentation is attached to the invoice.' },
   ]},
-  { code:6, name:'Expense Booked Against Wrong Head', items: [
-    'Kindly clarify the reason this expense has been booked under Head Office, given that the applicable branch code (Karachi) is 4321.',
-    'Asian Services provided calibration and environmental testing at the Lahore property but does not offer repair services; kindly book the payment under the correct account head.',
-    'Kindly book the withholding tax under the correct head of account.',
-    'Kindly confirm whether the Conveyance & Carriage expense should be classified under Cost of Sales or Administrative Expense.',
-    "Kindly review and revise the account head currently recorded as 'Mobile Allowance'.",
+  { code:5, name:'Payment Delays', items: [
+    { label:'Delay in submitting voucher to Systems & Audit', text:'Kindly provide the reason for the delay in submission of the voucher to Systems & Audit.' },
+    { label:'Delay releasing payment after invoice/GRN dated Sep-22', text:'The vendor invoice is dated 05-Sep-22 and the GRN 08-Sep-22; kindly clarify the reason for the delay in releasing payment to the vendor.' },
+    { label:'7-month gap between invoice and scheduled payment', text:'The vendor invoice is dated 12-May-2022, with payment scheduled only in Dec-2022. Kindly clarify the reason for this delay.' },
+    { label:'Undue delay in releasing payment', text:'Kindly clarify the reason for the undue delay in releasing this payment.' },
+    { label:'Significant delay in payment', text:'Kindly provide the reason for the significant delay in payment.' },
+    { label:'Delay in obtaining payment approval', text:'Kindly state the reason for the delay in obtaining payment approval.' },
+    { label:'Utility bills paid late — Rs 3,444 surcharge incurred', text:'Five utility bills were paid after the due date, resulting in a late-payment surcharge of Rs 3,444. No response has been received despite repeated reminders; kindly look into the matter.' },
+    { label:'Electricity bill paid late — Rs 491 surcharge incurred', text:'An electricity bill was paid after the due date, resulting in a late-payment surcharge of Rs 491. Kindly provide the reason.' },
   ]},
-  { code:7, name:'Errors in Data Entry, Typing and Calculation', items: [
-    "Ms. Nimrah Khan's daily allowance claim reflects 4 days; this appears to be an error, as the correct entitlement is 3 days. Kindly review.",
-    "Mr. Azam's daily allowance has been claimed for 4 days against an entitlement of 3.5 days. As per policy, a full day's allowance applies only where 8 or more hours are spent outstation; Mr. Azam has claimed a full day for 7.5 hours. Kindly review.",
-    "Mr. Zaki Ali's travel claim of Rs 38,156 does not reflect the applicable fuel rate of Rs 276.50 for the period 16-Feb-2024 to 29-Feb-2024; the recalculated claim amounts to Rs 34,102. Kindly rectify the voucher accordingly.",
-    'A typing error is noted: the cheque is drawn for Rs 7,545, while the voucher total reflects Rs 7,525. Kindly rectify.',
-    'Kindly amend the voucher amount in line with the invoice, from Rs 8,650 to Rs 8,950.',
-    'Kindly rectify the bill amount as discussed.',
+  { code:6, name:'Tax & Withholding Issues', items: [
+    { label:'Sales tax not withheld despite registration', text:'FHS is registered for sales tax; kindly clarify the reason for not withholding sales tax on this transaction.' },
+    { label:'Internet services WHT applied at 4% instead of 6%', text:'Income tax on internet services is applicable at 6%, whereas withholding is being applied at 4%. Kindly rectify.' },
+    { label:'Input tax recorded incorrectly against invoice', text:'Input tax booked against invoice No. 514800 has been recorded incorrectly. Kindly review and correct.' },
+    { label:'ICT tax not deducted', text:'Kindly provide the reason for not deducting ICT tax on this transaction.' },
+    { label:'SRB input tax not booked', text:'Kindly clarify why the input tax for SRB has not been booked.' },
+    { label:'ICT withholding rule wrongly applied to ISLB', text:'The 20% ICT tax withholding rule is not applicable to ISLB; kindly review the treatment applied.' },
+    { label:'Sales tax policy on room-service food required', text:'Kindly share the written policy governing the treatment of sales tax on room-service food on behalf of Xanders.' },
+    { label:'Sales tax withheld on gross (incl. GST) instead of base amount', text:'The vendor is not registered for sales tax but has charged 18% GST on the invoice; sales tax is being withheld at 5% on the gross amount inclusive of GST. In our view, the 5% should be withheld on the base amount only. Kindly review.' },
+    { label:'Confirm WHT rate under Section 153(1)(b) / PSTS Act', text:'Kindly confirm the applicable withholding rate under Section 153(1)(b) of the ITO and Schedule 2 (S.No. 34) of the PSTS Act 2012, given the nature of services rendered (Engineering/Architectural).' },
+    { label:'Vendor status inactive — WHT treatment needs adjustment', text:"The vendor's status is inactive; kindly adjust the withholding tax treatment accordingly." },
+    { label:'WHT rate needs revision from 3% to 4%', text:'The withholding tax rate applied requires revision from 3% to 4%. Kindly rectify.' },
+    { label:'Nature of advance tax / applicable ITO section unclear', text:'Kindly clarify the nature of the advance tax and the applicable section of the Income Tax Ordinance.' },
   ]},
-  { code:8, name:'Discrepancies in Employee Advances and Allowances', items: [
-    "Per Clause 18.2 of the HR Manual, TADA already covers laundry, refreshments and meals. As Mr. Shahrukh's TADA for the Hunza visit has already been released, the separate food claim submitted by Mr. Didar for the same visit is not admissible.",
-    "Following adjustment of Mr. Basit's advance against the Hunza Phase 2 travel policy, an amount of Rs 7,500 remains recoverable from him. Kindly action accordingly.",
-    'The applicable entitlement is a fixed allowance of Rs 4,000; actual food bills are not admissible for reimbursement.',
+  { code:7, name:'Wrong Expense Head / Classification', items: [
+    { label:'Expense booked under Head Office instead of Karachi branch', text:'Kindly clarify the reason this expense has been booked under Head Office, given that the applicable branch code (Karachi) is 4321.' },
+    { label:'Payment booked under wrong service head', text:'Asian Services provided calibration and environmental testing at the Lahore property but does not offer repair services; kindly book the payment under the correct account head.' },
+    { label:'Withholding tax booked under wrong head', text:'Kindly book the withholding tax under the correct head of account.' },
+    { label:'Conveyance & Carriage — classification unclear', text:'Kindly confirm whether the Conveyance & Carriage expense should be classified under Cost of Sales or Administrative Expense.' },
+    { label:"'Mobile Allowance' head needs review", text:"Kindly review and revise the account head currently recorded as 'Mobile Allowance'." },
   ]},
-  { code:9, name:'Miscellaneous Observations', items: [
-    'Hotel expenses can be recorded through the accounting module of Munshi, the software installed at FHS; kindly action accordingly.',
-    "As the employer bears the cost of social security contributions, it is the employer's responsibility to ensure employees are duly registered so they may access the associated benefits.",
-    'Kindly provide the reason a Service Level Agreement has not been executed with Steam Masters.',
-    'Kindly share the scope of work included under the Hot Water Heater maintenance services.',
-    'Kindly record, in the ledger, the excess amounts receivable from employees that are to be deducted from their salaries.',
-    'The daily wage of Rs 800 should be excluded from the reimbursement claim.',
-    'Kindly provide the fuel tank capacity of vehicle registration LEE-19-3266.',
-    'Kindly clarify whether the amount represents an advance or payment for completed work, as no supporting documentation is attached to the invoice.',
-    'Kindly provide the legal opinion pertaining to the attached ICT letter.',
-    'Kindly provide HR\'s approval confirming that employees earning above Rs 25,000 are eligible for PESSI.',
-    "Kindly provide HR's confirmation that employees are insured through PESSI rather than through a company-arranged policy.",
-    'The final settlement was not prepared in accordance with HR policy regarding encashment of casual and annual leave. Kindly review.',
+  { code:8, name:'Data Entry & Calculation Errors', items: [
+    { label:'Inconsistent units of measurement recorded', text:"Units of measurement recorded in the system are inconsistent — for instance, bananas are recorded in 'each' while mint is recorded in 'kg'. Kindly standardize." },
+    { label:'Daily allowance claimed for 4 days vs 3-day entitlement', text:"Ms. Nimrah Khan's daily allowance claim reflects 4 days; this appears to be an error, as the correct entitlement is 3 days. Kindly review." },
+    { label:"Full day's allowance claimed for 7.5 outstation hours", text:"Mr. Azam's daily allowance has been claimed for 4 days against an entitlement of 3.5 days. As per policy, a full day's allowance applies only where 8 or more hours are spent outstation; Mr. Azam has claimed a full day for 7.5 hours. Kindly review." },
+    { label:"Travel claim doesn't reflect applicable fuel rate", text:"Mr. Zaki Ali's travel claim of Rs 38,156 does not reflect the applicable fuel rate of Rs 276.50 for the period 16-Feb-2024 to 29-Feb-2024; the recalculated claim amounts to Rs 34,102. Kindly rectify the voucher accordingly." },
+    { label:"Cheque amount doesn't match voucher total", text:'A typing error is noted: the cheque is drawn for Rs 7,545, while the voucher total reflects Rs 7,525. Kindly rectify.' },
+    { label:"Voucher amount doesn't match invoice", text:'Kindly amend the voucher amount in line with the invoice, from Rs 8,650 to Rs 8,950.' },
+    { label:'Bill amount to be rectified as discussed', text:'Kindly rectify the bill amount as discussed.' },
+  ]},
+  { code:9, name:'Employee Advances, Allowances & Benefits', items: [
+    { label:'Separate food claim not admissible — already covered by TADA', text:"Per Clause 18.2 of the HR Manual, TADA already covers laundry, refreshments and meals. As Mr. Shahrukh's TADA for the Hunza visit has already been released, the separate food claim submitted by Mr. Didar for the same visit is not admissible." },
+    { label:'Rs 7,500 remains recoverable from employee advance', text:"Following adjustment of Mr. Basit's advance against the Hunza Phase 2 travel policy, an amount of Rs 7,500 remains recoverable from him. Kindly action accordingly." },
+    { label:'Actual food bills claimed against fixed allowance', text:'The applicable entitlement is a fixed allowance of Rs 4,000; actual food bills are not admissible for reimbursement.' },
+    { label:'List of employees claiming late-sitting food charges', text:'Kindly confirm the list of employees against whom late-sitting food charges have been claimed.' },
+    { label:'Employer responsible for employee social security registration', text:"As the employer bears the cost of social security contributions, it is the employer's responsibility to ensure employees are duly registered so they may access the associated benefits." },
+    { label:'Daily wage wrongly included in reimbursement claim', text:'The daily wage of Rs 800 should be excluded from the reimbursement claim.' },
+    { label:'HR approval for PESSI eligibility above Rs 25,000', text:"Kindly provide HR's approval confirming that employees earning above Rs 25,000 are eligible for PESSI." },
+    { label:'Confirm employees insured via PESSI, not company policy', text:"Kindly provide HR's confirmation that employees are insured through PESSI rather than through a company-arranged policy." },
+    { label:'Leave encashment not per HR policy in final settlement', text:'The final settlement was not prepared in accordance with HR policy regarding encashment of casual and annual leave. Kindly review.' },
+  ]},
+  { code:10, name:'Contracts, Agreements & Asset Records', items: [
+    { label:'SLA not executed with vendor', text:'Kindly provide the reason a Service Level Agreement has not been executed with Steam Masters.' },
+    { label:'Scope of work for maintenance services required', text:'Kindly share the scope of work included under the Hot Water Heater maintenance services.' },
+    { label:'Excess amounts receivable from employees not recorded', text:'Kindly record, in the ledger, the excess amounts receivable from employees that are to be deducted from their salaries.' },
+    { label:'Vehicle fuel tank capacity required', text:'Kindly provide the fuel tank capacity of vehicle registration LEE-19-3266.' },
+  ]},
+  { code:11, name:'Other / Administrative', items: [
+    { label:'Use Munshi accounting module for hotel expenses', text:'Hotel expenses can be recorded through the accounting module of Munshi, the software installed at FHS; kindly action accordingly.' },
+    { label:'Legal opinion on ICT letter required', text:'Kindly provide the legal opinion pertaining to the attached ICT letter.' },
   ]},
 ];
 const OBS_CATEGORIES = OBS_BANK.map(c => ({ code: c.code, name: c.name }));
@@ -648,7 +683,7 @@ const FOLLOWUP_STATUSES = ['Pending Reply','Replied','Not Satisfactory','Resolve
 /* This file ships with no sample/demo data — every voucher and observation below is entered by the user. */
 const SEED_VOUCHERS = [];
 
-let state = { vouchers: [] };
+let state = { vouchers: [], customBank: [] };
 let editingVoucherId = null;
 let editingObsId = null;
 let pendingObsOpts = {};
@@ -660,9 +695,14 @@ function load() {
   let raw = null;
   try { raw = localStorage.getItem(STORAGE_KEY); } catch(e) {}
   if (raw) {
-    try { state = JSON.parse(raw); if (!Array.isArray(state.vouchers)) state.vouchers = []; return; } catch(e) {}
+    try {
+      state = JSON.parse(raw);
+      if (!Array.isArray(state.vouchers)) state.vouchers = [];
+      if (!Array.isArray(state.customBank)) state.customBank = [];
+      return;
+    } catch(e) {}
   }
-  state = { vouchers: SEED_VOUCHERS.map((v,i) => Object.assign({ id: uid(), srNo: i+1, postAuditDate:'', postAuditReceivedDate:'', observations: [] }, v)) };
+  state = { vouchers: SEED_VOUCHERS.map((v,i) => Object.assign({ id: uid(), srNo: i+1, postAuditDate:'', postAuditReceivedDate:'', observations: [] }, v)), customBank: [] };
   save();
 }
 function save() {
@@ -670,8 +710,8 @@ function save() {
 }
 
 function resetAllData() {
-  if (!confirm('This will permanently erase every voucher and observation stored in this browser. Continue?')) return;
-  state = { vouchers: [] };
+  if (!confirm('This will permanently erase every voucher and observation stored in this browser. Your saved Observation Bank entries will be kept. Continue?')) return;
+  state = { vouchers: [], customBank: state.customBank || [] };
   save();
   renderAll();
 }
@@ -903,14 +943,19 @@ function clearObsFilters() {
 function populateBankCategorySelect() {
   const sel = document.getElementById('bank-category');
   if (!sel) return;
-  sel.innerHTML = '<option value="">All Categories</option>' +
-    OBS_BANK.map(c => `<option value="${c.code}">${c.code} — ${escHtml(c.name)}</option>`).join('');
+  const cur = sel.value;
+  let opts = '<option value="">All Categories</option>';
+  if ((state.customBank||[]).length) opts += '<option value="custom">★ My Saved Observations</option>';
+  opts += OBS_BANK.map(c => `<option value="${c.code}">${c.code} — ${escHtml(c.name)}</option>`).join('');
+  sel.innerHTML = opts;
+  sel.value = cur;
 }
 function openObsBankPicker(opts) {
   if (!state.vouchers.length) { alert('Please create a voucher first, then add an observation to it.'); return; }
   pendingObsOpts = opts || {};
   document.getElementById('bank-search').value = '';
   document.getElementById('bank-category').value = '';
+  populateBankCategorySelect();
   renderObsBankList();
   document.getElementById('obs-bank-modal').classList.add('open');
 }
@@ -922,23 +967,65 @@ function renderObsBankList() {
   const catFilter = document.getElementById('bank-category').value;
   const wrap = document.getElementById('obs-bank-list');
   let html = '';
-  OBS_BANK.forEach(cat => {
-    if (catFilter && String(cat.code) !== catFilter) return;
+  const matchesSearch = item => !search || (item.label + ' ' + item.text).toLowerCase().includes(search);
+
+  if (!catFilter || catFilter === 'custom') {
+    const custom = state.customBank || [];
     const matches = [];
-    cat.items.forEach((text, idx) => { if (!search || text.toLowerCase().includes(search)) matches.push(idx); });
-    if (!matches.length) return;
-    html += `<div class="bank-cat-head">${cat.code} — ${escHtml(cat.name)}</div>`;
-    html += matches.map(idx =>
-      `<button type="button" class="bank-item-btn" onclick="chooseBankObservation(${cat.code}, ${idx})">${escHtml(cat.items[idx])}</button>`
-    ).join('');
-  });
+    custom.forEach((item, idx) => { if (matchesSearch(item)) matches.push(idx); });
+    if (matches.length) {
+      html += '<div class="bank-cat-head">★ My Saved Observations</div>';
+      html += matches.map(idx => `
+        <div class="bank-item-row">
+          <button type="button" class="bank-item-btn" title="${escAttr(custom[idx].text)}" onclick="chooseBankObservation('custom', ${idx})">${escHtml(custom[idx].label)}</button>
+          <button type="button" class="bank-item-remove" title="Remove from bank" onclick="removeCustomBankItem(${idx})">&times;</button>
+        </div>`).join('');
+    }
+  }
+
+  if (catFilter !== 'custom') {
+    OBS_BANK.forEach(cat => {
+      if (catFilter && String(cat.code) !== catFilter) return;
+      const matches = [];
+      cat.items.forEach((item, idx) => { if (matchesSearch(item)) matches.push(idx); });
+      if (!matches.length) return;
+      html += `<div class="bank-cat-head">${cat.code} — ${escHtml(cat.name)}</div>`;
+      html += matches.map(idx =>
+        `<button type="button" class="bank-item-btn" title="${escAttr(cat.items[idx].text)}" onclick="chooseBankObservation(${cat.code}, ${idx})">${escHtml(cat.items[idx].label)}</button>`
+      ).join('');
+    });
+  }
+
   wrap.innerHTML = html || '<div class="empty-note">No matching observations. Try a different search, or write a new one below.</div>';
 }
 function chooseBankObservation(code, idx) {
-  const cat = OBS_BANK.find(c => c.code === code);
-  const text = cat.items[idx];
+  let text, obsTypeName;
+  if (code === 'custom') {
+    const item = (state.customBank||[])[idx];
+    if (!item) return;
+    text = item.text;
+    obsTypeName = item.obsType || '';
+  } else {
+    const cat = OBS_BANK.find(c => c.code === code);
+    text = cat.items[idx].text;
+    obsTypeName = cat.name;
+  }
   closeObsBankModal();
-  openObsModal(null, Object.assign({}, pendingObsOpts, { presetDescription: text, presetObsType: cat.name }));
+  openObsModal(null, Object.assign({}, pendingObsOpts, { presetDescription: text, presetObsType: obsTypeName }));
+}
+function removeCustomBankItem(idx) {
+  if (!confirm('Remove this saved observation from your bank?')) return;
+  state.customBank.splice(idx, 1);
+  save();
+  populateBankCategorySelect();
+  renderObsBankList();
+}
+function saveObservationToCustomBank(text, obsType) {
+  if (!state.customBank) state.customBank = [];
+  if (state.customBank.some(it => it.text === text)) return;
+  const labelInput = document.getElementById('o-bankLabel').value.trim();
+  const label = labelInput || truncate(text, 70);
+  state.customBank.push({ id: uid(), label, text, obsType: obsType || '' });
 }
 function chooseNewObservationManually() {
   closeObsBankModal();
@@ -1239,6 +1326,9 @@ function openObsModal(id, opts) {
   document.getElementById('o-description').value = obs.description || '';
   document.getElementById('o-instances').value = obs.instances || 1;
   document.getElementById('o-amount').value = obs.amount ?? '';
+  document.getElementById('o-saveToBank').checked = false;
+  document.getElementById('o-bankLabel').value = '';
+  document.getElementById('o-bankLabelWrap').style.display = 'none';
 
   const statusSel = document.getElementById('o-status');
   statusSel.innerHTML = OBS_STATUSES.map(s => `<option ${s===obs.status?'selected':''}>${s}</option>`).join('');
@@ -1366,6 +1456,10 @@ function saveObservation() {
     if (!handled) targetVoucher.observations.push(Object.assign({ id: uid() }, payload));
   } else {
     targetVoucher.observations.push(Object.assign({ id: uid() }, payload));
+  }
+
+  if (document.getElementById('o-saveToBank').checked) {
+    saveObservationToCustomBank(description, payload.obsType);
   }
 
   save();
@@ -1588,6 +1682,7 @@ function importBackup(evt) {
       const parsed = JSON.parse(reader.result);
       if (!parsed || !Array.isArray(parsed.vouchers)) throw new Error('bad format');
       if (!confirm(`Restore ${parsed.vouchers.length} vouchers from this backup? This replaces all current data.`)) return;
+      if (!Array.isArray(parsed.customBank)) parsed.customBank = [];
       state = parsed;
       save();
       renderAll();
