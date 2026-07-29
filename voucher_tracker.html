@@ -22,6 +22,7 @@
     border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer;
     font-size: 12px; font-weight: 600; white-space: nowrap;
   }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
   .btn-gold { background: #c9962a; color: #1a3a5c; }
   .btn-gold:hover { background: #e0ac3d; }
   .btn-outline { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.4); }
@@ -125,8 +126,9 @@
     z-index: 500; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 30px 12px;
   }
   .modal-overlay.open { display: flex; }
+  #obs-modal { z-index: 600; }
   .modal-box {
-    background: #fff; border-radius: 10px; width: 100%; max-width: 880px; box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    background: #fff; border-radius: 10px; width: 100%; max-width: 900px; box-shadow: 0 10px 40px rgba(0,0,0,0.3);
   }
   .modal-head {
     background: #1a3a5c; color: #fff; padding: 14px 20px; border-radius: 10px 10px 0 0;
@@ -146,18 +148,22 @@
   textarea { resize: vertical; min-height: 34px; }
 
   .obs-round {
-    border: 1px solid #dde3ec; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; background: #fbfcfe;
+    border: 1px solid #dde3ec; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; background: #fbfcfe;
   }
-  .obs-round-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .obs-round-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 10px; }
   .obs-round-head strong { color: #1a3a5c; font-size: 12.5px; }
   .reason-cbs { display: flex; gap: 14px; align-items: center; padding-top: 4px; }
   .reason-cbs label { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; text-transform: none; color: #334; }
   .reason-cbs input[type=checkbox] { width: auto; }
 
-  #btn-add-round { margin-bottom: 4px; }
+  #followup-body td { vertical-align: top; }
+  #followup-body input, #followup-body select, #followup-body textarea { width: 100%; }
+  #followup-body textarea { min-height: 30px; font-size: 12px; }
+  .fu-ref-cell { font-weight: 700; color: #1a3a5c; font-size: 12px; white-space: nowrap; }
 
   .legend-box { background: #fff; border: 1px solid #dde3ec; border-radius: 8px; padding: 16px 18px; }
-  .legend-box h4 { color: #1a3a5c; font-size: 13px; margin-bottom: 8px; }
+  .legend-box h4 { color: #1a3a5c; font-size: 13px; margin-bottom: 8px; margin-top: 14px; }
+  .legend-box h4:first-child { margin-top: 0; }
   .legend-box p { font-size: 12.5px; color: #445; line-height: 1.6; margin-bottom: 8px; }
   .legend-box ul { margin: 0 0 10px 18px; font-size: 12.5px; color: #445; line-height: 1.7; }
 
@@ -188,13 +194,14 @@
     <button class="btn btn-outline" onclick="document.getElementById('import-file').click()">Restore</button>
     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importBackup(event)">
     <button class="btn btn-outline" onclick="window.print()">Print</button>
-    <button class="btn btn-danger" onclick="resetAllData()">Reset</button>
+    <button class="btn btn-danger" onclick="resetAllData()">Clear All Data</button>
   </div>
 </div>
 
 <div id="tabbar">
   <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">Dashboard</button>
   <button class="tab-btn" data-tab="register" onclick="switchTab('register')">Voucher Register</button>
+  <button class="tab-btn" data-tab="observations" onclick="switchTab('observations')">Observations</button>
   <button class="tab-btn" data-tab="deductions" onclick="switchTab('deductions')">Deductions Report</button>
   <button class="tab-btn" data-tab="outstanding" onclick="switchTab('outstanding')">Outstanding Observations</button>
   <button class="tab-btn" data-tab="about" onclick="switchTab('about')">Legend</button>
@@ -207,7 +214,7 @@
     <div class="section-title">Overview</div>
     <div class="stat-grid" id="dash-stats"></div>
 
-    <div class="section-title">Breakdown</div>
+    <div class="section-title">Voucher Breakdown</div>
     <div class="grid-2">
       <div class="card breakdown-block"><h4>By Status</h4><div id="bd-status"></div></div>
       <div class="card breakdown-block"><h4>By Company</h4><div id="bd-company"></div></div>
@@ -215,6 +222,12 @@
     <div class="grid-2" style="margin-top:14px;">
       <div class="card breakdown-block"><h4>By Voucher Type</h4><div id="bd-vtype"></div></div>
       <div class="card breakdown-block"><h4>By Nature</h4><div id="bd-nature"></div></div>
+    </div>
+
+    <div class="section-title">Observation Breakdown</div>
+    <div class="grid-2">
+      <div class="card breakdown-block"><h4>By Observation Status</h4><div id="bd-obsstatus"></div></div>
+      <div class="card breakdown-block"><h4>By Observation Type</h4><div id="bd-obstype"></div></div>
     </div>
   </div>
 
@@ -241,6 +254,30 @@
     </div>
   </div>
 
+  <!-- OBSERVATIONS -->
+  <div class="tab-pane" id="pane-observations">
+    <div class="filter-bar no-print">
+      <div class="fld grow">
+        <label>Search</label>
+        <input type="text" id="obs-search" placeholder="Ref #, voucher no, description..." oninput="renderObservationsTab()">
+      </div>
+      <div class="fld"><label>Company</label><select id="obs-company" onchange="renderObservationsTab()"><option value="">All</option></select></div>
+      <div class="fld"><label>Status</label><select id="obs-status" onchange="renderObservationsTab()"><option value="">All</option></select></div>
+      <div class="fld"><button class="btn btn-outline" style="color:#1a3a5c;border-color:#1a3a5c" onclick="clearObsFilters()">Clear</button></div>
+      <div class="fld"><button class="btn btn-gold" onclick="openNewObservation()">+ New Observation</button></div>
+      <div class="fld"><button class="btn btn-outline" style="color:#1a3a5c;border-color:#1a3a5c" onclick="exportObservationsCSV()">Export CSV</button></div>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead><tr>
+          <th>Ref #</th><th>Voucher</th><th>Company</th><th>Obs. Date</th><th>OBS Code</th><th>Description</th>
+          <th class="num">Deduction (Rs.)</th><th>Status</th><th>Re-referred</th><th class="col-actions">Actions</th>
+        </tr></thead>
+        <tbody id="obs-body"></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- DEDUCTIONS -->
   <div class="tab-pane" id="pane-deductions">
     <div class="filter-bar no-print">
@@ -259,8 +296,8 @@
     <div class="table-scroll">
       <table class="data-table">
         <thead><tr>
-          <th>Voucher</th><th>Company</th><th>Party</th><th>Obs. Date</th><th>Ref #</th>
-          <th>Reason</th><th class="num">Deduction (Rs.)</th><th class="num">Financial Impact (Rs.)</th><th>Response</th>
+          <th>Ref #</th><th>Voucher</th><th>Company</th><th>Party</th><th>Obs. Date</th>
+          <th>Reason</th><th class="num">Deduction (Rs.)</th><th class="num">Financial Impact (Rs.)</th><th>Latest Reply</th>
         </tr></thead>
         <tbody id="ded-body"></tbody>
       </table>
@@ -276,8 +313,8 @@
     <div class="table-scroll">
       <table class="data-table">
         <thead><tr>
-          <th>Voucher</th><th>Company</th><th>Party</th><th>Observation Date</th><th>Observation Type</th>
-          <th>Description</th><th>Query Date</th><th>Query Date 2</th><th class="num">Days Pending</th>
+          <th>Ref #</th><th>Voucher</th><th>Company</th><th>Party</th><th>Observation Type</th>
+          <th>Description</th><th>Last Referred</th><th>Re-referrals</th><th class="num">Days Pending</th>
         </tr></thead>
         <tbody id="out-body"></tbody>
       </table>
@@ -287,7 +324,7 @@
   <!-- ABOUT -->
   <div class="tab-pane" id="pane-about">
     <div class="legend-box">
-      <h4>Status Meanings</h4>
+      <h4>Voucher Status Meanings</h4>
       <ul>
         <li><b>In Hand</b> — voucher received, not yet reviewed.</li>
         <li><b>Sample Out</b> — voucher pulled out for audit sampling / review.</li>
@@ -299,10 +336,30 @@
         <li><b>Mudasir / Chugtai Sb</b> — pending with the named reviewer for decision.</li>
         <li><b>Cancel Payment</b> — payment cancelled / voucher withdrawn.</li>
       </ul>
+
+      <h4>Raising, Replying To &amp; Re-referring an Observation</h4>
+      <p>The <b>Observations</b> tab is where every audit query against a voucher is raised and tracked, modelled on the "Audit Observation / Receiving" memo: it captures who it was sent <b>To</b> (the voucher's company), a <b>Reference No.</b>, the <b>Voucher #</b>, receiving and bill-forwarding dates, the amount involved, who <b>checked</b> it, and the observation text itself.</p>
+      <p>Every observation keeps its own <b>Reply / Follow-up History</b>. When the first reply comes in, record it directly against that entry. If the reply is incomplete or unsatisfactory, click <b>+ Re-refer (Request Another Reply)</b> — this adds a new row referencing the same observation (numbered <code>-R1</code>, <code>-R2</code>, ...) so the observation can be sent back for a fresh response as many times as needed, with the full back-and-forth kept on one record.</p>
+
+      <h4>OBS Code</h4>
+      <p>OBS Code mirrors the audit's standard observation categories (2–9 below); selecting an <b>Observation Type</b> auto-fills the matching code, which can still be overridden.</p>
+      <ul>
+        <li>2 — PMC Discrepancies Regarding Vendor Registration, RFQs and Budgetary Matters</li>
+        <li>3 — Timelines of Execution, Incomplete, Erroneous or Missing Supporting Data</li>
+        <li>4 — Late Payments</li>
+        <li>5 — Tax Related Issues</li>
+        <li>6 — Expense Booked Against Wrong Head</li>
+        <li>7 — Errors in Data Entry, Typing and Calculation</li>
+        <li>8 — Discrepancies in Employee Advances and Allowances</li>
+        <li>9 — Miscellaneous Observations</li>
+      </ul>
+
       <h4>Deduction Reasons</h4>
       <p>Every observation that results in a financial impact records why the amount was reduced: a <b>Quantity</b> discrepancy, a <b>Rate</b> discrepancy, or <b>Other</b> reason (e.g. missing support, tax withholding, policy non-compliance). More than one reason may apply to the same observation.</p>
+
       <h4>Reference Number Format</h4>
-      <p>Observation references follow <code>MMYYNNNN</code>, e.g. <code>07260001</code> = July 2026, observation #0001.</p>
+      <p>Observation references follow <code>MMYYNNNN</code>, e.g. <code>07260001</code> = July 2026, observation #0001. Re-referrals of the same observation are suffixed, e.g. <code>07260001-R1</code>.</p>
+
       <h4>Data storage</h4>
       <p>All data is saved locally in this browser (localStorage). Use <b>Backup (JSON)</b> regularly and <b>Restore</b> to move data between machines or browsers — clearing browser data will erase unsaved records.</p>
     </div>
@@ -357,10 +414,10 @@
         <div class="fld"><label>Post Audit Voucher Received On</label><input type="date" id="v-postAuditReceivedDate"></div>
       </div>
 
-      <div class="section-title">Observations, Reply &amp; Deduction Tracking</div>
-      <div class="hint">Log every observation raised against this voucher, the query/response cycle, and any resulting deduction — one entry per round.</div>
-      <div id="obs-rounds-container"></div>
-      <button class="btn btn-outline" id="btn-add-round" style="color:#1a3a5c;border-color:#1a3a5c" onclick="addObsRound()">+ Add Observation</button>
+      <div class="section-title">Observations</div>
+      <div class="hint" id="voucher-obs-hint" style="display:none">Save this voucher first, then use "+ New Observation" to raise one against it.</div>
+      <div id="voucher-obs-list"></div>
+      <button class="btn btn-outline" id="btn-voucher-new-obs" style="color:#1a3a5c;border-color:#1a3a5c" onclick="openObsModal(null, { voucherId: editingVoucherId })">+ New Observation</button>
     </div>
     <div class="modal-foot">
       <button class="btn btn-outline" style="color:#1a3a5c;border-color:#1a3a5c" onclick="closeVoucherModal()">Cancel</button>
@@ -370,36 +427,98 @@
   </div>
 </div>
 
-<datalist id="obs-type-list">
-  <option value="PMC Discrepancies Regarding Vendor Registration, RFQs and Budgetary Matters">
-  <option value="Timelines of Execution, Incomplete, Erroneous or Missing Supporting Data">
-  <option value="Late Payments">
-  <option value="Tax Related Issues">
-  <option value="Expense Booked Against Wrong Head">
-  <option value="Errors in Data Entry, Typing and Calculation">
-  <option value="Discrepancies in Employee Advances and Allowances">
-  <option value="Miscellaneous Observations">
-</datalist>
+<!-- OBSERVATION MODAL (based on the "Audit Observation / Receiving" memo format) -->
+<div class="modal-overlay" id="obs-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="obs-modal-title">New Observation</h3>
+      <button class="x-close" onclick="closeObsModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="fld span2"><label>Voucher (To)</label><select id="o-voucherId"></select></div>
+        <div class="fld"><label>Reference No.</label><input type="text" id="o-ref" placeholder="07260001" oninput="updateFollowupRefCells()"></div>
+
+        <div class="fld"><label>Observation (Receiving) Date</label><input type="date" id="o-obsDate"></div>
+        <div class="fld"><label>Bill Fwd. Date</label><input type="date" id="o-billFwdDate"></div>
+        <div class="fld"><label>Checked By</label><input type="text" id="o-checkedBy" placeholder="e.g. KS/AM"></div>
+
+        <div class="fld span2"><label>Observation Type</label><select id="o-obsType" onchange="onObsTypeChange()"></select></div>
+        <div class="fld"><label>OBS Code</label><input type="text" id="o-obsCode"></div>
+
+        <div class="fld span3"><label>Observation(s)</label><textarea id="o-description" placeholder="Describe the observation raised"></textarea></div>
+
+        <div class="fld"><label>No. of Instances</label><input type="number" id="o-instances" min="1" value="1"></div>
+        <div class="fld"><label>Amount Involved (Rs.)</label><input type="number" id="o-amount" step="0.01"></div>
+        <div class="fld"><label>Status</label><select id="o-status"></select></div>
+
+        <div class="fld span2">
+          <label>Deduction Reason</label>
+          <div class="reason-cbs">
+            <label><input type="checkbox" id="o-reasonQty"> Quantity</label>
+            <label><input type="checkbox" id="o-reasonRate"> Rate</label>
+            <label><input type="checkbox" id="o-reasonOther"> Other</label>
+          </div>
+        </div>
+        <div class="fld"><label>Finalized Amount (Rs.)</label><input type="number" id="o-finalizedAmount" step="0.01"></div>
+
+        <div class="fld span2"><label>Other Reason (if applicable)</label><input type="text" id="o-otherReasonText"></div>
+        <div class="fld"><label>Financial Impact (Reduction) Rs.</label><input type="number" id="o-financialImpactReduction" step="0.01"></div>
+
+        <div class="fld"><label>Financial Impact (Total) Rs.</label><input type="number" id="o-financialImpact" step="0.01"></div>
+      </div>
+
+      <div class="section-title">Reply / Follow-up History</div>
+      <div class="hint">Log the reply each time one is received. If it isn't satisfactory, re-refer the observation to request another reply.</div>
+      <div class="table-scroll"><table class="data-table">
+        <thead><tr><th>Ref</th><th>Date Referred</th><th>Reply / Comments</th><th>Reply Date</th><th>Status</th><th class="no-print"></th></tr></thead>
+        <tbody id="followup-body"></tbody>
+      </table></div>
+      <button class="btn btn-outline" style="color:#1a3a5c;border-color:#1a3a5c;margin-top:10px" onclick="addFollowup()">+ Re-refer (Request Another Reply)</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" style="color:#1a3a5c;border-color:#1a3a5c" onclick="closeObsModal()">Cancel</button>
+      <button class="btn btn-danger" id="btn-delete-obs" style="display:none" onclick="deleteCurrentObservation()">Delete Observation</button>
+      <button class="btn btn-gold" onclick="saveObservation()">Save Observation</button>
+    </div>
+  </div>
+</div>
 
 <script>
-const STORAGE_KEY = 'ks_voucher_tracker_v1';
+const STORAGE_KEY = 'ks_voucher_tracker_v2';
 const COMPANIES = ['BPS','ECD','PDLC','PTSL','KASALIN FOODS'];
 const VTYPES = ['BP','JV'];
 const NATURES = ['Advance','Payment','Adjustment','Reimbursement','Receipt'];
 const STATUSES = ['In Hand','Sample Out','Observation','Checked - In Hand','Released','Post Audit','Post Audit - In Hand','Mudasir / Chugtai Sb','Cancel Payment'];
 
-const SEED_VOUCHERS = [{"voucherType": "BP", "voucherNo": "17", "company": "BPS", "nature": "Payment", "partyName": "Hira Nadir", "narration": "", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "19", "company": "BPS", "nature": "Payment", "partyName": "Quratulain Ali", "narration": "", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "JV", "voucherNo": "18", "company": "PDLC", "nature": "Adjustment", "partyName": "EOBI Contribution MFO May 26", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "16", "company": "BPS", "nature": "Payment", "partyName": "M Amin  M Tufail", "narration": "Guard off Salary", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "25", "company": "BPS", "nature": "Payment", "partyName": "Zain ul Abdin", "narration": "", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "11", "company": "BPS", "nature": "Payment", "partyName": "Rehman Ali Shah", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "33", "company": "BPS", "nature": "Payment", "partyName": "PSP Project", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "12", "company": "BPS", "nature": "Payment", "partyName": "EOBI Contribution MFO May 26", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "20", "company": "BPS", "nature": "Payment", "partyName": "DHA Membership Fee", "narration": "", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "21", "company": "PDLC", "nature": "Payment", "partyName": "PRA  Payment FMO  May 26", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "19", "company": "PDLC", "nature": "Payment", "partyName": "Federal Sales Tax FMO May 26", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "20", "company": "PDLC", "nature": "Payment", "partyName": "Director General KPRA", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "59", "company": "PDLC", "nature": "Payment", "partyName": "PSSP Project PDLC", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "6", "company": "BPS", "nature": "Payment", "partyName": "Ali Mahmud Kasuri", "narration": "Synergy", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "70", "company": "BPS", "nature": "Payment", "partyName": "Alpha Homes", "narration": "", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "5", "company": "BPS", "nature": "Payment", "partyName": "Nasir Mahmud", "narration": "Gree Invertor", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "3", "company": "BPS", "nature": "Payment", "partyName": "Ali Mahmud Kasuri", "narration": "Hira Nadir", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "1", "company": "BPS", "nature": "Payment", "partyName": "50% Advance  Hira Nadir", "narration": "", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "34", "company": "BPS", "nature": "Payment", "partyName": "LESCO", "narration": "Electricity Bill", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "36", "company": "BPS", "nature": "Payment", "partyName": "Zain ul Abdin", "narration": "Appeal for Default Surcharge", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "40", "company": "BPS", "nature": "Payment", "partyName": "Matchless Tours and Travels Pvt Ltd", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "1", "company": "BPS", "nature": "Payment", "partyName": "Deputy Commisiioner Income Tax Lahore", "narration": "WHT 153", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "57", "company": "BPS", "nature": "Payment", "partyName": "Zain ul Abdin", "narration": "legal and professional exp", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "60", "company": "BPS", "nature": "Payment", "partyName": "Deputy Commisiioner Income Tax Lahore", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "34", "company": "BPS", "nature": "Payment", "partyName": "Mansoor iqbal", "narration": "Advance Salary", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "30", "company": "BPS", "nature": "Payment", "partyName": "Ali Mahmud Kasuri", "narration": "", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "27", "company": "BPS", "nature": "Payment", "partyName": "RD  ESL", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "32", "company": "BPS", "nature": "Payment", "partyName": "Membership Fee", "narration": "Land", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "29", "company": "BPS", "nature": "Payment", "partyName": "Ali Mahmud Kasuri", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "31", "company": "BPS", "nature": "Payment", "partyName": "Ali Mahmud Kasuri", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}];
+const OBS_CATEGORIES = [
+  { code:2, name:'PMC Discrepancies Regarding Vendor Registration, RFQs and Budgetary Matters' },
+  { code:3, name:'Timelines of Execution, Incomplete, Erroneous or Missing Supporting Data' },
+  { code:4, name:'Late Payments' },
+  { code:5, name:'Tax Related Issues' },
+  { code:6, name:'Expense Booked Against Wrong Head' },
+  { code:7, name:'Errors in Data Entry, Typing and Calculation' },
+  { code:8, name:'Discrepancies in Employee Advances and Allowances' },
+  { code:9, name:'Miscellaneous Observations' },
+];
+const OBS_STATUSES = ['Observation Raised','Replied','Not Satisfactory - Re-referred','Resolved','Closed'];
+const FOLLOWUP_STATUSES = ['Pending Reply','Replied','Not Satisfactory','Resolved'];
+
+/* This file ships with no sample/demo data — every voucher and observation below is entered by the user. */
+const SEED_VOUCHERS = [];
 
 let state = { vouchers: [] };
-let editingId = null;
+let editingVoucherId = null;
+let editingObsId = null;
 
-function uid() { return 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function uid() { return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function todayStr() { return new Date().toISOString().slice(0,10); }
 
 function load() {
   let raw = null;
   try { raw = localStorage.getItem(STORAGE_KEY); } catch(e) {}
   if (raw) {
-    try { state = JSON.parse(raw); return; } catch(e) {}
+    try { state = JSON.parse(raw); if (!Array.isArray(state.vouchers)) state.vouchers = []; return; } catch(e) {}
   }
   state = { vouchers: SEED_VOUCHERS.map((v,i) => Object.assign({ id: uid(), srNo: i+1, postAuditDate:'', postAuditReceivedDate:'', observations: [] }, v)) };
   save();
@@ -409,9 +528,9 @@ function save() {
 }
 
 function resetAllData() {
-  if (!confirm('This will erase all vouchers in this browser and reload the original sample data. Continue?')) return;
-  try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
-  load();
+  if (!confirm('This will permanently erase every voucher and observation stored in this browser. Continue?')) return;
+  state = { vouchers: [] };
+  save();
   renderAll();
 }
 
@@ -425,11 +544,9 @@ function fmtDate(d) {
   if (isNaN(dt)) return d;
   return dt.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
 }
-function monthLabel(d) {
-  if (!d) return '';
-  const dt = new Date(d + 'T00:00:00');
-  if (isNaN(dt)) return '';
-  return dt.toLocaleDateString('en-US', { month:'short', year:'2-digit' });
+function truncate(s, n) {
+  s = String(s||'');
+  return s.length > n ? s.slice(0, n-1) + '…' : s;
 }
 function badgeClass(status) {
   const map = {
@@ -439,12 +556,28 @@ function badgeClass(status) {
   };
   return map[status] || 'badge-default';
 }
+function obsBadgeClass(status) {
+  const map = {
+    'Observation Raised':'badge-observation', 'Replied':'badge-checked',
+    'Not Satisfactory - Re-referred':'badge-cancel', 'Resolved':'badge-released', 'Closed':'badge-inhand'
+  };
+  return map[status] || 'badge-default';
+}
 
 function voucherDeductionTotal(v) {
   return (v.observations||[]).reduce((s,o) => s + (Number(o.financialImpactReduction)||0), 0);
 }
 function voucherFinancialImpactTotal(v) {
   return (v.observations||[]).reduce((s,o) => s + (Number(o.financialImpact)||0), 0);
+}
+function latestFollowup(o) {
+  const fus = o.followups || [];
+  return fus.length ? fus[fus.length-1] : null;
+}
+function allObservationRows() {
+  const rows = [];
+  state.vouchers.forEach(v => (v.observations||[]).forEach(o => rows.push({ v, o })));
+  return rows;
 }
 
 /* ---------- TABS ---------- */
@@ -457,21 +590,24 @@ function switchTab(tab) {
   });
   if (tab === 'dashboard') renderDashboard();
   if (tab === 'register') renderRegister();
+  if (tab === 'observations') renderObservationsTab();
   if (tab === 'deductions') renderDeductions();
   if (tab === 'outstanding') renderOutstanding();
 }
 
 /* ---------- FILTER DROPDOWN POPULATION ---------- */
 function fillOptions(sel, values) {
+  if (!sel) return;
   const cur = sel.value;
   sel.innerHTML = '<option value="">All</option>' + values.map(v => `<option value="${escAttr(v)}">${escHtml(v)}</option>`).join('');
   sel.value = cur;
 }
 function populateFilterDropdowns() {
-  ['f-company','d-company','o-company'].forEach(id => fillOptions(document.getElementById(id), COMPANIES));
+  ['f-company','d-company','o-company','obs-company'].forEach(id => fillOptions(document.getElementById(id), COMPANIES));
   fillOptions(document.getElementById('f-vtype'), VTYPES);
   fillOptions(document.getElementById('f-nature'), NATURES);
   fillOptions(document.getElementById('f-status'), STATUSES);
+  fillOptions(document.getElementById('obs-status'), OBS_STATUSES);
 }
 
 function escHtml(s) { return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -480,10 +616,13 @@ function escAttr(s) { return escHtml(s); }
 /* ---------- DASHBOARD ---------- */
 function renderDashboard() {
   const vs = state.vouchers;
+  const allObs = [];
+  vs.forEach(v => (v.observations||[]).forEach(o => allObs.push(o)));
+
   const total = vs.length;
   const totalAmount = vs.reduce((s,v) => s + (Number(v.amountFinalized)||0), 0);
   const totalDeduction = vs.reduce((s,v) => s + voucherDeductionTotal(v), 0);
-  const outstanding = vs.reduce((s,v) => s + (v.observations||[]).filter(o => o.obsDate && !o.responseDate).length, 0);
+  const outstanding = allObs.filter(o => { const f = latestFollowup(o); return f && !f.replyDate; }).length;
   const postAuditPending = vs.filter(v => v.status === 'Post Audit' || v.status === 'Post Audit - In Hand').length;
 
   document.getElementById('dash-stats').innerHTML = `
@@ -498,10 +637,12 @@ function renderDashboard() {
   renderBreakdown('bd-company', vs, v => v.company || '(blank)');
   renderBreakdown('bd-vtype', vs, v => v.voucherType || '(blank)');
   renderBreakdown('bd-nature', vs, v => v.nature || '(blank)');
+  renderBreakdown('bd-obsstatus', allObs, o => o.status || '(blank)');
+  renderBreakdown('bd-obstype', allObs, o => o.obsType || '(blank)');
 }
-function renderBreakdown(elId, vs, keyFn) {
+function renderBreakdown(elId, items, keyFn) {
   const counts = {};
-  vs.forEach(v => { const k = keyFn(v); counts[k] = (counts[k]||0)+1; });
+  items.forEach(x => { const k = keyFn(x); counts[k] = (counts[k]||0)+1; });
   const entries = Object.entries(counts).sort((a,b) => b[1]-a[1]);
   const max = entries.length ? entries[0][1] : 1;
   const el = document.getElementById(elId);
@@ -510,7 +651,7 @@ function renderBreakdown(elId, vs, keyFn) {
     <div class="bd-row">
       <div class="bd-name" title="${escAttr(name)}">${escHtml(name)}</div>
       <div class="bd-bar-wrap"><div class="bd-bar-fill" style="width:${(count/max*100).toFixed(0)}%"></div></div>
-      <div class="bd-count">${count} (${(count/vs.length*100 || 0).toFixed(0)}%)</div>
+      <div class="bd-count">${count} (${(count/items.length*100 || 0).toFixed(0)}%)</div>
     </div>`).join('');
 }
 
@@ -531,7 +672,7 @@ const REGISTER_COLS = [
 let sortState = { key:'srNo', dir:1 };
 
 function clearRegisterFilters() {
-  ['f-search'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-search').value = '';
   ['f-company','f-vtype','f-nature','f-status'].forEach(id => document.getElementById(id).value = '');
   ['f-from','f-to'].forEach(id => document.getElementById(id).value = '');
   renderRegister();
@@ -584,6 +725,10 @@ function renderRegister() {
   });
 
   const body = document.getElementById('register-body');
+  if (!state.vouchers.length) {
+    body.innerHTML = `<tr><td colspan="${REGISTER_COLS.length+1}" class="empty-note">No vouchers yet. Click "+ New Voucher" to add the first one.</td></tr>`;
+    return;
+  }
   if (!rows.length) {
     body.innerHTML = `<tr><td colspan="${REGISTER_COLS.length+1}" class="empty-note">No vouchers match the current filters.</td></tr>`;
     return;
@@ -605,23 +750,69 @@ function sortRegisterBy(key) {
   renderRegister();
 }
 
+/* ---------- OBSERVATIONS TAB ---------- */
+function clearObsFilters() {
+  document.getElementById('obs-search').value = '';
+  document.getElementById('obs-company').value = '';
+  document.getElementById('obs-status').value = '';
+  renderObservationsTab();
+}
+function openNewObservation() {
+  if (!state.vouchers.length) { alert('Please create a voucher first, then add an observation to it.'); return; }
+  openObsModal(null, {});
+}
+function renderObservationsTab() {
+  populateFilterDropdowns();
+  const search = (document.getElementById('obs-search').value || '').toLowerCase();
+  const company = document.getElementById('obs-company').value;
+  const status = document.getElementById('obs-status').value;
+
+  let rows = allObservationRows();
+  if (company) rows = rows.filter(({v}) => v.company === company);
+  if (status) rows = rows.filter(({o}) => o.status === status);
+  if (search) {
+    rows = rows.filter(({v,o}) => [o.ref, v.voucherNo, v.partyName, o.description].join(' ').toLowerCase().includes(search));
+  }
+  rows.sort((a,b) => (b.o.obsDate||'').localeCompare(a.o.obsDate||''));
+
+  const body = document.getElementById('obs-body');
+  if (!allObservationRows().length) {
+    body.innerHTML = `<tr><td colspan="10" class="empty-note">No observations recorded yet. Click "+ New Observation" to raise one.</td></tr>`;
+    return;
+  }
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="10" class="empty-note">No observations match the current filters.</td></tr>`;
+    return;
+  }
+  body.innerHTML = rows.map(({v,o}) => {
+    const reReferrals = Math.max(0, (o.followups||[]).length - 1);
+    return `<tr>
+      <td>${escHtml(o.ref||'-')}</td>
+      <td>${escHtml(v.voucherType)}-${escHtml(v.voucherNo)}</td>
+      <td>${escHtml(v.company)}</td>
+      <td>${fmtDate(o.obsDate)}</td>
+      <td>${escHtml(o.obsCode||'-')}</td>
+      <td title="${escAttr(o.description)}">${escHtml(truncate(o.description,55))}</td>
+      <td class="num">${fmtMoney(o.financialImpactReduction)}</td>
+      <td><span class="badge ${obsBadgeClass(o.status)}">${escHtml(o.status)}</span></td>
+      <td>${reReferrals ? reReferrals + 'x' : '-'}</td>
+      <td class="col-actions row-actions"><button class="link-btn" onclick="openObsModal('${o.id}')">Open</button></td>
+    </tr>`;
+  }).join('');
+}
+
 /* ---------- DEDUCTIONS REPORT ---------- */
 function clearDeductionFilters() {
   document.getElementById('d-company').value = '';
   document.getElementById('d-reason').value = '';
   renderDeductions();
 }
-function allObservationRows() {
-  const rows = [];
-  state.vouchers.forEach(v => (v.observations||[]).forEach(o => rows.push({ v, o })));
-  return rows;
-}
 function renderDeductions() {
   populateFilterDropdowns();
   const company = document.getElementById('d-company').value;
   const reason = document.getElementById('d-reason').value;
 
-  let rows = allObservationRows().filter(({v,o}) => (Number(o.financialImpactReduction)||0) > 0 || (Number(o.financialImpact)||0) > 0);
+  let rows = allObservationRows().filter(({o}) => (Number(o.financialImpactReduction)||0) > 0 || (Number(o.financialImpact)||0) > 0);
   if (company) rows = rows.filter(({v}) => v.company === company);
   if (reason === 'qty') rows = rows.filter(({o}) => o.reasonQty);
   if (reason === 'rate') rows = rows.filter(({o}) => o.reasonRate);
@@ -642,16 +833,17 @@ function renderDeductions() {
   }
   body.innerHTML = rows.map(({v,o}) => {
     const reasons = [o.reasonQty && 'Quantity', o.reasonRate && 'Rate', o.reasonOther && ('Other' + (o.otherReasonText? ': '+o.otherReasonText : ''))].filter(Boolean).join(', ');
+    const f = latestFollowup(o);
     return `<tr>
+      <td>${escHtml(o.ref||'')}</td>
       <td>${escHtml(v.voucherType)}-${escHtml(v.voucherNo)}</td>
       <td>${escHtml(v.company)}</td>
       <td>${escHtml(v.partyName)}</td>
       <td>${fmtDate(o.obsDate)}</td>
-      <td>${escHtml(o.ref||'')}</td>
       <td>${escHtml(reasons||'-')}</td>
       <td class="num">${fmtMoney(o.financialImpactReduction)}</td>
       <td class="num">${fmtMoney(o.financialImpact)}</td>
-      <td>${o.responseDate ? fmtDate(o.responseDate) : '<span class="badge badge-observation">Pending</span>'}</td>
+      <td>${f && f.replyDate ? fmtDate(f.replyDate) : '<span class="badge badge-observation">Pending</span>'}</td>
     </tr>`;
   }).join('');
 }
@@ -660,14 +852,15 @@ function renderDeductions() {
 function renderOutstanding() {
   populateFilterDropdowns();
   const company = document.getElementById('o-company').value;
-  let rows = allObservationRows().filter(({o}) => o.obsDate && !o.responseDate);
+  let rows = allObservationRows().filter(({o}) => { const f = latestFollowup(o); return f && !f.replyDate; });
   if (company) rows = rows.filter(({v}) => v.company === company);
 
   const today = new Date();
   rows = rows.map(({v,o}) => {
-    const d = new Date(o.obsDate + 'T00:00:00');
+    const f = latestFollowup(o);
+    const d = new Date((f.queryDate || o.obsDate) + 'T00:00:00');
     const days = isNaN(d) ? 0 : Math.floor((today - d) / 86400000);
-    return { v, o, days };
+    return { v, o, f, days };
   }).sort((a,b) => b.days - a.days);
 
   const over30 = rows.filter(r => r.days > 30).length;
@@ -682,23 +875,26 @@ function renderOutstanding() {
     body.innerHTML = `<tr><td colspan="9" class="empty-note">No outstanding observations. Everything has a reply on file.</td></tr>`;
     return;
   }
-  body.innerHTML = rows.map(({v,o,days}) => `
+  body.innerHTML = rows.map(({v,o,f,days}) => {
+    const reReferrals = Math.max(0, (o.followups||[]).length - 1);
+    return `
     <tr>
+      <td>${escHtml(o.ref||'-')}</td>
       <td>${escHtml(v.voucherType)}-${escHtml(v.voucherNo)}</td>
       <td>${escHtml(v.company)}</td>
       <td>${escHtml(v.partyName)}</td>
-      <td>${fmtDate(o.obsDate)}</td>
       <td>${escHtml(o.obsType||'-')}</td>
-      <td>${escHtml(o.obsDesc||'')}</td>
-      <td>${fmtDate(o.queryDate)}</td>
-      <td>${fmtDate(o.queryDate2)}</td>
+      <td title="${escAttr(o.description)}">${escHtml(truncate(o.description,50))}</td>
+      <td>${fmtDate(f.queryDate || o.obsDate)}</td>
+      <td>${reReferrals ? reReferrals + 'x' : '-'}</td>
       <td class="num">${days}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 /* ---------- VOUCHER MODAL ---------- */
 function openVoucherModal(id) {
-  editingId = id;
+  editingVoucherId = id;
   const v = id ? state.vouchers.find(x => x.id === id) : {
     voucherType:'BP', company:'BPS', nature:'Payment', status:'In Hand',
     receivingDate:'', releasingDate:'', voucherNo:'', partyName:'', narration:'',
@@ -720,72 +916,36 @@ function openVoucherModal(id) {
   document.getElementById('v-postAuditDate').value = v.postAuditDate || '';
   document.getElementById('v-postAuditReceivedDate').value = v.postAuditReceivedDate || '';
 
-  const container = document.getElementById('obs-rounds-container');
-  container.innerHTML = '';
-  (v.observations || []).forEach(o => addObsRound(o));
+  document.getElementById('btn-voucher-new-obs').disabled = !id;
+  document.getElementById('voucher-obs-hint').style.display = id ? 'none' : '';
+  renderVoucherObsList(id);
 
   document.getElementById('voucher-modal').classList.add('open');
 }
 function closeVoucherModal() {
   document.getElementById('voucher-modal').classList.remove('open');
-  editingId = null;
+  editingVoucherId = null;
 }
-
-let obsRoundSeq = 0;
-function addObsRound(data) {
-  data = data || {};
-  const rid = 'r' + (obsRoundSeq++);
-  const wrap = document.createElement('div');
-  wrap.className = 'obs-round';
-  wrap.dataset.rid = rid;
-  wrap.innerHTML = `
-    <div class="obs-round-head">
-      <strong>Observation Round</strong>
-      <button class="btn btn-danger btn-sm" onclick="this.closest('.obs-round').remove()">Remove</button>
-    </div>
-    <div class="form-grid">
-      <div class="fld"><label>Observation Date</label><input type="date" class="o-obsDate" value="${escAttr(data.obsDate||'')}"></div>
-      <div class="fld span2"><label>Observation Type</label><input type="text" class="o-obsType" list="obs-type-list" value="${escAttr(data.obsType||'')}" placeholder="Select or type category"></div>
-      <div class="fld span3"><label>Observation Description</label><textarea class="o-obsDesc" placeholder="Details of the observation raised">${escHtml(data.obsDesc||'')}</textarea></div>
-
-      <div class="fld"><label>Ref # <span style="text-transform:none;font-weight:400;color:#889">(MMYYNNNN)</span></label><input type="text" class="o-ref" value="${escAttr(data.ref||'')}" placeholder="07260001"></div>
-      <div class="fld span2">
-        <label>Deduction Reason</label>
-        <div class="reason-cbs">
-          <label><input type="checkbox" class="o-reasonQty" ${data.reasonQty?'checked':''}> Quantity</label>
-          <label><input type="checkbox" class="o-reasonRate" ${data.reasonRate?'checked':''}> Rate</label>
-          <label><input type="checkbox" class="o-reasonOther" ${data.reasonOther?'checked':''}> Other</label>
-        </div>
+function renderVoucherObsList(voucherId) {
+  const wrap = document.getElementById('voucher-obs-list');
+  const voucher = voucherId ? state.vouchers.find(v => v.id === voucherId) : null;
+  if (!voucher) { wrap.innerHTML = ''; return; }
+  const obs = voucher.observations || [];
+  if (!obs.length) { wrap.innerHTML = '<div class="empty-note">No observations logged yet for this voucher.</div>'; return; }
+  wrap.innerHTML = obs.map(o => {
+    const f = latestFollowup(o);
+    return `<div class="obs-round">
+      <div class="obs-round-head">
+        <strong>${escHtml(o.ref||'(no ref)')} &mdash; ${fmtDate(o.obsDate)}</strong>
+        <span class="row-actions">
+          <span class="badge ${obsBadgeClass(o.status)}">${escHtml(o.status)}</span>
+          <button class="link-btn" onclick="openObsModal('${o.id}')">Open</button>
+        </span>
       </div>
-      <div class="fld span3"><label>Other Reason (if applicable)</label><input type="text" class="o-otherReasonText" value="${escAttr(data.otherReasonText||'')}"></div>
-
-      <div class="fld"><label>Financial Impact (Reduction) Rs.</label><input type="number" step="0.01" class="o-financialImpactReduction" value="${data.financialImpactReduction ?? ''}"></div>
-      <div class="fld"><label>Financial Impact (Total) Rs.</label><input type="number" step="0.01" class="o-financialImpact" value="${data.financialImpact ?? ''}"></div>
-      <div class="fld"><label>Response Date</label><input type="date" class="o-responseDate" value="${escAttr(data.responseDate||'')}"></div>
-
-      <div class="fld"><label>Query Date</label><input type="date" class="o-queryDate" value="${escAttr(data.queryDate||'')}"></div>
-      <div class="fld"><label>Query Date 2 (Follow-up)</label><input type="date" class="o-queryDate2" value="${escAttr(data.queryDate2||'')}"></div>
-    </div>
-  `;
-  document.getElementById('obs-rounds-container').appendChild(wrap);
-}
-
-function collectObsRounds() {
-  return Array.from(document.querySelectorAll('#obs-rounds-container .obs-round')).map(el => ({
-    obsDate: el.querySelector('.o-obsDate').value,
-    obsType: el.querySelector('.o-obsType').value.trim(),
-    obsDesc: el.querySelector('.o-obsDesc').value.trim(),
-    ref: el.querySelector('.o-ref').value.trim(),
-    reasonQty: el.querySelector('.o-reasonQty').checked,
-    reasonRate: el.querySelector('.o-reasonRate').checked,
-    reasonOther: el.querySelector('.o-reasonOther').checked,
-    otherReasonText: el.querySelector('.o-otherReasonText').value.trim(),
-    financialImpactReduction: el.querySelector('.o-financialImpactReduction').value,
-    financialImpact: el.querySelector('.o-financialImpact').value,
-    responseDate: el.querySelector('.o-responseDate').value,
-    queryDate: el.querySelector('.o-queryDate').value,
-    queryDate2: el.querySelector('.o-queryDate2').value,
-  }));
+      <div style="font-size:12.5px;color:#445;">${escHtml(truncate(o.description,150))}</div>
+      <div style="font-size:11.5px;color:#889;margin-top:6px;">Deduction: ${fmtMoney(o.financialImpactReduction)} &middot; Follow-ups: ${(o.followups||[]).length} &middot; Latest reply: ${f && f.replyDate ? fmtDate(f.replyDate) : 'Pending'}</div>
+    </div>`;
+  }).join('');
 }
 
 function saveVoucher() {
@@ -808,27 +968,228 @@ function saveVoucher() {
     releasingDate: document.getElementById('v-releasingDate').value,
     postAuditDate: document.getElementById('v-postAuditDate').value,
     postAuditReceivedDate: document.getElementById('v-postAuditReceivedDate').value,
-    observations: collectObsRounds(),
   };
 
-  if (editingId) {
-    const idx = state.vouchers.findIndex(x => x.id === editingId);
+  if (editingVoucherId) {
+    const idx = state.vouchers.findIndex(x => x.id === editingVoucherId);
     state.vouchers[idx] = Object.assign({}, state.vouchers[idx], payload);
   } else {
     const nextSr = state.vouchers.reduce((m,v) => Math.max(m, v.srNo||0), 0) + 1;
-    state.vouchers.push(Object.assign({ id: uid(), srNo: nextSr }, payload));
+    state.vouchers.push(Object.assign({ id: uid(), srNo: nextSr, observations: [] }, payload));
   }
   save();
   closeVoucherModal();
   renderAll();
 }
 function deleteCurrentVoucher() {
-  if (!editingId) return;
-  if (!confirm('Delete this voucher permanently?')) return;
-  state.vouchers = state.vouchers.filter(x => x.id !== editingId);
+  if (!editingVoucherId) return;
+  if (!confirm('Delete this voucher and all its recorded observations permanently?')) return;
+  state.vouchers = state.vouchers.filter(x => x.id !== editingVoucherId);
   save();
   closeVoucherModal();
   renderAll();
+}
+
+/* ---------- OBSERVATION MODAL ---------- */
+function nextObsRef(dateStr) {
+  const d = dateStr ? new Date(dateStr+'T00:00:00') : new Date();
+  if (isNaN(d)) return '';
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const yy = String(d.getFullYear()).slice(-2);
+  const prefix = mm + yy;
+  let count = 0;
+  state.vouchers.forEach(v => (v.observations||[]).forEach(o => { if ((o.ref||'').startsWith(prefix)) count++; }));
+  return prefix + String(count+1).padStart(4,'0');
+}
+
+function openObsModal(id, opts) {
+  opts = opts || {};
+  editingObsId = id;
+  let voucher = null, obs;
+
+  if (id) {
+    for (const v of state.vouchers) {
+      const found = (v.observations||[]).find(o => o.id === id);
+      if (found) { obs = found; voucher = v; break; }
+    }
+  } else {
+    voucher = opts.voucherId ? state.vouchers.find(v => v.id === opts.voucherId) : null;
+    obs = {
+      id: uid(), obsDate: todayStr(), billFwdDate:'', checkedBy:'', obsType:'', obsCode:'',
+      description:'', instances:1, amount: (voucher && voucher.amountFinalized) || '', status:'Observation Raised',
+      reasonQty:false, reasonRate:false, reasonOther:false, otherReasonText:'',
+      financialImpactReduction:'', financialImpact:'', finalizedAmount:'', followups:[]
+    };
+    obs.ref = nextObsRef(obs.obsDate);
+    obs.followups.push({ refSuffix:'', queryDate: obs.obsDate, comments:'', replyDate:'', status:'Pending Reply' });
+  }
+
+  const lockVoucher = !!(id || opts.voucherId);
+  const sel = document.getElementById('o-voucherId');
+  sel.innerHTML = state.vouchers.map(v =>
+    `<option value="${v.id}">${escHtml(v.voucherType+'-'+v.voucherNo+' — '+v.partyName+' ('+v.company+')')}</option>`
+  ).join('');
+  sel.value = (voucher && voucher.id) || (opts.voucherId || '') || (state.vouchers[0] && state.vouchers[0].id) || '';
+  sel.disabled = lockVoucher;
+
+  document.getElementById('o-ref').value = obs.ref || '';
+  document.getElementById('o-obsDate').value = obs.obsDate || '';
+  document.getElementById('o-billFwdDate').value = obs.billFwdDate || '';
+  document.getElementById('o-checkedBy').value = obs.checkedBy || '';
+
+  const typeSel = document.getElementById('o-obsType');
+  typeSel.innerHTML = '<option value="">Select type...</option>' +
+    OBS_CATEGORIES.map(c => `<option value="${escAttr(c.name)}" data-code="${c.code}" ${obs.obsType===c.name?'selected':''}>${c.code} — ${escHtml(c.name)}</option>`).join('');
+  document.getElementById('o-obsCode').value = obs.obsCode || '';
+
+  document.getElementById('o-description').value = obs.description || '';
+  document.getElementById('o-instances').value = obs.instances || 1;
+  document.getElementById('o-amount').value = obs.amount ?? '';
+
+  const statusSel = document.getElementById('o-status');
+  statusSel.innerHTML = OBS_STATUSES.map(s => `<option ${s===obs.status?'selected':''}>${s}</option>`).join('');
+
+  document.getElementById('o-reasonQty').checked = !!obs.reasonQty;
+  document.getElementById('o-reasonRate').checked = !!obs.reasonRate;
+  document.getElementById('o-reasonOther').checked = !!obs.reasonOther;
+  document.getElementById('o-otherReasonText').value = obs.otherReasonText || '';
+  document.getElementById('o-finalizedAmount').value = obs.finalizedAmount ?? '';
+  document.getElementById('o-financialImpactReduction').value = obs.financialImpactReduction ?? '';
+  document.getElementById('o-financialImpact').value = obs.financialImpact ?? '';
+
+  renderFollowupRows(obs.followups && obs.followups.length ? obs.followups : [{ refSuffix:'', queryDate: obs.obsDate, comments:'', replyDate:'', status:'Pending Reply' }]);
+
+  document.getElementById('btn-delete-obs').style.display = id ? '' : 'none';
+  document.getElementById('obs-modal-title').textContent = id ? `Edit Observation ${obs.ref || ''}` : 'New Observation';
+  document.getElementById('obs-modal').classList.add('open');
+}
+function closeObsModal() {
+  document.getElementById('obs-modal').classList.remove('open');
+  editingObsId = null;
+}
+function onObsTypeChange() {
+  const sel = document.getElementById('o-obsType');
+  const opt = sel.options[sel.selectedIndex];
+  const code = opt ? opt.getAttribute('data-code') : '';
+  if (code) document.getElementById('o-obsCode').value = code;
+}
+
+function renderFollowupRows(followups) {
+  const body = document.getElementById('followup-body');
+  body.innerHTML = '';
+  followups.forEach(fu => appendFollowupRow(fu));
+  updateFollowupRefCells();
+}
+function appendFollowupRow(fu) {
+  fu = fu || { refSuffix:'', queryDate:'', comments:'', replyDate:'', status:'Pending Reply' };
+  const tr = document.createElement('tr');
+  tr.dataset.suffix = fu.refSuffix || '';
+  tr.innerHTML = `
+    <td class="fu-ref-cell">-</td>
+    <td><input type="date" class="fu-queryDate" value="${escAttr(fu.queryDate||'')}"></td>
+    <td><textarea class="fu-comments" rows="1">${escHtml(fu.comments||'')}</textarea></td>
+    <td><input type="date" class="fu-replyDate" value="${escAttr(fu.replyDate||'')}"></td>
+    <td><select class="fu-status">${FOLLOWUP_STATUSES.map(s=>`<option ${s===fu.status?'selected':''}>${s}</option>`).join('')}</select></td>
+    <td class="no-print"><button class="btn btn-danger btn-sm" onclick="removeFollowupRow(this)">&times;</button></td>
+  `;
+  document.getElementById('followup-body').appendChild(tr);
+}
+function addFollowup() {
+  const rows = document.querySelectorAll('#followup-body tr');
+  const suffix = 'R' + rows.length;
+  appendFollowupRow({ refSuffix: suffix, queryDate: todayStr(), comments:'', replyDate:'', status:'Pending Reply' });
+  updateFollowupRefCells();
+}
+function removeFollowupRow(btn) {
+  const rows = document.querySelectorAll('#followup-body tr');
+  if (rows.length <= 1) { alert('At least one entry is required.'); return; }
+  btn.closest('tr').remove();
+  updateFollowupRefCells();
+}
+function updateFollowupRefCells() {
+  const ref = document.getElementById('o-ref').value.trim() || '(unsaved ref)';
+  document.querySelectorAll('#followup-body tr').forEach(tr => {
+    const suffix = tr.dataset.suffix;
+    tr.querySelector('.fu-ref-cell').textContent = suffix ? ref + '-' + suffix : ref;
+  });
+}
+function collectFollowups() {
+  return Array.from(document.querySelectorAll('#followup-body tr')).map(tr => ({
+    refSuffix: tr.dataset.suffix || '',
+    queryDate: tr.querySelector('.fu-queryDate').value,
+    comments: tr.querySelector('.fu-comments').value.trim(),
+    replyDate: tr.querySelector('.fu-replyDate').value,
+    status: tr.querySelector('.fu-status').value,
+  }));
+}
+
+function saveObservation() {
+  const voucherId = document.getElementById('o-voucherId').value;
+  if (!voucherId) { alert('Please select the voucher this observation belongs to.'); return; }
+  const description = document.getElementById('o-description').value.trim();
+  if (!description) { alert('Please enter the observation description.'); return; }
+
+  const payload = {
+    ref: document.getElementById('o-ref').value.trim(),
+    obsDate: document.getElementById('o-obsDate').value,
+    billFwdDate: document.getElementById('o-billFwdDate').value,
+    checkedBy: document.getElementById('o-checkedBy').value.trim(),
+    obsType: document.getElementById('o-obsType').value,
+    obsCode: document.getElementById('o-obsCode').value.trim(),
+    description,
+    instances: document.getElementById('o-instances').value,
+    amount: document.getElementById('o-amount').value,
+    status: document.getElementById('o-status').value,
+    reasonQty: document.getElementById('o-reasonQty').checked,
+    reasonRate: document.getElementById('o-reasonRate').checked,
+    reasonOther: document.getElementById('o-reasonOther').checked,
+    otherReasonText: document.getElementById('o-otherReasonText').value.trim(),
+    finalizedAmount: document.getElementById('o-finalizedAmount').value,
+    financialImpactReduction: document.getElementById('o-financialImpactReduction').value,
+    financialImpact: document.getElementById('o-financialImpact').value,
+    followups: collectFollowups(),
+  };
+
+  const targetVoucher = state.vouchers.find(v => v.id === voucherId);
+  if (!targetVoucher.observations) targetVoucher.observations = [];
+
+  if (editingObsId) {
+    let handled = false;
+    for (const v of state.vouchers) {
+      const idx = (v.observations||[]).findIndex(o => o.id === editingObsId);
+      if (idx >= 0) {
+        if (v.id === voucherId) {
+          v.observations[idx] = Object.assign({}, v.observations[idx], payload);
+        } else {
+          const [moved] = v.observations.splice(idx, 1);
+          targetVoucher.observations.push(Object.assign({}, moved, payload));
+        }
+        handled = true;
+        break;
+      }
+    }
+    if (!handled) targetVoucher.observations.push(Object.assign({ id: uid() }, payload));
+  } else {
+    targetVoucher.observations.push(Object.assign({ id: uid() }, payload));
+  }
+
+  save();
+  closeObsModal();
+  renderAll();
+  if (document.getElementById('voucher-modal').classList.contains('open')) {
+    renderVoucherObsList(editingVoucherId);
+  }
+}
+function deleteCurrentObservation() {
+  if (!editingObsId) return;
+  if (!confirm('Delete this observation and its full reply history?')) return;
+  state.vouchers.forEach(v => { v.observations = (v.observations||[]).filter(o => o.id !== editingObsId); });
+  save();
+  closeObsModal();
+  renderAll();
+  if (document.getElementById('voucher-modal').classList.contains('open')) {
+    renderVoucherObsList(editingVoucherId);
+  }
 }
 
 /* ---------- CSV EXPORT ---------- */
@@ -841,7 +1202,7 @@ function exportCSV() {
   const headers = ['Sr No','Voucher Receiving Date','Voucher Releasing Date','Voucher Type','Voucher No','Company','Nature','Party Name','Narration','Status','Amount Finalized','Total Deduction','Total Financial Impact','Observation Count','Outstanding Observations','Post Audit Date','Post Audit Voucher Received On'];
   const lines = [headers.join(',')];
   state.vouchers.forEach(v => {
-    const outstanding = (v.observations||[]).filter(o => o.obsDate && !o.responseDate).length;
+    const outstanding = (v.observations||[]).filter(o => { const f = latestFollowup(o); return f && !f.replyDate; }).length;
     lines.push([
       v.srNo, v.receivingDate, v.releasingDate, v.voucherType, v.voucherNo, v.company, v.nature,
       v.partyName, v.narration, v.status, v.amountFinalized, voucherDeductionTotal(v), voucherFinancialImpactTotal(v),
@@ -849,6 +1210,20 @@ function exportCSV() {
     ].map(csvEscape).join(','));
   });
   downloadFile(lines.join('\n'), 'voucher_register.csv', 'text/csv');
+}
+function exportObservationsCSV() {
+  const headers = ['Reference No','Voucher','Company','Party','Observation Date','Bill Fwd Date','OBS Code','Observation Type','Description','Instances','Amount','Reason','Deduction (Reduction)','Financial Impact (Total)','Finalized Amount','Checked By','Status','Re-referral Count','Latest Reply Date'];
+  const lines = [headers.join(',')];
+  allObservationRows().forEach(({v,o}) => {
+    const reasons = [o.reasonQty && 'Quantity', o.reasonRate && 'Rate', o.reasonOther && 'Other'].filter(Boolean).join('/');
+    const f = latestFollowup(o);
+    lines.push([
+      o.ref, v.voucherType+'-'+v.voucherNo, v.company, v.partyName, o.obsDate, o.billFwdDate, o.obsCode, o.obsType,
+      o.description, o.instances, o.amount, reasons, o.financialImpactReduction, o.financialImpact, o.finalizedAmount,
+      o.checkedBy, o.status, Math.max(0,(o.followups||[]).length-1), f ? f.replyDate : ''
+    ].map(csvEscape).join(','));
+  });
+  downloadFile(lines.join('\n'), 'observations_report.csv', 'text/csv');
 }
 function exportBackup() {
   downloadFile(JSON.stringify(state, null, 2), 'voucher_tracker_backup_' + new Date().toISOString().slice(0,10) + '.json', 'application/json');
@@ -885,6 +1260,7 @@ function renderAll() {
   populateFilterDropdowns();
   renderDashboard();
   renderRegister();
+  renderObservationsTab();
   renderDeductions();
   renderOutstanding();
 }
