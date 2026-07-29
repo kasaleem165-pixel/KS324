@@ -161,6 +161,24 @@
   #followup-body textarea { min-height: 30px; font-size: 12px; }
   .fu-ref-cell { font-weight: 700; color: #1a3a5c; font-size: 12px; white-space: nowrap; }
 
+  #obs-bank-modal { z-index: 600; }
+  .bank-cat-head {
+    font-size: 11px; font-weight: 700; color: #1a3a5c; text-transform: uppercase; letter-spacing: 0.3px;
+    margin: 14px 0 6px; padding-bottom: 4px; border-bottom: 1px solid #e6ebf1;
+  }
+  .bank-cat-head:first-child { margin-top: 0; }
+  .bank-item-btn {
+    display: block; width: 100%; text-align: left; background: #fbfcfe; border: 1px solid #dde3ec;
+    border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; font-size: 12.5px; color: #223; cursor: pointer;
+    font-family: inherit; line-height: 1.4;
+  }
+  .bank-item-btn:hover { background: #eef4fb; border-color: #1a3a5c; }
+  .bank-pick-hint {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: #eef4fb; border: 1px solid #cfe0f2; border-radius: 6px; padding: 8px 12px;
+    font-size: 12px; color: #1a3a5c; margin: -6px 0 14px;
+  }
+
   .legend-box { background: #fff; border: 1px solid #dde3ec; border-radius: 8px; padding: 16px 18px; }
   .legend-box h4 { color: #1a3a5c; font-size: 13px; margin-bottom: 8px; margin-top: 14px; }
   .legend-box h4:first-child { margin-top: 0; }
@@ -264,7 +282,7 @@
       <div class="fld"><label>Company</label><select id="obs-company" onchange="renderObservationsTab()"><option value="">All</option></select></div>
       <div class="fld"><label>Status</label><select id="obs-status" onchange="renderObservationsTab()"><option value="">All</option></select></div>
       <div class="fld"><button class="btn btn-outline" style="color:#1a3a5c;border-color:#1a3a5c" onclick="clearObsFilters()">Clear</button></div>
-      <div class="fld"><button class="btn btn-gold" onclick="openNewObservation()">+ New Observation</button></div>
+      <div class="fld"><button class="btn btn-gold" onclick="openObsBankPicker({})">+ New Observation</button></div>
       <div class="fld"><button class="btn btn-outline" style="color:#1a3a5c;border-color:#1a3a5c" onclick="exportObservationsCSV()">Export CSV</button></div>
     </div>
     <div class="table-scroll">
@@ -337,8 +355,12 @@
         <li><b>Cancel Payment</b> — payment cancelled / voucher withdrawn.</li>
       </ul>
 
+      <h4>Selecting an Observation from the Data Bank</h4>
+      <p>Clicking <b>+ New Observation</b> first opens the <b>Observation Data Bank</b> — the audit's standard list of 70 pre-written observations across the 8 categories below, taken from the "Top Observations" reference sheet. Search or filter by category and pick the one that matches; its wording and category are carried straight into the observation form (still fully editable).</p>
+      <p>If nothing in the bank fits, click <b>None of these — Write a New Observation</b> to open the same form with a blank description, so a brand-new observation can be defined from scratch.</p>
+
       <h4>Raising, Replying To &amp; Re-referring an Observation</h4>
-      <p>The <b>Observations</b> tab is where every audit query against a voucher is raised and tracked, modelled on the "Audit Observation / Receiving" memo: it captures who it was sent <b>To</b> (the voucher's company), a <b>Reference No.</b>, the <b>Voucher #</b>, receiving and bill-forwarding dates, the amount involved, who <b>checked</b> it, and the observation text itself.</p>
+      <p>Whether picked from the bank or written fresh, every observation lands in one form modelled on the "Audit Observation / Receiving" memo: it captures who it was sent <b>To</b> (the voucher's company), a <b>Reference No.</b>, the <b>Voucher #</b>, receiving and bill-forwarding dates, the amount involved, who <b>checked</b> it, and the observation text itself.</p>
       <p>Every observation keeps its own <b>Reply / Follow-up History</b>. When the first reply comes in, record it directly against that entry. If the reply is incomplete or unsatisfactory, click <b>+ Re-refer (Request Another Reply)</b> — this adds a new row referencing the same observation (numbered <code>-R1</code>, <code>-R2</code>, ...) so the observation can be sent back for a fresh response as many times as needed, with the full back-and-forth kept on one record.</p>
 
       <h4>OBS Code</h4>
@@ -417,12 +439,34 @@
       <div class="section-title">Observations</div>
       <div class="hint" id="voucher-obs-hint" style="display:none">Save this voucher first, then use "+ New Observation" to raise one against it.</div>
       <div id="voucher-obs-list"></div>
-      <button class="btn btn-outline" id="btn-voucher-new-obs" style="color:#1a3a5c;border-color:#1a3a5c" onclick="openObsModal(null, { voucherId: editingVoucherId })">+ New Observation</button>
+      <button class="btn btn-outline" id="btn-voucher-new-obs" style="color:#1a3a5c;border-color:#1a3a5c" onclick="openObsBankPicker({ voucherId: editingVoucherId })">+ New Observation</button>
     </div>
     <div class="modal-foot">
       <button class="btn btn-outline" style="color:#1a3a5c;border-color:#1a3a5c" onclick="closeVoucherModal()">Cancel</button>
       <button class="btn btn-danger" id="btn-delete-voucher" style="display:none" onclick="deleteCurrentVoucher()">Delete Voucher</button>
       <button class="btn btn-gold" onclick="saveVoucher()">Save Voucher</button>
+    </div>
+  </div>
+</div>
+
+<!-- OBSERVATION BANK PICKER (from the "Top Observations" reference sheet) -->
+<div class="modal-overlay" id="obs-bank-modal">
+  <div class="modal-box" style="max-width:760px">
+    <div class="modal-head">
+      <h3>Select an Observation</h3>
+      <button class="x-close" onclick="closeObsBankModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="hint" style="margin-left:0">Pick a matching observation from the data bank below (drawn from the audit's "Top Observations" reference sheet). If none of these fit, write a new one instead.</div>
+      <div class="filter-bar no-print" style="margin-bottom:10px">
+        <div class="fld grow"><label>Search</label><input type="text" id="bank-search" placeholder="Search by keyword..." oninput="renderObsBankList()"></div>
+        <div class="fld"><label>Category</label><select id="bank-category" onchange="renderObsBankList()"></select></div>
+      </div>
+      <div id="obs-bank-list" style="max-height:48vh; overflow-y:auto;"></div>
+    </div>
+    <div class="modal-foot" style="justify-content:space-between">
+      <button class="btn btn-outline" style="color:#1a3a5c;border-color:#1a3a5c" onclick="closeObsBankModal()">Cancel</button>
+      <button class="btn btn-gold" onclick="chooseNewObservationManually()">None of these — Write a New Observation</button>
     </div>
   </div>
 </div>
@@ -435,6 +479,10 @@
       <button class="x-close" onclick="closeObsModal()">&times;</button>
     </div>
     <div class="modal-body">
+      <div class="bank-pick-hint" id="obs-bank-pick-hint" style="display:none">
+        <span>Description pre-filled from the observation data bank — edit freely if needed.</span>
+        <button class="link-btn" onclick="backToObsBank()">&larr; Choose a different observation</button>
+      </div>
       <div class="form-grid">
         <div class="fld span2"><label>Voucher (To)</label><select id="o-voucherId"></select></div>
         <div class="fld"><label>Reference No.</label><input type="text" id="o-ref" placeholder="07260001" oninput="updateFollowupRefCells()"></div>
@@ -491,16 +539,96 @@ const VTYPES = ['BP','JV'];
 const NATURES = ['Advance','Payment','Adjustment','Reimbursement','Receipt'];
 const STATUSES = ['In Hand','Sample Out','Observation','Checked - In Hand','Released','Post Audit','Post Audit - In Hand','Mudasir / Chugtai Sb','Cancel Payment'];
 
-const OBS_CATEGORIES = [
-  { code:2, name:'PMC Discrepancies Regarding Vendor Registration, RFQs and Budgetary Matters' },
-  { code:3, name:'Timelines of Execution, Incomplete, Erroneous or Missing Supporting Data' },
-  { code:4, name:'Late Payments' },
-  { code:5, name:'Tax Related Issues' },
-  { code:6, name:'Expense Booked Against Wrong Head' },
-  { code:7, name:'Errors in Data Entry, Typing and Calculation' },
-  { code:8, name:'Discrepancies in Employee Advances and Allowances' },
-  { code:9, name:'Miscellaneous Observations' },
+/* Observation data bank — transcribed from the "Top Observations" reference sheet, grouped by its 8 standard categories. */
+const OBS_BANK = [
+  { code:2, name:'PMC Discrepancies Regarding Vendor Registration, RFQs and Budgetary Matters', items: [
+    'The pattern printed on the Dori bag does not conform to the approved design guidelines.',
+    'As per the attached GRN, replacement of the defective Baby Grinder (8mm) is required. Kindly provide a formal statement from the concerned person confirming the defect.',
+    'Qamar Brothers was selected over Universal Overseas — an authorized TOA distributor — despite a marginal cost difference of Rs 7,000. Kindly share the rationale for this vendor selection.',
+    'Kindly confirm whether Qamar Brothers will repair the damaged parts using locally sourced components or imported ones.',
+    'The rates charged for certain items appear to be on the higher side. Kindly review and clarify.',
+    "The quantities delivered do not correspond with the hotel's actual requirement as communicated by Supply Chain (Annexure A refers).",
+    'A discrepancy exists between the GRN and the quantity of items actually delivered by the vendor.',
+    'Per policy, a CSQ is valid for one year. The CSQ on record, issued 17-Apr-25, has since expired. Kindly provide an updated CSQ.',
+    'Kindly provide complete specifications, including Make and Model, for all items purchased and repaired.',
+    'The rates charged by Sidra Printcom are higher than those quoted by M/s Amin Copier & Bookshop and M/s Momin Photostate for comparable services. Kindly clarify the basis of vendor selection.',
+    'The CSQ approved on 01-Apr-2022 is incomplete, reflecting only one vendor. A comparative CSQ with multiple vendors is required.',
+    'The revised per-unit rates are higher than the previous rates without adequate justification. Kindly clarify.',
+  ]},
+  { code:3, name:'Timelines of Execution, Incomplete, Erroneous or Missing Supporting Data', items: [
+    "Units of measurement recorded in the system are inconsistent — for instance, bananas are recorded in 'each' while mint is recorded in 'kg'. Kindly standardize.",
+    'Kindly share the PR, Quotations, CSQ and PO in support of this transaction.',
+    'Kindly share the inspection report duly vetted and endorsed by the Engineering Department.',
+    'The original invoice has not been provided; kindly share the same for verification.',
+    'Kindly share the Guest Refund Ledger to substantiate this transaction.',
+    "Guest refund transactions of PKR 36,100, PKR 25,126 and PKR 107,556 remain unsubstantiated in the absence of the FHS bank statement/ledger and the guest's CNIC copy. Kindly provide the supporting documentation.",
+    'Kindly share the inventory record in support of this transaction.',
+    'Kindly provide the reason for the significant delay in payment.',
+    'The UAT has still not been formally handed over by the Finance Department despite repeated verbal requests. Kindly provide the signed UAT to enable release of payment.',
+    'Kindly provide the vehicle log book in support of this expense.',
+    'Kindly provide the Fixed Asset Register for verification.',
+    'Kindly provide the Repair & Maintenance/AMC contract, or details of any special maintenance arrangement, along with the rental agreement.',
+  ]},
+  { code:4, name:'Late Payments', items: [
+    'Kindly provide the reason for the delay in submission of the voucher to Systems & Audit.',
+    'The vendor invoice is dated 05-Sep-22 and the GRN 08-Sep-22; kindly clarify the reason for the delay in releasing payment to the vendor.',
+    'The vendor invoice is dated 12-May-2022, with payment scheduled only in Dec-2022. Kindly clarify the reason for this delay.',
+    'Kindly clarify the reason for the undue delay in releasing this payment.',
+    'Kindly confirm the list of employees against whom late-sitting food charges have been claimed.',
+    'Kindly state the reason for the delay in obtaining payment approval.',
+    'Five utility bills were paid after the due date, resulting in a late-payment surcharge of Rs 3,444. No response has been received despite repeated reminders; kindly look into the matter.',
+    'An electricity bill was paid after the due date, resulting in a late-payment surcharge of Rs 491. Kindly provide the reason.',
+  ]},
+  { code:5, name:'Tax Related Issues', items: [
+    'FHS is registered for sales tax; kindly clarify the reason for not withholding sales tax on this transaction.',
+    'Income tax on internet services is applicable at 6%, whereas withholding is being applied at 4%. Kindly rectify.',
+    'Input tax booked against invoice No. 514800 has been recorded incorrectly. Kindly review and correct.',
+    'Kindly provide the reason for not deducting ICT tax on this transaction.',
+    'Kindly clarify why the input tax for SRB has not been booked.',
+    'The 20% ICT tax withholding rule is not applicable to ISLB; kindly review the treatment applied.',
+    'Kindly share the written policy governing the treatment of sales tax on room-service food on behalf of Xanders.',
+    'The vendor is not registered for sales tax but has charged 18% GST on the invoice; sales tax is being withheld at 5% on the gross amount inclusive of GST. In our view, the 5% should be withheld on the base amount only. Kindly review.',
+    'Kindly confirm the applicable withholding rate under Section 153(1)(b) of the ITO and Schedule 2 (S.No. 34) of the PSTS Act 2012, given the nature of services rendered (Engineering/Architectural).',
+    "The vendor's status is inactive; kindly adjust the withholding tax treatment accordingly.",
+    'The withholding tax rate applied requires revision from 3% to 4%. Kindly rectify.',
+    'Kindly clarify the nature of the advance tax and the applicable section of the Income Tax Ordinance.',
+  ]},
+  { code:6, name:'Expense Booked Against Wrong Head', items: [
+    'Kindly clarify the reason this expense has been booked under Head Office, given that the applicable branch code (Karachi) is 4321.',
+    'Asian Services provided calibration and environmental testing at the Lahore property but does not offer repair services; kindly book the payment under the correct account head.',
+    'Kindly book the withholding tax under the correct head of account.',
+    'Kindly confirm whether the Conveyance & Carriage expense should be classified under Cost of Sales or Administrative Expense.',
+    "Kindly review and revise the account head currently recorded as 'Mobile Allowance'.",
+  ]},
+  { code:7, name:'Errors in Data Entry, Typing and Calculation', items: [
+    "Ms. Nimrah Khan's daily allowance claim reflects 4 days; this appears to be an error, as the correct entitlement is 3 days. Kindly review.",
+    "Mr. Azam's daily allowance has been claimed for 4 days against an entitlement of 3.5 days. As per policy, a full day's allowance applies only where 8 or more hours are spent outstation; Mr. Azam has claimed a full day for 7.5 hours. Kindly review.",
+    "Mr. Zaki Ali's travel claim of Rs 38,156 does not reflect the applicable fuel rate of Rs 276.50 for the period 16-Feb-2024 to 29-Feb-2024; the recalculated claim amounts to Rs 34,102. Kindly rectify the voucher accordingly.",
+    'A typing error is noted: the cheque is drawn for Rs 7,545, while the voucher total reflects Rs 7,525. Kindly rectify.',
+    'Kindly amend the voucher amount in line with the invoice, from Rs 8,650 to Rs 8,950.',
+    'Kindly rectify the bill amount as discussed.',
+  ]},
+  { code:8, name:'Discrepancies in Employee Advances and Allowances', items: [
+    "Per Clause 18.2 of the HR Manual, TADA already covers laundry, refreshments and meals. As Mr. Shahrukh's TADA for the Hunza visit has already been released, the separate food claim submitted by Mr. Didar for the same visit is not admissible.",
+    "Following adjustment of Mr. Basit's advance against the Hunza Phase 2 travel policy, an amount of Rs 7,500 remains recoverable from him. Kindly action accordingly.",
+    'The applicable entitlement is a fixed allowance of Rs 4,000; actual food bills are not admissible for reimbursement.',
+  ]},
+  { code:9, name:'Miscellaneous Observations', items: [
+    'Hotel expenses can be recorded through the accounting module of Munshi, the software installed at FHS; kindly action accordingly.',
+    "As the employer bears the cost of social security contributions, it is the employer's responsibility to ensure employees are duly registered so they may access the associated benefits.",
+    'Kindly provide the reason a Service Level Agreement has not been executed with Steam Masters.',
+    'Kindly share the scope of work included under the Hot Water Heater maintenance services.',
+    'Kindly record, in the ledger, the excess amounts receivable from employees that are to be deducted from their salaries.',
+    'The daily wage of Rs 800 should be excluded from the reimbursement claim.',
+    'Kindly provide the fuel tank capacity of vehicle registration LEE-19-3266.',
+    'Kindly clarify whether the amount represents an advance or payment for completed work, as no supporting documentation is attached to the invoice.',
+    'Kindly provide the legal opinion pertaining to the attached ICT letter.',
+    'Kindly provide HR\'s approval confirming that employees earning above Rs 25,000 are eligible for PESSI.',
+    "Kindly provide HR's confirmation that employees are insured through PESSI rather than through a company-arranged policy.",
+    'The final settlement was not prepared in accordance with HR policy regarding encashment of casual and annual leave. Kindly review.',
+  ]},
 ];
+const OBS_CATEGORIES = OBS_BANK.map(c => ({ code: c.code, name: c.name }));
 const OBS_STATUSES = ['Observation Raised','Replied','Not Satisfactory - Re-referred','Resolved','Closed'];
 const FOLLOWUP_STATUSES = ['Pending Reply','Replied','Not Satisfactory','Resolved'];
 
@@ -510,6 +638,7 @@ const SEED_VOUCHERS = [];
 let state = { vouchers: [] };
 let editingVoucherId = null;
 let editingObsId = null;
+let pendingObsOpts = {};
 
 function uid() { return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function todayStr() { return new Date().toISOString().slice(0,10); }
@@ -757,9 +886,54 @@ function clearObsFilters() {
   document.getElementById('obs-status').value = '';
   renderObservationsTab();
 }
-function openNewObservation() {
+/* ---------- OBSERVATION BANK PICKER ---------- */
+function populateBankCategorySelect() {
+  const sel = document.getElementById('bank-category');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">All Categories</option>' +
+    OBS_BANK.map(c => `<option value="${c.code}">${c.code} — ${escHtml(c.name)}</option>`).join('');
+}
+function openObsBankPicker(opts) {
   if (!state.vouchers.length) { alert('Please create a voucher first, then add an observation to it.'); return; }
-  openObsModal(null, {});
+  pendingObsOpts = opts || {};
+  document.getElementById('bank-search').value = '';
+  document.getElementById('bank-category').value = '';
+  renderObsBankList();
+  document.getElementById('obs-bank-modal').classList.add('open');
+}
+function closeObsBankModal() {
+  document.getElementById('obs-bank-modal').classList.remove('open');
+}
+function renderObsBankList() {
+  const search = (document.getElementById('bank-search').value || '').toLowerCase();
+  const catFilter = document.getElementById('bank-category').value;
+  const wrap = document.getElementById('obs-bank-list');
+  let html = '';
+  OBS_BANK.forEach(cat => {
+    if (catFilter && String(cat.code) !== catFilter) return;
+    const matches = [];
+    cat.items.forEach((text, idx) => { if (!search || text.toLowerCase().includes(search)) matches.push(idx); });
+    if (!matches.length) return;
+    html += `<div class="bank-cat-head">${cat.code} — ${escHtml(cat.name)}</div>`;
+    html += matches.map(idx =>
+      `<button type="button" class="bank-item-btn" onclick="chooseBankObservation(${cat.code}, ${idx})">${escHtml(cat.items[idx])}</button>`
+    ).join('');
+  });
+  wrap.innerHTML = html || '<div class="empty-note">No matching observations. Try a different search, or write a new one below.</div>';
+}
+function chooseBankObservation(code, idx) {
+  const cat = OBS_BANK.find(c => c.code === code);
+  const text = cat.items[idx];
+  closeObsBankModal();
+  openObsModal(null, Object.assign({}, pendingObsOpts, { presetDescription: text, presetObsType: cat.name }));
+}
+function chooseNewObservationManually() {
+  closeObsBankModal();
+  openObsModal(null, pendingObsOpts);
+}
+function backToObsBank() {
+  closeObsModal();
+  openObsBankPicker(pendingObsOpts);
 }
 function renderObservationsTab() {
   populateFilterDropdowns();
@@ -1015,14 +1189,20 @@ function openObsModal(id, opts) {
   } else {
     voucher = opts.voucherId ? state.vouchers.find(v => v.id === opts.voucherId) : null;
     obs = {
-      id: uid(), obsDate: todayStr(), billFwdDate:'', checkedBy:'', obsType:'', obsCode:'',
-      description:'', instances:1, amount: (voucher && voucher.amountFinalized) || '', status:'Observation Raised',
+      id: uid(), obsDate: todayStr(), billFwdDate:'', checkedBy:'', obsType: opts.presetObsType || '', obsCode:'',
+      description: opts.presetDescription || '', instances:1, amount: (voucher && voucher.amountFinalized) || '', status:'Observation Raised',
       reasonQty:false, reasonRate:false, reasonOther:false, otherReasonText:'',
       financialImpactReduction:'', financialImpact:'', finalizedAmount:'', followups:[]
     };
+    if (obs.obsType) {
+      const cat = OBS_CATEGORIES.find(c => c.name === obs.obsType);
+      if (cat) obs.obsCode = String(cat.code);
+    }
     obs.ref = nextObsRef(obs.obsDate);
     obs.followups.push({ refSuffix:'', queryDate: obs.obsDate, comments:'', replyDate:'', status:'Pending Reply' });
   }
+
+  document.getElementById('obs-bank-pick-hint').style.display = (!id && opts.presetDescription) ? '' : 'none';
 
   const lockVoucher = !!(id || opts.voucherId);
   const sel = document.getElementById('o-voucherId');
@@ -1258,6 +1438,7 @@ function downloadFile(content, filename, type) {
 
 function renderAll() {
   populateFilterDropdowns();
+  populateBankCategorySelect();
   renderDashboard();
   renderRegister();
   renderObservationsTab();
