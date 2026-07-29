@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BHS | Voucher Tracker</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', Arial, sans-serif; background: #f4f6f9; color: #222; font-size: 14px; }
+  button { font-family: inherit; }
+
+  /* TOP BAR */
+  #topbar {
+    background: #1a3a5c; color: #fff; padding: 10px 18px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; z-index: 200; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+  #topbar .brand { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+  #topbar .brand span { color: #c9962a; }
+  #topbar .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .btn {
+    border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer;
+    font-size: 12px; font-weight: 600; white-space: nowrap;
+  }
+  .btn-gold { background: #c9962a; color: #1a3a5c; }
+  .btn-gold:hover { background: #e0ac3d; }
+  .btn-outline { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.4); }
+  .btn-outline:hover { background: rgba(255,255,255,0.12); }
+  .btn-danger { background: #c0392b; color: #fff; }
+  .btn-danger:hover { background: #a93226; }
+  .btn-sm { padding: 4px 9px; font-size: 11px; }
+
+  /* TABS */
+  #tabbar {
+    background: #fff; border-bottom: 1px solid #dde3ec; display: flex; gap: 2px;
+    padding: 0 14px; position: sticky; top: 49px; z-index: 190; overflow-x: auto;
+  }
+  .tab-btn {
+    background: none; border: none; padding: 12px 16px; font-size: 13px; font-weight: 600;
+    color: #5a6b7d; cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap;
+  }
+  .tab-btn:hover { color: #1a3a5c; }
+  .tab-btn.active { color: #1a3a5c; border-bottom-color: #c9962a; }
+
+  .main-wrap { max-width: 1300px; margin: 0 auto; padding: 16px 14px 50px; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  .section-title {
+    font-size: 15px; font-weight: 700; color: #1a3a5c;
+    border-left: 4px solid #c9962a; padding-left: 10px;
+    margin: 22px 0 12px;
+  }
+  .section-title:first-child { margin-top: 0; }
+  .hint { font-size: 11.5px; color: #778; margin: -6px 0 12px 14px; }
+
+  /* CARDS */
+  .card { background: #fff; border-radius: 8px; border: 1px solid #dde3ec; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+  .stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .stat-card { padding: 14px 16px; }
+  .stat-card .lbl { font-size: 11px; color: #667; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+  .stat-card .val { font-size: 24px; font-weight: 800; color: #1a3a5c; }
+  .stat-card .sub { font-size: 11px; color: #889; margin-top: 4px; }
+  .stat-card.warn .val { color: #b8860b; }
+  .stat-card.bad .val { color: #c0392b; }
+  .stat-card.good .val { color: #276d40; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+  .breakdown-block { padding: 14px 16px; }
+  .breakdown-block h4 { font-size: 12.5px; color: #1a3a5c; margin-bottom: 10px; }
+  .bd-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; font-size: 12px; }
+  .bd-row .bd-name { width: 130px; flex-shrink: 0; color: #445; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bd-row .bd-bar-wrap { flex: 1; background: #eef1f6; border-radius: 4px; height: 14px; overflow: hidden; }
+  .bd-row .bd-bar-fill { height: 14px; background: linear-gradient(90deg, #1a3a5c, #2e6da4); border-radius: 4px; }
+  .bd-row .bd-count { width: 78px; text-align: right; flex-shrink: 0; color: #556; font-weight: 600; }
+
+  /* FILTER BAR */
+  .filter-bar {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: end; background: #fff;
+    border: 1px solid #dde3ec; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;
+  }
+  .fld { display: flex; flex-direction: column; gap: 3px; }
+  .fld label { font-size: 10.5px; color: #667; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+  input, select, textarea {
+    font-family: inherit; font-size: 12.5px; padding: 6px 8px; border: 1px solid #cfd8e3;
+    border-radius: 4px; background: #fff; color: #222;
+  }
+  input:focus, select:focus, textarea:focus { outline: 1px solid #1a3a5c; border-color: #1a3a5c; }
+  .fld input, .fld select { min-width: 130px; }
+  .fld.grow input { min-width: 200px; }
+
+  /* TABLE */
+  table.data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    background: #f0f4f8; color: #1a3a5c; font-size: 11.5px; font-weight: 700; padding: 9px 10px;
+    text-align: left; border-bottom: 2px solid #dde3ec; cursor: pointer; white-space: nowrap; user-select: none;
+  }
+  .data-table th:hover { background: #e6edf5; }
+  .data-table th.sorted::after { content: ' \25BE'; color: #c9962a; }
+  .data-table td { padding: 8px 10px; border-bottom: 1px solid #edf1f5; font-size: 12.5px; vertical-align: middle; }
+  .data-table tr:hover td { background: #f7f9fc; }
+  .data-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .table-scroll { overflow-x: auto; border: 1px solid #dde3ec; border-radius: 8px; background: #fff; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+  .badge-inhand { background: #e8edf3; color: #444; }
+  .badge-sampleout { background: #fdf1d8; color: #8a6109; }
+  .badge-released { background: #e2f3e6; color: #1e7d3a; }
+  .badge-checked { background: #dff1ec; color: #147a63; }
+  .badge-observation { background: #fbe3e0; color: #b8402f; }
+  .badge-postaudit { background: #e6e8fb; color: #4136ad; }
+  .badge-cancel { background: #f3d9d9; color: #8f1d1d; }
+  .badge-query { background: #fde8f0; color: #a01a5e; }
+  .badge-default { background: #eee; color: #555; }
+
+  .link-btn { background: none; border: none; color: #1a3a5c; text-decoration: underline; cursor: pointer; font-size: 12px; padding: 0; }
+  .row-actions { display: flex; gap: 8px; white-space: nowrap; }
+  .empty-note { padding: 30px; text-align: center; color: #889; font-size: 13px; }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(20,30,45,0.55);
+    z-index: 500; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 30px 12px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: #fff; border-radius: 10px; width: 100%; max-width: 880px; box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  }
+  .modal-head {
+    background: #1a3a5c; color: #fff; padding: 14px 20px; border-radius: 10px 10px 0 0;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal-head h3 { font-size: 15px; }
+  .modal-head .x-close { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; line-height: 1; }
+  .modal-body { padding: 18px 20px; max-height: 72vh; overflow-y: auto; }
+  .modal-foot { padding: 14px 20px; border-top: 1px solid #dde3ec; display: flex; justify-content: flex-end; gap: 10px; }
+
+  .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .form-grid .fld { grid-column: span 1; }
+  .form-grid .fld.span2 { grid-column: span 2; }
+  .form-grid .fld.span3 { grid-column: span 3; }
+  .form-grid label { font-size: 10.5px; color: #556; font-weight: 700; text-transform: uppercase; }
+  .form-grid input, .form-grid select, .form-grid textarea { width: 100%; }
+  textarea { resize: vertical; min-height: 34px; }
+
+  .obs-round {
+    border: 1px solid #dde3ec; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; background: #fbfcfe;
+  }
+  .obs-round-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .obs-round-head strong { color: #1a3a5c; font-size: 12.5px; }
+  .reason-cbs { display: flex; gap: 14px; align-items: center; padding-top: 4px; }
+  .reason-cbs label { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; text-transform: none; color: #334; }
+  .reason-cbs input[type=checkbox] { width: auto; }
+
+  #btn-add-round { margin-bottom: 4px; }
+
+  .legend-box { background: #fff; border: 1px solid #dde3ec; border-radius: 8px; padding: 16px 18px; }
+  .legend-box h4 { color: #1a3a5c; font-size: 13px; margin-bottom: 8px; }
+  .legend-box p { font-size: 12.5px; color: #445; line-height: 1.6; margin-bottom: 8px; }
+  .legend-box ul { margin: 0 0 10px 18px; font-size: 12.5px; color: #445; line-height: 1.7; }
+
+  @media print {
+    #topbar, #tabbar, .filter-bar, .row-actions, th.col-actions, td.col-actions, .no-print { display: none !important; }
+    .tab-pane { display: none !important; }
+    .tab-pane.print-active { display: block !important; }
+    body { background: #fff; }
+    .main-wrap { padding: 0; max-width: none; }
+  }
+
+  @media (max-width: 900px) {
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+    .form-grid .fld.span2, .form-grid .fld.span3 { grid-column: span 1; }
+  }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="brand">BHS | Voucher <span>Tracker</span></div>
+  <div class="controls">
+    <button class="btn btn-gold" onclick="openVoucherModal(null)">+ New Voucher</button>
+    <button class="btn btn-outline" onclick="exportCSV()">Export CSV</button>
+    <button class="btn btn-outline" onclick="exportBackup()">Backup (JSON)</button>
+    <button class="btn btn-outline" onclick="document.getElementById('import-file').click()">Restore</button>
+    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importBackup(event)">
+    <button class="btn btn-outline" onclick="window.print()">Print</button>
+    <button class="btn btn-danger" onclick="resetAllData()">Reset</button>
+  </div>
+</div>
+
+<div id="tabbar">
+  <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">Dashboard</button>
+  <button class="tab-btn" data-tab="register" onclick="switchTab('register')">Voucher Register</button>
+  <button class="tab-btn" data-tab="deductions" onclick="switchTab('deductions')">Deductions Report</button>
+  <button class="tab-btn" data-tab="outstanding" onclick="switchTab('outstanding')">Outstanding Observations</button>
+  <button class="tab-btn" data-tab="about" onclick="switchTab('about')">Legend</button>
+</div>
+
+<div class="main-wrap">
+
+  <!-- DASHBOARD -->
+  <div class="tab-pane active" id="pane-dashboard">
+    <div class="section-title">Overview</div>
+    <div class="stat-grid" id="dash-stats"></div>
+
+    <div class="section-title">Breakdown</div>
+    <div class="grid-2">
+      <div class="card breakdown-block"><h4>By Status</h4><div id="bd-status"></div></div>
+      <div class="card breakdown-block"><h4>By Company</h4><div id="bd-company"></div></div>
+    </div>
+    <div class="grid-2" style="margin-top:14px;">
+      <div class="card breakdown-block"><h4>By Voucher Type</h4><div id="bd-vtype"></div></div>
+      <div class="card breakdown-block"><h4>By Nature</h4><div id="bd-nature"></div></div>
+    </div>
+  </div>
+
+  <!-- REGISTER -->
+  <div class="tab-pane" id="pane-register">
+    <div class="filter-bar no-print">
+      <div class="fld grow">
+        <label>Search</label>
+        <input type="text" id="f-search" placeholder="Voucher No, Party, Narration..." oninput="renderRegister()">
+      </div>
+      <div class="fld"><label>Company</label><select id="f-company" onchange="renderRegister()"><option value="">All</option></select></div>
+      <div class="fld"><label>Voucher Type</label><select id="f-vtype" onchange="renderRegister()"><option value="">All</option></select></div>
+      <div class="fld"><label>Nature</label><select id="f-nature" onchange="renderRegister()"><option value="">All</option></select></div>
+      <div class="fld"><label>Status</label><select id="f-status" onchange="renderRegister()"><option value="">All</option></select></div>
+      <div class="fld"><label>From</label><input type="date" id="f-from" onchange="renderRegister()"></div>
+      <div class="fld"><label>To</label><input type="date" id="f-to" onchange="renderRegister()"></div>
+      <div class="fld"><button class="btn btn-outline" style="color:#1a3a5c;border-color:#1a3a5c" onclick="clearRegisterFilters()">Clear</button></div>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table" id="register-table">
+        <thead><tr id="register-head"></tr></thead>
+        <tbody id="register-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- DEDUCTIONS -->
+  <div class="tab-pane" id="pane-deductions">
+    <div class="filter-bar no-print">
+      <div class="fld"><label>Company</label><select id="d-company" onchange="renderDeductions()"><option value="">All</option></select></div>
+      <div class="fld"><label>Reason</label>
+        <select id="d-reason" onchange="renderDeductions()">
+          <option value="">All</option>
+          <option value="qty">Quantity</option>
+          <option value="rate">Rate</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="fld"><button class="btn btn-outline" style="color:#1a3a5c;border-color:#1a3a5c" onclick="clearDeductionFilters()">Clear</button></div>
+    </div>
+    <div class="stat-grid" style="grid-template-columns:repeat(3,1fr); margin-bottom:14px;" id="ded-stats"></div>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead><tr>
+          <th>Voucher</th><th>Company</th><th>Party</th><th>Obs. Date</th><th>Ref #</th>
+          <th>Reason</th><th class="num">Deduction (Rs.)</th><th class="num">Financial Impact (Rs.)</th><th>Response</th>
+        </tr></thead>
+        <tbody id="ded-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- OUTSTANDING -->
+  <div class="tab-pane" id="pane-outstanding">
+    <div class="filter-bar no-print">
+      <div class="fld"><label>Company</label><select id="o-company" onchange="renderOutstanding()"><option value="">All</option></select></div>
+    </div>
+    <div class="stat-grid" style="grid-template-columns:repeat(3,1fr); margin-bottom:14px;" id="out-stats"></div>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead><tr>
+          <th>Voucher</th><th>Company</th><th>Party</th><th>Observation Date</th><th>Observation Type</th>
+          <th>Description</th><th>Query Date</th><th>Query Date 2</th><th class="num">Days Pending</th>
+        </tr></thead>
+        <tbody id="out-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ABOUT -->
+  <div class="tab-pane" id="pane-about">
+    <div class="legend-box">
+      <h4>Status Meanings</h4>
+      <ul>
+        <li><b>In Hand</b> — voucher received, not yet reviewed.</li>
+        <li><b>Sample Out</b> — voucher pulled out for audit sampling / review.</li>
+        <li><b>Observation</b> — an observation has been raised on the voucher and is awaiting reply.</li>
+        <li><b>Checked - In Hand</b> — review complete, voucher retained.</li>
+        <li><b>Released</b> — voucher cleared and returned.</li>
+        <li><b>Post Audit</b> — flagged for post-audit follow-up.</li>
+        <li><b>Post Audit - In Hand</b> — post-audit voucher retained for re-check.</li>
+        <li><b>Mudasir / Chugtai Sb</b> — pending with the named reviewer for decision.</li>
+        <li><b>Cancel Payment</b> — payment cancelled / voucher withdrawn.</li>
+      </ul>
+      <h4>Deduction Reasons</h4>
+      <p>Every observation that results in a financial impact records why the amount was reduced: a <b>Quantity</b> discrepancy, a <b>Rate</b> discrepancy, or <b>Other</b> reason (e.g. missing support, tax withholding, policy non-compliance). More than one reason may apply to the same observation.</p>
+      <h4>Reference Number Format</h4>
+      <p>Observation references follow <code>MMYYNNNN</code>, e.g. <code>07260001</code> = July 2026, observation #0001.</p>
+      <h4>Data storage</h4>
+      <p>All data is saved locally in this browser (localStorage). Use <b>Backup (JSON)</b> regularly and <b>Restore</b> to move data between machines or browsers — clearing browser data will erase unsaved records.</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- VOUCHER MODAL -->
+<div class="modal-overlay" id="voucher-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modal-title">New Voucher</h3>
+      <button class="x-close" onclick="closeVoucherModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="section-title" style="margin-top:0">Voucher Details</div>
+      <div class="form-grid">
+        <div class="fld"><label>Voucher Receiving Date</label><input type="date" id="v-receivingDate"></div>
+        <div class="fld"><label>Voucher Type</label>
+          <select id="v-voucherType"><option value="BP">BP</option><option value="JV">JV</option></select>
+        </div>
+        <div class="fld"><label>Voucher No.</label><input type="text" id="v-voucherNo" placeholder="e.g. 17"></div>
+
+        <div class="fld"><label>Company</label>
+          <select id="v-company">
+            <option value="BPS">BPS</option><option value="ECD">ECD</option><option value="PDLC">PDLC</option>
+            <option value="PTSL">PTSL</option><option value="KASALIN FOODS">KASALIN FOODS</option>
+          </select>
+        </div>
+        <div class="fld"><label>Nature</label>
+          <select id="v-nature">
+            <option value="Advance">Advance</option><option value="Payment">Payment</option>
+            <option value="Adjustment">Adjustment</option><option value="Reimbursement">Reimbursement</option>
+            <option value="Receipt">Receipt</option>
+          </select>
+        </div>
+        <div class="fld"><label>Status</label>
+          <select id="v-status">
+            <option>In Hand</option><option>Sample Out</option><option>Observation</option>
+            <option>Checked - In Hand</option><option>Released</option><option>Post Audit</option>
+            <option>Post Audit - In Hand</option><option>Mudasir / Chugtai Sb</option><option>Cancel Payment</option>
+          </select>
+        </div>
+
+        <div class="fld span2"><label>Party Name</label><input type="text" id="v-partyName" placeholder="Payee / vendor / employee"></div>
+        <div class="fld"><label>Amount Finalized (Rs.)</label><input type="number" id="v-amountFinalized" step="0.01" min="0"></div>
+
+        <div class="fld span3"><label>Narration</label><textarea id="v-narration" placeholder="Purpose / description"></textarea></div>
+
+        <div class="fld"><label>Releasing Date</label><input type="date" id="v-releasingDate"></div>
+        <div class="fld"><label>Post Audit Date</label><input type="date" id="v-postAuditDate"></div>
+        <div class="fld"><label>Post Audit Voucher Received On</label><input type="date" id="v-postAuditReceivedDate"></div>
+      </div>
+
+      <div class="section-title">Observations, Reply &amp; Deduction Tracking</div>
+      <div class="hint">Log every observation raised against this voucher, the query/response cycle, and any resulting deduction — one entry per round.</div>
+      <div id="obs-rounds-container"></div>
+      <button class="btn btn-outline" id="btn-add-round" style="color:#1a3a5c;border-color:#1a3a5c" onclick="addObsRound()">+ Add Observation</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" style="color:#1a3a5c;border-color:#1a3a5c" onclick="closeVoucherModal()">Cancel</button>
+      <button class="btn btn-danger" id="btn-delete-voucher" style="display:none" onclick="deleteCurrentVoucher()">Delete Voucher</button>
+      <button class="btn btn-gold" onclick="saveVoucher()">Save Voucher</button>
+    </div>
+  </div>
+</div>
+
+<datalist id="obs-type-list">
+  <option value="PMC Discrepancies Regarding Vendor Registration, RFQs and Budgetary Matters">
+  <option value="Timelines of Execution, Incomplete, Erroneous or Missing Supporting Data">
+  <option value="Late Payments">
+  <option value="Tax Related Issues">
+  <option value="Expense Booked Against Wrong Head">
+  <option value="Errors in Data Entry, Typing and Calculation">
+  <option value="Discrepancies in Employee Advances and Allowances">
+  <option value="Miscellaneous Observations">
+</datalist>
+
+<script>
+const STORAGE_KEY = 'ks_voucher_tracker_v1';
+const COMPANIES = ['BPS','ECD','PDLC','PTSL','KASALIN FOODS'];
+const VTYPES = ['BP','JV'];
+const NATURES = ['Advance','Payment','Adjustment','Reimbursement','Receipt'];
+const STATUSES = ['In Hand','Sample Out','Observation','Checked - In Hand','Released','Post Audit','Post Audit - In Hand','Mudasir / Chugtai Sb','Cancel Payment'];
+
+const SEED_VOUCHERS = [{"voucherType": "BP", "voucherNo": "17", "company": "BPS", "nature": "Payment", "partyName": "Hira Nadir", "narration": "", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "19", "company": "BPS", "nature": "Payment", "partyName": "Quratulain Ali", "narration": "", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "JV", "voucherNo": "18", "company": "PDLC", "nature": "Adjustment", "partyName": "EOBI Contribution MFO May 26", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "16", "company": "BPS", "nature": "Payment", "partyName": "M Amin  M Tufail", "narration": "Guard off Salary", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "25", "company": "BPS", "nature": "Payment", "partyName": "Zain ul Abdin", "narration": "", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "11", "company": "BPS", "nature": "Payment", "partyName": "Rehman Ali Shah", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "33", "company": "BPS", "nature": "Payment", "partyName": "PSP Project", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "12", "company": "BPS", "nature": "Payment", "partyName": "EOBI Contribution MFO May 26", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "20", "company": "BPS", "nature": "Payment", "partyName": "DHA Membership Fee", "narration": "", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "21", "company": "PDLC", "nature": "Payment", "partyName": "PRA  Payment FMO  May 26", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "19", "company": "PDLC", "nature": "Payment", "partyName": "Federal Sales Tax FMO May 26", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "20", "company": "PDLC", "nature": "Payment", "partyName": "Director General KPRA", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "59", "company": "PDLC", "nature": "Payment", "partyName": "PSSP Project PDLC", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "6", "company": "BPS", "nature": "Payment", "partyName": "Ali Mahmud Kasuri", "narration": "Synergy", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "70", "company": "BPS", "nature": "Payment", "partyName": "Alpha Homes", "narration": "", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "5", "company": "BPS", "nature": "Payment", "partyName": "Nasir Mahmud", "narration": "Gree Invertor", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "3", "company": "BPS", "nature": "Payment", "partyName": "Ali Mahmud Kasuri", "narration": "Hira Nadir", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "1", "company": "BPS", "nature": "Payment", "partyName": "50% Advance  Hira Nadir", "narration": "", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "34", "company": "BPS", "nature": "Payment", "partyName": "LESCO", "narration": "Electricity Bill", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "36", "company": "BPS", "nature": "Payment", "partyName": "Zain ul Abdin", "narration": "Appeal for Default Surcharge", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "40", "company": "BPS", "nature": "Payment", "partyName": "Matchless Tours and Travels Pvt Ltd", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "1", "company": "BPS", "nature": "Payment", "partyName": "Deputy Commisiioner Income Tax Lahore", "narration": "WHT 153", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "57", "company": "BPS", "nature": "Payment", "partyName": "Zain ul Abdin", "narration": "legal and professional exp", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "60", "company": "BPS", "nature": "Payment", "partyName": "Deputy Commisiioner Income Tax Lahore", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "34", "company": "BPS", "nature": "Payment", "partyName": "Mansoor iqbal", "narration": "Advance Salary", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "30", "company": "BPS", "nature": "Payment", "partyName": "Ali Mahmud Kasuri", "narration": "", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "27", "company": "BPS", "nature": "Payment", "partyName": "RD  ESL", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "32", "company": "BPS", "nature": "Payment", "partyName": "Membership Fee", "narration": "Land", "status": "Sample Out", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "29", "company": "BPS", "nature": "Payment", "partyName": "Ali Mahmud Kasuri", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}, {"voucherType": "BP", "voucherNo": "31", "company": "BPS", "nature": "Payment", "partyName": "Ali Mahmud Kasuri", "narration": "", "status": "Released", "amountFinalized": null, "receivingDate": "2026-06-26", "releasingDate": "2026-06-26"}];
+
+let state = { vouchers: [] };
+let editingId = null;
+
+function uid() { return 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+function load() {
+  let raw = null;
+  try { raw = localStorage.getItem(STORAGE_KEY); } catch(e) {}
+  if (raw) {
+    try { state = JSON.parse(raw); return; } catch(e) {}
+  }
+  state = { vouchers: SEED_VOUCHERS.map((v,i) => Object.assign({ id: uid(), srNo: i+1, postAuditDate:'', postAuditReceivedDate:'', observations: [] }, v)) };
+  save();
+}
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+}
+
+function resetAllData() {
+  if (!confirm('This will erase all vouchers in this browser and reload the original sample data. Continue?')) return;
+  try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+  load();
+  renderAll();
+}
+
+function fmtMoney(n) {
+  n = Number(n) || 0;
+  return 'Rs. ' + n.toLocaleString('en-PK', { maximumFractionDigits: 2 });
+}
+function fmtDate(d) {
+  if (!d) return '';
+  const dt = new Date(d + 'T00:00:00');
+  if (isNaN(dt)) return d;
+  return dt.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+}
+function monthLabel(d) {
+  if (!d) return '';
+  const dt = new Date(d + 'T00:00:00');
+  if (isNaN(dt)) return '';
+  return dt.toLocaleDateString('en-US', { month:'short', year:'2-digit' });
+}
+function badgeClass(status) {
+  const map = {
+    'In Hand':'badge-inhand', 'Sample Out':'badge-sampleout', 'Released':'badge-released',
+    'Checked - In Hand':'badge-checked', 'Observation':'badge-observation', 'Post Audit':'badge-postaudit',
+    'Post Audit - In Hand':'badge-postaudit', 'Cancel Payment':'badge-cancel', 'Mudasir / Chugtai Sb':'badge-query'
+  };
+  return map[status] || 'badge-default';
+}
+
+function voucherDeductionTotal(v) {
+  return (v.observations||[]).reduce((s,o) => s + (Number(o.financialImpactReduction)||0), 0);
+}
+function voucherFinancialImpactTotal(v) {
+  return (v.observations||[]).reduce((s,o) => s + (Number(o.financialImpact)||0), 0);
+}
+
+/* ---------- TABS ---------- */
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-pane').forEach(p => {
+    const active = p.id === 'pane-' + tab;
+    p.classList.toggle('active', active);
+    p.classList.toggle('print-active', active);
+  });
+  if (tab === 'dashboard') renderDashboard();
+  if (tab === 'register') renderRegister();
+  if (tab === 'deductions') renderDeductions();
+  if (tab === 'outstanding') renderOutstanding();
+}
+
+/* ---------- FILTER DROPDOWN POPULATION ---------- */
+function fillOptions(sel, values) {
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All</option>' + values.map(v => `<option value="${escAttr(v)}">${escHtml(v)}</option>`).join('');
+  sel.value = cur;
+}
+function populateFilterDropdowns() {
+  ['f-company','d-company','o-company'].forEach(id => fillOptions(document.getElementById(id), COMPANIES));
+  fillOptions(document.getElementById('f-vtype'), VTYPES);
+  fillOptions(document.getElementById('f-nature'), NATURES);
+  fillOptions(document.getElementById('f-status'), STATUSES);
+}
+
+function escHtml(s) { return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function escAttr(s) { return escHtml(s); }
+
+/* ---------- DASHBOARD ---------- */
+function renderDashboard() {
+  const vs = state.vouchers;
+  const total = vs.length;
+  const totalAmount = vs.reduce((s,v) => s + (Number(v.amountFinalized)||0), 0);
+  const totalDeduction = vs.reduce((s,v) => s + voucherDeductionTotal(v), 0);
+  const outstanding = vs.reduce((s,v) => s + (v.observations||[]).filter(o => o.obsDate && !o.responseDate).length, 0);
+  const postAuditPending = vs.filter(v => v.status === 'Post Audit' || v.status === 'Post Audit - In Hand').length;
+
+  document.getElementById('dash-stats').innerHTML = `
+    <div class="card stat-card"><div class="lbl">Total Vouchers</div><div class="val">${total}</div></div>
+    <div class="card stat-card good"><div class="lbl">Total Amount Finalized</div><div class="val">${fmtMoney(totalAmount)}</div></div>
+    <div class="card stat-card bad"><div class="lbl">Total Deductions</div><div class="val">${fmtMoney(totalDeduction)}</div></div>
+    <div class="card stat-card warn"><div class="lbl">Outstanding Observations</div><div class="val">${outstanding}</div></div>
+    <div class="card stat-card warn"><div class="lbl">Post Audit Pending</div><div class="val">${postAuditPending}</div></div>
+  `;
+
+  renderBreakdown('bd-status', vs, v => v.status || '(blank)');
+  renderBreakdown('bd-company', vs, v => v.company || '(blank)');
+  renderBreakdown('bd-vtype', vs, v => v.voucherType || '(blank)');
+  renderBreakdown('bd-nature', vs, v => v.nature || '(blank)');
+}
+function renderBreakdown(elId, vs, keyFn) {
+  const counts = {};
+  vs.forEach(v => { const k = keyFn(v); counts[k] = (counts[k]||0)+1; });
+  const entries = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+  const max = entries.length ? entries[0][1] : 1;
+  const el = document.getElementById(elId);
+  if (!entries.length) { el.innerHTML = '<div class="empty-note">No data</div>'; return; }
+  el.innerHTML = entries.map(([name,count]) => `
+    <div class="bd-row">
+      <div class="bd-name" title="${escAttr(name)}">${escHtml(name)}</div>
+      <div class="bd-bar-wrap"><div class="bd-bar-fill" style="width:${(count/max*100).toFixed(0)}%"></div></div>
+      <div class="bd-count">${count} (${(count/vs.length*100 || 0).toFixed(0)}%)</div>
+    </div>`).join('');
+}
+
+/* ---------- REGISTER ---------- */
+const REGISTER_COLS = [
+  { key:'srNo', label:'Sr#' },
+  { key:'receivingDate', label:'Receiving Date', fmt:fmtDate },
+  { key:'voucherType', label:'Type' },
+  { key:'voucherNo', label:'Voucher No.' },
+  { key:'company', label:'Company' },
+  { key:'nature', label:'Nature' },
+  { key:'partyName', label:'Party Name' },
+  { key:'status', label:'Status', badge:true },
+  { key:'amountFinalized', label:'Amount Finalized', num:true, fmt:fmtMoney },
+  { key:'_deduction', label:'Deduction', num:true, fmt:fmtMoney },
+  { key:'_obsCount', label:'Observations', num:true },
+];
+let sortState = { key:'srNo', dir:1 };
+
+function clearRegisterFilters() {
+  ['f-search'].forEach(id => document.getElementById(id).value = '');
+  ['f-company','f-vtype','f-nature','f-status'].forEach(id => document.getElementById(id).value = '');
+  ['f-from','f-to'].forEach(id => document.getElementById(id).value = '');
+  renderRegister();
+}
+
+function getFilteredVouchers() {
+  const search = (document.getElementById('f-search').value || '').toLowerCase();
+  const company = document.getElementById('f-company').value;
+  const vtype = document.getElementById('f-vtype').value;
+  const nature = document.getElementById('f-nature').value;
+  const status = document.getElementById('f-status').value;
+  const from = document.getElementById('f-from').value;
+  const to = document.getElementById('f-to').value;
+
+  return state.vouchers.filter(v => {
+    if (company && v.company !== company) return false;
+    if (vtype && v.voucherType !== vtype) return false;
+    if (nature && v.nature !== nature) return false;
+    if (status && v.status !== status) return false;
+    if (from && (!v.receivingDate || v.receivingDate < from)) return false;
+    if (to && (!v.receivingDate || v.receivingDate > to)) return false;
+    if (search) {
+      const hay = [v.voucherNo, v.partyName, v.narration, v.company].join(' ').toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+function renderRegister() {
+  populateFilterDropdowns();
+  const head = document.getElementById('register-head');
+  head.innerHTML = REGISTER_COLS.map(c =>
+    `<th class="${sortState.key===c.key?'sorted':''}" onclick="sortRegisterBy('${c.key}')">${c.label}</th>`
+  ).join('') + '<th class="col-actions">Actions</th>';
+
+  let rows = getFilteredVouchers().map(v => Object.assign({}, v, {
+    _deduction: voucherDeductionTotal(v),
+    _obsCount: (v.observations||[]).length
+  }));
+
+  rows.sort((a,b) => {
+    let av = a[sortState.key], bv = b[sortState.key];
+    if (av == null) av = ''; if (bv == null) bv = '';
+    if (typeof av === 'string') av = av.toLowerCase();
+    if (typeof bv === 'string') bv = bv.toLowerCase();
+    if (av < bv) return -1*sortState.dir;
+    if (av > bv) return 1*sortState.dir;
+    return 0;
+  });
+
+  const body = document.getElementById('register-body');
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="${REGISTER_COLS.length+1}" class="empty-note">No vouchers match the current filters.</td></tr>`;
+    return;
+  }
+  body.innerHTML = rows.map(v => {
+    const cells = REGISTER_COLS.map(c => {
+      let val = v[c.key];
+      if (c.badge) return `<td><span class="badge ${badgeClass(val)}">${escHtml(val||'-')}</span></td>`;
+      if (c.fmt) val = c.fmt(val);
+      return `<td class="${c.num?'num':''}">${escHtml(val==null?'':val)}</td>`;
+    }).join('');
+    return `<tr>${cells}<td class="col-actions row-actions">
+      <button class="link-btn" onclick="openVoucherModal('${v.id}')">Edit</button>
+    </td></tr>`;
+  }).join('');
+}
+function sortRegisterBy(key) {
+  if (sortState.key === key) sortState.dir *= -1; else { sortState.key = key; sortState.dir = 1; }
+  renderRegister();
+}
+
+/* ---------- DEDUCTIONS REPORT ---------- */
+function clearDeductionFilters() {
+  document.getElementById('d-company').value = '';
+  document.getElementById('d-reason').value = '';
+  renderDeductions();
+}
+function allObservationRows() {
+  const rows = [];
+  state.vouchers.forEach(v => (v.observations||[]).forEach(o => rows.push({ v, o })));
+  return rows;
+}
+function renderDeductions() {
+  populateFilterDropdowns();
+  const company = document.getElementById('d-company').value;
+  const reason = document.getElementById('d-reason').value;
+
+  let rows = allObservationRows().filter(({v,o}) => (Number(o.financialImpactReduction)||0) > 0 || (Number(o.financialImpact)||0) > 0);
+  if (company) rows = rows.filter(({v}) => v.company === company);
+  if (reason === 'qty') rows = rows.filter(({o}) => o.reasonQty);
+  if (reason === 'rate') rows = rows.filter(({o}) => o.reasonRate);
+  if (reason === 'other') rows = rows.filter(({o}) => o.reasonOther);
+
+  const totalDeduction = rows.reduce((s,{o}) => s + (Number(o.financialImpactReduction)||0), 0);
+  const totalImpact = rows.reduce((s,{o}) => s + (Number(o.financialImpact)||0), 0);
+  document.getElementById('ded-stats').innerHTML = `
+    <div class="card stat-card"><div class="lbl">Observations with Deduction</div><div class="val">${rows.length}</div></div>
+    <div class="card stat-card bad"><div class="lbl">Total Deduction</div><div class="val">${fmtMoney(totalDeduction)}</div></div>
+    <div class="card stat-card"><div class="lbl">Total Financial Impact</div><div class="val">${fmtMoney(totalImpact)}</div></div>
+  `;
+
+  const body = document.getElementById('ded-body');
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="9" class="empty-note">No deductions recorded yet.</td></tr>`;
+    return;
+  }
+  body.innerHTML = rows.map(({v,o}) => {
+    const reasons = [o.reasonQty && 'Quantity', o.reasonRate && 'Rate', o.reasonOther && ('Other' + (o.otherReasonText? ': '+o.otherReasonText : ''))].filter(Boolean).join(', ');
+    return `<tr>
+      <td>${escHtml(v.voucherType)}-${escHtml(v.voucherNo)}</td>
+      <td>${escHtml(v.company)}</td>
+      <td>${escHtml(v.partyName)}</td>
+      <td>${fmtDate(o.obsDate)}</td>
+      <td>${escHtml(o.ref||'')}</td>
+      <td>${escHtml(reasons||'-')}</td>
+      <td class="num">${fmtMoney(o.financialImpactReduction)}</td>
+      <td class="num">${fmtMoney(o.financialImpact)}</td>
+      <td>${o.responseDate ? fmtDate(o.responseDate) : '<span class="badge badge-observation">Pending</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ---------- OUTSTANDING OBSERVATIONS REPORT ---------- */
+function renderOutstanding() {
+  populateFilterDropdowns();
+  const company = document.getElementById('o-company').value;
+  let rows = allObservationRows().filter(({o}) => o.obsDate && !o.responseDate);
+  if (company) rows = rows.filter(({v}) => v.company === company);
+
+  const today = new Date();
+  rows = rows.map(({v,o}) => {
+    const d = new Date(o.obsDate + 'T00:00:00');
+    const days = isNaN(d) ? 0 : Math.floor((today - d) / 86400000);
+    return { v, o, days };
+  }).sort((a,b) => b.days - a.days);
+
+  const over30 = rows.filter(r => r.days > 30).length;
+  document.getElementById('out-stats').innerHTML = `
+    <div class="card stat-card warn"><div class="lbl">Outstanding Observations</div><div class="val">${rows.length}</div></div>
+    <div class="card stat-card bad"><div class="lbl">Pending &gt; 30 Days</div><div class="val">${over30}</div></div>
+    <div class="card stat-card"><div class="lbl">Oldest Pending (Days)</div><div class="val">${rows.length ? rows[0].days : 0}</div></div>
+  `;
+
+  const body = document.getElementById('out-body');
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="9" class="empty-note">No outstanding observations. Everything has a reply on file.</td></tr>`;
+    return;
+  }
+  body.innerHTML = rows.map(({v,o,days}) => `
+    <tr>
+      <td>${escHtml(v.voucherType)}-${escHtml(v.voucherNo)}</td>
+      <td>${escHtml(v.company)}</td>
+      <td>${escHtml(v.partyName)}</td>
+      <td>${fmtDate(o.obsDate)}</td>
+      <td>${escHtml(o.obsType||'-')}</td>
+      <td>${escHtml(o.obsDesc||'')}</td>
+      <td>${fmtDate(o.queryDate)}</td>
+      <td>${fmtDate(o.queryDate2)}</td>
+      <td class="num">${days}</td>
+    </tr>`).join('');
+}
+
+/* ---------- VOUCHER MODAL ---------- */
+function openVoucherModal(id) {
+  editingId = id;
+  const v = id ? state.vouchers.find(x => x.id === id) : {
+    voucherType:'BP', company:'BPS', nature:'Payment', status:'In Hand',
+    receivingDate:'', releasingDate:'', voucherNo:'', partyName:'', narration:'',
+    amountFinalized:'', postAuditDate:'', postAuditReceivedDate:'', observations:[]
+  };
+  document.getElementById('modal-title').textContent = id ? `Edit Voucher: ${v.voucherType}-${v.voucherNo}` : 'New Voucher';
+  document.getElementById('btn-delete-voucher').style.display = id ? '' : 'none';
+
+  document.getElementById('v-receivingDate').value = v.receivingDate || '';
+  document.getElementById('v-voucherType').value = v.voucherType || 'BP';
+  document.getElementById('v-voucherNo').value = v.voucherNo || '';
+  document.getElementById('v-company').value = v.company || 'BPS';
+  document.getElementById('v-nature').value = v.nature || 'Payment';
+  document.getElementById('v-status').value = v.status || 'In Hand';
+  document.getElementById('v-partyName').value = v.partyName || '';
+  document.getElementById('v-amountFinalized').value = v.amountFinalized ?? '';
+  document.getElementById('v-narration').value = v.narration || '';
+  document.getElementById('v-releasingDate').value = v.releasingDate || '';
+  document.getElementById('v-postAuditDate').value = v.postAuditDate || '';
+  document.getElementById('v-postAuditReceivedDate').value = v.postAuditReceivedDate || '';
+
+  const container = document.getElementById('obs-rounds-container');
+  container.innerHTML = '';
+  (v.observations || []).forEach(o => addObsRound(o));
+
+  document.getElementById('voucher-modal').classList.add('open');
+}
+function closeVoucherModal() {
+  document.getElementById('voucher-modal').classList.remove('open');
+  editingId = null;
+}
+
+let obsRoundSeq = 0;
+function addObsRound(data) {
+  data = data || {};
+  const rid = 'r' + (obsRoundSeq++);
+  const wrap = document.createElement('div');
+  wrap.className = 'obs-round';
+  wrap.dataset.rid = rid;
+  wrap.innerHTML = `
+    <div class="obs-round-head">
+      <strong>Observation Round</strong>
+      <button class="btn btn-danger btn-sm" onclick="this.closest('.obs-round').remove()">Remove</button>
+    </div>
+    <div class="form-grid">
+      <div class="fld"><label>Observation Date</label><input type="date" class="o-obsDate" value="${escAttr(data.obsDate||'')}"></div>
+      <div class="fld span2"><label>Observation Type</label><input type="text" class="o-obsType" list="obs-type-list" value="${escAttr(data.obsType||'')}" placeholder="Select or type category"></div>
+      <div class="fld span3"><label>Observation Description</label><textarea class="o-obsDesc" placeholder="Details of the observation raised">${escHtml(data.obsDesc||'')}</textarea></div>
+
+      <div class="fld"><label>Ref # <span style="text-transform:none;font-weight:400;color:#889">(MMYYNNNN)</span></label><input type="text" class="o-ref" value="${escAttr(data.ref||'')}" placeholder="07260001"></div>
+      <div class="fld span2">
+        <label>Deduction Reason</label>
+        <div class="reason-cbs">
+          <label><input type="checkbox" class="o-reasonQty" ${data.reasonQty?'checked':''}> Quantity</label>
+          <label><input type="checkbox" class="o-reasonRate" ${data.reasonRate?'checked':''}> Rate</label>
+          <label><input type="checkbox" class="o-reasonOther" ${data.reasonOther?'checked':''}> Other</label>
+        </div>
+      </div>
+      <div class="fld span3"><label>Other Reason (if applicable)</label><input type="text" class="o-otherReasonText" value="${escAttr(data.otherReasonText||'')}"></div>
+
+      <div class="fld"><label>Financial Impact (Reduction) Rs.</label><input type="number" step="0.01" class="o-financialImpactReduction" value="${data.financialImpactReduction ?? ''}"></div>
+      <div class="fld"><label>Financial Impact (Total) Rs.</label><input type="number" step="0.01" class="o-financialImpact" value="${data.financialImpact ?? ''}"></div>
+      <div class="fld"><label>Response Date</label><input type="date" class="o-responseDate" value="${escAttr(data.responseDate||'')}"></div>
+
+      <div class="fld"><label>Query Date</label><input type="date" class="o-queryDate" value="${escAttr(data.queryDate||'')}"></div>
+      <div class="fld"><label>Query Date 2 (Follow-up)</label><input type="date" class="o-queryDate2" value="${escAttr(data.queryDate2||'')}"></div>
+    </div>
+  `;
+  document.getElementById('obs-rounds-container').appendChild(wrap);
+}
+
+function collectObsRounds() {
+  return Array.from(document.querySelectorAll('#obs-rounds-container .obs-round')).map(el => ({
+    obsDate: el.querySelector('.o-obsDate').value,
+    obsType: el.querySelector('.o-obsType').value.trim(),
+    obsDesc: el.querySelector('.o-obsDesc').value.trim(),
+    ref: el.querySelector('.o-ref').value.trim(),
+    reasonQty: el.querySelector('.o-reasonQty').checked,
+    reasonRate: el.querySelector('.o-reasonRate').checked,
+    reasonOther: el.querySelector('.o-reasonOther').checked,
+    otherReasonText: el.querySelector('.o-otherReasonText').value.trim(),
+    financialImpactReduction: el.querySelector('.o-financialImpactReduction').value,
+    financialImpact: el.querySelector('.o-financialImpact').value,
+    responseDate: el.querySelector('.o-responseDate').value,
+    queryDate: el.querySelector('.o-queryDate').value,
+    queryDate2: el.querySelector('.o-queryDate2').value,
+  }));
+}
+
+function saveVoucher() {
+  const voucherNo = document.getElementById('v-voucherNo').value.trim();
+  const partyName = document.getElementById('v-partyName').value.trim();
+  if (!voucherNo || !partyName) {
+    alert('Voucher No. and Party Name are required.');
+    return;
+  }
+  const payload = {
+    voucherType: document.getElementById('v-voucherType').value,
+    voucherNo,
+    company: document.getElementById('v-company').value,
+    nature: document.getElementById('v-nature').value,
+    status: document.getElementById('v-status').value,
+    partyName,
+    amountFinalized: document.getElementById('v-amountFinalized').value,
+    narration: document.getElementById('v-narration').value.trim(),
+    receivingDate: document.getElementById('v-receivingDate').value,
+    releasingDate: document.getElementById('v-releasingDate').value,
+    postAuditDate: document.getElementById('v-postAuditDate').value,
+    postAuditReceivedDate: document.getElementById('v-postAuditReceivedDate').value,
+    observations: collectObsRounds(),
+  };
+
+  if (editingId) {
+    const idx = state.vouchers.findIndex(x => x.id === editingId);
+    state.vouchers[idx] = Object.assign({}, state.vouchers[idx], payload);
+  } else {
+    const nextSr = state.vouchers.reduce((m,v) => Math.max(m, v.srNo||0), 0) + 1;
+    state.vouchers.push(Object.assign({ id: uid(), srNo: nextSr }, payload));
+  }
+  save();
+  closeVoucherModal();
+  renderAll();
+}
+function deleteCurrentVoucher() {
+  if (!editingId) return;
+  if (!confirm('Delete this voucher permanently?')) return;
+  state.vouchers = state.vouchers.filter(x => x.id !== editingId);
+  save();
+  closeVoucherModal();
+  renderAll();
+}
+
+/* ---------- CSV EXPORT ---------- */
+function csvEscape(v) {
+  v = v == null ? '' : String(v);
+  if (/[",\n]/.test(v)) return '"' + v.replace(/"/g,'""') + '"';
+  return v;
+}
+function exportCSV() {
+  const headers = ['Sr No','Voucher Receiving Date','Voucher Releasing Date','Voucher Type','Voucher No','Company','Nature','Party Name','Narration','Status','Amount Finalized','Total Deduction','Total Financial Impact','Observation Count','Outstanding Observations','Post Audit Date','Post Audit Voucher Received On'];
+  const lines = [headers.join(',')];
+  state.vouchers.forEach(v => {
+    const outstanding = (v.observations||[]).filter(o => o.obsDate && !o.responseDate).length;
+    lines.push([
+      v.srNo, v.receivingDate, v.releasingDate, v.voucherType, v.voucherNo, v.company, v.nature,
+      v.partyName, v.narration, v.status, v.amountFinalized, voucherDeductionTotal(v), voucherFinancialImpactTotal(v),
+      (v.observations||[]).length, outstanding, v.postAuditDate, v.postAuditReceivedDate
+    ].map(csvEscape).join(','));
+  });
+  downloadFile(lines.join('\n'), 'voucher_register.csv', 'text/csv');
+}
+function exportBackup() {
+  downloadFile(JSON.stringify(state, null, 2), 'voucher_tracker_backup_' + new Date().toISOString().slice(0,10) + '.json', 'application/json');
+}
+function importBackup(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      if (!parsed || !Array.isArray(parsed.vouchers)) throw new Error('bad format');
+      if (!confirm(`Restore ${parsed.vouchers.length} vouchers from this backup? This replaces all current data.`)) return;
+      state = parsed;
+      save();
+      renderAll();
+    } catch(e) {
+      alert('Could not read this file as a Voucher Tracker backup.');
+    }
+  };
+  reader.readAsText(file);
+  evt.target.value = '';
+}
+function downloadFile(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function renderAll() {
+  populateFilterDropdowns();
+  renderDashboard();
+  renderRegister();
+  renderDeductions();
+  renderOutstanding();
+}
+
+load();
+renderAll();
+</script>
+</body>
+</html>
