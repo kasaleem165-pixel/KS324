@@ -180,11 +180,23 @@
     width: 30px; flex-shrink: 0; cursor: pointer; font-size: 14px; margin-bottom: 6px;
   }
   .bank-item-remove:hover { background: #e9baba; }
-  .bank-pick-hint {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    background: #eef4fb; border: 1px solid #cfe0f2; border-radius: 6px; padding: 8px 12px;
-    font-size: 12px; color: #1a3a5c; margin: -6px 0 14px;
+  .bank-item-btn.selected { background: #dff1ec; border-color: #147a63; }
+  .bank-item-btn.selected::before { content: "✓ "; color: #147a63; font-weight: 700; }
+
+  .bank-picker-layout { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
+  .bank-picker-tray {
+    border: 1px solid #dde3ec; border-radius: 8px; padding: 12px; background: #fbfcfe;
+    max-height: 56vh; overflow-y: auto; position: sticky; top: 0;
   }
+  .tray-head { font-size: 11px; font-weight: 700; color: #1a3a5c; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 8px; }
+  .tray-item {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;
+    background: #fff; border: 1px solid #dde3ec; border-radius: 6px; padding: 7px 9px; margin-bottom: 6px; font-size: 12px; color: #223;
+  }
+  .tray-item button { flex-shrink: 0; background: none; border: none; color: #c0392b; cursor: pointer; font-size: 15px; line-height: 1; }
+  .tray-empty { font-size: 12px; color: #889; padding: 8px 2px; }
+
+  .review-card .obs-round-head .src-badge { font-size: 10.5px; font-weight: 700; color: #889; text-transform: uppercase; }
 
   .legend-box { background: #fff; border: 1px solid #dde3ec; border-radius: 8px; padding: 16px 18px; }
   .legend-box h4 { color: #1a3a5c; font-size: 13px; margin-bottom: 8px; margin-top: 14px; }
@@ -205,6 +217,8 @@
     .grid-2, .grid-3 { grid-template-columns: 1fr; }
     .form-grid { grid-template-columns: 1fr; }
     .form-grid .fld.span2, .form-grid .fld.span3 { grid-column: span 1; }
+    .bank-picker-layout { grid-template-columns: 1fr; }
+    .bank-picker-tray { position: static; max-height: none; }
   }
 </style>
 </head>
@@ -362,10 +376,10 @@
         <li><b>Cancel Payment</b> — payment cancelled / voucher withdrawn.</li>
       </ul>
 
-      <h4>Selecting an Observation from the Data Bank</h4>
-      <p>Clicking <b>+ New Observation</b> first opens the <b>Observation Data Bank</b> — 70 pre-written observations from the "Top Observations" reference sheet, regrouped into the 11 focused categories below (in place of the sheet's original 8, one of which was a large catch-all). Each item shows a short label in the list — hover over it, or check the full wording once picked, since it's carried straight into the observation description (still fully editable).</p>
-      <p>If nothing in the bank fits, click <b>None of these — Write a New Observation</b> to open the same form with a blank description, so a brand-new observation can be defined from scratch.</p>
-      <p>Writing one from scratch? Tick <b>Save this wording to the Observation Bank for future reuse</b> in the form, optionally give it a short label, and it's added to a <b>★ My Saved Observations</b> section at the top of the picker — so the bank grows with your own recurring wording over time. Remove any saved entry with the <b>&times;</b> next to it in the picker.</p>
+      <h4>Selecting Observations from the Data Bank</h4>
+      <p>Clicking <b>+ New Observation</b> opens the <b>Observation Data Bank</b> — 70 pre-written observations from the "Top Observations" reference sheet, regrouped into the 11 focused categories below (in place of the sheet's original 8, one of which was a large catch-all) — on the left, with a <b>Selected Observations</b> panel on the right. Pick the voucher this batch belongs to once at the top, then click as many matching observations as you need; each click adds it to the panel on the right (click it again to remove it). Nothing fits? Use <b>+ Add Blank Observation</b> in that panel to include one written from scratch.</p>
+      <p>When the panel has everything you need, click <b>Generate</b> to open a <b>Review &amp; Approve</b> screen with one fully editable form per selected observation — reference no., dates, OBS code, description, deduction detail, all editable, plus a "Save to Bank" option per item. Remove any you change your mind about, or go <b>&larr; Back to Selection</b> to add more, then click <b>Approve &amp; Save All</b> to create every observation in the batch against that voucher in one go.</p>
+      <p>Writing a new one and want to reuse the wording later? Tick <b>Save this wording to the Observation Bank for future reuse</b> and it's added to a <b>★ My Saved Observations</b> section at the top of the picker. Remove any saved entry with the <b>&times;</b> next to it there.</p>
 
       <h4>Raising, Replying To &amp; Re-referring an Observation</h4>
       <p>Whether picked from the bank or written fresh, every observation lands in one form modelled on the "Audit Observation / Receiving" memo: it captures who it was sent <b>To</b> (the voucher's company), a <b>Reference No.</b>, the <b>Voucher #</b>, receiving and bill-forwarding dates, the amount involved, who <b>checked</b> it, and the observation text itself.</p>
@@ -471,22 +485,52 @@
 
 <!-- OBSERVATION BANK PICKER (from the "Top Observations" reference sheet) -->
 <div class="modal-overlay" id="obs-bank-modal">
-  <div class="modal-box" style="max-width:760px">
+  <div class="modal-box" style="max-width:1120px">
     <div class="modal-head">
-      <h3>Select an Observation</h3>
+      <h3>Select Observations</h3>
       <button class="x-close" onclick="closeObsBankModal()">&times;</button>
     </div>
     <div class="modal-body">
-      <div class="hint" style="margin-left:0">Pick a matching observation from the data bank below (drawn from the audit's "Top Observations" reference sheet). If none of these fit, write a new one instead.</div>
-      <div class="filter-bar no-print" style="margin-bottom:10px">
-        <div class="fld grow"><label>Search</label><input type="text" id="bank-search" placeholder="Search by keyword..." oninput="renderObsBankList()"></div>
-        <div class="fld"><label>Category</label><select id="bank-category" onchange="renderObsBankList()"></select></div>
+      <div class="hint" style="margin-left:0">Pick as many observations as you need from the bank below — each pick lands in the Selected Observations panel on the right. When you're done, click Generate to review, edit and approve them all together.</div>
+      <div class="form-grid" style="margin-bottom:14px">
+        <div class="fld span3"><label>Voucher (applies to this whole batch)</label><select id="bank-voucherId"></select></div>
       </div>
-      <div id="obs-bank-list" style="max-height:48vh; overflow-y:auto;"></div>
+      <div class="bank-picker-layout">
+        <div class="bank-picker-browse">
+          <div class="filter-bar no-print">
+            <div class="fld grow"><label>Search</label><input type="text" id="bank-search" placeholder="Search by keyword..." oninput="renderObsBankList()"></div>
+            <div class="fld"><label>Category</label><select id="bank-category" onchange="renderObsBankList()"></select></div>
+          </div>
+          <div id="obs-bank-list" style="max-height:48vh; overflow-y:auto;"></div>
+        </div>
+        <div class="bank-picker-tray">
+          <div class="tray-head">Selected Observations (<span id="tray-count">0</span>)</div>
+          <div id="selection-tray-list"></div>
+          <button class="btn btn-outline" style="color:#1a3a5c;border-color:#1a3a5c;width:100%;margin-top:6px" onclick="addBlankToTray()">+ Add Blank Observation</button>
+        </div>
+      </div>
     </div>
     <div class="modal-foot" style="justify-content:space-between">
       <button class="btn btn-outline" style="color:#1a3a5c;border-color:#1a3a5c" onclick="closeObsBankModal()">Cancel</button>
-      <button class="btn btn-gold" onclick="chooseNewObservationManually()">None of these — Write a New Observation</button>
+      <button class="btn btn-gold" id="btn-generate-selected" onclick="generateSelectedObservations()" disabled>Generate (<span id="tray-count-2">0</span>)</button>
+    </div>
+  </div>
+</div>
+
+<!-- REVIEW & APPROVE SELECTED OBSERVATIONS -->
+<div class="modal-overlay" id="obs-review-modal">
+  <div class="modal-box" style="max-width:980px">
+    <div class="modal-head">
+      <h3>Review &amp; Approve Observations</h3>
+      <button class="x-close" onclick="closeReviewModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="hint" style="margin-left:0">Edit any of the observations below before approving. Removing one here just drops it from this batch — it won't be saved.</div>
+      <div id="review-cards-container"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" style="color:#1a3a5c;border-color:#1a3a5c" onclick="backToTrayFromReview()">&larr; Back to Selection</button>
+      <button class="btn btn-gold" onclick="approveAllReviewed()">Approve &amp; Save All</button>
     </div>
   </div>
 </div>
@@ -499,10 +543,6 @@
       <button class="x-close" onclick="closeObsModal()">&times;</button>
     </div>
     <div class="modal-body">
-      <div class="bank-pick-hint" id="obs-bank-pick-hint" style="display:none">
-        <span>Description pre-filled from the observation data bank — edit freely if needed.</span>
-        <button class="link-btn" onclick="backToObsBank()">&larr; Choose a different observation</button>
-      </div>
       <div class="form-grid">
         <div class="fld span2"><label>Voucher (To)</label><select id="o-voucherId"></select></div>
         <div class="fld"><label>Reference No.</label><input type="text" id="o-ref" placeholder="07260001" oninput="updateFollowupRefCells()"></div>
@@ -559,9 +599,9 @@
       </div>
     </div>
     <div class="modal-foot">
-      <button class="btn btn-outline" id="btn-report-obs" style="color:#1a3a5c;border-color:#1a3a5c;display:none" onclick="printObservationReport(editingObsId)">Print / Send Report</button>
+      <button class="btn btn-outline" id="btn-report-obs" style="color:#1a3a5c;border-color:#1a3a5c" onclick="printObservationReport(editingObsId)">Print / Send Report</button>
       <button class="btn btn-outline" style="color:#1a3a5c;border-color:#1a3a5c" onclick="closeObsModal()">Cancel</button>
-      <button class="btn btn-danger" id="btn-delete-obs" style="display:none" onclick="deleteCurrentObservation()">Delete Observation</button>
+      <button class="btn btn-danger" id="btn-delete-obs" onclick="deleteCurrentObservation()">Delete Observation</button>
       <button class="btn btn-gold" onclick="saveObservation()">Save Observation</button>
     </div>
   </div>
@@ -687,6 +727,8 @@ let state = { vouchers: [], customBank: [] };
 let editingVoucherId = null;
 let editingObsId = null;
 let pendingObsOpts = {};
+let selectionTray = [];
+let reviewVoucherId = null;
 
 function uid() { return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function todayStr() { return new Date().toISOString().slice(0,10); }
@@ -953,14 +995,30 @@ function populateBankCategorySelect() {
 function openObsBankPicker(opts) {
   if (!state.vouchers.length) { alert('Please create a voucher first, then add an observation to it.'); return; }
   pendingObsOpts = opts || {};
+  selectionTray = [];
+  showObsBankModal();
+}
+function showObsBankModal() {
   document.getElementById('bank-search').value = '';
   document.getElementById('bank-category').value = '';
+
+  const vSel = document.getElementById('bank-voucherId');
+  vSel.innerHTML = state.vouchers.map(v =>
+    `<option value="${v.id}">${escHtml(v.voucherType+'-'+v.voucherNo+' — '+v.partyName+' ('+v.company+')')}</option>`
+  ).join('');
+  vSel.value = reviewVoucherId || pendingObsOpts.voucherId || (state.vouchers[0] && state.vouchers[0].id) || '';
+  vSel.disabled = !!pendingObsOpts.voucherId;
+
   populateBankCategorySelect();
   renderObsBankList();
+  renderSelectionTray();
   document.getElementById('obs-bank-modal').classList.add('open');
 }
 function closeObsBankModal() {
   document.getElementById('obs-bank-modal').classList.remove('open');
+}
+function isInTray(source, code, idx) {
+  return selectionTray.some(t => t.source === source && t.code === code && t.idx === idx);
 }
 function renderObsBankList() {
   const search = (document.getElementById('bank-search').value || '').toLowerCase();
@@ -977,7 +1035,7 @@ function renderObsBankList() {
       html += '<div class="bank-cat-head">★ My Saved Observations</div>';
       html += matches.map(idx => `
         <div class="bank-item-row">
-          <button type="button" class="bank-item-btn" title="${escAttr(custom[idx].text)}" onclick="chooseBankObservation('custom', ${idx})">${escHtml(custom[idx].label)}</button>
+          <button type="button" class="bank-item-btn${isInTray('custom','custom',idx)?' selected':''}" title="${escAttr(custom[idx].text)}" onclick="toggleTrayItem('custom','custom',${idx})">${escHtml(custom[idx].label)}</button>
           <button type="button" class="bank-item-remove" title="Remove from bank" onclick="removeCustomBankItem(${idx})">&times;</button>
         </div>`).join('');
     }
@@ -991,27 +1049,57 @@ function renderObsBankList() {
       if (!matches.length) return;
       html += `<div class="bank-cat-head">${cat.code} — ${escHtml(cat.name)}</div>`;
       html += matches.map(idx =>
-        `<button type="button" class="bank-item-btn" title="${escAttr(cat.items[idx].text)}" onclick="chooseBankObservation(${cat.code}, ${idx})">${escHtml(cat.items[idx].label)}</button>`
+        `<button type="button" class="bank-item-btn${isInTray('bank',cat.code,idx)?' selected':''}" title="${escAttr(cat.items[idx].text)}" onclick="toggleTrayItem('bank',${cat.code},${idx})">${escHtml(cat.items[idx].label)}</button>`
       ).join('');
     });
   }
 
-  wrap.innerHTML = html || '<div class="empty-note">No matching observations. Try a different search, or write a new one below.</div>';
+  wrap.innerHTML = html || '<div class="empty-note">No matching observations. Try a different search, or add a blank one on the right.</div>';
 }
-function chooseBankObservation(code, idx) {
-  let text, obsTypeName;
-  if (code === 'custom') {
-    const item = (state.customBank||[])[idx];
-    if (!item) return;
-    text = item.text;
-    obsTypeName = item.obsType || '';
+function toggleTrayItem(source, code, idx) {
+  const existingIdx = selectionTray.findIndex(t => t.source === source && t.code === code && t.idx === idx);
+  if (existingIdx >= 0) {
+    selectionTray.splice(existingIdx, 1);
   } else {
-    const cat = OBS_BANK.find(c => c.code === code);
-    text = cat.items[idx].text;
-    obsTypeName = cat.name;
+    let label, text, obsType;
+    if (source === 'custom') {
+      const item = (state.customBank||[])[idx];
+      if (!item) return;
+      label = item.label; text = item.text; obsType = item.obsType || '';
+    } else {
+      const cat = OBS_BANK.find(c => c.code === code);
+      label = cat.items[idx].label; text = cat.items[idx].text; obsType = cat.name;
+    }
+    selectionTray.push({ trayId: uid(), source, code, idx, label, text, obsType });
   }
-  closeObsBankModal();
-  openObsModal(null, Object.assign({}, pendingObsOpts, { presetDescription: text, presetObsType: obsTypeName }));
+  renderObsBankList();
+  renderSelectionTray();
+}
+function addBlankToTray() {
+  selectionTray.push({ trayId: uid(), source:'blank', code:null, idx:null, label:'New (blank) observation', text:'', obsType:'' });
+  renderSelectionTray();
+}
+function removeFromTray(trayId) {
+  selectionTray = selectionTray.filter(t => t.trayId !== trayId);
+  renderObsBankList();
+  renderSelectionTray();
+}
+function renderSelectionTray() {
+  const count = selectionTray.length;
+  document.getElementById('tray-count').textContent = count;
+  document.getElementById('tray-count-2').textContent = count;
+  document.getElementById('btn-generate-selected').disabled = count === 0;
+
+  const wrap = document.getElementById('selection-tray-list');
+  if (!count) {
+    wrap.innerHTML = '<div class="tray-empty">Nothing selected yet. Click observations on the left to add them here.</div>';
+    return;
+  }
+  wrap.innerHTML = selectionTray.map(t => `
+    <div class="tray-item">
+      <span>${escHtml(t.label)}</span>
+      <button type="button" title="Remove" onclick="removeFromTray('${t.trayId}')">&times;</button>
+    </div>`).join('');
 }
 function removeCustomBankItem(idx) {
   if (!confirm('Remove this saved observation from your bank?')) return;
@@ -1027,13 +1115,147 @@ function saveObservationToCustomBank(text, obsType) {
   const label = labelInput || truncate(text, 70);
   state.customBank.push({ id: uid(), label, text, obsType: obsType || '' });
 }
-function chooseNewObservationManually() {
+/* ---------- REVIEW & APPROVE SELECTED OBSERVATIONS ---------- */
+function generateSelectedObservations() {
+  if (!selectionTray.length) return;
+  reviewVoucherId = document.getElementById('bank-voucherId').value;
+  if (!reviewVoucherId) { alert('Please select a voucher for this batch.'); return; }
   closeObsBankModal();
-  openObsModal(null, pendingObsOpts);
+  openReviewModal();
 }
-function backToObsBank() {
-  closeObsModal();
-  openObsBankPicker(pendingObsOpts);
+function openReviewModal() {
+  const container = document.getElementById('review-cards-container');
+  container.innerHTML = selectionTray.map((item, idx) => buildReviewCardHtml(item, idx)).join('');
+  document.getElementById('obs-review-modal').classList.add('open');
+}
+function closeReviewModal() {
+  document.getElementById('obs-review-modal').classList.remove('open');
+}
+function backToTrayFromReview() {
+  closeReviewModal();
+  showObsBankModal();
+}
+function buildReviewCardHtml(item, idx) {
+  const sourceLabel = item.source === 'blank' ? 'Blank' : (item.source === 'custom' ? 'My Saved Observations' : 'Observation Bank');
+  return `
+  <div class="obs-round review-card" data-tray-id="${escAttr(item.trayId)}">
+    <div class="obs-round-head">
+      <strong>#${idx+1} <span class="src-badge">${escHtml(sourceLabel)}</span></strong>
+      <button class="btn btn-danger btn-sm" onclick="removeReviewCard(this)">Remove</button>
+    </div>
+    <div class="form-grid">
+      <div class="fld"><label>Observation (Receiving) Date</label><input type="date" class="rc-obsDate" value="${todayStr()}"></div>
+      <div class="fld"><label>Bill Fwd. Date</label><input type="date" class="rc-billFwdDate"></div>
+      <div class="fld"><label>Checked By</label><input type="text" class="rc-checkedBy" placeholder="e.g. KS/AM"></div>
+
+      <div class="fld span2"><label>Observation Type</label>
+        <select class="rc-obsType" onchange="onReviewObsTypeChange(this)">
+          <option value="">Select type...</option>
+          ${OBS_CATEGORIES.map(c => `<option value="${escAttr(c.name)}" data-code="${c.code}" ${item.obsType===c.name?'selected':''}>${c.code} — ${escHtml(c.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fld"><label>OBS Code</label><input type="text" class="rc-obsCode" value="${escAttr((OBS_CATEGORIES.find(c=>c.name===item.obsType)||{}).code || '')}"></div>
+
+      <div class="fld span3"><label>Observation(s)</label><textarea class="rc-description" placeholder="Describe the observation raised">${escHtml(item.text||'')}</textarea></div>
+
+      <div class="fld"><label>No. of Instances</label><input type="number" class="rc-instances" min="1" value="1"></div>
+      <div class="fld"><label>Amount Involved (Rs.)</label><input type="number" class="rc-amount" step="0.01"></div>
+      <div class="fld"><label>Status</label>
+        <select class="rc-status">${OBS_STATUSES.map(s => `<option ${s==='Observation Raised'?'selected':''}>${s}</option>`).join('')}</select>
+      </div>
+
+      <div class="fld span2">
+        <label>Deduction Reason</label>
+        <div class="reason-cbs">
+          <label><input type="checkbox" class="rc-reasonQty"> Quantity</label>
+          <label><input type="checkbox" class="rc-reasonRate"> Rate</label>
+          <label><input type="checkbox" class="rc-reasonOther"> Other</label>
+        </div>
+      </div>
+      <div class="fld"><label>Finalized Amount (Rs.)</label><input type="number" class="rc-finalizedAmount" step="0.01"></div>
+
+      <div class="fld span2"><label>Other Reason (if applicable)</label><input type="text" class="rc-otherReasonText"></div>
+      <div class="fld"><label>Financial Impact (Reduction) Rs.</label><input type="number" class="rc-financialImpactReduction" step="0.01"></div>
+
+      <div class="fld"><label>Financial Impact (Total) Rs.</label><input type="number" class="rc-financialImpact" step="0.01"></div>
+
+      <div class="fld span3" style="margin-top:-4px">
+        <label style="text-transform:none; font-weight:500; display:flex; align-items:center; gap:6px; font-size:12.5px; color:#334;">
+          <input type="checkbox" class="rc-saveToBank" style="width:auto;"> Save this wording to the Observation Bank for future reuse
+        </label>
+      </div>
+    </div>
+  </div>`;
+}
+function onReviewObsTypeChange(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  const code = opt ? opt.getAttribute('data-code') : '';
+  if (code) sel.closest('.review-card').querySelector('.rc-obsCode').value = code;
+}
+function removeReviewCard(btn) {
+  const container = document.getElementById('review-cards-container');
+  if (container.querySelectorAll('.review-card').length <= 1) {
+    if (!confirm('This is the last observation in this batch. Remove it and close the review screen?')) return;
+    btn.closest('.review-card').remove();
+    closeReviewModal();
+    return;
+  }
+  btn.closest('.review-card').remove();
+}
+function approveAllReviewed() {
+  const cards = Array.from(document.querySelectorAll('#review-cards-container .review-card'));
+  if (!cards.length) { alert('Nothing left to approve — add at least one observation or go back to selection.'); return; }
+
+  const targetVoucher = state.vouchers.find(v => v.id === reviewVoucherId);
+  if (!targetVoucher) { alert('The selected voucher could not be found.'); return; }
+  if (!targetVoucher.observations) targetVoucher.observations = [];
+
+  const blanks = cards.filter(c => !c.querySelector('.rc-description').value.trim());
+  if (blanks.length) { alert('Please enter a description for every observation before approving (or remove the blank ones).'); return; }
+
+  cards.forEach(card => {
+    const obsDate = card.querySelector('.rc-obsDate').value;
+    const description = card.querySelector('.rc-description').value.trim();
+    const obsType = card.querySelector('.rc-obsType').value;
+    const payload = {
+      id: uid(),
+      ref: nextObsRef(obsDate),
+      obsDate,
+      billFwdDate: card.querySelector('.rc-billFwdDate').value,
+      checkedBy: card.querySelector('.rc-checkedBy').value.trim(),
+      obsType,
+      obsCode: card.querySelector('.rc-obsCode').value.trim(),
+      description,
+      instances: card.querySelector('.rc-instances').value,
+      amount: card.querySelector('.rc-amount').value,
+      status: card.querySelector('.rc-status').value,
+      reasonQty: card.querySelector('.rc-reasonQty').checked,
+      reasonRate: card.querySelector('.rc-reasonRate').checked,
+      reasonOther: card.querySelector('.rc-reasonOther').checked,
+      otherReasonText: card.querySelector('.rc-otherReasonText').value.trim(),
+      finalizedAmount: card.querySelector('.rc-finalizedAmount').value,
+      financialImpactReduction: card.querySelector('.rc-financialImpactReduction').value,
+      financialImpact: card.querySelector('.rc-financialImpact').value,
+      followups: [{ refSuffix:'', queryDate: obsDate, comments:'', replyDate:'', status:'Pending Reply' }],
+    };
+    targetVoucher.observations.push(payload);
+    if (card.querySelector('.rc-saveToBank').checked) {
+      if (!state.customBank) state.customBank = [];
+      if (!state.customBank.some(it => it.text === description)) {
+        state.customBank.push({ id: uid(), label: truncate(description, 70), text: description, obsType });
+      }
+    }
+  });
+
+  const savedCount = cards.length;
+  save();
+  closeReviewModal();
+  selectionTray = [];
+  renderAll();
+  if (document.getElementById('voucher-modal').classList.contains('open')) {
+    renderVoucherObsList(editingVoucherId);
+  }
+  alert(`${savedCount} observation${savedCount===1?'':'s'} saved to ${targetVoucher.voucherType}-${targetVoucher.voucherNo}.`);
 }
 function renderObservationsTab() {
   populateFilterDropdowns();
@@ -1277,41 +1499,21 @@ function nextObsRef(dateStr) {
   return prefix + String(count+1).padStart(4,'0');
 }
 
-function openObsModal(id, opts) {
-  opts = opts || {};
+function openObsModal(id) {
   editingObsId = id;
   let voucher = null, obs;
-
-  if (id) {
-    for (const v of state.vouchers) {
-      const found = (v.observations||[]).find(o => o.id === id);
-      if (found) { obs = found; voucher = v; break; }
-    }
-  } else {
-    voucher = opts.voucherId ? state.vouchers.find(v => v.id === opts.voucherId) : null;
-    obs = {
-      id: uid(), obsDate: todayStr(), billFwdDate:'', checkedBy:'', obsType: opts.presetObsType || '', obsCode:'',
-      description: opts.presetDescription || '', instances:1, amount: (voucher && voucher.amountFinalized) || '', status:'Observation Raised',
-      reasonQty:false, reasonRate:false, reasonOther:false, otherReasonText:'',
-      financialImpactReduction:'', financialImpact:'', finalizedAmount:'', followups:[]
-    };
-    if (obs.obsType) {
-      const cat = OBS_CATEGORIES.find(c => c.name === obs.obsType);
-      if (cat) obs.obsCode = String(cat.code);
-    }
-    obs.ref = nextObsRef(obs.obsDate);
-    obs.followups.push({ refSuffix:'', queryDate: obs.obsDate, comments:'', replyDate:'', status:'Pending Reply' });
+  for (const v of state.vouchers) {
+    const found = (v.observations||[]).find(o => o.id === id);
+    if (found) { obs = found; voucher = v; break; }
   }
+  if (!obs) return;
 
-  document.getElementById('obs-bank-pick-hint').style.display = (!id && opts.presetDescription) ? '' : 'none';
-
-  const lockVoucher = !!(id || opts.voucherId);
   const sel = document.getElementById('o-voucherId');
   sel.innerHTML = state.vouchers.map(v =>
     `<option value="${v.id}">${escHtml(v.voucherType+'-'+v.voucherNo+' — '+v.partyName+' ('+v.company+')')}</option>`
   ).join('');
-  sel.value = (voucher && voucher.id) || (opts.voucherId || '') || (state.vouchers[0] && state.vouchers[0].id) || '';
-  sel.disabled = lockVoucher;
+  sel.value = voucher.id;
+  sel.disabled = true;
 
   document.getElementById('o-ref').value = obs.ref || '';
   document.getElementById('o-obsDate').value = obs.obsDate || '';
@@ -1343,9 +1545,7 @@ function openObsModal(id, opts) {
 
   renderFollowupRows(obs.followups && obs.followups.length ? obs.followups : [{ refSuffix:'', queryDate: obs.obsDate, comments:'', replyDate:'', status:'Pending Reply' }]);
 
-  document.getElementById('btn-delete-obs').style.display = id ? '' : 'none';
-  document.getElementById('btn-report-obs').style.display = id ? '' : 'none';
-  document.getElementById('obs-modal-title').textContent = id ? `Edit Observation ${obs.ref || ''}` : 'New Observation';
+  document.getElementById('obs-modal-title').textContent = `Edit Observation ${obs.ref || ''}`;
   document.getElementById('obs-modal').classList.add('open');
 }
 function closeObsModal() {
