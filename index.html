@@ -13659,7 +13659,8 @@ function updbDiscardDraft(){
 
 function updbExportApp(){
   var ext = sg(DB_EXT_KEY, []);
-  if(!ext.length){
+  var supKeys = Object.keys(_dbmSuppressed);
+  if(!ext.length && !supKeys.length){
     if(!confirm('No approved observations in the databank extension yet.\nExport the app file anyway (it will be identical to the current version)?')) return;
   }
   // Fetch the current page HTML source
@@ -13682,6 +13683,11 @@ function updbExportApp(){
           added++;
         }
       }
+
+      // Remove suppressed observations from exported databank permanently
+      var supSet = _dbmSuppressed;
+      var suppressed = db.observations.filter(function(o){ return supSet[o.id]; }).length;
+      db.observations = db.observations.filter(function(o){ return !supSet[o.id]; });
 
       // Replace the audit-data block in the fetched HTML
       var updated = html.replace(
@@ -13730,7 +13736,11 @@ function updbExportApp(){
       a.click();
       setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
       _clearExportPending();
-      showToast('✅ Updated app exported — '+added+' new observation(s) baked in. Upload index.html to Netlify to update all users.', 5000);
+      var exportMsg = '✅ Updated app exported';
+      if(added) exportMsg += ' — '+added+' new observation(s) added';
+      if(suppressed) exportMsg += (added?' &bull; ':' — ')+suppressed+' suppressed observation(s) permanently removed';
+      exportMsg += '. Upload index.html to Netlify to update all users.';
+      showToast(exportMsg, 6000);
     })
     .catch(function(e){ alert('Could not fetch app source: '+e.message+'\n\nTry running from the deployed Netlify URL, not a local file.'); });
 }
