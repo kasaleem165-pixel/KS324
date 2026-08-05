@@ -13235,31 +13235,57 @@ function dupobsLoadDraft(inp){
 }
 
 function dupobsApproveRemovals(){
-  // Collect observations to remove: those in 'select_one' groups where keepIdx is set and the obs is custom
-  var toRemove = [];
+  // Separate unchecked obs into: custom (delete) and core (suppress)
+  var toRemove = [];    // custom extension obs — permanently deleted
+  var toSuppress = [];  // core obs — suppressed/hidden, restorable
   for(var g=0;g<_dupobsGroups.length;g++){
     var grp = _dupobsGroups[g];
     var ks = grp.keepIdxSet || [];
     if(grp.decision !== 'select_one' || ks.length === 0) continue;
     for(var gi=0;gi<grp.obs.length;gi++){
-      if(ks.indexOf(gi) < 0 && grp.obs[gi].custom) toRemove.push(grp.obs[gi].id);
+      if(ks.indexOf(gi) >= 0) continue; // kept — skip
+      if(grp.obs[gi].custom) toRemove.push(grp.obs[gi].id);
+      else toSuppress.push(grp.obs[gi].id);
     }
   }
-  if(!toRemove.length){
-    alert('Nothing to remove. Make sure you have used "Select One to Keep" for each group and that the observations marked for removal are custom (extension) entries — core observations cannot be removed.');
+  if(!toRemove.length && !toSuppress.length){
+    alert('Nothing to action. Make sure you have clicked "Select Which to Keep" for each group and ticked at least one observation to keep — unchecked ones will be removed or suppressed.');
     return;
   }
-  if(!confirm('Remove '+toRemove.length+' observation(s) from the databank extension?\n\nThis cannot be undone. Core observations are not affected.')) return;
-  var ext = sg(DB_EXT_KEY, []);
-  var removeSet = {};
-  for(var r=0;r<toRemove.length;r++) removeSet[toRemove[r]]=true;
-  ext = ext.filter(function(o){ return !removeSet[o.id]; });
-  ss(DB_EXT_KEY, ext);
-  DB.observations = DB.observations.filter(function(o){ return !removeSet[o.id]; });
-  _setExportPending();
+  var msg = '';
+  if(toRemove.length)   msg += '• '+toRemove.length+' custom observation(s) will be permanently DELETED.\n';
+  if(toSuppress.length) msg += '• '+toSuppress.length+' core observation(s) will be SUPPRESSED (hidden from filters and reports — restorable anytime via Observation Filter & Overrides).\n';
+  msg += '\nProceed?';
+  if(!confirm(msg)) return;
+
+  // 1. Delete custom obs from extension
+  if(toRemove.length){
+    var ext = sg(DB_EXT_KEY, []);
+    var removeSet = {};
+    for(var r=0;r<toRemove.length;r++) removeSet[toRemove[r]]=true;
+    ext = ext.filter(function(o){ return !removeSet[o.id]; });
+    ss(DB_EXT_KEY, ext);
+    DB.observations = DB.observations.filter(function(o){ return !removeSet[o.id]; });
+    _setExportPending();
+  }
+
+  // 2. Suppress core obs using the existing suppression system
+  if(toSuppress.length){
+    var supSet = {};
+    for(var s=0;s<toSuppress.length;s++){
+      _dbmSuppressed[toSuppress[s]] = true;
+      supSet[toSuppress[s]] = true;
+    }
+    DB.observations = DB.observations.filter(function(o){ return !supSet[o.id]; });
+    ss(DB_SUP_KEY, Object.keys(_dbmSuppressed));
+  }
+
   _dupobsGroups = [];
   _dupobsClearSave();
-  showToast('&#10003; '+toRemove.length+' observation(s) removed. Use Admin → Export Updated App to distribute changes.', 5000);
+  var parts = [];
+  if(toRemove.length)   parts.push(toRemove.length+' custom observation(s) deleted');
+  if(toSuppress.length) parts.push(toSuppress.length+' core observation(s) suppressed — restore anytime via Observation Filter &amp; Overrides');
+  showToast('&#10003; '+parts.join(' &bull; ')+'.', 6000);
   setTimeout(dupobsScan, 300);
 }
 
