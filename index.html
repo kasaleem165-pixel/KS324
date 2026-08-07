@@ -10493,18 +10493,11 @@ function injectTypePill(id, div){
   div.appendChild(row);
   // Prior-ref input row — only for repeated observations
   if(curType==='Repeated'){
-    // Auto-fill LARR from RA detection results first; fall back to template sentence
+    // Auto-fill LARR: try RA reports first (detection results or direct scan),
+    // fall back to blank template so the user sees the standard sentence ready to edit.
     if(!lastRefMap[id]){
-      var _iptRdm=window._rdMatches||[];
-      var _iptFound=false;
-      for(var _iptI=0;_iptI<_iptRdm.length;_iptI++){
-        if(_iptRdm[_iptI].obsId===id){
-          setLastRef(id, _buildLarrSentence(_iptRdm[_iptI].ref||'', _iptRdm[_iptI].year||''));
-          _iptFound=true;
-          break;
-        }
-      }
-      if(!_iptFound) setLastRef(id, _buildLarrSentence('',''));
+      var _iptSentence=_larrAutoFillFromRA(id);
+      setLastRef(id, _iptSentence||_buildLarrSentence('',''));
     }
     var lrRow=document.createElement('div');
     lrRow.id='lrx-'+id;
@@ -10817,19 +10810,11 @@ function setObsType(id, val) {
   var lrx=document.getElementById('lrx-'+id);
   var lrInp=document.getElementById('lr-'+id);
   if(val==='Repeated'){
-    // Auto-fill LARR from prior detection results if not already set;
+    // Auto-fill LARR: try RA reports first (detection results or direct scan),
     // fall back to blank template so the user sees the standard sentence ready to edit.
     if(!lastRefMap[id]){
-      var _rdm=window._rdMatches||[];
-      var _lrrFound=false;
-      for(var _rmi=0;_rmi<_rdm.length;_rmi++){
-        if(_rdm[_rmi].obsId===id){
-          setLastRef(id, _buildLarrSentence(_rdm[_rmi].ref||'', _rdm[_rmi].year||''));
-          _lrrFound=true;
-          break;
-        }
-      }
-      if(!_lrrFound) setLastRef(id, _buildLarrSentence('',''));
+      var _lrrSentence=_larrAutoFillFromRA(id);
+      setLastRef(id, _lrrSentence||_buildLarrSentence('',''));
     }
     if(!lrx){
       var newRow=document.createElement('div');
@@ -10866,6 +10851,70 @@ function _buildLarrSentence(obsRef, year){
     +' of the last issued Branch Audit Report'
     +(yr?' ('+yr+')':'')
     +' of this branch.';
+}
+
+// Try to auto-fill a LARR sentence for obsId:
+// 1. Uses _rdMatches if Detect Repeats was already run (fast path)
+// 2. Otherwise scans ra_loadedReports directly with the same matching algorithm
+// Returns a built sentence string on success, null if no match (≥60%) found.
+function _larrAutoFillFromRA(obsId){
+  // 1. Fast path — already in detection results
+  var _rdm=window._rdMatches||[];
+  for(var _li=0;_li<_rdm.length;_li++){
+    if(_rdm[_li].obsId===obsId){
+      return _buildLarrSentence(_rdm[_li].ref||'',_rdm[_li].year||'');
+    }
+  }
+  // 2. Scan loaded RA reports directly
+  var reports=window.ra_loadedReports||[];
+  if(!reports.length) return null;
+  var bestStr=null,bestAny=null;
+  for(var _ri=0;_ri<reports.length;_ri++){
+    var _rp=reports[_ri];
+    if(_rp.docxObsList&&_rp.docxObsList.length){if(!bestStr||_rp.date>bestStr.date) bestStr=_rp;}
+    if(!bestAny||_rp.date>bestAny.date) bestAny=_rp;
+  }
+  var _best=bestStr||bestAny;
+  if(!_best||(!_best.docxObsList&&!_best.text)) return null;
+  var _bestYear=_best.date?_best.date.slice(0,4):'';
+  // Get obs title + body
+  var _oTitle='',_oBody='';
+  for(var _di=0;_di<DB.observations.length;_di++){
+    if(DB.observations[_di].id===obsId){
+      _oTitle=DB.observations[_di].title||'';
+      _oBody=(DB.observations[_di].observation||'')+' '+(DB.observations[_di].recommendation||'');
+      break;
+    }
+  }
+  if(!_oTitle){ for(var _ci=0;_ci<customs.length;_ci++){if(customs[_ci].id===obsId){_oTitle=customs[_ci].title||'';_oBody=customs[_ci].observation||'';break;}}}
+  if(!_oTitle) return null;
+  function _ln(s){return s.toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();}
+  function _lov(a,b){var wa=a.split(' ').filter(function(w){return w.length>1;});var wb=b.split(' ').filter(function(w){return w.length>1;});if(!wa.length||!wb.length)return 0;var hab=0;for(var i=0;i<wa.length;i++){if(wb.indexOf(wa[i])!==-1)hab++;}var hba=0;for(var j=0;j<wb.length;j++){if(wa.indexOf(wb[j])!==-1)hba++;}return Math.max(hab/wa.length,hba/wb.length);}
+  var _nT=_ln(_oTitle),_nB=_ln(_oBody);
+  var _bScore=0,_bRef='';
+  if(_best.docxObsList&&_best.docxObsList.length){
+    var _prevObs=_best.docxObsList;
+    for(var _pi=0;_pi<_prevObs.length;_pi++){
+      var _p=_prevObs[_pi];
+      var _nPT=_ln(_p.title||''),_nPC=_ln(_p.content||'');
+      var _s=Math.max(_lov(_nT,_nPT),(_nB&&_nPC)?_lov(_nB,_nPC):0,_nPC?_lov(_nT,_nPC):0,(_nB&&_nPT)?_lov(_nB,_nPT):0);
+      if(_s>_bScore){_bScore=_s;_bRef=_p.ref||'';}
+    }
+  } else {
+    var _rtl=(_best.text||'').toLowerCase();
+    var _rpos=[],_rre=/\b([1-9]\d?\.[1-9]\d?)\b/g,_rm;
+    while((_rm=_rre.exec(_rtl))!==null){_rpos.push({ref:_rm[1],pos:_rm.index});}
+    var _wds=_nT.split(' ').filter(function(w){return w.length>1;});
+    if(!_wds.length) return null;
+    for(var _rpi=0;_rpi<_rpos.length;_rpi++){
+      var _win=_rtl.substring(Math.max(0,_rpos[_rpi].pos-80),_rpos[_rpi].pos+350).replace(/[^a-z0-9 ]/g,' ');
+      var _hits=0;for(var _wi=0;_wi<_wds.length;_wi++){if(_win.indexOf(_wds[_wi])!==-1)_hits++;}
+      var _sc=_hits/_wds.length;
+      if(_sc>_bScore){_bScore=_sc;_bRef=_rpos[_rpi].ref;}
+    }
+  }
+  if(_bScore>=0.60) return _buildLarrSentence(_bRef,_bestYear);
+  return null;
 }
 
 // ============================================================
