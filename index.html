@@ -9906,15 +9906,26 @@ function _raReportsRestore(){
 function _raReportsClear(){
   window.ra_loadedReports=[];
   idbDel(RA_IDB_KEY);
+  // Clear persisted RA analysis state so stale branch/mode can't be re-restored
+  try{ localStorage.removeItem(RA_STATE_KEY); }catch(e){}
   if(typeof ra_renderLoadedFilesList==='function') ra_renderLoadedFilesList();
   if(typeof _updateRepeatDetectPanel==='function') _updateRepeatDetectPanel();
   // Reset RA results panel to empty state so stale analysis doesn't persist into new report
   var raEmpty   = document.getElementById('ra-results-empty');
   var raCont    = document.getElementById('ra-results-content');
   var raBrSearch= document.getElementById('ra-branch-search');
+  var raBrSel   = document.getElementById('ra-sel_branch');
+  var raBrBadge = document.getElementById('ra-branch-badge');
+  var raBrBadgeTxt = document.getElementById('ra-branch-badge-text');
   if(raEmpty)    { raEmpty.style.display='flex'; }
   if(raCont)     { raCont.style.display='none'; raCont.innerHTML=''; }
   if(raBrSearch) { raBrSearch.value=''; }
+  // Reset the hidden select AND the badge chip so RA doesn't show a stale branch
+  if(raBrSel)      { raBrSel.value=''; }
+  if(raBrBadge)    { raBrBadge.style.display='none'; }
+  if(raBrBadgeTxt) { raBrBadgeTxt.textContent=''; }
+  // Reset in-memory current branch reference
+  if(typeof ra_currentBranch !== 'undefined') ra_currentBranch=null;
   // Reset branch filter state
   if(typeof _raBranchRegionFilter !== 'undefined') _raBranchRegionFilter='';
   if(typeof _raBranchCityFilter   !== 'undefined') _raBranchCityFilter='';
