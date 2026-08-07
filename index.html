@@ -10518,6 +10518,12 @@ function handleSel(id, checked, div) {
       obsTypeMap[id]=_hsType;
     }
     _obsOrderAdd(id);
+    // Default: lock Instances & Financial Impact as N/A for newly selected obs
+    // (auditor unlocks deliberately if data exists; omitted from report when locked)
+    window._pfWaivers = window._pfWaivers || {};
+    if(window._pfWaivers[id+'|Financial Impact'] === undefined){
+      window._pfWaivers[id+'|Financial Impact'] = true;
+    }
   } else {
     delete selIds[id]; _obsOrderRemove(id);
   }
@@ -12410,7 +12416,7 @@ function renderRpt(){
       var priorRefDraft=lastRefMap[o.id]||'';
       var _W=window._pfWaivers||{};
       var _fiWaived=!!_W[o.id+'|Financial Impact'];
-      function _naBtn(field,active){var fk=field.replace(/\s/g,'_');return '<button id="na-'+fk+'-'+o.id+'" onclick="_naToggle(\''+o.id+'\',\''+field+'\')" title="'+(active?'Undo — re-enable this field':'Mark as Nil / Not Applicable — suppresses the alert')+'" style="padding:1px 7px;font-size:9px;font-weight:700;border-radius:8px;border:1px solid '+(active?'#27ae60':'#bbb')+';background:'+(active?'#27ae60':'#f5f5f5')+';color:'+(active?'#fff':'#777')+';cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0">'+(active?'&#10003; N/A':'Nil/N/A')+'</button>';}
+      function _naBtn(field,active){var fk=field.replace(/\s/g,'_');return '<button id="na-'+fk+'-'+o.id+'" onclick="_naToggle(\''+o.id+'\',\''+field+'\')" title="'+(active?'Click to enter data':'Lock — mark as N/A (omitted from report)')+'" style="padding:2px 8px;font-size:10px;font-weight:700;border-radius:8px;border:1px solid '+(active?'#2070b8':'#bbb')+';background:'+(active?'#eaf2fb':'#f5f5f5')+';color:'+(active?'#2070b8':'#888')+';cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;display:flex;align-items:center;gap:3px">'+(active?'&#128274; N/A — Click to Enter':'&#128275; Unlocked')+'</button>';}
       h+='<div class="och">';
       // ── Row 1: number badge + full-width title ──────────────────────────
       h+='<div class="och-title">';
@@ -18214,15 +18220,22 @@ function _naToggle(obsId, field){
     if(!obsObj) for(var j=0;j<customs.length;j++){if(customs[j].id===obsId){obsObj=customs[j];break;}}
     if(obsObj) badge.innerHTML = obsReadinessBadge(obsObj);
   }
-  // Update N/A button appearance
+  // Update unlock/lock button appearance
   var fk = field.replace(/\s/g,'_');
   var btn = document.getElementById('na-'+fk+'-'+obsId);
   if(btn){
-    btn.style.background = active ? '#27ae60' : '#f5f5f5';
-    btn.style.color = active ? '#fff' : '#777';
-    btn.style.borderColor = active ? '#27ae60' : '#bbb';
-    btn.innerHTML = active ? '&#10003; N/A' : 'Nil/N/A';
-    btn.title = active ? 'Undo — re-enable this field' : 'Mark as Nil / Not Applicable — suppresses the alert';
+    btn.style.background = active ? '#eaf2fb' : '#f5f5f5';
+    btn.style.color = active ? '#2070b8' : '#888';
+    btn.style.borderColor = active ? '#2070b8' : '#bbb';
+    btn.innerHTML = active ? '&#128274; N/A — Click to Enter' : '&#128275; Unlocked';
+    btn.title = active ? 'Click to enter data' : 'Lock — mark as N/A (omitted from report)';
+  }
+  // Update container background to reflect locked/unlocked state
+  var fi = document.getElementById('fw-inst-'+obsId);
+  if(fi && fi.parentNode && fi.parentNode.parentNode && fi.parentNode.parentNode.parentNode){
+    var container = fi.parentNode.parentNode.parentNode;
+    container.style.background = active ? '#f5f5f5' : '#f0f7e8';
+    container.style.borderColor = active ? '#ccc' : '#b8d8a0';
   }
   // Disable/enable related inputs
   if(field === 'Financial Impact'){
