@@ -11047,6 +11047,29 @@ function applySuggestedSens(obsId, sug){
 }
 
 // ── Auto-detect materiality from inline table or annexure text ────────────
+function _autoUnlockFiFields(obsId){
+  // Called whenever system auto-fills instance count from annexure/table
+  // Clears the N/A waiver so fields appear unlocked, and updates the button live if visible
+  window._pfWaivers=window._pfWaivers||{};
+  delete window._pfWaivers[obsId+'|Financial Impact'];
+  var btn=document.getElementById('na-Financial_Impact-'+obsId);
+  if(btn){
+    btn.style.background='#f5f5f5'; btn.style.color='#888'; btn.style.borderColor='#bbb';
+    btn.innerHTML='&#128275; Unlocked';
+    btn.title='Lock — mark as N/A (omitted from report)';
+  }
+  var fi=document.getElementById('fw-inst-'+obsId);
+  if(fi){
+    fi.disabled=false;
+    var wrap=fi.parentNode&&fi.parentNode.parentNode;
+    if(wrap){wrap.style.opacity='';wrap.style.pointerEvents='';}
+    var container=wrap&&wrap.parentNode;
+    if(container){container.style.background='#f0f7e8';container.style.borderColor='#b8d8a0';}
+  }
+  var fa=document.getElementById('fw-amt-'+obsId);
+  if(fa) fa.disabled=false;
+}
+
 function autoDetectMateriality(obsId, obsText, linkedAnx){
   if(instCountMap[obsId]>0) return null; // don't overwrite auditor's value
 
@@ -11074,6 +11097,7 @@ function autoDetectMateriality(obsId, obsText, linkedAnx){
     if(tblHeaders>0&&tblDataRows>0){
       instCountMap[obsId]=tblDataRows;
       instSourceMap[obsId]='auto: inline table';
+      _autoUnlockFiFields(obsId);
       return{count:tblDataRows,source:'inline table'};
     }
   }
@@ -11102,6 +11126,7 @@ function autoDetectMateriality(obsId, obsText, linkedAnx){
           var axDr=pipeRows-1; // subtract the 1 header row
           instCountMap[obsId]=axDr;
           instSourceMap[obsId]='auto: Annexure '+(ax.label||'');
+          _autoUnlockFiFields(obsId);
           return{count:axDr,source:'Annexure '+(ax.label||'')};
         }
       } else {
@@ -11112,6 +11137,7 @@ function autoDetectMateriality(obsId, obsText, linkedAnx){
           var axRows=axLines.length-1; // subtract 1 for the header/title row
           instCountMap[obsId]=axRows;
           instSourceMap[obsId]='auto: Annexure '+(ax.label||'');
+          _autoUnlockFiFields(obsId);
           return{count:axRows,source:'Annexure '+(ax.label||'')};
         }
       }
