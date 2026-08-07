@@ -12839,9 +12839,54 @@ function doClear(){
 }
 
 function doNewReport(){
-  if(!confirm('Start a new blank report? All current data will be cleared.'))return;
-  _performFullClear();
-  toast('New report started — please fill in branch information.');
+  if(!confirm('Start a new blank report? All current data will be cleared.')) return;
+
+  // Ask whether this is the branch's first audit or a returning audit.
+  // The answer drives firstTimeAudit flag AND the starting page.
+  var el = document.createElement('div');
+  el.id = 'new-report-modal';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+  el.innerHTML =
+    '<div style="background:#fff;border-radius:12px;width:460px;max-width:96vw;box-shadow:0 10px 40px rgba(0,0,0,.3);overflow:hidden;font-family:Inter,Arial,sans-serif">' +
+      '<div style="background:#1a3a5c;color:#fff;padding:14px 18px">' +
+        '<div style="font-size:15px;font-weight:700">&#128203; Starting New Audit Report</div>' +
+        '<div style="font-size:11.5px;color:#b0c8e8;margin-top:3px">Has this branch been audited before?</div>' +
+      '</div>' +
+      '<div style="padding:20px 18px">' +
+        '<div style="display:flex;flex-direction:column;gap:12px">' +
+          '<button id="nr-first" style="display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border:2px solid #27ae60;border-radius:8px;background:#f0fff4;cursor:pointer;text-align:left;font-family:inherit;transition:background .15s" onmouseover="this.style.background=\'#d4f5e0\'" onmouseout="this.style.background=\'#f0fff4\'">' +
+            '<span style="font-size:26px;line-height:1;flex-shrink:0">&#127381;</span>' +
+            '<div><div style="font-size:13px;font-weight:700;color:#1a5c30">First Audit of this Branch</div>' +
+            '<div style="font-size:11.5px;color:#3a7050;margin-top:3px;line-height:1.5">No previous audit report exists. All observations will be treated as New. You will go directly to the observation selection page.</div></div>' +
+          '</button>' +
+          '<button id="nr-returning" style="display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border:2px solid #1a3a5c;border-radius:8px;background:#f0f4ff;cursor:pointer;text-align:left;font-family:inherit;transition:background .15s" onmouseover="this.style.background=\'#dce6f5\'" onmouseout="this.style.background=\'#f0f4ff\'">' +
+            '<span style="font-size:26px;line-height:1;flex-shrink:0">&#128196;</span>' +
+            '<div><div style="font-size:13px;font-weight:700;color:#1a3a5c">Branch has a Previous Audit Report</div>' +
+            '<div style="font-size:11.5px;color:#3a5070;margin-top:3px;line-height:1.5">You will be taken to the Risk Assessment panel first to load the previous report. This enables automatic repeat detection when generating.</div></div>' +
+          '</button>' +
+        '</div>' +
+        '<div style="margin-top:14px;text-align:right">' +
+          '<button onclick="document.getElementById(\'new-report-modal\').remove()" style="padding:7px 16px;background:#eef0f4;border:none;border-radius:6px;font-size:12px;font-weight:600;color:#666;cursor:pointer;font-family:inherit">Cancel</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(el);
+
+  document.getElementById('nr-first').addEventListener('click', function(){
+    el.remove();
+    _performFullClear();
+    setFirstTimeAudit(true);
+    toast('New report started — First Time Audit. Please fill in branch information and select observations.');
+  });
+
+  document.getElementById('nr-returning').addEventListener('click', function(){
+    el.remove();
+    _performFullClear();
+    setFirstTimeAudit(false);
+    // Open the RA panel so user loads the previous report before selecting observations
+    if(!document.getElementById('ra-panel').classList.contains('ra-drawer-open')) toggleRAPanel();
+    toast('New report started. Please load the previous audit report in the Risk Assessment panel.');
+  });
 }
 
 // ============================================================
