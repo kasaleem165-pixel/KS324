@@ -9487,14 +9487,10 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       </div>
     </div>
 
-    <div class="g2">
-      <div class="fr"><label>Audit Type</label>
-        <input type="text" id="brautype" placeholder="e.g. Routine Audit Visit">
-      </div>
-      <div class="fr"><label>Report Date</label>
-        <input type="date" id="rdt" onchange="validateDates()">
-      </div>
+    <div class="fr"><label>Audit Type</label>
+      <input type="text" id="brautype" placeholder="e.g. Routine Audit Visit">
     </div>
+    <input type="hidden" id="rdt">
 
     <div class="fr"><label>Audit Period</label>
       <div class="g2">
@@ -9506,7 +9502,6 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         </div>
       </div>
       <div id="err_per" style="display:none;color:#c0392b;font-size:11px;margin-top:3px">&#9888; Audit Period To must not be later than Visit From date.</div>
-      <div id="err_per_rdt" style="display:none;color:#c0392b;font-size:11px;margin-top:3px">&#9888; Audit Period To must not be later than Report Date.</div>
     </div>
 
     <div class="fr"><label>Visit Dates</label>
@@ -9518,7 +9513,6 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
           <input type="date" id="brvisit_to" onchange="validateDates()">
         </div>
       </div>
-      <div id="err_rdt" style="display:none;color:#c0392b;font-size:11px;margin-top:3px">&#9888; Report Date must not be before the Visit From date.</div>
     </div>
 
     <div class="fr"><label>Previous Audit Report Date</label>
@@ -10872,7 +10866,7 @@ function validateDates() {
     if(el) el.style.borderColor = bad ? '#c0392b' : '';
   }
   // Clear all first
-  ['rper_from','rper_to','brvisit_from','brvisit_to','rdt'].forEach(function(id){ mark(id,false); });
+  ['rper_from','rper_to','brvisit_from','brvisit_to'].forEach(function(id){ mark(id,false); });
 
   // Rule 1: Audit Period From must not be after Audit Period To
   var r1 = perFrom && perTo && perFrom > perTo;
@@ -10882,21 +10876,9 @@ function validateDates() {
   var r2 = perTo && visitFrom && perTo > visitFrom;
   if(r2){ errors.push('Audit Period To must not be later than Visit From date.'); mark('rper_to',true); mark('brvisit_from',true); }
 
-  // Rule 3: Audit Period To must not be later than Report Date
-  var r3 = perTo && rdt && perTo > rdt;
-  if(r3){ errors.push('Audit Period To must not be later than Report Date.'); mark('rper_to',true); mark('rdt',true); }
-
   // Rule 4: Visit From must not be after Visit To
   var r4 = visitFrom && visitTo && visitFrom > visitTo;
   if(r4){ errors.push('Visit From must not be later than Visit To.'); mark('brvisit_from',true); mark('brvisit_to',true); }
-
-  // Rule 5: Report Date must not be before Visit From
-  var r5 = rdt && visitFrom && rdt < visitFrom;
-  if(r5){ errors.push('Report Date must not be earlier than Visit From date.'); mark('rdt',true); mark('brvisit_from',true); }
-
-  // Rule 6: Report Date must not be before Visit To
-  var r6 = rdt && visitTo && rdt < visitTo;
-  if(r6){ errors.push('Report Date must not be earlier than Visit To date.'); mark('rdt',true); mark('brvisit_to',true); }
 
   // Show consolidated error block
   var errBox = document.getElementById('date-err-box');
@@ -10904,11 +10886,11 @@ function validateDates() {
     errBox = document.createElement('div');
     errBox.id = 'date-err-box';
     errBox.style.cssText = 'margin-top:6px;padding:7px 10px;background:#fdecea;border:1px solid #f0a0a0;border-radius:4px;font-size:11px;color:#8b1a1a;line-height:1.7';
-    var visitDiv = document.getElementById('err_rdt');
-    if(visitDiv && visitDiv.parentNode) visitDiv.parentNode.insertBefore(errBox, visitDiv);
+    var _visitSect = document.getElementById('err_per');
+    if(_visitSect && _visitSect.parentNode) _visitSect.parentNode.appendChild(errBox);
   }
   // Hide legacy individual error elements
-  ['err_per','err_per_rdt','err_rdt'].forEach(function(id){
+  ['err_per'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.style.display='none';
   });
 
