@@ -12062,7 +12062,7 @@ function confirmAndGenerate(){
     var _aie=true;
     for(var _ii=0;_ii<INTRO_SECTION_IDS.length;_ii++){var _ie=document.getElementById(INTRO_SECTION_IDS[_ii]);if(_ie&&_ie.value.trim()){_aie=false;break;}}
     if(_aie&&DB.intro_sections) autoFillIntroSections();
-    renderRpt();
+    _detectRepeatsForGenerate(function(){ renderRpt(); });
     return;
   }
 
@@ -12119,7 +12119,7 @@ function confirmAndGenerate(){
   }
   if(_allIntroEmpty&&DB.intro_sections) autoFillIntroSections();
 
-  renderRpt();
+  _detectRepeatsForGenerate(function(){ renderRpt(); });
 }
 
 function flushObsEditsToDb(){
@@ -20474,8 +20474,8 @@ function detectRepeatsFromPrevReport(){
   mh+='<button onclick="rdSelectAll(false)" style="padding:4px 10px;font-size:11px;border:1px solid #4a6080;border-radius:4px;background:transparent;color:#c8d8ea;cursor:pointer">None</button>';
   mh+='</div>';
   mh+='<div style="display:flex;gap:8px">';
-  mh+='<button onclick="document.getElementById(\'rd-modal\').remove()" style="padding:7px 18px;border:1px solid #4a6080;border-radius:6px;background:transparent;color:#c8d8ea;font-size:12px;cursor:pointer">Cancel</button>';
-  mh+='<button onclick="_applyRepeatSelections()" style="padding:7px 22px;border:none;border-radius:6px;background:linear-gradient(135deg,#6a3090,#9040c0);color:#fff;font-size:12px;font-weight:700;cursor:pointer">&#10003; Apply Selected</button>';
+  mh+='<button onclick="_rdCancelAndContinue()" style="padding:7px 18px;border:1px solid #4a6080;border-radius:6px;background:transparent;color:#c8d8ea;font-size:12px;cursor:pointer">Skip / No Repeats</button>';
+  mh+='<button onclick="_applyRepeatSelections()" style="padding:7px 22px;border:none;border-radius:6px;background:linear-gradient(135deg,#6a3090,#9040c0);color:#fff;font-size:12px;font-weight:700;cursor:pointer">&#10003; Apply &amp; Generate</button>';
   mh+='</div></div></div>';
 
   var modal=document.createElement('div');
@@ -20483,7 +20483,8 @@ function detectRepeatsFromPrevReport(){
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
   var inner=document.createElement('div');
   inner.style.cssText='background:#0d1a2a;border:1px solid #2a4060;border-radius:10px;max-width:560px;width:100%;max-height:82vh;overflow-y:auto;padding:20px';
-  inner.innerHTML='<div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:12px">&#128260; Possible Repeats — Review &amp; Confirm</div>'+mh;
+  var _rdTitle=window._rdPostGenerate?'&#128260; Step 1 of 2 — Review Possible Repeats Before Generating':'&#128260; Possible Repeats — Review &amp; Confirm';
+  inner.innerHTML='<div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:12px">'+_rdTitle+'</div>'+mh;
   modal.appendChild(inner);
   document.body.appendChild(modal);
 }
@@ -20514,10 +20515,53 @@ function _applyRepeatSelections(){
   var modal=document.getElementById('rd-modal');
   if(modal) modal.remove();
   doSearch();
-  if(typeof renderRpt==='function') renderRpt(); // refresh draft so LARR box appears immediately
   autoSaveNow();
   if(applied) ra_toast(applied+' observation(s) marked as Repeated with LARR auto-filled.');
   else ra_toast('No observations marked — all were unticked.');
+  // If triggered from Generate Report flow, run the continuation now
+  _rdFirePostGenerate();
+}
+
+// Cancel path for the detection modal — skips applying, then continues generation if triggered from Generate
+function _rdCancelAndContinue(){
+  var modal=document.getElementById('rd-modal');
+  if(modal) modal.remove();
+  _rdFirePostGenerate();
+}
+
+// Fires and clears the stored post-generate callback (set by _detectRepeatsForGenerate)
+function _rdFirePostGenerate(){
+  var cb=window._rdPostGenerate;
+  window._rdPostGenerate=null;
+  if(typeof cb==='function') cb();
+}
+
+// Wrapper called by confirmAndGenerate — runs repeat detection if a previous RA report
+// is loaded, then calls the continuation cb (which renders the report).
+// If no RA reports are loaded or this is a first-time audit, calls cb immediately.
+function _detectRepeatsForGenerate(cb){
+  var reports=window.ra_loadedReports||[];
+  var selList=Object.keys(selIds).filter(function(k){return selIds[k];});
+  if(!reports.length||firstTimeAudit||!selList.length){
+    cb(); return;
+  }
+  // Store callback so Apply / Skip buttons can fire it after the modal closes
+  window._rdPostGenerate=cb;
+  // Re-use the existing detection function — it will show the modal
+  // Override its 0-match alert to use a toast instead, then fire cb
+  var _origAlert=window.alert;
+  window.alert=function(msg){
+    // Intercept only the "no matches found" alert from detectRepeatsFromPrevReport
+    if(msg&&msg.indexOf('No matches found')!==-1){
+      window.alert=_origAlert;
+      ra_toast('No repeated observations detected — generating report.');
+      _rdFirePostGenerate();
+    } else {
+      window.alert=_origAlert;
+      _origAlert(msg);
+    }
+  };
+  detectRepeatsFromPrevReport();
 }
 
 // Extract observation list from docx XML — returns {catKey: {High:n, 'M to H':n, ...}}
