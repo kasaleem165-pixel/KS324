@@ -11066,33 +11066,69 @@ function autoDetectMateriality(obsId, obsText, linkedAnx){
   if(instCountMap[obsId]>0) return null; // don't overwrite auditor's value
 
   // 1. Inline pipe-table in observation text
+  // Count only data rows: skip separator rows (|---|---|) and subtract 1 header per table.
+  // A header is identified as the first non-separator pipe row in each table block
+  // (separated from the previous block by one or more non-pipe lines).
   if(obsText){
-    var lines=obsText.split('\n'),tblRows=0;
+    var lines=obsText.split('\n');
+    var tblDataRows=0, tblHeaders=0, inTable=false;
     for(var i=0;i<lines.length;i++){
       var ln=lines[i].trim();
-      if(ln.indexOf('|')===-1)continue;
-      if(/^\|[\s\-:|]+\|?\s*$/.test(ln))continue;
-      tblRows++;
+      if(ln.indexOf('|')===-1){
+        inTable=false; // gap between tables
+        continue;
+      }
+      if(/^\|[\s\-:|]+\|?\s*$/.test(ln)) continue; // separator row — skip
+      if(!inTable){
+        inTable=true;
+        tblHeaders++; // first real row of a new table block = header
+      } else {
+        tblDataRows++; // subsequent rows in same table = data
+      }
     }
-    if(tblRows>1){
-      var dr=tblRows-1;
-      instCountMap[obsId]=dr;
+    if(tblHeaders>0&&tblDataRows>0){
+      instCountMap[obsId]=tblDataRows;
       instSourceMap[obsId]='auto: inline table';
-      return{count:dr,source:'inline table'};
+      return{count:tblDataRows,source:'inline table'};
     }
   }
 
-  // 2. Linked annexure text — count non-empty lines (subtract 1 for header)
+  // 2. Linked annexure text — count data rows only
   if(linkedAnx&&linkedAnx.length){
     for(var ai=0;ai<linkedAnx.length;ai++){
       var ax=linkedAnx[ai];
       if(!ax.text||!ax.text.trim())continue;
-      var axLines=ax.text.split('\n').filter(function(l){return l.trim().length>0;});
-      if(axLines.length>1){
-        var axRows=axLines.length-1;
-        instCountMap[obsId]=axRows;
-        instSourceMap[obsId]='auto: Annexure '+(ax.label||'');
-        return{count:axRows,source:'Annexure '+(ax.label||'')};
+      var axRawLines=ax.text.split('\n');
+      // Check whether the annexure content is a pipe-table
+      var hasPipe=false;
+      for(var pi=0;pi<axRawLines.length;pi++){
+        if(axRawLines[pi].indexOf('|')!==-1){hasPipe=true;break;}
+      }
+      if(hasPipe){
+        // Pipe-table: use same logic as Section 1 — skip separator rows, then subtract 1 header
+        var pipeRows=0;
+        for(var pri=0;pri<axRawLines.length;pri++){
+          var pln=axRawLines[pri].trim();
+          if(pln.indexOf('|')===-1)continue;          // non-table line (title, blank) — skip
+          if(/^\|[\s\-:|]+\|?\s*$/.test(pln))continue; // separator row — skip
+          pipeRows++;
+        }
+        if(pipeRows>1){
+          var axDr=pipeRows-1; // subtract the 1 header row
+          instCountMap[obsId]=axDr;
+          instSourceMap[obsId]='auto: Annexure '+(ax.label||'');
+          return{count:axDr,source:'Annexure '+(ax.label||'')};
+        }
+      } else {
+        // Plain-text list: count non-empty lines that are NOT a heading/title.
+        // A heading line is the FIRST non-empty line if there are multiple; subtract it.
+        var axLines=axRawLines.filter(function(l){return l.trim().length>0;});
+        if(axLines.length>1){
+          var axRows=axLines.length-1; // subtract 1 for the header/title row
+          instCountMap[obsId]=axRows;
+          instSourceMap[obsId]='auto: Annexure '+(ax.label||'');
+          return{count:axRows,source:'Annexure '+(ax.label||'')};
+        }
       }
     }
   }
