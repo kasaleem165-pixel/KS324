@@ -9382,6 +9382,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
   <div id="aws-report-tabs">
     <div class="aws-report-tab active" id="aws-tab-table" onclick="awsShowRptTab('table')">&#128203; Summary Table</div>
     <div class="aws-report-tab" id="aws-tab-chart" onclick="awsShowRptTab('chart')">&#128200; Bar Chart</div>
+    <div class="aws-report-tab" id="aws-tab-draft" onclick="awsShowRptTab('draft')">&#128196; Draft Report Observations</div>
   </div>
   <div id="aws-report-panel">
     <div id="aws-rpt-table-wrap">
@@ -9393,6 +9394,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <tbody id="aws-rpt-tbody"></tbody>
       </table>
     </div>
+    <div id="aws-rpt-draft" style="display:none"></div>
     <div id="aws-rpt-chart">
       <div class="aws-chart-legend">
         <div class="aws-legend-item"><div class="aws-legend-dot" style="background:#ffc107"></div>Checked w/ Observation</div>
@@ -19290,19 +19292,133 @@ function awsShowRptTab(tab){
   aws_rptTab=tab;
   var tt=document.getElementById('aws-tab-table');
   var tc=document.getElementById('aws-tab-chart');
+  var td=document.getElementById('aws-tab-draft');
   var tw=document.getElementById('aws-rpt-table-wrap');
   var cw=document.getElementById('aws-rpt-chart');
-  if(tab==='table'){
-    if(tt) tt.className='aws-report-tab active';
-    if(tc) tc.className='aws-report-tab';
-    if(tw) tw.style.display='';
-    if(cw) cw.style.display='none';
-  } else {
-    if(tt) tt.className='aws-report-tab';
-    if(tc) tc.className='aws-report-tab active';
-    if(tw) tw.style.display='none';
-    if(cw) cw.style.display='';
+  var dw=document.getElementById('aws-rpt-draft');
+  var base='aws-report-tab', active=' active';
+  if(tt) tt.className=base+(tab==='table'?active:'');
+  if(tc) tc.className=base+(tab==='chart'?active:'');
+  if(td) td.className=base+(tab==='draft'?active:'');
+  if(tw) tw.style.display=(tab==='table'?'':'none');
+  if(cw) cw.style.display=(tab==='chart'?'':'none');
+  if(dw){ dw.style.display=(tab==='draft'?'':'none'); if(tab==='draft') awsRenderDraftTab(); }
+}
+
+function awsRenderDraftTab(){
+  var wrap=document.getElementById('aws-rpt-draft');
+  if(!wrap) return;
+
+  // Collect all selected obs, group by category
+  var cats=AWS_OBS_DATA.cats;
+  var grouped={}; // catName → [{obs, type, sens, coso, awsStatus}]
+  var total=0;
+
+  for(var ci=0;ci<cats.length;ci++){
+    var cat=cats[ci];
+    var list=AWS_OBS_DATA.obs[cat]||[];
+    for(var oi=0;oi<list.length;oi++){
+      var o=list[oi];
+      if(!selIds[o.id]) continue;
+      if(!grouped[cat]) grouped[cat]=[];
+      var awsSt=(aws_state.obs[o.id]&&aws_state.obs[o.id].status)||'Not Started';
+      var obsType=obsTypeMap[o.id]||o.type||'New';
+      var sens=sensitivityMap[o.id]||'';
+      var coso=cosoMap[o.id]||'';
+      grouped[cat].push({obs:o, type:obsType, sens:sens, coso:coso, awsSt:awsSt});
+      total++;
+    }
   }
+
+  // Also capture custom observations (not in AWS_OBS_DATA)
+  var customInDraft=[];
+  for(var k=0;k<customs.length;k++){
+    var co=customs[k];
+    if(!selIds[co.id]) continue;
+    var awsSt2=(aws_state.obs[co.id]&&aws_state.obs[co.id].status)||'—';
+    customInDraft.push({obs:co, type:obsTypeMap[co.id]||co.type||'New', sens:sensitivityMap[co.id]||'', coso:cosoMap[co.id]||'', awsSt:awsSt2});
+    total++;
+  }
+
+  if(total===0){
+    wrap.innerHTML='<div style="text-align:center;padding:32px 0;color:#888;font-size:13px">&#128203; No observations have been added to the draft report yet.<br><span style="font-size:12px">Select observations from the Build tab to populate this list.</span></div>';
+    return;
+  }
+
+  var typeColor={New:'#2070b8',Repeated:'#d06020'};
+  var sensColor={High:'#c0392b','M to H':'#e67e22','L to M':'#2980b9',Low:'#27ae60'};
+
+  var h='<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">';
+  h+='<span style="font-size:13px;font-weight:700;color:#1a3a5c">&#128196; Observations in Current Draft Report</span>';
+  h+='<span style="background:#1a3a5c;color:#fff;border-radius:10px;padding:2px 10px;font-size:12px;font-weight:700">'+total+' Total</span>';
+  h+='</div>';
+
+  // Per-category sections
+  for(var ci2=0;ci2<cats.length;ci2++){
+    var cat2=cats[ci2];
+    var rows=grouped[cat2];
+    if(!rows||!rows.length) continue;
+    h+='<div style="margin-bottom:14px">';
+    h+='<div style="background:#1a3a5c;color:#fff;padding:6px 12px;border-radius:6px 6px 0 0;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between">';
+    h+='<span>'+awsEsc(cat2)+'</span>';
+    h+='<span style="background:rgba(255,255,255,.2);border-radius:8px;padding:1px 8px;font-size:11px">'+rows.length+' obs.</span>';
+    h+='</div>';
+    h+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+    h+='<thead><tr style="background:#eaf0f8">';
+    h+='<th style="padding:6px 10px;text-align:left;font-weight:700;color:#1a3a5c;width:70px">Obs. ID</th>';
+    h+='<th style="padding:6px 10px;text-align:left;font-weight:700;color:#1a3a5c">Title</th>';
+    h+='<th style="padding:6px 10px;text-align:center;font-weight:700;color:#1a3a5c;width:70px">Type</th>';
+    h+='<th style="padding:6px 10px;text-align:center;font-weight:700;color:#1a3a5c;width:60px">Sens.</th>';
+    h+='<th style="padding:6px 10px;text-align:center;font-weight:700;color:#1a3a5c;width:50px">COSO</th>';
+    h+='<th style="padding:6px 10px;text-align:center;font-weight:700;color:#1a3a5c;width:110px">Work Status</th>';
+    h+='</tr></thead><tbody>';
+    for(var ri=0;ri<rows.length;ri++){
+      var r=rows[ri];
+      var bg=ri%2===0?'#fff':'#f7f9fc';
+      var tc2=typeColor[r.type]||'#555';
+      var sc=sensColor[r.sens]||'#aaa';
+      var wsSt=r.awsSt;
+      var wsBg=wsSt==='Checked with Observation'?'#fff3cd':wsSt==='Checked & Clear'?'#d4edda':wsSt==='In Progress'?'#ffe8cc':wsSt==='Sampled Out'?'#eef0ff':wsSt==='Not Applicable'?'#f3f3f3':'#f0f0f0';
+      var wsFg=wsSt==='Checked with Observation'?'#856404':wsSt==='Checked & Clear'?'#155724':wsSt==='In Progress'?'#a04000':wsSt==='Sampled Out'?'#3a3a9a':'#555';
+      h+='<tr style="background:'+bg+'">';
+      h+='<td style="padding:6px 10px;color:#555;font-size:11px">'+awsEsc(r.obs.id)+'</td>';
+      h+='<td style="padding:6px 10px;color:#1a3a5c;font-weight:600">'+awsEsc(r.obs.title)+'</td>';
+      h+='<td style="padding:6px 10px;text-align:center"><span style="background:'+tc2+';color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">'+awsEsc(r.type)+'</span></td>';
+      h+='<td style="padding:6px 10px;text-align:center">'+(r.sens?'<span style="background:'+sc+';color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">'+awsEsc(r.sens)+'</span>':'<span style="color:#bbb;font-size:11px">—</span>')+'</td>';
+      h+='<td style="padding:6px 10px;text-align:center">'+(r.coso?'<span style="background:#1a3a5c;color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">'+awsEsc(r.coso)+'</span>':'<span style="color:#bbb;font-size:11px">—</span>')+'</td>';
+      h+='<td style="padding:6px 10px;text-align:center"><span style="background:'+wsBg+';color:'+wsFg+';border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap">'+awsEsc(wsSt)+'</span></td>';
+      h+='</tr>';
+    }
+    h+='</tbody></table></div>';
+  }
+
+  // Custom observations section
+  if(customInDraft.length){
+    h+='<div style="margin-bottom:14px">';
+    h+='<div style="background:#5b3fa0;color:#fff;padding:6px 12px;border-radius:6px 6px 0 0;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between">';
+    h+='<span>&#10024; Custom Observations</span>';
+    h+='<span style="background:rgba(255,255,255,.2);border-radius:8px;padding:1px 8px;font-size:11px">'+customInDraft.length+' obs.</span>';
+    h+='</div>';
+    h+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+    h+='<thead><tr style="background:#f0eaff"><th style="padding:6px 10px;text-align:left;font-weight:700;color:#3a1a7c;width:70px">ID</th><th style="padding:6px 10px;text-align:left;font-weight:700;color:#3a1a7c">Title</th><th style="padding:6px 10px;text-align:center;font-weight:700;color:#3a1a7c;width:70px">Type</th><th style="padding:6px 10px;text-align:center;font-weight:700;color:#3a1a7c;width:60px">Sens.</th><th style="padding:6px 10px;text-align:center;font-weight:700;color:#3a1a7c;width:50px">COSO</th><th style="padding:6px 10px;text-align:center;font-weight:700;color:#3a1a7c;width:110px">Work Status</th></tr></thead><tbody>';
+    for(var cri=0;cri<customInDraft.length;cri++){
+      var cr=customInDraft[cri];
+      var cbg=cri%2===0?'#fff':'#f9f6ff';
+      var ctc=typeColor[cr.type]||'#555';
+      var csc=sensColor[cr.sens]||'#aaa';
+      h+='<tr style="background:'+cbg+'">';
+      h+='<td style="padding:6px 10px;color:#555;font-size:11px">Custom</td>';
+      h+='<td style="padding:6px 10px;color:#1a3a5c;font-weight:600">'+awsEsc(cr.obs.title)+'</td>';
+      h+='<td style="padding:6px 10px;text-align:center"><span style="background:'+ctc+';color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">'+awsEsc(cr.type)+'</span></td>';
+      h+='<td style="padding:6px 10px;text-align:center">'+(cr.sens?'<span style="background:'+csc+';color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">'+awsEsc(cr.sens)+'</span>':'<span style="color:#bbb;font-size:11px">—</span>')+'</td>';
+      h+='<td style="padding:6px 10px;text-align:center">'+(cr.coso?'<span style="background:#1a3a5c;color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">'+awsEsc(cr.coso)+'</span>':'<span style="color:#bbb;font-size:11px">—</span>')+'</td>';
+      h+='<td style="padding:6px 10px;text-align:center"><span style="background:#f3f3f3;color:#555;border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700">'+awsEsc(cr.awsSt)+'</span></td>';
+      h+='</tr>';
+    }
+    h+='</tbody></table></div>';
+  }
+
+  wrap.innerHTML=h;
 }
 
 function awsResetAll(){
