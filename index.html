@@ -15792,7 +15792,21 @@ function annexTextToHtml(text, navy, gbor){
       while(i<lines.length&&/^\|.*\|$/.test(lines[i].trim())){
         tableLines.push(lines[i]); i++;
       }
-      html+='<table style="border-collapse:collapse;width:100%;font-size:12px;margin-bottom:8px">';
+      // Count columns from first non-divider row for even distribution
+      var _cols=0;
+      for(var _ct=0;_ct<tableLines.length;_ct++){
+        var _ctl=tableLines[_ct].trim();
+        if(/^\|[-| :]+\|$/.test(_ctl)) continue;
+        _cols=_ctl.split('|').length-2; break;
+      }
+      var _colPct=_cols>0?Math.floor(100/_cols)+'%':'auto';
+      html+='<div style="overflow-x:auto;margin-bottom:8px">';
+      html+='<table style="border-collapse:collapse;width:100%;table-layout:fixed;font-size:12px;word-wrap:break-word">';
+      if(_cols>0){
+        html+='<colgroup>';
+        for(var _ci=0;_ci<_cols;_ci++) html+='<col style="width:'+_colPct+';min-width:70px">';
+        html+='</colgroup>';
+      }
       var firstRow=true;
       for(var t=0;t<tableLines.length;t++){
         var tl=tableLines[t].trim();
@@ -15803,12 +15817,12 @@ function annexTextToHtml(text, navy, gbor){
         html+='<tr>';
         for(var c=0;c<cells.length;c++){
           var td=firstRow?'th':'td';
-          html+='<'+td+' style="border:1px solid '+gbor+';padding:5px 8px;'+(firstRow?'background:'+navy+';color:#fff;font-weight:700;':'')+'">'+esc(cells[c].trim())+'</'+td+'>';
+          html+='<'+td+' style="border:1px solid '+gbor+';padding:5px 8px;overflow-wrap:break-word;word-break:break-word;white-space:normal;'+(firstRow?'background:'+navy+';color:#fff;font-weight:700;':'')+'">'+esc(cells[c].trim())+'</'+td+'>';
         }
         html+='</tr>';
         firstRow=false;
       }
-      html+='</table>';
+      html+='</table></div>';
     } else {
       if(line.trim()) html+='<p style="font-size:12px;line-height:1.7;margin:0 0 6px 0">'+esc(line)+'</p>';
       else html+='<div style="height:6px"></div>';
