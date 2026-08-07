@@ -10520,13 +10520,24 @@ function _obsOrderRemove(id){
 }
 
 function handleSel(id, checked, div) {
-  if(checked){ selIds[id]=true; _obsOrderAdd(id); } else { delete selIds[id]; _obsOrderRemove(id); }
+  if(checked){
+    selIds[id]=true;
+    // Seed obsTypeMap from the DB/custom obs type if Detect Repeats hasn't set it yet.
+    // This ensures DB-tagged Repeated observations land in the correct obsOrder section.
+    if(!obsTypeMap[id]){
+      var _hsType='New';
+      for(var _hsi=0;_hsi<DB.observations.length;_hsi++){if(DB.observations[_hsi].id===id){_hsType=DB.observations[_hsi].type||'New';break;}}
+      if(_hsType==='New'){for(var _hsc=0;_hsc<customs.length;_hsc++){if(customs[_hsc].id===id){_hsType=customs[_hsc].type||'New';break;}}}
+      obsTypeMap[id]=_hsType;
+    }
+    _obsOrderAdd(id);
+  } else {
+    delete selIds[id]; _obsOrderRemove(id);
+  }
   if(div){
     div.className = 'ri' + (checked?' on':'');
     var ax = document.getElementById('ax-'+id);
-    // Pill may already be present from pending-add; inject if missing
-    if(checked){ injectTypePill(id, div); }
-    else if(ax){ ax.parentNode.removeChild(ax); delete obsTypeMap[id]; }
+    if(!checked && ax){ ax.parentNode.removeChild(ax); delete obsTypeMap[id]; }
   }
   autoSaveNow();
 }
