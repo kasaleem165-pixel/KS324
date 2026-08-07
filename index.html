@@ -11779,9 +11779,9 @@ function _renderVersionHistory(sessions){
     '<div class="vh-autosave"><span class="vh-dot"></span><span id="autosave-ts">Last saved: '+lastSave+'</span></div>'+
     '<div class="vh-foot">'+
     '<button class="vh-save-now" onclick="doSaveNow()">&#128190; Save Now</button>'+
-    '<button class="vh-imp" onclick="document.getElementById(\'sessioninp\').click()">&#128194; Import from File</button>'+
+    '<button class="vh-imp" onclick="_guardLoad(\'a new session file\',function(){document.getElementById(\'sessioninp\').click();})">&#128194; Import from File</button>'+
     '<button style="background:#b84000;color:#fff" class="vh-btn" onclick="exportFullBackup()">&#128230; Full Data Backup</button>'+
-    '<button style="background:#5b3fa0;color:#fff" class="vh-btn" onclick="document.getElementById(\'fullbackupinp\').click()">&#128229; Restore Backup</button>'+
+    '<button style="background:#5b3fa0;color:#fff" class="vh-btn" onclick="_guardLoad(\'a backup file\',function(){document.getElementById(\'fullbackupinp\').click();})">&#128229; Restore Backup</button>'+
     '<button class="vh-close-btn" onclick="closeVH()">Close</button>'+
     '</div></div>';
   document.body.appendChild(el);
@@ -12032,6 +12032,42 @@ function hasAnyData(){
     if(el && el.value.trim()) return true;
   }
   return false;
+}
+
+// ── Save-first guard for any destructive load operation ───────────────────
+// Shows a modal warning when the auditor has active unsaved data and tries
+// to load a new file. The auditor must explicitly choose to proceed or cancel.
+function _guardLoad(actionLabel, proceed){
+  if(!hasAnyData()){ proceed(); return; }
+  // Build warning modal
+  var el=document.createElement('div');
+  el.id='_guard-load-modal';
+  el.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(20,30,50,.65);display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+  el.innerHTML=
+    '<div style="background:#fff;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,.35);max-width:420px;width:92%;padding:28px 26px;text-align:center">'
+    +'<div style="font-size:38px;margin-bottom:10px">&#9888;&#65039;</div>'
+    +'<div style="font-size:16px;font-weight:800;color:#c0392b;margin-bottom:8px">Unsaved Work Detected</div>'
+    +'<div style="font-size:13px;color:#3a4a5c;line-height:1.6;margin-bottom:18px">'
+      +'You have active data in the current session.<br>'
+      +'<strong>Loading '+actionLabel+' will replace your current work.</strong><br><br>'
+      +'Please <strong>Export / Save</strong> your session first to avoid losing any data.'
+    +'</div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px">'
+      +'<button id="_gl-save" style="padding:9px 0;background:#1a6030;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">&#128190; Go Back &amp; Save First</button>'
+      +'<button id="_gl-proceed" style="padding:9px 0;background:#fff;color:#c0392b;border:2px solid #c0392b;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#9888; Load Anyway (current work will be lost)</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(el);
+  document.getElementById('_gl-save').onclick=function(){
+    el.remove();
+    // Scroll user back to the top so they can see the save/export controls
+    window.scrollTo(0,0);
+    toast('Please export or save your session, then load the new file.');
+  };
+  document.getElementById('_gl-proceed').onclick=function(){
+    el.remove();
+    proceed();
+  };
 }
 
 // ============================================================
@@ -18805,7 +18841,7 @@ function setRefPreset(id, val){
 }
 
 function triggerLoadReport(){
-  document.getElementById('rptinp').click();
+  _guardLoad('a report / session file',function(){document.getElementById('rptinp').click();});
 }
 
 function loadReportFile(e){
