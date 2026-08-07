@@ -10493,12 +10493,25 @@ function injectTypePill(id, div){
   div.appendChild(row);
   // Prior-ref input row — only for repeated observations
   if(curType==='Repeated'){
+    // Auto-fill LARR from RA detection results first; fall back to template sentence
+    if(!lastRefMap[id]){
+      var _iptRdm=window._rdMatches||[];
+      var _iptFound=false;
+      for(var _iptI=0;_iptI<_iptRdm.length;_iptI++){
+        if(_iptRdm[_iptI].obsId===id){
+          setLastRef(id, _buildLarrSentence(_iptRdm[_iptI].ref||'', _iptRdm[_iptI].year||''));
+          _iptFound=true;
+          break;
+        }
+      }
+      if(!_iptFound) setLastRef(id, _buildLarrSentence('',''));
+    }
     var lrRow=document.createElement('div');
     lrRow.id='lrx-'+id;
     lrRow.style.cssText='margin-top:4px;display:flex;align-items:center;gap:5px';
     lrRow.onclick=function(e){e.stopPropagation();};
     lrRow.innerHTML='<span style="font-size:10px;font-weight:700;color:#d06020;white-space:nowrap">LARR:</span>'
-      +'<input type="text" id="lr-'+id+'" placeholder="e.g. Report No. SAB-2024-07" value="'+(lastRefMap[id]||'')+'" style="flex:1;font-size:11px;padding:3px 8px;border:1px solid #f0b080;border-radius:6px;font-family:inherit;color:#5a2000;background:#fff8f2" onclick="event.stopPropagation()" oninput="setLastRef(\''+id+'\',this.value)">';
+      +'<input type="text" id="lr-'+id+'" placeholder="e.g. Report No. SAB-2024-07" value="'+esc(lastRefMap[id]||'')+'" style="flex:1;font-size:11px;padding:3px 8px;border:1px solid #f0b080;border-radius:6px;font-family:inherit;color:#5a2000;background:#fff8f2" onclick="event.stopPropagation()" oninput="setLastRef(\''+id+'\',this.value)">';
     div.appendChild(lrRow);
   }
 }
@@ -10804,15 +10817,19 @@ function setObsType(id, val) {
   var lrx=document.getElementById('lrx-'+id);
   var lrInp=document.getElementById('lr-'+id);
   if(val==='Repeated'){
-    // Auto-fill LARR from prior detection results if not already set
+    // Auto-fill LARR from prior detection results if not already set;
+    // fall back to blank template so the user sees the standard sentence ready to edit.
     if(!lastRefMap[id]){
       var _rdm=window._rdMatches||[];
+      var _lrrFound=false;
       for(var _rmi=0;_rmi<_rdm.length;_rmi++){
         if(_rdm[_rmi].obsId===id){
           setLastRef(id, _buildLarrSentence(_rdm[_rmi].ref||'', _rdm[_rmi].year||''));
+          _lrrFound=true;
           break;
         }
       }
+      if(!_lrrFound) setLastRef(id, _buildLarrSentence('',''));
     }
     if(!lrx){
       var newRow=document.createElement('div');
@@ -20498,6 +20515,9 @@ function _applyRepeatSelections(){
     var chk=document.getElementById('rdchk-'+i);
     if(chk&&chk.checked){
       obsTypeMap[items[i].obsId]='Repeated';
+      // Move from new → repeated in obsOrder so editing panel shows correct section
+      _obsOrderRemove(items[i].obsId);
+      _obsOrderAdd(items[i].obsId);
       // Read ref from picker if shown (multiple candidates), else use stored best match ref
       var refSel=document.getElementById('rdref-'+i);
       var chosenRef=refSel?refSel.value:(items[i].ref||'');
