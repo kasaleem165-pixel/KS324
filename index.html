@@ -20084,19 +20084,40 @@ function ra_onBranchSelect(val){
   }
   var clr=document.getElementById('ra-branch-search-clear');
   if(clr) clr.style.display=val?'':'none';
-  // Show complexity hint in Stage 1 panel
+  // Show inline complexity score input in Stage 1 panel
   var hint=document.getElementById('ra-s1-cx-hint');
   if(hint&&val){
     ra_loadComplexityMap();
     var cs=ra_getComplexityScore(val);
-    if(cs!=null){
-      hint.innerHTML='&#9881; Complexity score for this branch: <strong>'+cs+'/100</strong> ('+ra_cxLevel(cs).replace(/<[^>]+>/g,'').trim()+') — from matrix';
-      hint.style.display='block';
-    } else {
-      hint.innerHTML='&#9888; No complexity score set for this branch. Default 50 will be used. <a href="#" onclick="ra_switchStage(3);return false" style="color:#1a3a5c;font-weight:700">Set it in Complexity Matrix &#8594;</a>';
-      hint.style.display='block';
-    }
+    var curVal=cs!=null?cs:'';
+    var lvlHtml=cs!=null?'&nbsp;<span style="font-size:10px;color:#fff;background:'+_ra_cxColor(cs)+';border-radius:3px;padding:1px 6px;font-weight:700">'+ra_cxLevel(cs).replace(/<[^>]+>/g,'').trim()+'</span>':'';
+    hint.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+      +'<label style="font-size:11px;font-weight:700;color:#1a3a5c;white-space:nowrap">&#9881; Complexity Score (0–100):</label>'
+      +'<input type="number" min="0" max="100" value="'+curVal+'" placeholder="e.g. 65" '
+      +'style="width:75px;padding:3px 7px;border:1px solid #a8d8b8;border-radius:4px;font-size:12px;font-family:inherit;font-weight:700;color:#1a3a5c" '
+      +'oninput="ra_s1CxSave(this.value,\''+val.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')" id="ra-s1-cx-inp">'
+      +'<span id="ra-s1-cx-lvl">'+lvlHtml+'</span>'
+      +(cs==null?'<span style="font-size:10px;color:#888;font-style:italic">Leave blank to use default (50)</span>':'')
+      +'</div>';
+    hint.style.display='block';
   } else if(hint){ hint.style.display='none'; }
+}
+
+function _ra_cxColor(s){
+  return s>=75?'#c03030':s>=55?'#b04400':s>=35?'#806000':s>=15?'#1a6020':'#5a6a80';
+}
+
+function ra_s1CxSave(val, branchName){
+  ra_loadComplexityMap();
+  var n=parseInt(val);
+  var lvlEl=document.getElementById('ra-s1-cx-lvl');
+  if(!isNaN(n)&&n>=0&&n<=100&&branchName){
+    _raComplexityMap[branchName.trim().toLowerCase()]=n;
+    ra_saveComplexityMap();
+    if(lvlEl) lvlEl.innerHTML='&nbsp;<span style="font-size:10px;color:#fff;background:'+_ra_cxColor(n)+';border-radius:3px;padding:1px 6px;font-weight:700">'+ra_cxLevel(n).replace(/<[^>]+>/g,'').trim()+'</span>';
+  } else {
+    if(lvlEl) lvlEl.innerHTML='';
+  }
 }
 
 function _ra_checkBranchMismatch(){
@@ -25082,13 +25103,13 @@ function ra_methodologyHtml(){
           <div class="ra-hint" style="line-height:1.6">The system will use:<br>
             &#8226; Sensitivity distribution from uploaded past report<br>
             &#8226; Outstanding observations table (Analysis of Audit Observations)<br>
-            &#8226; Branch complexity score from the <strong>Complexity Matrix</strong> tab
+            &#8226; Branch complexity score — enter below when branch is selected
           </div>
-          <div id="ra-s1-cx-hint" style="margin-top:8px;font-size:10.5px;padding:5px 9px;border-radius:4px;border:1px solid #a8d8b8;background:#fff;color:#1a6a3a;display:none"></div>
+          <div id="ra-s1-cx-hint" style="margin-top:8px;font-size:10.5px;padding:6px 10px;border-radius:4px;border:1px solid #a8d8b8;background:#f0faf5;color:#1a6a3a;display:none"></div>
         </div>
         <div style="padding:14px 16px">
           <button class="ra-btn-gold" onclick="ra_stage1CalcPlanningScore()" style="background:linear-gradient(135deg,#1a6a3a,#23a060);color:#fff">&#9312; Calculate Branch Planning Score</button>
-          <div class="ra-hint" style="text-align:center;margin-top:8px">Extracts sensitivity &amp; outstanding data from uploaded past report · reads complexity from matrix</div>
+          <div class="ra-hint" style="text-align:center;margin-top:8px">Extracts sensitivity &amp; outstanding data from uploaded past report · uses complexity score entered above</div>
         </div>
       </div><!-- end ra-s1-section -->
       <div id="ra-s23-section" style="display:none">
