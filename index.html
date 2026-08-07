@@ -10407,19 +10407,16 @@ function renderList(obs, toks, showScore) {
       inner += '</div></div>';
 
       if(selIds[o.id]){
+        // Show Repeated badge + LARR only when Detect Repeats has confirmed this obs as repeated.
+        // No manual New/Repeated toggle — classification is done exclusively via Detect Repeats.
         var curType = obsTypeMap[o.id] || 'New';
-        inner += '<div style="display:flex;gap:6px;margin-top:6px;padding-top:6px;border-top:1px solid #eef2f7" id="ax-'+o.id+'">';
-        inner += '<span style="font-size:11px;font-weight:700;color:var(--navy);line-height:26px;white-space:nowrap">Type:</span>';
-        inner += '<label style="display:flex;align-items:center;gap:3px;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;transition:all .15s;'+(curType==='New'?'border:1.5px solid #2070b8;background:#2070b8;color:#fff;box-shadow:0 2px 6px rgba(32,112,184,.35)':'border:1.5px solid #ccc;background:#f0f0f0;color:#aaa;opacity:0.55;cursor:default')+'" onclick="event.stopPropagation()">';
-        inner += '<input type="radio" name="otyp-'+o.id+'" value="New" style="display:none" '+(curType==='New'?'checked':'')+' onchange="setObsType(\''+o.id+'\',\'New\')">New</label>';
-        inner += '<label style="display:flex;align-items:center;gap:3px;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;transition:all .15s;'+(curType==='Repeated'?'border:1.5px solid #d06020;background:#d06020;color:#fff;box-shadow:0 2px 6px rgba(208,96,32,.35)':'border:1.5px solid #ccc;background:#f0f0f0;color:#aaa;opacity:0.55;cursor:default')+'" onclick="event.stopPropagation()">';
-        inner += '<input type="radio" name="otyp-'+o.id+'" value="Repeated" style="display:none" '+(curType==='Repeated'?'checked':'')+' onchange="setObsType(\''+o.id+'\',\'Repeated\')">Repeated</label>';
-        inner += '</div>';
         if(curType==='Repeated'){
-          inner += '<div id="lrx-'+o.id+'" style="margin-top:4px;display:flex;align-items:center;gap:5px" onclick="event.stopPropagation()">';
+          inner += '<div id="ax-'+o.id+'" style="margin-top:6px;padding-top:6px;border-top:1px solid #eef2f7">';
+          inner += '<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;background:#d06020;color:#fff;margin-bottom:5px">&#128260; Repeated Observation</span>';
+          inner += '<div id="lrx-'+o.id+'" style="display:flex;align-items:center;gap:5px" onclick="event.stopPropagation()">';
           inner += '<span style="font-size:10px;font-weight:700;color:#d06020;white-space:nowrap">LARR:</span>';
-          inner += '<input type="text" id="lr-'+o.id+'" placeholder="e.g. Report No. SAB-2024-07" value="'+(lastRefMap[o.id]||'')+'" style="flex:1;font-size:11px;padding:3px 8px;border:1px solid #f0b080;border-radius:6px;font-family:inherit;color:#5a2000;background:#fff8f2" onclick="event.stopPropagation()" oninput="setLastRef(\''+o.id+'\',this.value)">';
-          inner += '</div>';
+          inner += '<input type="text" id="lr-'+o.id+'" value="'+(lastRefMap[o.id]||'')+'" style="flex:1;font-size:11px;padding:3px 8px;border:1px solid #f0b080;border-radius:6px;font-family:inherit;color:#5a2000;background:#fff8f2" onclick="event.stopPropagation()" oninput="setLastRef(\''+o.id+'\',this.value)">';
+          inner += '</div></div>';
         }
       }
 
@@ -10464,9 +10461,8 @@ function queuePending(id, checked) {
     // Visually mark the row as pending
     var div = document.getElementById('ri-'+id);
     if(div) div.className = 'ri' + (checked ? ' pending-add' : ' pending-rem');
-    // Show New/Repeated pill immediately on pending-add; remove on pending-rem
-    if(checked){ injectTypePill(id, div); }
-    else { var ax=document.getElementById('ax-'+id); if(ax){ax.parentNode.removeChild(ax); delete obsTypeMap[id];} }
+    // Remove type badge if observation is deselected
+    if(!checked){ var ax=document.getElementById('ax-'+id); if(ax){ax.parentNode.removeChild(ax); delete obsTypeMap[id];} }
   }
   // Keep checkbox in the desired state (not reverted)
   var cb = document.getElementById('cb-'+id);
@@ -10474,40 +10470,10 @@ function queuePending(id, checked) {
   updateGenBtn();
 }
 
-function injectTypePill(id, div){
-  if(!div || document.getElementById('ax-'+id)) return;
-  // Respect user override first, then DB-level type tag, then default to New
-  var dbType='New';
-  for(var _di=0;_di<DB.observations.length;_di++){ if(DB.observations[_di].id===id){ dbType=DB.observations[_di].type||'New'; break; } }
-  var curType = obsTypeMap[id] || dbType;
-  if(!obsTypeMap[id]) obsTypeMap[id]=curType;
-  var row = document.createElement('div');
-  row.style.cssText='display:flex;gap:6px;margin-top:6px;padding-top:6px;border-top:1px solid #eef2f7';
-  row.id='ax-'+id;
-  row.innerHTML=
-    '<span style="font-size:11px;font-weight:700;color:var(--navy);line-height:26px;white-space:nowrap">Type:</span>'+
-    '<label style="display:flex;align-items:center;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;transition:all .15s;'+(curType==='New'?'border:1.5px solid #2070b8;background:#2070b8;color:#fff;box-shadow:0 2px 6px rgba(32,112,184,.35)':'border:1.5px solid #ccc;background:#f0f0f0;color:#aaa;opacity:0.55;cursor:default')+'" onclick="event.stopPropagation()">'+
-    '<input type="radio" name="otyp-'+id+'" value="New" style="display:none" '+(curType==='New'?'checked':'')+' onchange="setObsType(\''+id+'\',\'New\')">New</label>'+
-    '<label style="display:flex;align-items:center;font-size:12px;font-weight:600;cursor:pointer;padding:3px 12px;border-radius:12px;transition:all .15s;'+(curType==='Repeated'?'border:1.5px solid #d06020;background:#d06020;color:#fff;box-shadow:0 2px 6px rgba(208,96,32,.35)':'border:1.5px solid #ccc;background:#f0f0f0;color:#aaa;opacity:0.55;cursor:default')+'" onclick="event.stopPropagation()">'+
-    '<input type="radio" name="otyp-'+id+'" value="Repeated" style="display:none" '+(curType==='Repeated'?'checked':'')+' onchange="setObsType(\''+id+'\',\'Repeated\')">Repeated</label>';
-  div.appendChild(row);
-  // Prior-ref input row — only for repeated observations
-  if(curType==='Repeated'){
-    // Auto-fill LARR: try RA reports first (detection results or direct scan),
-    // fall back to blank template so the user sees the standard sentence ready to edit.
-    if(!lastRefMap[id]){
-      var _iptSentence=_larrAutoFillFromRA(id);
-      setLastRef(id, _iptSentence||_buildLarrSentence('',''));
-    }
-    var lrRow=document.createElement('div');
-    lrRow.id='lrx-'+id;
-    lrRow.style.cssText='margin-top:4px;display:flex;align-items:center;gap:5px';
-    lrRow.onclick=function(e){e.stopPropagation();};
-    lrRow.innerHTML='<span style="font-size:10px;font-weight:700;color:#d06020;white-space:nowrap">LARR:</span>'
-      +'<input type="text" id="lr-'+id+'" placeholder="e.g. Report No. SAB-2024-07" value="'+esc(lastRefMap[id]||'')+'" style="flex:1;font-size:11px;padding:3px 8px;border:1px solid #f0b080;border-radius:6px;font-family:inherit;color:#5a2000;background:#fff8f2" onclick="event.stopPropagation()" oninput="setLastRef(\''+id+'\',this.value)">';
-    div.appendChild(lrRow);
-  }
-}
+// injectTypePill — retired. New/Repeated classification is now done exclusively
+// via the Detect Repeats button. This stub remains to avoid errors from any
+// legacy call paths that may still reference it.
+function injectTypePill(id, div){ /* no-op */ }
 
 // Ensure obsOrder arrays reflect current selIds (called at render time as safety net)
 function _obsOrderSync(allObs){
@@ -10775,62 +10741,21 @@ function getSnippet(raw, toks) {
   return hlText(esc(snip), toks);
 }
 
+// setObsType — called internally by _applyRepeatSelections (Detect Repeats).
+// No longer wired to any manual UI toggle; classification is via Detect Repeats only.
 function setObsType(id, val) {
   obsTypeMap[id] = val;
   // Move between section order arrays when type changes
   _obsOrderRemove(id);
   if(selIds[id]) _obsOrderAdd(id);
-  // Update pill colours in-place without re-rendering the list
-  var axRow = document.getElementById('ax-'+id);
-  if(axRow){
-    var labels = axRow.querySelectorAll('label');
-    for(var i=0;i<labels.length;i++){
-      var inp = labels[i].querySelector('input[type=radio]');
-      if(!inp) continue;
-      var isNew = inp.value==='New';
-      var active = inp.value===val;
-      if(active){
-        labels[i].style.background = isNew?'#2070b8':'#d06020';
-        labels[i].style.color = '#fff';
-        labels[i].style.border = '1.5px solid '+(isNew?'#2070b8':'#d06020');
-        labels[i].style.opacity = '1';
-        labels[i].style.cursor = 'pointer';
-        labels[i].style.boxShadow = isNew?'0 2px 6px rgba(32,112,184,.35)':'0 2px 6px rgba(208,96,32,.35)';
-      } else {
-        labels[i].style.background = '#f0f0f0';
-        labels[i].style.color = '#aaa';
-        labels[i].style.border = '1.5px solid #ccc';
-        labels[i].style.opacity = '0.55';
-        labels[i].style.cursor = 'default';
-        labels[i].style.boxShadow = 'none';
-      }
-    }
-  }
-  // Show or hide the prior-ref input row based on type
-  var lrx=document.getElementById('lrx-'+id);
+  // Update LARR in-place if the input already exists in the DOM
   var lrInp=document.getElementById('lr-'+id);
   if(val==='Repeated'){
-    // Auto-fill LARR: try RA reports first (detection results or direct scan),
-    // fall back to blank template so the user sees the standard sentence ready to edit.
     if(!lastRefMap[id]){
       var _lrrSentence=_larrAutoFillFromRA(id);
       setLastRef(id, _lrrSentence||_buildLarrSentence('',''));
     }
-    if(!lrx){
-      var newRow=document.createElement('div');
-      newRow.id='lrx-'+id;
-      newRow.style.cssText='margin-top:4px;display:flex;align-items:center;gap:5px';
-      newRow.onclick=function(e){e.stopPropagation();};
-      newRow.innerHTML='<span style="font-size:10px;font-weight:700;color:#d06020;white-space:nowrap">LARR:</span>'
-        +'<input type="text" id="lr-'+id+'" placeholder="For prior audit history of this finding, please refer to Observation No. — of the last issued Branch Audit Report of this branch." value="'+(lastRefMap[id]||'')+'" style="flex:1;font-size:11px;padding:3px 8px;border:1px solid #f0b080;border-radius:6px;font-family:inherit;color:#5a2000;background:#fff8f2" onclick="event.stopPropagation()" oninput="setLastRef(\''+id+'\',this.value)">';
-      var _axRow=document.getElementById('ax-'+id);
-      if(_axRow&&_axRow.parentNode) _axRow.parentNode.insertBefore(newRow, _axRow.nextSibling);
-    } else if(lrInp && !lrInp.value && lastRefMap[id]){
-      // Row already exists but input was empty — update it (e.g. toggled back and forth)
-      lrInp.value = lastRefMap[id];
-    }
-  } else {
-    if(lrx) lrx.parentNode.removeChild(lrx);
+    if(lrInp && !lrInp.value && lastRefMap[id]) lrInp.value=lastRefMap[id];
   }
   renderRpt();
 }
