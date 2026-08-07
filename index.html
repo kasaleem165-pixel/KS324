@@ -454,6 +454,24 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
 
 /* ===== AUDIT WORK STATUS PANEL ===== */
 #aws-panel{display:none;max-width:100%;padding:16px 18px 40px;background:#f4f6f9;min-height:calc(100vh - 50px)}
+#draft-tab-btn{background:#5b3fa0;color:#fff}
+#draft-panel{display:none;max-width:100%;padding:16px 18px 40px;background:#f4f6f9;min-height:calc(100vh - 50px)}
+#draft-panel .dp-cat-block{margin-bottom:14px;border:1px solid #dde3ec;border-radius:8px;overflow:hidden}
+#draft-panel .dp-cat-hdr{background:#1a3a5c;color:#fff;padding:8px 14px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+#draft-panel .dp-cat-hdr:hover{background:#14304f}
+#draft-panel .dp-cat-body{display:block}
+#draft-panel .dp-cat-body.collapsed{display:none}
+#draft-panel table{width:100%;border-collapse:collapse;font-size:12px}
+#draft-panel thead tr{background:#eaf0f8}
+#draft-panel thead th{padding:6px 10px;font-weight:700;color:#1a3a5c;white-space:nowrap}
+#draft-panel tbody tr{border-bottom:1px solid #edf1f5}
+#draft-panel tbody tr:nth-child(even){background:#f7f9fc}
+#draft-panel tbody tr:nth-child(odd){background:#fff}
+#draft-panel .dp-title-link{color:#1a3a5c;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+#draft-panel .dp-title-link:hover{color:#c9962a}
+#draft-panel .dp-detail-row{background:#f8fafd!important;border-bottom:2px solid #dde3ec!important}
+#draft-panel .dp-detail-inner{padding:10px 16px 14px 32px;font-size:12px;color:#2a3a50}
+@media print{#draft-panel{background:#fff}#dp-top-controls,#dp-print-btn,.dp-cat-hdr .dp-toggle{display:none!important}.dp-cat-body.collapsed{display:block!important}}
 .aws-section-title{font-size:15px;font-weight:700;color:#1a3a5c;border-left:4px solid #c9962a;padding-left:10px;margin:20px 0 12px}
 /* Heat map */
 #aws-heatmap-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:4px}
@@ -9226,6 +9244,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       <div class="tb-dd-menu">
         <button class="tb-dd-item" id="aws-tab-btn" onclick="toggleAWSPanel();tbDDClose()"><span class="di">&#128203;</span> Work Status</button>
         <button class="tb-dd-item" id="ra-tab-btn"  onclick="toggleRAPanel();tbDDClose()"><span class="di">&#128202;</span> Risk Assessment</button>
+        <button class="tb-dd-item" id="draft-tab-btn" onclick="toggleDraftPanel();tbDDClose()"><span class="di">&#128196;</span> Draft Summary</button>
       </div>
     </div>
 
@@ -9382,7 +9401,6 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
   <div id="aws-report-tabs">
     <div class="aws-report-tab active" id="aws-tab-table" onclick="awsShowRptTab('table')">&#128203; Summary Table</div>
     <div class="aws-report-tab" id="aws-tab-chart" onclick="awsShowRptTab('chart')">&#128200; Bar Chart</div>
-    <div class="aws-report-tab" id="aws-tab-draft" onclick="awsShowRptTab('draft')">&#128196; Draft Report Observations</div>
   </div>
   <div id="aws-report-panel">
     <div id="aws-rpt-table-wrap">
@@ -9394,7 +9412,6 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <tbody id="aws-rpt-tbody"></tbody>
       </table>
     </div>
-    <div id="aws-rpt-draft" style="display:none"></div>
     <div id="aws-rpt-chart">
       <div class="aws-chart-legend">
         <div class="aws-legend-item"><div class="aws-legend-dot" style="background:#ffc107"></div>Checked w/ Observation</div>
@@ -9411,6 +9428,25 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
   <div class="aws-section-title">Category Details</div>
   <div id="aws-cat-sections"></div>
 </div>
+
+<!-- ── Draft Summary Panel ───────────────────────────────────────────── -->
+<div id="draft-panel">
+  <div id="dp-top-controls" style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+    <span style="font-size:15px;font-weight:800;color:#1a3a5c">&#128196; Draft Report — Observation Summary</span>
+    <span style="font-size:11px;color:#888;margin-right:auto">All observations currently added to the draft report</span>
+    <button id="dp-print-btn" onclick="window.print()" style="padding:5px 13px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128424; Print / Export</button>
+    <button onclick="toggleDraftPanel()" style="padding:5px 11px;background:#f5e8e8;border:1px solid #e0b0b0;border-radius:6px;color:#c03030;font-size:13px;font-weight:700;cursor:pointer;line-height:1">&#10005;</button>
+  </div>
+  <div id="dp-branch-bar" style="background:#1a3a5c;color:#fff;border-radius:8px;padding:10px 18px;margin-bottom:14px;display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:8px"><span style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#c9d8e8">Branch</span><span id="dp-bb-name" style="font-size:14px;font-weight:700;color:#fff">—</span></div>
+    <div style="display:flex;align-items:center;gap:8px"><span style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#c9d8e8">Report No.</span><span id="dp-bb-rno" style="font-size:14px;font-weight:700;color:#f0c040">—</span></div>
+    <div style="display:flex;align-items:center;gap:8px"><span style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#c9d8e8">Total Observations</span><span id="dp-bb-total" style="font-size:14px;font-weight:800;color:#c9962a">0</span></div>
+    <div style="display:flex;align-items:center;gap:8px"><span style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#c9d8e8">New</span><span id="dp-bb-new" style="font-size:14px;font-weight:700;color:#90c8f0">0</span></div>
+    <div style="display:flex;align-items:center;gap:8px"><span style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#c9d8e8">Repeated</span><span id="dp-bb-rep" style="font-size:14px;font-weight:700;color:#f0a060">0</span></div>
+  </div>
+  <div id="dp-content"></div>
+</div>
+
 <input type="file" id="fileinp" accept=".html" style="display:none" onchange="loadAuditeeFile(event)">
 <input type="file" id="sessioninp" accept=".json" style="display:none" onchange="importSessionFile(event)">
 <input type="file" id="fullbackupinp" accept=".json" style="display:none" onchange="importFullBackup(event)">
@@ -12620,8 +12656,7 @@ function renderRpt(){
         h+='<div class="assess-radios">';
         h+='<label><input type="radio" name="asr-'+o.id+'" value="agreed" onclick="setAssess(\''+o.id+'\',\'agreed\')"'+(aStatus==='agreed'?' checked':'')+'>  Agreed by Auditee</label>';
         h+='<label><input type="radio" name="asr-'+o.id+'" value="resolved" onclick="setAssess(\''+o.id+'\',\'resolved\')"'+(aStatus==='resolved'?' checked':'')+'>  Resolved</label>';
-        h+='<label><input type="radio" name="asr-'+o.id+'" value="partial" onclick="setAssess(\''+o.id+'\',\'partial\')"'+(aStatus==='partial'?' checked':'')+'>  Partially Resolved</label>';
-        h+='<label><input type="radio" name="asr-'+o.id+'" value="notresolved" onclick="setAssess(\''+o.id+'\',\'notresolved\')"'+(aStatus==='notresolved'?' checked':'')+'>  Not Resolved</label>';
+        h+='<label><input type="radio" name="asr-'+o.id+'" value="notresolved" onclick="setAssess(\''+o.id+'\',\'notresolved\')"'+(aStatus==='notresolved'?' checked':'')+'>  Not Agreed by Auditee</label>';
         h+='</div>';
         h+='<div id="agr-blk-'+o.id+'" style="display:'+(aStatus==='agreed'?'block':'none')+'">';
         h+='<div class="assess-agreed">&#10003; Status: Accepted by Auditee &#8212; Auditee has acknowledged the observation and committed to corrective action.</div>';
@@ -16554,7 +16589,7 @@ function finalizeReport(){
     if(sectROFin) h+='<div style="font-size:11.5px;font-weight:700;color:#1a5c3a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">RO Section Response</div>'+'<div style="font-size:13px;line-height:1.6;color:#1a3a2a;margin-bottom:10px;white-space:pre-wrap;background:#f0fff8;padding:6px 10px;border-radius:4px;border-left:3px solid #3a9a6a">'+esc(sectROFin)+'</div>';
     if(sectHOFin) h+='<div style="font-size:11.5px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">HO Section Response</div>'+'<div style="font-size:13px;line-height:1.6;color:#1a2a5a;margin-bottom:10px;white-space:pre-wrap;background:#f0f4ff;padding:6px 10px;border-radius:4px;border-left:3px solid #4a6ab0">'+esc(sectHOFin)+'</div>';
     if(responseLoaded&&aStatus){
-      h+='<div style="margin:8px 0;padding:6px 10px;background:#eef4ff;border:1px solid #4a7fc1;border-radius:4px;font-size:11px;font-weight:700;color:#1a3a5c">Auditor Assessment: '+(aStatus==='agreed'?'Agreed by Auditee':aStatus==='resolved'?'Resolved':aStatus==='partial'?'Partially Resolved':'Not Resolved')+'</div>';
+      h+='<div style="margin:8px 0;padding:6px 10px;background:#eef4ff;border:1px solid #4a7fc1;border-radius:4px;font-size:11px;font-weight:700;color:#1a3a5c">Auditor Assessment: '+(aStatus==='agreed'?'Agreed by Auditee':aStatus==='resolved'?'Resolved':'Not Agreed by Auditee')+'</div>';
       if(aStatus==='agreed') h+='<div style="padding:8px 12px;background:#e6f7e6;border-left:3px solid #3a8a3a;border-radius:0 4px 4px 0;font-size:12px;color:#2a5a2a;font-weight:600;margin-bottom:6px">&#10003; Accepted by Auditee</div>';
       if(aStatus==='resolved'&&actStored) h+=sl('Action Taken')+st(actStored);
       if((aStatus==='partial'||aStatus==='notresolved')&&avStored) h+=sl('Audit View')+st(avStored);
@@ -19292,53 +19327,72 @@ function awsShowRptTab(tab){
   aws_rptTab=tab;
   var tt=document.getElementById('aws-tab-table');
   var tc=document.getElementById('aws-tab-chart');
-  var td=document.getElementById('aws-tab-draft');
   var tw=document.getElementById('aws-rpt-table-wrap');
   var cw=document.getElementById('aws-rpt-chart');
-  var dw=document.getElementById('aws-rpt-draft');
   var base='aws-report-tab', active=' active';
   if(tt) tt.className=base+(tab==='table'?active:'');
   if(tc) tc.className=base+(tab==='chart'?active:'');
-  if(td) td.className=base+(tab==='draft'?active:'');
   if(tw) tw.style.display=(tab==='table'?'':'none');
   if(cw) cw.style.display=(tab==='chart'?'':'none');
-  if(dw){ dw.style.display=(tab==='draft'?'':'none'); if(tab==='draft') awsRenderDraftTab(); }
 }
 
-function awsNavToObs(obsId){
-  // Close Work Status panel, show main, then scroll to the observation card
-  var panel=document.getElementById('aws-panel');
-  var main=document.getElementById('main');
-  var btn=document.getElementById('aws-tab-btn');
-  if(panel) panel.style.display='none';
-  if(main) main.style.display='';
-  if(btn) btn.textContent='\u{1F4CB} Work Status';
-  _setPanelBack(null);
-  setRptBtnsDisabled(false);
-  var raBtn2=document.getElementById('ra-tab-btn');
-  if(raBtn2) raBtn2.disabled=false;
-  // Navigate to and highlight the card
-  _pfNavToObs(obsId);
-}
-
-function awsToggleDraftDetail(obsId){
-  var row=document.getElementById('aws-dd-'+obsId);
+function dpToggleDetail(obsId){
+  var row=document.getElementById('dp-dd-'+obsId);
   if(!row) return;
   var visible=row.style.display!=='none';
   row.style.display=visible?'none':'';
-  var btn=document.getElementById('aws-ddbtn-'+obsId);
-  if(btn) btn.textContent=visible?'▼ Details':'▲ Hide';
+  var btn=document.getElementById('dp-ddbtn-'+obsId);
+  if(btn){ btn.textContent=visible?'▼ Details':'▲ Hide'; btn.style.background=visible?'#eaf2fb':'#d0e8fc'; }
 }
 
-function awsRenderDraftTab(){
-  var wrap=document.getElementById('aws-rpt-draft');
-  if(!wrap) return;
+function dpNavToObs(obsId){
+  // Close Draft panel, show main, navigate to the card
+  toggleDraftPanel();
+  setTimeout(function(){ _pfNavToObs(obsId); }, 80);
+}
 
-  // Collect all selected obs, group by category
+function toggleDraftPanel(){
+  var panel=document.getElementById('draft-panel');
+  var main=document.getElementById('main');
+  var btn=document.getElementById('draft-tab-btn');
+  if(!panel||!main) return;
+  var showing=panel.style.display==='block';
+  if(showing){
+    panel.style.display='none';
+    main.style.display='';
+    if(btn) btn.textContent='\u{1F4C4} Draft Summary';
+    _setPanelBack(null);
+    setRptBtnsDisabled(false);
+    var raBtn=document.getElementById('ra-tab-btn'); if(raBtn) raBtn.disabled=false;
+    var awsBtn=document.getElementById('aws-tab-btn'); if(awsBtn) awsBtn.disabled=false;
+  } else {
+    // Hide other full-page panels first
+    var awsP=document.getElementById('aws-panel'); if(awsP) awsP.style.display='none';
+    var awsTabBtn=document.getElementById('aws-tab-btn'); if(awsTabBtn) awsTabBtn.textContent='\u{1F4CB} Work Status';
+    panel.style.display='block';
+    panel.classList.add('panel-fadein');
+    setTimeout(function(){ panel.classList.remove('panel-fadein'); },300);
+    main.style.display='none';
+    if(btn) btn.textContent='\u{1F4C4} Close Draft Summary';
+    _setPanelBack('Draft Summary');
+    setRptBtnsDisabled(true);
+    var raBtn2=document.getElementById('ra-tab-btn'); if(raBtn2) raBtn2.disabled=true;
+    var awsBtn2=document.getElementById('aws-tab-btn'); if(awsBtn2) awsBtn2.disabled=true;
+    renderDraftPanel();
+  }
+}
+
+function renderDraftPanel(){
+  var content=document.getElementById('dp-content');
+  if(!content) return;
+
   var cats=AWS_OBS_DATA.cats;
   var grouped={};
-  var total=0;
+  var total=0, newCount=0, repCount=0;
+  var typeColor={New:'#2070b8',Repeated:'#d06020'};
+  var sensColor={High:'#c0392b','M to H':'#e67e22','L to M':'#2980b9',Low:'#27ae60'};
 
+  // Collect DB observations
   for(var ci=0;ci<cats.length;ci++){
     var cat=cats[ci];
     var list=AWS_OBS_DATA.obs[cat]||[];
@@ -19346,132 +19400,160 @@ function awsRenderDraftTab(){
       var o=list[oi];
       if(!selIds[o.id]) continue;
       if(!grouped[cat]) grouped[cat]=[];
-      var awsSt=(aws_state.obs[o.id]&&aws_state.obs[o.id].status)||'Not Started';
-      var obsType=obsTypeMap[o.id]||o.type||'New';
-      var sens=sensitivityMap[o.id]||'';
-      var coso=cosoMap[o.id]||'';
-      // Get current text (may have been edited)
-      var obsText=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:(o.observation||'');
-      var recText=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:(o.recommendation||'');
-      grouped[cat].push({obs:o, type:obsType, sens:sens, coso:coso, awsSt:awsSt, obsText:obsText, recText:recText});
-      total++;
+      var oType=obsTypeMap[o.id]||o.type||'New';
+      var entry={
+        obs:o, type:oType,
+        sens:sensitivityMap[o.id]||'',
+        coso:cosoMap[o.id]||'',
+        awsSt:(aws_state.obs[o.id]&&aws_state.obs[o.id].status)||'Not Started',
+        obsText:(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:(o.observation||''),
+        recText:(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:(o.recommendation||''),
+        larr:lastRefMap[o.id]||'',
+        bsNote:obsNotesMap[o.id]||''
+      };
+      grouped[cat].push(entry);
+      total++; if(oType==='Repeated') repCount++; else newCount++;
     }
   }
 
   // Custom observations
-  var customInDraft=[];
+  var customRows=[];
   for(var k=0;k<customs.length;k++){
     var co=customs[k];
     if(!selIds[co.id]) continue;
-    var awsSt2=(aws_state.obs[co.id]&&aws_state.obs[co.id].status)||'—';
-    var obsText2=(obsEdits[co.id]&&obsEdits[co.id].observation!=null)?obsEdits[co.id].observation:(co.observation||'');
-    var recText2=(obsEdits[co.id]&&obsEdits[co.id].recommendation!=null)?obsEdits[co.id].recommendation:(co.recommendation||'');
-    customInDraft.push({obs:co, type:obsTypeMap[co.id]||co.type||'New', sens:sensitivityMap[co.id]||'', coso:cosoMap[co.id]||'', awsSt:awsSt2, obsText:obsText2, recText:recText2});
-    total++;
+    var coType=obsTypeMap[co.id]||co.type||'New';
+    customRows.push({
+      obs:co, type:coType,
+      sens:sensitivityMap[co.id]||'',
+      coso:cosoMap[co.id]||'',
+      awsSt:(aws_state.obs[co.id]&&aws_state.obs[co.id].status)||'—',
+      obsText:(obsEdits[co.id]&&obsEdits[co.id].observation!=null)?obsEdits[co.id].observation:(co.observation||''),
+      recText:(obsEdits[co.id]&&obsEdits[co.id].recommendation!=null)?obsEdits[co.id].recommendation:(co.recommendation||''),
+      larr:lastRefMap[co.id]||'',
+      bsNote:obsNotesMap[co.id]||''
+    });
+    total++; if(coType==='Repeated') repCount++; else newCount++;
   }
 
+  // Update header bar counts
+  var brname=document.getElementById('brname'); var rno=document.getElementById('rno');
+  var dpName=document.getElementById('dp-bb-name'); var dpRno=document.getElementById('dp-bb-rno');
+  var dpTotal=document.getElementById('dp-bb-total'); var dpNew=document.getElementById('dp-bb-new'); var dpRep=document.getElementById('dp-bb-rep');
+  if(dpName) dpName.textContent=(brname&&brname.value.trim())||'(Branch not set)';
+  if(dpRno)  dpRno.textContent=(rno&&rno.value.trim())||'(Report No. not set)';
+  if(dpTotal) dpTotal.textContent=total;
+  if(dpNew)   dpNew.textContent=newCount;
+  if(dpRep)   dpRep.textContent=repCount;
+
   if(total===0){
-    wrap.innerHTML='<div style="text-align:center;padding:32px 0;color:#888;font-size:13px">&#128203; No observations have been added to the draft report yet.<br><span style="font-size:12px">Select observations from the Build tab to populate this list.</span></div>';
+    content.innerHTML='<div style="text-align:center;padding:48px 0;color:#888;font-size:13px">&#128203; No observations have been added to the draft report yet.<br><span style="font-size:12px;margin-top:6px;display:block">Select observations from the Build tab observation list.</span></div>';
     return;
   }
 
-  var typeColor={New:'#2070b8',Repeated:'#d06020'};
-  var sensColor={High:'#c0392b','M to H':'#e67e22','L to M':'#2980b9',Low:'#27ae60'};
-
-  function _wsBadge(wsSt){
-    var wsBg=wsSt==='Checked with Observation'?'#fff3cd':wsSt==='Checked & Clear'?'#d4edda':wsSt==='In Progress'?'#ffe8cc':wsSt==='Sampled Out'?'#eef0ff':wsSt==='Not Applicable'?'#f3f3f3':'#f0f0f0';
-    var wsFg=wsSt==='Checked with Observation'?'#856404':wsSt==='Checked & Clear'?'#155724':wsSt==='In Progress'?'#a04000':wsSt==='Sampled Out'?'#3a3a9a':'#555';
-    return '<span style="background:'+wsBg+';color:'+wsFg+';border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap">'+awsEsc(wsSt)+'</span>';
+  function _wsBadge(st){
+    var bg=st==='Checked with Observation'?'#fff3cd':st==='Checked & Clear'?'#d4edda':st==='In Progress'?'#ffe8cc':st==='Sampled Out'?'#eef0ff':st==='Not Applicable'?'#f3f3f3':'#ececec';
+    var fg=st==='Checked with Observation'?'#856404':st==='Checked & Clear'?'#155724':st==='In Progress'?'#a04000':st==='Sampled Out'?'#3a3a9a':'#555';
+    return '<span style="background:'+bg+';color:'+fg+';border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap">'+awsEsc(st)+'</span>';
   }
 
-  function _obsRows(rows, isCustom){
-    var h2='';
-    for(var ri=0;ri<rows.length;ri++){
-      var r=rows[ri];
-      var bg=ri%2===0?'#fff':'#f7f9fc';
-      var tc2=typeColor[r.type]||'#555';
-      var sc=sensColor[r.sens]||'#aaa';
-      var obsId=r.obs.id;
-      var larr=lastRefMap[obsId]||'';
-      // Main summary row — clicking title navigates to card
-      h2+='<tr style="background:'+bg+';border-bottom:1px solid #edf1f5">';
-      h2+='<td style="padding:7px 10px;color:#888;font-size:11px;white-space:nowrap">'+(isCustom?'Custom':awsEsc(obsId))+'</td>';
-      h2+='<td style="padding:7px 10px">'
-        +'<span onclick="awsNavToObs(\''+obsId+'\')" title="Click to open this observation in the Build view" '
-        +'style="color:#1a3a5c;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:2px;font-size:12px">'
-        +awsEsc(r.obs.title)+'</span>'
-      +'</td>';
-      h2+='<td style="padding:7px 10px;text-align:center"><span style="background:'+tc2+';color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">'+awsEsc(r.type)+'</span></td>';
-      h2+='<td style="padding:7px 10px;text-align:center">'+(r.sens?'<span style="background:'+sc+';color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">'+awsEsc(r.sens)+'</span>':'<span style="color:#ccc">—</span>')+'</td>';
-      h2+='<td style="padding:7px 10px;text-align:center">'+(r.coso?'<span style="background:#1a3a5c;color:#fff;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">'+awsEsc(r.coso)+'</span>':'<span style="color:#ccc">—</span>')+'</td>';
-      h2+='<td style="padding:7px 10px;text-align:center">'+_wsBadge(r.awsSt)+'</td>';
-      h2+='<td style="padding:7px 10px;text-align:center"><button id="aws-ddbtn-'+obsId+'" onclick="awsToggleDraftDetail(\''+obsId+'\')" style="font-size:11px;padding:2px 9px;background:#eaf2fb;color:#1a3a5c;border:1px solid #b0c8e8;border-radius:5px;cursor:pointer;font-family:inherit;font-weight:700;white-space:nowrap">&#9660; Details</button></td>';
-      h2+='</tr>';
-      // Detail expansion row (hidden by default)
-      h2+='<tr id="aws-dd-'+obsId+'" style="display:none;background:#f8fafd">';
-      h2+='<td colspan="7" style="padding:10px 16px 14px 32px;border-bottom:2px solid #dde3ec">';
-      h2+='<div style="display:flex;flex-direction:column;gap:8px;font-size:12px;color:#2a3a50;max-width:860px">';
-      if(r.obsText){
-        h2+='<div><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#1a3a5c;margin-bottom:3px">&#128270; Observation</div>'
-          +'<div style="background:#fff;border:1px solid #dde3ec;border-radius:5px;padding:8px 10px;line-height:1.6;white-space:pre-wrap">'+awsEsc(r.obsText)+'</div></div>';
-      }
-      if(r.recText){
-        h2+='<div><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#1a6030;margin-bottom:3px">&#128204; Recommendation</div>'
-          +'<div style="background:#fff;border:1px solid #dde3ec;border-radius:5px;padding:8px 10px;line-height:1.6;white-space:pre-wrap">'+awsEsc(r.recText)+'</div></div>';
-      }
-      if(r.type==='Repeated'&&larr){
-        h2+='<div><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#8a3000;margin-bottom:3px">&#128196; Last Audit Report Reference</div>'
-          +'<div style="background:#fff8f2;border:1px solid #f0c090;border-radius:5px;padding:6px 10px;font-size:12px">'+awsEsc(larr)+'</div></div>';
-      }
-      h2+='<div style="margin-top:4px"><button onclick="awsNavToObs(\''+obsId+'\')" style="font-size:12px;padding:5px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600">&#9998; Open &amp; Edit in Build View</button></div>';
-      h2+='</div></td></tr>';
+  function _tableHead(hdrColor){
+    return '<table><thead><tr style="background:'+hdrColor+'">'
+      +'<th style="padding:7px 10px;text-align:left;width:72px">ID</th>'
+      +'<th style="padding:7px 10px;text-align:left">Observation Title <span style="font-size:10px;font-weight:400;opacity:.7">(click to open &amp; edit)</span></th>'
+      +'<th style="padding:7px 10px;text-align:center;width:72px">Type</th>'
+      +'<th style="padding:7px 10px;text-align:center;width:64px">Sensitivity</th>'
+      +'<th style="padding:7px 10px;text-align:center;width:52px">COSO</th>'
+      +'<th style="padding:7px 10px;text-align:center;width:130px">Work Status</th>'
+      +'<th style="padding:7px 10px;text-align:center;width:76px"></th>'
+      +'</tr></thead><tbody>';
+  }
+
+  function _obsRow(r, isCustom){
+    var id=r.obs.id;
+    var tc=typeColor[r.type]||'#555';
+    var sc=sensColor[r.sens]||'#aaa';
+    var h='<tr>';
+    h+='<td style="padding:7px 10px;color:#888;font-size:11px">'+(isCustom?'Custom':awsEsc(id))+'</td>';
+    h+='<td style="padding:7px 10px"><span class="dp-title-link" onclick="dpNavToObs(\''+id+'\')">'+awsEsc(r.obs.title)+'</span></td>';
+    h+='<td style="padding:7px 10px;text-align:center"><span style="background:'+tc+';color:#fff;border-radius:8px;padding:1px 8px;font-size:10px;font-weight:700">'+awsEsc(r.type)+'</span></td>';
+    h+='<td style="padding:7px 10px;text-align:center">'+(r.sens?'<span style="background:'+sc+';color:#fff;border-radius:8px;padding:1px 8px;font-size:10px;font-weight:700">'+awsEsc(r.sens)+'</span>':'<span style="color:#ccc">—</span>')+'</td>';
+    h+='<td style="padding:7px 10px;text-align:center">'+(r.coso?'<span style="background:#1a3a5c;color:#fff;border-radius:8px;padding:1px 8px;font-size:10px;font-weight:700">'+awsEsc(r.coso)+'</span>':'<span style="color:#ccc">—</span>')+'</td>';
+    h+='<td style="padding:7px 10px;text-align:center">'+_wsBadge(r.awsSt)+'</td>';
+    h+='<td style="padding:7px 10px;text-align:center"><button id="dp-ddbtn-'+id+'" onclick="dpToggleDetail(\''+id+'\')" style="font-size:11px;padding:2px 10px;background:#eaf2fb;color:#1a3a5c;border:1px solid #b0c8e8;border-radius:5px;cursor:pointer;font-family:inherit;font-weight:700;white-space:nowrap">&#9660; Details</button></td>';
+    h+='</tr>';
+    // Expandable detail row
+    h+='<tr id="dp-dd-'+id+'" class="dp-detail-row" style="display:none">';
+    h+='<td colspan="7"><div class="dp-detail-inner">';
+    h+='<div style="display:flex;flex-direction:column;gap:8px;max-width:900px">';
+    if(r.obsText){
+      h+='<div><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#1a3a5c;margin-bottom:3px">&#128270; Observation</div>'
+        +'<div style="background:#fff;border:1px solid #dde3ec;border-radius:5px;padding:8px 10px;line-height:1.6;white-space:pre-wrap;font-size:12px">'+awsEsc(r.obsText)+'</div></div>';
     }
-    return h2;
+    if(r.bsNote){
+      h+='<div><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#6a5a00;margin-bottom:3px">&#128203; Branch-Specific Notes / Tables</div>'
+        +'<div style="background:#fffef5;border:1px solid #e0d080;border-radius:5px;padding:8px 10px;line-height:1.6;white-space:pre-wrap;font-size:12px">'+awsEsc(r.bsNote)+'</div></div>';
+    }
+    if(r.recText){
+      h+='<div><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#1a6030;margin-bottom:3px">&#128204; Recommendation</div>'
+        +'<div style="background:#fff;border:1px solid #dde3ec;border-radius:5px;padding:8px 10px;line-height:1.6;white-space:pre-wrap;font-size:12px">'+awsEsc(r.recText)+'</div></div>';
+    }
+    if(r.type==='Repeated'&&r.larr){
+      h+='<div><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#8a3000;margin-bottom:3px">&#128196; Last Audit Report Reference (LARR)</div>'
+        +'<div style="background:#fff8f2;border:1px solid #f0c090;border-radius:5px;padding:6px 10px;font-size:12px">'+awsEsc(r.larr)+'</div></div>';
+    }
+    h+='<div style="margin-top:4px"><button onclick="dpNavToObs(\''+id+'\')" style="font-size:12px;padding:5px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600">&#9998; Open &amp; Edit in Build View</button></div>';
+    h+='</div></div></td></tr>';
+    return h;
   }
 
-  var h='<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">';
-  h+='<span style="font-size:13px;font-weight:700;color:#1a3a5c">&#128196; Observations in Current Draft Report</span>';
-  h+='<span style="background:#1a3a5c;color:#fff;border-radius:10px;padding:2px 10px;font-size:12px;font-weight:700">'+total+' Total</span>';
-  h+='<span style="font-size:11px;color:#888;margin-left:4px">Click any title to jump to it in the Build view &nbsp;|&nbsp; &#9660; Details to expand inline</span>';
-  h+='</div>';
+  var h='';
 
+  // DB observations grouped by category
   for(var ci2=0;ci2<cats.length;ci2++){
     var cat2=cats[ci2];
     var rows=grouped[cat2];
     if(!rows||!rows.length) continue;
-    h+='<div style="margin-bottom:14px;border:1px solid #dde3ec;border-radius:6px;overflow:hidden">';
-    h+='<div style="background:#1a3a5c;color:#fff;padding:7px 12px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between">';
+    var catId='dp-cat-'+ci2;
+    h+='<div class="dp-cat-block">';
+    h+='<div class="dp-cat-hdr" onclick="dpToggleCat(\''+catId+'\')">';
     h+='<span>'+awsEsc(cat2)+'</span>';
-    h+='<span style="background:rgba(255,255,255,.2);border-radius:8px;padding:1px 8px;font-size:11px">'+rows.length+' obs.</span>';
-    h+='</div>';
-    h+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
-    h+='<thead><tr style="background:#eaf0f8">';
-    h+='<th style="padding:6px 10px;text-align:left;font-weight:700;color:#1a3a5c;width:72px">ID</th>';
-    h+='<th style="padding:6px 10px;text-align:left;font-weight:700;color:#1a3a5c">Title <span style="font-size:10px;font-weight:400;color:#888">(click to open)</span></th>';
-    h+='<th style="padding:6px 10px;text-align:center;font-weight:700;color:#1a3a5c;width:72px">Type</th>';
-    h+='<th style="padding:6px 10px;text-align:center;font-weight:700;color:#1a3a5c;width:62px">Sens.</th>';
-    h+='<th style="padding:6px 10px;text-align:center;font-weight:700;color:#1a3a5c;width:52px">COSO</th>';
-    h+='<th style="padding:6px 10px;text-align:center;font-weight:700;color:#1a3a5c;width:120px">Work Status</th>';
-    h+='<th style="padding:6px 10px;text-align:center;font-weight:700;color:#1a3a5c;width:80px"></th>';
-    h+='</tr></thead><tbody>';
-    h+=_obsRows(rows, false);
-    h+='</tbody></table></div>';
+    h+='<div style="display:flex;align-items:center;gap:8px">';
+    h+='<span style="background:rgba(255,255,255,.2);border-radius:8px;padding:1px 10px;font-size:11px">'+rows.length+' obs.</span>';
+    h+='<span class="dp-toggle" style="font-size:13px">&#9660;</span>';
+    h+='</div></div>';
+    h+='<div class="dp-cat-body" id="'+catId+'">';
+    h+=_tableHead('#eaf0f8');
+    for(var ri=0;ri<rows.length;ri++) h+=_obsRow(rows[ri],false);
+    h+='</tbody></table></div></div>';
   }
 
-  if(customInDraft.length){
-    h+='<div style="margin-bottom:14px;border:1px solid #c8b8f0;border-radius:6px;overflow:hidden">';
-    h+='<div style="background:#5b3fa0;color:#fff;padding:7px 12px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between">';
+  // Custom observations
+  if(customRows.length){
+    h+='<div class="dp-cat-block" style="border-color:#c8b8f0">';
+    h+='<div class="dp-cat-hdr" style="background:#5b3fa0" onclick="dpToggleCat(\'dp-cat-custom\')">';
     h+='<span>&#10024; Custom Observations</span>';
-    h+='<span style="background:rgba(255,255,255,.2);border-radius:8px;padding:1px 8px;font-size:11px">'+customInDraft.length+' obs.</span>';
-    h+='</div>';
-    h+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
-    h+='<thead><tr style="background:#f0eaff"><th style="padding:6px 10px;text-align:left;font-weight:700;color:#3a1a7c;width:72px">ID</th><th style="padding:6px 10px;text-align:left;font-weight:700;color:#3a1a7c">Title <span style="font-size:10px;font-weight:400;color:#888">(click to open)</span></th><th style="padding:6px 10px;text-align:center;font-weight:700;color:#3a1a7c;width:72px">Type</th><th style="padding:6px 10px;text-align:center;font-weight:700;color:#3a1a7c;width:62px">Sens.</th><th style="padding:6px 10px;text-align:center;font-weight:700;color:#3a1a7c;width:52px">COSO</th><th style="padding:6px 10px;text-align:center;font-weight:700;color:#3a1a7c;width:120px">Work Status</th><th style="padding:6px 10px;width:80px"></th></tr></thead><tbody>';
-    h+=_obsRows(customInDraft, true);
-    h+='</tbody></table></div>';
+    h+='<div style="display:flex;align-items:center;gap:8px">';
+    h+='<span style="background:rgba(255,255,255,.2);border-radius:8px;padding:1px 10px;font-size:11px">'+customRows.length+' obs.</span>';
+    h+='<span class="dp-toggle" style="font-size:13px">&#9660;</span>';
+    h+='</div></div>';
+    h+='<div class="dp-cat-body" id="dp-cat-custom">';
+    h+=_tableHead('#f0eaff');
+    for(var cri=0;cri<customRows.length;cri++) h+=_obsRow(customRows[cri],true);
+    h+='</tbody></table></div></div>';
   }
 
-  wrap.innerHTML=h;
+  content.innerHTML=h;
 }
+
+function dpToggleCat(id){
+  var body=document.getElementById(id);
+  if(!body) return;
+  var hdr=body.previousElementSibling;
+  var collapsed=body.classList.toggle('collapsed');
+  var icon=hdr&&hdr.querySelector('.dp-toggle');
+  if(icon) icon.textContent=collapsed?'▶':'▼';
+}
+
 
 function awsResetAll(){
   if(!confirm('Reset ALL work status data? This cannot be undone.')) return;
