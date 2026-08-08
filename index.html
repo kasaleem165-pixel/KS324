@@ -23164,6 +23164,8 @@ function srrRenderAudit(){
       kwHtml='<span style="color:#c0390b;font-size:10.5px;font-style:italic">No keywords matched — fallback applied</span>';
     }
     var caName=srrDef?srrDef.caName:'—';
+    var rrId  =srrDef?srrDef.rr:'';
+    var rrName=srrDef?srrDef.rrName:'—';
     var srrCol=srrDef?srrDef.col:'#888';
     h+='<tr style="background:'+rowBg+';border-bottom:1px solid #e8eef6">';
     h+='<td style="padding:7px 10px;font-size:10.5px;color:#888;white-space:nowrap">'+_srrEsc(o.id)+'</td>';
@@ -23171,6 +23173,7 @@ function srrRenderAudit(){
     h+='<td style="padding:7px 10px;font-size:10.5px;color:#4a6080">'+_srrEsc(o.category||'Others')+'</td>';
     h+='<td style="padding:7px 10px;text-align:center;background:'+scoreBg+';color:'+scoreCol+';font-weight:700">'+scoreLabel+'</td>';
     h+='<td style="padding:7px 10px">'+(r.srrId?'<span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:800;background:'+srrCol+';color:#fff">'+_srrEsc(r.srrId)+'</span>':'<span style="color:#aaa">—</span>')+'</td>';
+    h+='<td style="padding:7px 10px;line-height:1.4">'+(rrId?'<div style="font-size:9.5px;font-weight:800;color:'+srrCol+';letter-spacing:.4px;margin-bottom:1px">'+_srrEsc(rrId)+'</div>':'')+'<div style="font-size:10.5px;color:#2a3a50;font-weight:600">'+_srrEsc(rrName)+'</div></td>';
     h+='<td style="padding:7px 10px;font-size:10.5px;color:#2a4a60;line-height:1.4">'+_srrEsc(caName)+'</td>';
     h+='<td style="padding:7px 10px">'+kwHtml+'</td>';
     h+='</tr>';
@@ -23188,7 +23191,7 @@ function _srrAuditPill(label,count,col,bg){
 
 function srrExportAudit(){
   var all=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
-  var rows=[['Obs ID','Title','Category','Score','Fallback?','SRR ID','Control Activity','Keywords Matched','Manually Reassigned']];
+  var rows=[['Obs ID','Title','Category','Score','Fallback?','SRR ID','Risk (RR ID)','Risk Name','Control Activity','Keywords Matched','Manually Reassigned']];
   all.forEach(function(o){
     var ra=srr_reassigned[o.id];
     var audit=_getObsSrrAudit(o);
@@ -23199,6 +23202,8 @@ function srrExportAudit(){
       ra?'(manual)':audit.score,
       (!ra&&audit.isFallback)?'YES':'no',
       srrId||'',
+      srrDef?srrDef.rr:'',
+      srrDef?srrDef.rrName:'',
       srrDef?srrDef.caName:'',
       ra?'(reassigned)':audit.matchedKws.join('; '),
       ra?'YES':'no'
@@ -27657,10 +27662,11 @@ function dbmExportCSV(){
         <tr style="background:#1a3a5c;color:#fff">
           <th style="padding:8px 10px;text-align:left;width:80px">Obs ID</th>
           <th style="padding:8px 10px;text-align:left">Observation Title</th>
-          <th style="padding:8px 10px;text-align:left;width:160px">Category</th>
-          <th style="padding:8px 10px;text-align:center;width:60px">Score</th>
-          <th style="padding:8px 10px;text-align:left;width:120px">Matched SRR</th>
-          <th style="padding:8px 10px;text-align:left;width:200px">Control Activity</th>
+          <th style="padding:8px 10px;text-align:left;width:150px">Category</th>
+          <th style="padding:8px 10px;text-align:center;width:55px">Score</th>
+          <th style="padding:8px 10px;text-align:left;width:110px">Matched SRR</th>
+          <th style="padding:8px 10px;text-align:left;width:170px">Risk (RR)</th>
+          <th style="padding:8px 10px;text-align:left;width:185px">Control Activity</th>
           <th style="padding:8px 10px;text-align:left">Keywords Matched</th>
         </tr>
       </thead>
