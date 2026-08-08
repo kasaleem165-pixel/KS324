@@ -269,6 +269,9 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 .catg{margin-bottom:24px}
 .cattl{font-family:'Merriweather',serif;font-size:12px;font-weight:700;color:var(--navy);background:#edf2f8;border-left:4px solid var(--navy);padding:7px 12px;margin-bottom:10px;border-radius:0 4px 4px 0;text-transform:uppercase;letter-spacing:.4px}
 .sectitle{font-family:'Merriweather',serif;font-size:14px;font-weight:700;color:#fff;background:var(--navy);padding:10px 16px;margin-bottom:16px;border-radius:4px;letter-spacing:.3px}
+.rnav-obs-item:hover{background:#e8f4ff !important}
+.rnav-sec:hover{background:#dde8f6 !important}
+.rnav-area-hdr:hover{background:#eaf2fb !important}
 .oc{border:1px solid var(--gbor);border-left-width:4px;border-radius:5px;margin-bottom:12px;overflow:hidden}
 .oc.repeated{border-left-color:var(--orange)}.oc.new{border-left-color:var(--bluenew)}
 .och{display:flex;flex-direction:column;padding:8px 12px;background:#fafbfc;border-bottom:1px solid var(--gbor);gap:5px}
@@ -12764,8 +12767,243 @@ function renderRpt(){
     var ids=Object.keys(instCountMap).concat(Object.keys(instAmountMap));
     for(var i=0;i<ids.length;i++) updateFwSuggestion(ids[i]);
   },0);
+  // Build/refresh the floating navigation panel
+  _buildRptNavPanel(sections);
   // analysis-inline is already embedded in h above; no separate refresh needed
 }
+
+// ── Draft Report — Floating Navigation Panel ─────────────────────────────────
+var _rptNavOpen = true;   // panel visible by default
+var _rptNavSpy  = null;   // IntersectionObserver handle
+
+function _buildRptNavPanel(sections){
+  // ── 1. Ensure toggle button exists in #RP ──
+  var rpEl = document.getElementById('RP');
+  if(!rpEl) return;
+
+  var toggleBtn = document.getElementById('rpt-nav-toggle');
+  if(!toggleBtn){
+    toggleBtn = document.createElement('button');
+    toggleBtn.id = 'rpt-nav-toggle';
+    toggleBtn.title = 'Toggle Navigation Panel';
+    toggleBtn.innerHTML = '&#9776; Navigation';
+    toggleBtn.setAttribute('style',
+      'position:fixed;top:62px;left:calc(var(--lp-w,320px) + 8px);z-index:1200;'+
+      'background:#1a3a5c;color:#fff;border:none;border-radius:0 0 6px 6px;'+
+      'padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:.5px;'+
+      'cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;gap:6px;'+
+      'box-shadow:0 2px 6px rgba(0,0,0,.25);transition:background .15s');
+    toggleBtn.onmouseover = function(){ this.style.background='#2a5a8c'; };
+    toggleBtn.onmouseout  = function(){ this.style.background='#1a3a5c'; };
+    toggleBtn.onclick = _toggleRptNav;
+    document.body.appendChild(toggleBtn);
+  }
+
+  // ── 2. Ensure panel container exists ──
+  var panel = document.getElementById('rpt-nav-panel');
+  if(!panel){
+    panel = document.createElement('div');
+    panel.id = 'rpt-nav-panel';
+    panel.setAttribute('style',
+      'position:fixed;top:90px;left:calc(var(--lp-w,320px) + 8px);z-index:1199;'+
+      'width:240px;max-height:calc(100vh - 110px);'+
+      'background:#fff;border:1px solid #c8d8ec;border-radius:6px;'+
+      'box-shadow:0 4px 20px rgba(26,58,92,.18);'+
+      'display:flex;flex-direction:column;overflow:hidden;'+
+      'font-family:Inter,Arial,sans-serif;transition:opacity .2s');
+    document.body.appendChild(panel);
+  }
+
+  // ── 3. Build tree HTML ──
+  var navy='#1a3a5c';
+  var ph = '';
+  ph += '<div style="background:'+navy+';color:#fff;padding:8px 12px;font-size:11.5px;font-weight:800;'+
+        'letter-spacing:.4px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">'+
+        '<span>&#128203; Report Navigation</span>'+
+        '<span style="font-size:10px;font-weight:400;opacity:.75;cursor:pointer" onclick="_toggleRptNav()" title="Close">&#10005;</span>'+
+        '</div>';
+  ph += '<div id="rpt-nav-body" style="overflow-y:auto;flex:1;padding:6px 0">';
+
+  // Header links
+  ph += '<div class="rnav-group">';
+  ph += _rnavItem('rpt-nav-top','&#127968; Report Header','top',true);
+  ph += _rnavItem('rpt-nav-analysis','&#9651; Analysis / COSO','analysis-inline',true);
+  ph += '</div>';
+  ph += '<div style="height:1px;background:#e0e8f4;margin:4px 8px"></div>';
+
+  for(var si=0;si<sections.length;si++){
+    if(!sections[si].obs.length) continue;
+    var secKey  = si===0?'repeated':'new';
+    var secIcon = si===0?'&#128257;':'&#128204;';
+    var secId   = 'sec-nav-'+secKey;
+    var secTitle= sections[si].label;
+    // Section header (clickable, collapsible)
+    ph += '<div class="rnav-sec" id="'+secId+'-hdr" onclick="_rnavToggleSec(\''+secKey+'\')" '+
+          'style="display:flex;align-items:center;gap:5px;padding:5px 10px;cursor:pointer;'+
+          'font-size:11px;font-weight:800;color:'+navy+';text-transform:uppercase;letter-spacing:.5px;'+
+          'background:#edf2f8;border-top:1px solid #d8e4f0;border-bottom:1px solid #d8e4f0;'+
+          'user-select:none;margin-top:4px">'+
+          '<span id="rnav-arrow-'+secKey+'" style="font-size:9px;transition:transform .2s">&#9660;</span>'+
+          secIcon+' '+esc(secTitle)+'</div>';
+
+    ph += '<div id="rnav-sec-body-'+secKey+'" style="display:block">';
+
+    // Group by area (same logic as renderRpt)
+    var areaOrder=[], areaGroups={};
+    for(var _ai=0;_ai<sections[si].obs.length;_ai++){
+      var _acat=(sections[si].obs[_ai].category||'Others').trim()||'Others';
+      if(!areaGroups[_acat]){areaOrder.push(_acat);areaGroups[_acat]=[];}
+      areaGroups[_acat].push(sections[si].obs[_ai]);
+    }
+    var multiArea=areaOrder.length>1;
+    var obsLabels=getObsReportLabels();
+    var globalNum=0;
+
+    for(var ai=0;ai<areaOrder.length;ai++){
+      var aLabel=areaOrder[ai];
+      var aObs=areaGroups[aLabel];
+      var aId='rnav-area-'+secKey+'-'+ai;
+
+      if(multiArea){
+        ph += '<div id="'+aId+'-hdr" onclick="_rnavToggleArea(\''+aId+'\')" '+
+              'style="display:flex;align-items:center;gap:4px;padding:4px 12px;cursor:pointer;'+
+              'font-size:10.5px;font-weight:700;color:#2a5a8c;background:#f4f7fb;'+
+              'border-bottom:1px solid #e0e8f4;user-select:none">'+
+              '<span id="rnav-arrow-'+aId+'" style="font-size:8px">&#9654;</span>'+
+              '&#128204; '+esc(aLabel)+'</div>';
+        ph += '<div id="'+aId+'-body" style="display:none">';
+      }
+
+      for(var oi=0;oi<aObs.length;oi++){
+        globalNum++;
+        var o=aObs[oi];
+        var lbl=obsLabels[o.id]||((si===0?'1':'2')+'.'+globalNum);
+        var shortTitle=o.title?( o.title.length>34 ? o.title.substring(0,33)+'…' : o.title ):'(untitled)';
+        ph += '<div class="rnav-obs-item" id="rnav-obs-'+o.id+'" '+
+              'onclick="_rnavJump(\'oc-'+o.id+'\')" '+
+              'style="display:flex;align-items:flex-start;gap:6px;padding:4px 12px 4px '+(multiArea?'22px':'14px')+';'+
+              'cursor:pointer;border-bottom:1px solid #f0f4fa;transition:background .12s">'+
+              '<span style="flex-shrink:0;font-size:10px;font-weight:800;color:#1a3a5c;'+
+              'background:#e8f0fa;border-radius:3px;padding:1px 5px;margin-top:1px">'+esc(lbl)+'</span>'+
+              '<span style="font-size:10.5px;color:#2a3a50;line-height:1.4">'+esc(shortTitle)+'</span>'+
+              '</div>';
+      }
+
+      if(multiArea){
+        ph += '</div>'; // end area body
+      }
+    }
+    ph += '</div>'; // end sec body
+  }
+
+  // Annexure link (if present)
+  ph += '<div style="height:1px;background:#e0e8f4;margin:4px 8px"></div>';
+  ph += _rnavItem('rpt-nav-annex','&#128206; Annexures','annex-section',true);
+
+  ph += '</div>'; // end rpt-nav-body
+
+  // Observation count footer
+  var totalObs=sections.reduce(function(s,sec){return s+sec.obs.length;},0);
+  ph += '<div style="flex-shrink:0;padding:5px 10px;background:#edf2f8;border-top:1px solid #d8e4f0;'+
+        'font-size:10px;color:#6a7a90;text-align:center">'+
+        totalObs+' observation'+(totalObs!==1?'s':'')+' in report</div>';
+
+  panel.innerHTML = ph;
+  panel.style.display = _rptNavOpen ? 'flex' : 'none';
+  panel.style.flexDirection = 'column';
+  toggleBtn.style.display = 'flex';
+
+  // ── 4. Scroll-spy via IntersectionObserver ──
+  if(_rptNavSpy){ _rptNavSpy.disconnect(); _rptNavSpy=null; }
+  if(typeof IntersectionObserver !== 'undefined'){
+    _rptNavSpy = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){
+          var obsId=e.target.id.replace('oc-','');
+          _rnavHighlight(obsId);
+        }
+      });
+    },{root:null, rootMargin:'-10% 0px -60% 0px', threshold:0});
+    var ocs=document.querySelectorAll('[id^="oc-"]');
+    for(var i=0;i<ocs.length;i++) _rptNavSpy.observe(ocs[i]);
+  }
+}
+
+function _rnavItem(id,label,targetId,soft){
+  return '<div id="'+id+'" onclick="_rnavJump(\''+targetId+'\')" '+
+    'style="padding:4px 14px;cursor:pointer;font-size:10.5px;color:#3a5070;'+
+    'border-bottom:1px solid #f0f4fa;display:flex;align-items:center;gap:6px;transition:background .12s" '+
+    'onmouseover="this.style.background=\'#f0f6ff\'" onmouseout="this.style.background=\'\'">'+
+    label+'</div>';
+}
+
+function _rnavJump(targetId){
+  var el=document.getElementById(targetId);
+  if(!el) return;
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+  // Flash highlight
+  var prev=el.style.outline;
+  el.style.outline='2px solid #c9962a';
+  el.style.outlineOffset='3px';
+  setTimeout(function(){ el.style.outline=prev||''; el.style.outlineOffset=''; },1200);
+}
+
+function _rnavHighlight(obsId){
+  // Remove all highlights
+  var items=document.querySelectorAll('.rnav-obs-item');
+  for(var i=0;i<items.length;i++){
+    items[i].style.background='';
+    items[i].style.fontWeight='';
+  }
+  var active=document.getElementById('rnav-obs-'+obsId);
+  if(active){
+    active.style.background='#e8f4ff';
+    // Auto-expand parent area group if collapsed
+    var panel=active.parentElement;
+    if(panel && panel.style.display==='none') panel.style.display='block';
+    // Scroll nav item into view within the nav panel
+    try{ active.scrollIntoView({block:'nearest'}); }catch(e){}
+  }
+}
+
+function _rnavToggleSec(secKey){
+  var body=document.getElementById('rnav-sec-body-'+secKey);
+  var arrow=document.getElementById('rnav-arrow-'+secKey);
+  if(!body) return;
+  var open=body.style.display!=='none';
+  body.style.display=open?'none':'block';
+  if(arrow) arrow.style.transform=open?'rotate(-90deg)':'';
+}
+
+function _rnavToggleArea(aId){
+  var body=document.getElementById(aId+'-body');
+  var arrow=document.getElementById('rnav-arrow-'+aId);
+  if(!body) return;
+  var open=body.style.display!=='none';
+  body.style.display=open?'none':'block';
+  if(arrow) arrow.innerHTML=open?'&#9654;':'&#9660;';
+}
+
+function _toggleRptNav(){
+  _rptNavOpen=!_rptNavOpen;
+  var panel=document.getElementById('rpt-nav-panel');
+  if(panel) panel.style.display=_rptNavOpen?'flex':'none';
+}
+
+// Hide nav panel when switching away from the report tab
+(function(){
+  var _origShowTab=window.showTab;
+  if(typeof _origShowTab==='function'){
+    window.showTab=function(t){
+      _origShowTab(t);
+      var panel=document.getElementById('rpt-nav-panel');
+      var btn=document.getElementById('rpt-nav-toggle');
+      var onRpt=(t==='rpt');
+      if(panel) panel.style.display=(onRpt&&_rptNavOpen)?'flex':'none';
+      if(btn)   btn.style.display=onRpt?'flex':'none';
+    };
+  }
+})();
 
 function remObs(id){
   var title='this observation';
