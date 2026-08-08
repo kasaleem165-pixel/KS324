@@ -12517,9 +12517,29 @@ function renderRpt(){
     var secTotal=sections[si].obs.length;
     h+='<div class="sectitle">'+esc(sections[si].label)+'</div>';
     var obs=sections[si].obs;
-    for(var oi=0;oi<obs.length;oi++){
+
+    // ── Group observations by area (category) within each section ──
+    // Collect area order preserving user's obsOrder sequence
+    var _areaOrder=[], _areaGroups={};
+    for(var _ai=0;_ai<obs.length;_ai++){
+      var _acat=(obs[_ai].category||'Others').trim()||'Others';
+      if(!_areaGroups[_acat]){_areaOrder.push(_acat);_areaGroups[_acat]=[];}
+      _areaGroups[_acat].push(obs[_ai]);
+    }
+    var _multiArea=_areaOrder.length>1; // only show area headers when >1 area present
+
+    for(var _agi=0;_agi<_areaOrder.length;_agi++){
+      var _aLabel=_areaOrder[_agi];
+      var _aObs=_areaGroups[_aLabel];
+      if(_multiArea){
+        h+='<div style="margin:18px 0 6px;padding:5px 14px;background:linear-gradient(90deg,#e8f0fa 0%,#f4f7fb 100%);border-left:4px solid #1a3a5c;border-radius:0 6px 6px 0">'
+          +'<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#1a3a5c">&#128204; Area: '+esc(_aLabel)+'</span>'
+          +'<span style="font-size:10px;color:#6a7a90;margin-left:8px">('+_aObs.length+' observation'+(_aObs.length!==1?'s':'')+')</span>'
+          +'</div>';
+      }
+      for(var oi=0;oi<_aObs.length;oi++){
         num++;
-        var o=obs[oi];
+        var o=_aObs[oi];
       var effType=obsTypeMap[o.id]||o.type||'New';
       var tc=effType.toLowerCase();
       var ax=annexMap[o.id]||o._annex||'';
@@ -12717,8 +12737,9 @@ function renderRpt(){
       var _riskObsText=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:o.observation||'';
       h+=buildObsRiskPanel(o, _riskObsText);
       h+='</div></div>';
-      }
-  }
+      } // end for(oi) — obs within area group
+    } // end for(_agi) — area groups within section
+  } // end for(si) — sections
 
   // Build obsNumMap for annexure back-references (per-section R-/N- numbering)
   var obsNumMap=getObsReportLabels();
