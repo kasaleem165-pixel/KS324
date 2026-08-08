@@ -19560,8 +19560,14 @@ function awsRenderCategories(){
     html+='</div>';
     html+='<div class="aws-cat-body'+collapsed+'" id="aws_cat_body_'+i+'">';
     html+='<table class="aws-obs-table"><thead><tr><th style="width:36px">Done</th><th style="width:72px">ID</th><th>Observation</th><th style="width:120px">Risk Link</th><th style="width:170px">Status</th><th style="width:36px">&#128221;</th></tr></thead><tbody>';
-    for(var j=0;j<list.length;j++){
-      var obs=list[j];
+    // Sort: unchecked / in-progress first, checked (done) observations last
+    var sortedList=list.slice().sort(function(a,b){
+      var sa=aws_state.obs[a.id], sb=aws_state.obs[b.id];
+      var doneA=(sa&&sa.checked)?1:0, doneB=(sb&&sb.checked)?1:0;
+      return doneA-doneB; // 0 before 1 → unchecked first
+    });
+    for(var j=0;j<sortedList.length;j++){
+      var obs=sortedList[j];
       var st=awsGetObsState(obs.id);
       var rowCls=st.status==='Checked with Observation'?' aws-row-obs':(st.checked?' aws-row-checked':'');
       var cbChk=st.checked?' checked':'';
@@ -19647,6 +19653,33 @@ function awsUpdateRowUI(id){
     if(sel){sel.value=st.status;sel.className='aws-status-sel '+awsStatusClass(st.status);}
     var rbtn=document.getElementById('aws_rbtn_'+id);
     if(rbtn) rbtn.className='aws-remark-btn'+((st.remark&&st.remark.length>0)?' active':'');
+
+    // Move row (+ its remark row) to bottom if checked, top if unchecked
+    var tbody=row.parentNode;
+    if(tbody){
+      var remarkRow=document.getElementById('aws_rrow_'+id);
+      if(st.checked){
+        // Append after the last currently-checked row (or at very end)
+        tbody.appendChild(row);
+        if(remarkRow) tbody.appendChild(remarkRow);
+      } else {
+        // Prepend before the first currently-checked row
+        var firstChecked=null;
+        var rows=tbody.querySelectorAll('tr.aws-obs-row');
+        for(var _ri=0;_ri<rows.length;_ri++){
+          if(rows[_ri].classList.contains('aws-row-checked')||rows[_ri].classList.contains('aws-row-obs')){
+            firstChecked=rows[_ri]; break;
+          }
+        }
+        if(firstChecked){
+          tbody.insertBefore(row, firstChecked);
+          if(remarkRow) tbody.insertBefore(remarkRow, firstChecked);
+        } else {
+          tbody.insertBefore(row, tbody.firstChild);
+          if(remarkRow) tbody.insertBefore(remarkRow, tbody.children[1]||null);
+        }
+      }
+    }
   }
 }
 
