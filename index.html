@@ -12777,7 +12777,7 @@ var _rptNavOpen = true;   // panel visible by default
 var _rptNavSpy  = null;   // IntersectionObserver handle
 
 function _buildRptNavPanel(sections){
-  // ── 1. Ensure toggle button exists in #RP ──
+  // ── 1. Ensure toggle button exists ──
   var rpEl = document.getElementById('RP');
   if(!rpEl) return;
 
@@ -12785,16 +12785,20 @@ function _buildRptNavPanel(sections){
   if(!toggleBtn){
     toggleBtn = document.createElement('button');
     toggleBtn.id = 'rpt-nav-toggle';
-    toggleBtn.title = 'Toggle Navigation Panel';
-    toggleBtn.innerHTML = '&#9776; Navigation';
+    toggleBtn.title = 'Toggle Navigation Panel (Ctrl+Shift+N)';
+    toggleBtn.innerHTML = '&#9776;<br><span style="font-size:9px;letter-spacing:.4px">NAV</span>';
     toggleBtn.setAttribute('style',
-      'position:fixed;top:62px;left:calc(var(--lp-w,320px) + 8px);z-index:1200;'+
-      'background:#1a3a5c;color:#fff;border:none;border-radius:0 0 6px 6px;'+
-      'padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:.5px;'+
-      'cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;gap:6px;'+
-      'box-shadow:0 2px 6px rgba(0,0,0,.25);transition:background .15s');
+      'position:fixed;top:120px;z-index:1200;'+
+      'background:#1a3a5c;color:#fff;border:none;'+
+      'border-radius:0 6px 6px 0;'+ // tab sticking out from left edge of RP
+      'padding:10px 7px;width:28px;'+
+      'font-size:13px;font-weight:700;line-height:1.3;'+
+      'cursor:pointer;font-family:Inter,sans-serif;'+
+      'box-shadow:2px 2px 8px rgba(0,0,0,.25);'+
+      'writing-mode:horizontal-tb;text-align:center;'+
+      'transition:background .15s,left .25s');
     toggleBtn.onmouseover = function(){ this.style.background='#2a5a8c'; };
-    toggleBtn.onmouseout  = function(){ this.style.background='#1a3a5c'; };
+    toggleBtn.onmouseout  = function(){ this.style.background=_rptNavOpen?'#c9962a':'#1a3a5c'; };
     toggleBtn.onclick = _toggleRptNav;
     document.body.appendChild(toggleBtn);
   }
@@ -12805,14 +12809,17 @@ function _buildRptNavPanel(sections){
     panel = document.createElement('div');
     panel.id = 'rpt-nav-panel';
     panel.setAttribute('style',
-      'position:fixed;top:90px;left:calc(var(--lp-w,320px) + 8px);z-index:1199;'+
-      'width:240px;max-height:calc(100vh - 110px);'+
-      'background:#fff;border:1px solid #c8d8ec;border-radius:6px;'+
-      'box-shadow:0 4px 20px rgba(26,58,92,.18);'+
+      'position:fixed;top:50px;z-index:1199;'+
+      'width:232px;max-height:calc(100vh - 60px);'+
+      'background:#fff;border:1px solid #c8d8ec;border-radius:0 6px 6px 0;'+
+      'box-shadow:4px 0 20px rgba(26,58,92,.18);'+
       'display:flex;flex-direction:column;overflow:hidden;'+
       'font-family:Inter,Arial,sans-serif;transition:opacity .2s');
     document.body.appendChild(panel);
   }
+
+  // Position both elements flush with the left edge of #RP
+  _rnavReposition();
 
   // ── 3. Build tree HTML ──
   var navy='#1a3a5c';
@@ -12984,11 +12991,43 @@ function _rnavToggleArea(aId){
   if(arrow) arrow.innerHTML=open?'&#9654;':'&#9660;';
 }
 
+// Compute position from actual DOM rects and apply to panel + button
+function _rnavReposition(){
+  var rpEl=document.getElementById('RP');
+  if(!rpEl) return;
+  var rect=rpEl.getBoundingClientRect();
+  var leftEdge=Math.round(rect.left);         // pixel X of RP's left edge
+  var panelW=232;
+
+  // Compute top from toolbar bottom
+  var tbEl=document.getElementById('toolbar');
+  var topEdge=tbEl ? Math.round(tbEl.getBoundingClientRect().bottom)+2 : 50;
+
+  var panel=document.getElementById('rpt-nav-panel');
+  var btn  =document.getElementById('rpt-nav-toggle');
+
+  if(panel){
+    panel.style.left=leftEdge+'px';
+    panel.style.top=topEdge+'px';
+    panel.style.maxHeight='calc(100vh - '+(topEdge+8)+'px)';
+  }
+  if(btn){
+    // Tab sits at right edge of panel when open, at RP left edge when closed
+    btn.style.left=(_rptNavOpen ? leftEdge+panelW : leftEdge)+'px';
+    btn.style.top=(topEdge+30)+'px';          // slightly below the panel top bar
+    btn.style.background=_rptNavOpen?'#c9962a':'#1a3a5c';
+  }
+}
+
 function _toggleRptNav(){
   _rptNavOpen=!_rptNavOpen;
   var panel=document.getElementById('rpt-nav-panel');
   if(panel) panel.style.display=_rptNavOpen?'flex':'none';
+  _rnavReposition();
 }
+
+// Reposition on window resize (LP may change width)
+window.addEventListener('resize', function(){ _rnavReposition(); });
 
 // Hide nav panel when switching away from the report tab
 (function(){
@@ -13001,6 +13040,7 @@ function _toggleRptNav(){
       var onRpt=(t==='rpt');
       if(panel) panel.style.display=(onRpt&&_rptNavOpen)?'flex':'none';
       if(btn)   btn.style.display=onRpt?'flex':'none';
+      if(onRpt) _rnavReposition();
     };
   }
 })();
@@ -22558,6 +22598,8 @@ function toggleLP(){
   var collapsing=!lp.classList.contains('lp-collapsed');
   lp.classList.toggle('lp-collapsed');
   if(btn) btn.innerHTML=collapsing?'&#9654;':'&#9664;';
+  // LP width changed — reposition nav panel after transition finishes
+  setTimeout(_rnavReposition, 280);
 }
 document.addEventListener('click',function(e){
   if(!e.target.closest||!e.target.closest('#toolbar')) tbDDClose();
