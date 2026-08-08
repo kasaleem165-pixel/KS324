@@ -21413,6 +21413,10 @@ function generateReviewerHtml(role){
   sess.reviewRole  = role;
   sess.reviewStage = role==='ro' ? 'ro_review' : 'ho_review';
 
+  // Capture any pending corrections reconciliation data (set by _cgResend)
+  var _corrections = window._pendingCorrections || null;
+  var _correctionsJson = _corrections ? JSON.stringify(_corrections).replace(/<\/script>/gi,'<\\/script>') : 'null';
+
   var H      = getHdrVals();
   var branch = H.brname||'Branch';
   var stageLabel = role==='ro' ? 'RO Audit Supervisor Review' : 'HO Audit Supervisor Review';
@@ -21480,6 +21484,29 @@ function generateReviewerHtml(role){
   rv+='.btn-issue{background:#1a6030;color:#fff}\n';
   rv+='.sb-cmt{width:100%;padding:8px 10px;border:2px solid #c04040;border-radius:5px;font-family:Inter,sans-serif;font-size:12.5px;color:#5a1010;background:#fff8f8;resize:vertical;min-height:60px;box-sizing:border-box;display:none}\n';
   rv+='@media print{.action-bar,.notice{display:none!important}}\n';
+  rv+='.cr-section{background:#fff;border-radius:8px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.1);overflow:hidden;border:2px solid #1a3a5c}\n';
+  rv+='.cr-hdr{background:linear-gradient(90deg,#1a3a5c,#2a5080);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px}\n';
+  rv+='.cr-hdr-title{font-size:14px;font-weight:800;flex:1}\n';
+  rv+='.cr-hdr-sub{font-size:11px;opacity:.75}\n';
+  rv+='.cr-progress{padding:10px 16px;background:#f0f4f8;border-bottom:1px solid #dde3ec;display:flex;align-items:center;gap:12px}\n';
+  rv+='.cr-prog-bar-wrap{flex:1;height:6px;background:#c8d8ec;border-radius:3px;overflow:hidden}\n';
+  rv+='.cr-prog-bar{height:6px;background:#1a6030;border-radius:3px;width:0%;transition:width .3s}\n';
+  rv+='.cr-table{width:100%;border-collapse:collapse}\n';
+  rv+='.cr-table th{background:#1a3a5c;color:#fff;padding:7px 10px;font-size:10.5px;font-weight:700;text-align:left;letter-spacing:.4px;text-transform:uppercase}\n';
+  rv+='.cr-table td{padding:9px 10px;border-bottom:1px solid #dde3ec;vertical-align:top;font-size:12px}\n';
+  rv+='.cr-table tr:last-child td{border-bottom:none}\n';
+  rv+='.cr-table tr.cr-approved-row td{background:#f0fff4}\n';
+  rv+='.cr-table tr.cr-rejected-row td{background:#fff8f8}\n';
+  rv+='.cr-sup-cmt{color:#7a4000;background:#fff8f0;border-left:3px solid #e07030;border-radius:0 4px 4px 0;padding:5px 8px;font-size:11.5px;white-space:pre-wrap;line-height:1.5}\n';
+  rv+='.cr-aud-note{color:#1a4020;background:#f0fff4;border-left:3px solid #27ae60;border-radius:0 4px 4px 0;padding:5px 8px;font-size:11.5px;white-space:pre-wrap;line-height:1.5}\n';
+  rv+='.cr-diff-wrap{margin-top:5px;display:grid;grid-template-columns:1fr 1fr;gap:4px}\n';
+  rv+='.cr-diff-orig{background:#ffe8e8;border-left:3px solid #c0392b;border-radius:0 3px 3px 0;padding:4px 7px;font-size:10.5px;line-height:1.45;color:#5a1010;white-space:pre-wrap}\n';
+  rv+='.cr-diff-edit{background:#e8f8e8;border-left:3px solid #27ae60;border-radius:0 3px 3px 0;padding:4px 7px;font-size:10.5px;line-height:1.45;color:#105a10;white-space:pre-wrap}\n';
+  rv+='.cr-diff-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;opacity:.6;margin-bottom:2px}\n';
+  rv+='.cr-btn-approve{padding:4px 10px;background:#27ae60;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;margin-right:5px}\n';
+  rv+='.cr-btn-more{padding:4px 10px;background:#e74c3c;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}\n';
+  rv+='.cr-status-badge{display:inline-block;padding:3px 9px;border-radius:10px;font-size:10px;font-weight:700}\n';
+  rv+='.cr-footer{padding:12px 16px;background:#f8fafc;border-top:2px solid #1a3a5c;display:flex;align-items:center;gap:10px;flex-wrap:wrap}\n';
   rv+='</style>\n</head>\n<body>\n<div id="wrap">\n';
 
   // ── Header ────────────────────────────────────────────────────────────
@@ -21511,6 +21538,76 @@ function generateReviewerHtml(role){
   rv+='<div class="stat"><div class="num" id="stat-flagged">0</div><div class="lbl">Flagged</div></div>';
   rv+='<div class="stat"><div class="num" id="stat-amended">0</div><div class="lbl">Amended</div></div>';
   rv+='</div>\n';
+
+  // ── Corrections Review Section (only present on corrected re-submissions) ─
+  if(_corrections){
+    var _crFlagged=Object.keys(_corrections.flags||{}).filter(function(id){return _corrections.flags[id];});
+    var _crCount=_crFlagged.length;
+    rv+='<script type="application/json" id="bss-corrections">'+_correctionsJson+'<\/script>\n';
+    rv+='<div class="cr-section" id="cr-section">\n';
+    rv+='<div class="cr-hdr">';
+    rv+='<div><div class="cr-hdr-title">&#128203; Corrections Review — '+esc(_corrections.fromRole)+' Manager</div>';
+    rv+='<div class="cr-hdr-sub">Review each correction below. Approve or request further changes before forwarding.</div></div>';
+    rv+='<div style="background:rgba(255,255,255,.15);border-radius:6px;padding:5px 12px;text-align:center;white-space:nowrap">';
+    rv+='<div style="font-size:20px;font-weight:800" id="cr-count">0</div>';
+    rv+='<div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;opacity:.8">of '+_crCount+' reviewed</div>';
+    rv+='</div></div>\n';
+    if(_corrections.sendBackComment){
+      rv+='<div style="background:#fff8f0;border-bottom:1px solid #f0d0a0;padding:9px 16px;font-size:12px;color:#7a4000">';
+      rv+='<strong>&#128172; Overall Comment from '+esc(_corrections.fromRole)+' Manager:</strong> '+esc(_corrections.sendBackComment)+'</div>';
+    }
+    rv+='<div class="cr-progress">';
+    rv+='<div style="font-size:11px;font-weight:700;color:#1a3a5c;white-space:nowrap">Progress: <span id="cr-prog-lbl">0 / '+_crCount+'</span></div>';
+    rv+='<div class="cr-prog-bar-wrap"><div class="cr-prog-bar" id="cr-prog-bar"></div></div>';
+    rv+='<div style="font-size:11px;font-weight:700;color:#27ae60;white-space:nowrap" id="cr-all-ok" style="display:none"></div>';
+    rv+='</div>\n';
+    rv+='<div style="overflow-x:auto"><table class="cr-table">';
+    rv+='<thead><tr><th style="width:32px">#</th><th>Observation</th><th>'+esc(_corrections.fromRole)+' Comment</th><th>Correction Made</th><th style="width:200px">Wording Change</th><th style="width:120px">Decision</th></tr></thead><tbody id="cr-tbody">';
+    _crFlagged.forEach(function(id,idx){
+      var matchedObs=null;
+      for(var ai=0;ai<allObs.length;ai++){if(allObs[ai].id===id){matchedObs=allObs[ai];break;}}
+      var obsTitle=matchedObs?matchedObs.title:id;
+      var supComment=(_corrections.comments&&_corrections.comments[id])||'';
+      var audNote=(_corrections.auditorNotes&&_corrections.auditorNotes[id])||'';
+      var wc=_corrections.wordingSnap&&_corrections.wordingSnap[id];
+      rv+='<tr id="cr-row-'+esc(id)+'">';
+      rv+='<td style="font-weight:700;color:#1a3a5c;text-align:center">'+(idx+1)+'</td>';
+      rv+='<td style="font-weight:600;color:#1e2d40">'+esc(obsTitle)+'</td>';
+      rv+='<td>'+(supComment?'<div class="cr-sup-cmt">'+esc(supComment)+'</div>':'<span style="color:#aaa;font-style:italic">No comment</span>')+'</td>';
+      rv+='<td>'+(audNote?'<div class="cr-aud-note">'+esc(audNote)+'</div>':'<span style="color:#aaa;font-style:italic">No note provided</span>')+'</td>';
+      // Wording diff column
+      rv+='<td>';
+      if(wc){
+        if(wc.obsOrig!=null&&wc.obsEdit!=null&&wc.obsOrig!==wc.obsEdit){
+          rv+='<div style="font-size:9.5px;font-weight:700;color:#1a3a5c;margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px">Observation</div>';
+          rv+='<div class="cr-diff-wrap"><div class="cr-diff-orig"><div class="cr-diff-lbl">Before</div>'+esc(wc.obsOrig)+'</div><div class="cr-diff-edit"><div class="cr-diff-lbl">After</div>'+esc(wc.obsEdit)+'</div></div>';
+        }
+        if(wc.recOrig!=null&&wc.recEdit!=null&&wc.recOrig!==wc.recEdit){
+          rv+='<div style="font-size:9.5px;font-weight:700;color:#1a3a5c;margin:6px 0 3px;text-transform:uppercase;letter-spacing:.4px">Recommendation</div>';
+          rv+='<div class="cr-diff-wrap"><div class="cr-diff-orig"><div class="cr-diff-lbl">Before</div>'+esc(wc.recOrig)+'</div><div class="cr-diff-edit"><div class="cr-diff-lbl">After</div>'+esc(wc.recEdit)+'</div></div>';
+        }
+        if((wc.obsOrig===wc.obsEdit||wc.obsOrig==null)&&(wc.recOrig===wc.recEdit||wc.recOrig==null)){
+          rv+='<span style="color:#888;font-style:italic;font-size:11px">No text change detected</span>';
+        }
+      } else {
+        rv+='<span style="color:#aaa;font-style:italic;font-size:11px">—</span>';
+      }
+      rv+='</td>';
+      // Decision column
+      rv+='<td>';
+      rv+='<div id="cr-status-'+esc(id)+'" style="margin-bottom:5px"></div>';
+      rv+='<button class="cr-btn-approve" onclick="_crDecide(\''+esc(id)+'\',true)">&#10003; Approved</button>';
+      rv+='<button class="cr-btn-more" onclick="_crDecide(\''+esc(id)+'\',false)">&#8617; Needs More Work</button>';
+      rv+='</td>';
+      rv+='</tr>';
+    });
+    rv+='</tbody></table></div>';
+    rv+='<div class="cr-footer">';
+    rv+='<div id="cr-footer-msg" style="flex:1;font-size:12px;color:#555">Review all '+_crCount+' item'+(+_crCount!==1?'s':'')+' above before proceeding.</div>';
+    rv+='<div id="cr-footer-btns"></div>';
+    rv+='</div>';
+    rv+='</div>\n'; // cr-section
+  }
 
   // ── Observation cards — split into Repeated / New sections ───────────
   // Separate and sort to match the finalized report structure
@@ -21619,15 +21716,18 @@ function generateReviewerHtml(role){
   rv+='<div style="margin-bottom:90px">';
   rv+='<textarea id="sendback-comment" class="sb-cmt" placeholder="Overall comment for send-back (required when sending back)..."></textarea>';
   rv+='</div>\n';
+  var _crLocked=(_corrections&&_corrections.flags&&Object.keys(_corrections.flags).some(function(id){return _corrections.flags[id];}));
   rv+='<div class="action-bar"><div class="action-btns">';
   if(role==='ro'){
     rv+='<button class="btn-sb" onclick="showSBComment();doAction(\'send_back\')">&#8617; Send Back to Auditor</button>';
-    rv+='<button class="btn-fwd" onclick="doAction(\'forward_ho\')">&#8594; Forward to HO &#10003;</button>';
+    rv+='<button class="btn-fwd" id="btn-fwd-main"'+(_crLocked?' disabled title="Complete Corrections Review above before forwarding" style="opacity:.45;cursor:not-allowed"':'')+' onclick="doAction(\'forward_ho\')">&#8594; Forward to HO &#10003;</button>';
   } else {
     rv+='<button class="btn-sb" onclick="showSBComment();doAction(\'send_back_to_ro\')">&#8617; Send Back to RO</button>';
-    rv+='<button class="btn-issue" onclick="doAction(\'issue\')">&#10003; Issue Report</button>';
+    rv+='<button class="btn-issue" id="btn-fwd-main"'+(_crLocked?' disabled title="Complete Corrections Review above before issuing" style="opacity:.45;cursor:not-allowed"':'')+' onclick="doAction(\'issue\')">&#10003; Issue Report</button>';
   }
-  rv+='</div></div>\n</div>\n'; // action-bar, wrap
+  rv+='</div>';
+  if(_crLocked) rv+='<div style="font-size:11px;color:#e07030;text-align:center;margin-top:5px">&#9888; Complete the <strong>Corrections Review</strong> section above before proceeding.</div>';
+  rv+='</div>\n</div>\n'; // action-bar, wrap
 
   // ── Inline JS ─────────────────────────────────────────────────────────
   rv+='<script>\n';
@@ -21909,6 +22009,9 @@ function _showReviewSendBackModal(dec, fromRole){
   body += '<div id="cg-progress-bar" style="height:5px;background:#c0392b;border-radius:3px;width:0%;transition:width .3s"></div>';
   body += '</div></div>';
 
+  // Initialise auditor notes map
+  window._cgAuditorNotes = {};
+
   // Observation checklist
   body += '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6a8aaa;margin-bottom:6px">Flagged Observations ('+flagged.length+')</div>';
   flagged.forEach(function(id, idx){
@@ -21923,11 +22026,16 @@ function _showReviewSendBackModal(dec, fromRole){
     body += '<div style="font-size:12px;font-weight:700;color:#c8e0fa;line-height:1.4">'+esc(title)+'</div>';
     if(cmts[id]) body += '<div style="font-size:11px;color:#f0c080;margin-top:4px;line-height:1.45;white-space:pre-wrap">&#128172; '+esc(cmts[id])+'</div>';
     body += '</div></div></div>';
-    // Go to button
+    // Go to button + correction notes textarea
     body += '<div style="padding:6px 10px;display:flex;gap:6px">';
     body += '<button onclick="_cgGoTo(\''+id+'\')" style="flex:1;padding:5px 8px;background:rgba(32,112,184,.25);color:#90c8f8;border:1px solid rgba(32,112,184,.4);border-radius:4px;font-family:Inter,sans-serif;font-size:11px;font-weight:700;cursor:pointer">&#128269; Go to Observation</button>';
     body += '<div id="cg-done-'+id+'" style="display:none;padding:5px 8px;background:rgba(39,174,96,.2);color:#80e0a0;border:1px solid rgba(39,174,96,.4);border-radius:4px;font-size:11px;font-weight:700">&#10003; Done</div>';
-    body += '</div></div>';
+    body += '</div>';
+    body += '<div style="padding:5px 10px 8px;border-top:1px solid rgba(255,255,255,.05)">';
+    body += '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#5a7a9a;margin-bottom:3px">Your correction notes <span style="font-weight:400;font-style:italic;color:#3a5a7a">(briefly describe what you changed)</span></div>';
+    body += '<textarea id="cg-note-'+id+'" oninput="window._cgAuditorNotes[\''+id+'\']=this.value" placeholder="e.g. Updated wording, changed sensitivity to High, added SOM reference..." style="width:100%;box-sizing:border-box;background:#0d1a2a;border:1px solid #2a4060;border-radius:4px;color:#c8e0fa;font-family:Inter,sans-serif;font-size:11px;padding:5px 7px;resize:vertical;min-height:38px;outline:none"></textarea>';
+    body += '</div>';
+    body += '</div>';
   });
   body += '</div>'; // end scroll body
 
@@ -22015,7 +22123,22 @@ function _cgMarkDone(id){
 function _cgResend(){
   var role=window._cgFromRole==='HO'?'ho':'ro';
   if(!confirm('This will generate the corrected review file to send back to the '+window._cgFromRole+' Manager.\n\nProceed?')) return;
+  // Bundle the previous-round corrections data so the reviewer sees a reconciliation page
+  var dec=window._cgDec||{};
+  var flagged=window._cgFlagged||[];
+  var wordingSnap={};
+  flagged.forEach(function(id){ if(wordingChanges[id]) wordingSnap[id]=JSON.parse(JSON.stringify(wordingChanges[id])); });
+  window._pendingCorrections={
+    fromRole:window._cgFromRole,
+    roundLabel:'Corrections Review',
+    sendBackComment:dec.sendBackComment||'',
+    comments:dec.comments||{},
+    flags:dec.flags||{},
+    auditorNotes:window._cgAuditorNotes||{},
+    wordingSnap:wordingSnap
+  };
   generateReviewerHtml(role);
+  window._pendingCorrections=null;
   setTimeout(function(){
     var panel=document.getElementById('correction-guide-panel');
     if(panel) panel.remove();
