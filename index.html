@@ -12913,7 +12913,7 @@ function _buildRptNavPanel(sections){
   panel.innerHTML = ph;
   panel.style.display = _rptNavOpen ? 'flex' : 'none';
   panel.style.flexDirection = 'column';
-  toggleBtn.style.display = 'flex';
+  if(tbBtn) tbBtn.style.display = 'flex';
 
   // ── 4. Scroll-spy via IntersectionObserver ──
   if(_rptNavSpy){ _rptNavSpy.disconnect(); _rptNavSpy=null; }
@@ -13018,21 +13018,16 @@ function _toggleRptNav(){
 // Reposition on window resize (LP may change width)
 window.addEventListener('resize', function(){ _rnavReposition(); });
 
-// Show/hide panel and toolbar button when switching tabs
-(function(){
-  var _origShowTab=window.showTab;
-  if(typeof _origShowTab==='function'){
-    window.showTab=function(t){
-      _origShowTab(t);
-      var panel=document.getElementById('rpt-nav-panel');
-      var tbBtn=document.getElementById('rpt-nav-toggle-tb');
-      var onRpt=(t==='rpt');
-      if(panel) panel.style.display=(onRpt&&_rptNavOpen)?'flex':'none';
-      if(tbBtn) tbBtn.style.display=onRpt&&_reportEverGenerated?'flex':'none';
-      if(onRpt) _rnavReposition();
-    };
-  }
-})();
+// Show/hide nav button and panel when the main report area is covered by a panel
+// Called by toggleSRRPanel / toggleAWSPanel / toggleRAPanel etc.
+function _rnavSetMainVisible(visible){
+  var panel=document.getElementById('rpt-nav-panel');
+  var tbBtn=document.getElementById('rpt-nav-toggle-tb');
+  if(!_reportEverGenerated) return; // never show if report hasn't been generated yet
+  if(panel) panel.style.display=(visible&&_rptNavOpen)?'flex':'none';
+  if(tbBtn) tbBtn.style.display=visible?'flex':'none';
+  if(visible) _rnavReposition();
+}
 
 function remObs(id){
   var title='this observation';
@@ -19391,6 +19386,7 @@ function toggleAWSPanel(){
     setRptBtnsDisabled(false);
     var raBtn2=document.getElementById('ra-tab-btn');
     if(raBtn2) raBtn2.disabled=false;
+    _rnavSetMainVisible(true);
   } else {
     panel.style.display='block';
     panel.classList.add('panel-fadein');
@@ -19403,6 +19399,7 @@ function toggleAWSPanel(){
     btn.textContent='\u{1F4CB} Work Status';
     _setPanelBack('Work Status');
     setRptBtnsDisabled(true);
+    _rnavSetMainVisible(false);
     // Populate branch info bar from main report fields
     var gv=function(id){var el=document.getElementById(id);return el&&el.value.trim()?el.value.trim():'—';};
     var bbCode=document.getElementById('aws-bb-code');
@@ -22654,6 +22651,7 @@ function toggleSRRPanel(){
     main.style.display  = '';
     if(btn){ btn.textContent='\u{1F5FA} Risk Map Editor'; _setPanelBack(null); }
     setRptBtnsDisabled(false);
+    _rnavSetMainVisible(true);
   } else {
     if(awsPanel) awsPanel.style.display = 'none';
     if(raPanel)  raPanel.style.display  = 'none';
@@ -22668,6 +22666,7 @@ function toggleSRRPanel(){
     if(btn){ btn.textContent='\u{1F5FA} Risk Map Editor'; _setPanelBack('Risk Mapping Editor'); }
     setRptBtnsDisabled(true);
     srrBuildTable();
+    _rnavSetMainVisible(false);
   }
 }
 
