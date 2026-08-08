@@ -9310,6 +9310,16 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       </div>
     </div>
 
+    <!-- Report Navigation toggle — standalone toolbar button -->
+    <button id="rpt-nav-toggle-tb" onclick="_toggleRptNav()"
+      title="Toggle Report Navigation Panel — jump to any area or observation"
+      style="display:none;align-items:center;gap:5px;padding:5px 11px;
+             background:#c9962a;color:#fff;border:none;border-radius:5px;
+             font-size:11.5px;font-weight:700;letter-spacing:.3px;cursor:pointer;
+             font-family:Inter,sans-serif;white-space:nowrap;flex-shrink:0">
+      &#9776; Report Nav
+    </button>
+
     <div class="tb-dd dd-right" id="dd-admin">
       <button class="tb-dd-tab" onclick="if(window._hoAuthed){tbDDToggle('dd-admin');}else{showHOAuthModal(function(){tbDDToggle('dd-admin');});}">Admin <span id="admin-export-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px;vertical-align:middle">Export Pending</span> <span class="arr">&#9660;</span></button>
       <div class="tb-dd-menu">
@@ -12777,48 +12787,29 @@ var _rptNavOpen = true;   // panel visible by default
 var _rptNavSpy  = null;   // IntersectionObserver handle
 
 function _buildRptNavPanel(sections){
-  // ── 1. Ensure toggle button exists ──
   var rpEl = document.getElementById('RP');
   if(!rpEl) return;
 
-  var toggleBtn = document.getElementById('rpt-nav-toggle');
-  if(!toggleBtn){
-    toggleBtn = document.createElement('button');
-    toggleBtn.id = 'rpt-nav-toggle';
-    toggleBtn.title = 'Toggle Navigation Panel (Ctrl+Shift+N)';
-    toggleBtn.innerHTML = '&#9776;<br><span style="font-size:9px;letter-spacing:.4px">NAV</span>';
-    toggleBtn.setAttribute('style',
-      'position:fixed;top:120px;z-index:1200;'+
-      'background:#1a3a5c;color:#fff;border:none;'+
-      'border-radius:0 6px 6px 0;'+ // tab sticking out from left edge of RP
-      'padding:10px 7px;width:28px;'+
-      'font-size:13px;font-weight:700;line-height:1.3;'+
-      'cursor:pointer;font-family:Inter,sans-serif;'+
-      'box-shadow:2px 2px 8px rgba(0,0,0,.25);'+
-      'writing-mode:horizontal-tb;text-align:center;'+
-      'transition:background .15s,left .25s');
-    toggleBtn.onmouseover = function(){ this.style.background='#2a5a8c'; };
-    toggleBtn.onmouseout  = function(){ this.style.background=_rptNavOpen?'#c9962a':'#1a3a5c'; };
-    toggleBtn.onclick = _toggleRptNav;
-    document.body.appendChild(toggleBtn);
-  }
+  // Show the toolbar toggle button now that a report exists
+  var tbBtn = document.getElementById('rpt-nav-toggle-tb');
+  if(tbBtn) tbBtn.style.display='flex';
 
-  // ── 2. Ensure panel container exists ──
+  // ── Ensure floating panel container exists ──
   var panel = document.getElementById('rpt-nav-panel');
   if(!panel){
     panel = document.createElement('div');
     panel.id = 'rpt-nav-panel';
     panel.setAttribute('style',
       'position:fixed;top:50px;z-index:1199;'+
-      'width:232px;max-height:calc(100vh - 60px);'+
-      'background:#fff;border:1px solid #c8d8ec;border-radius:0 6px 6px 0;'+
-      'box-shadow:4px 0 20px rgba(26,58,92,.18);'+
+      'width:236px;max-height:calc(100vh - 60px);'+
+      'background:#fff;border:1px solid #c8d8ec;border-radius:0 8px 8px 0;'+
+      'box-shadow:6px 0 24px rgba(26,58,92,.20);'+
       'display:flex;flex-direction:column;overflow:hidden;'+
-      'font-family:Inter,Arial,sans-serif;transition:opacity .2s');
+      'font-family:Inter,Arial,sans-serif;transition:opacity .15s');
     document.body.appendChild(panel);
   }
 
-  // Position both elements flush with the left edge of #RP
+  // Position flush with left edge of #RP, just below toolbar
   _rnavReposition();
 
   // ── 3. Build tree HTML ──
@@ -12991,31 +12982,22 @@ function _rnavToggleArea(aId){
   if(arrow) arrow.innerHTML=open?'&#9654;':'&#9660;';
 }
 
-// Compute position from actual DOM rects and apply to panel + button
+// Compute position from actual DOM rects and apply to panel
 function _rnavReposition(){
   var rpEl=document.getElementById('RP');
   if(!rpEl) return;
   var rect=rpEl.getBoundingClientRect();
-  var leftEdge=Math.round(rect.left);         // pixel X of RP's left edge
-  var panelW=232;
+  var leftEdge=Math.round(rect.left);
 
-  // Compute top from toolbar bottom
+  // Top = just below toolbar
   var tbEl=document.getElementById('toolbar');
   var topEdge=tbEl ? Math.round(tbEl.getBoundingClientRect().bottom)+2 : 50;
 
   var panel=document.getElementById('rpt-nav-panel');
-  var btn  =document.getElementById('rpt-nav-toggle');
-
   if(panel){
     panel.style.left=leftEdge+'px';
     panel.style.top=topEdge+'px';
     panel.style.maxHeight='calc(100vh - '+(topEdge+8)+'px)';
-  }
-  if(btn){
-    // Tab sits at right edge of panel when open, at RP left edge when closed
-    btn.style.left=(_rptNavOpen ? leftEdge+panelW : leftEdge)+'px';
-    btn.style.top=(topEdge+30)+'px';          // slightly below the panel top bar
-    btn.style.background=_rptNavOpen?'#c9962a':'#1a3a5c';
   }
 }
 
@@ -13023,23 +13005,26 @@ function _toggleRptNav(){
   _rptNavOpen=!_rptNavOpen;
   var panel=document.getElementById('rpt-nav-panel');
   if(panel) panel.style.display=_rptNavOpen?'flex':'none';
+  // Update toolbar button label
+  var tbBtn=document.getElementById('rpt-nav-toggle-tb');
+  if(tbBtn) tbBtn.innerHTML=(_rptNavOpen?'&#9776; Hide Nav':'&#9776; Report Nav');
   _rnavReposition();
 }
 
 // Reposition on window resize (LP may change width)
 window.addEventListener('resize', function(){ _rnavReposition(); });
 
-// Hide nav panel when switching away from the report tab
+// Show/hide panel and toolbar button when switching tabs
 (function(){
   var _origShowTab=window.showTab;
   if(typeof _origShowTab==='function'){
     window.showTab=function(t){
       _origShowTab(t);
       var panel=document.getElementById('rpt-nav-panel');
-      var btn=document.getElementById('rpt-nav-toggle');
+      var tbBtn=document.getElementById('rpt-nav-toggle-tb');
       var onRpt=(t==='rpt');
       if(panel) panel.style.display=(onRpt&&_rptNavOpen)?'flex':'none';
-      if(btn)   btn.style.display=onRpt?'flex':'none';
+      if(tbBtn) tbBtn.style.display=onRpt&&_reportEverGenerated?'flex':'none';
       if(onRpt) _rnavReposition();
     };
   }
@@ -23176,10 +23161,42 @@ function srrRenderAudit(){
     h+='<td style="padding:7px 10px;line-height:1.4">'+(rrId?'<div style="font-size:9.5px;font-weight:800;color:'+srrCol+';letter-spacing:.4px;margin-bottom:1px">'+_srrEsc(rrId)+'</div>':'')+'<div style="font-size:10.5px;color:#2a3a50;font-weight:600">'+_srrEsc(rrName)+'</div></td>';
     h+='<td style="padding:7px 10px;font-size:10.5px;color:#2a4a60;line-height:1.4">'+_srrEsc(caName)+'</td>';
     h+='<td style="padding:7px 10px">'+kwHtml+'</td>';
+    // Fix button — opens editor at this observation
+    var fixStyle=r.ra
+      ? 'background:#e8f0fa;color:#888;border:1px solid #c8d8ec;cursor:default'
+      : 'background:#1a3a5c;color:#fff;border:none;cursor:pointer';
+    var fixTitle=r.ra?'Already manually reassigned':'Open in Editor to reassign correct Risk (SRR)';
+    h+='<td style="padding:7px 10px;text-align:center">'
+      +'<button onclick="srrAuditFix(\''+o.id+'\')" title="'+fixTitle+'" '
+      +'style="padding:3px 9px;border-radius:4px;font-size:10.5px;font-weight:700;font-family:inherit;'
+      +fixStyle+'">'+( r.ra ? '&#10003;' : '&#9998; Fix')+'</button>'
+      +'</td>';
     h+='</tr>';
   }
   if(!h) h='<tr><td colspan="7" style="padding:24px;text-align:center;color:#888;font-size:12px">No observations match the selected filters.</td></tr>';
   tbody.innerHTML=h;
+}
+
+// Jump from Mapping Audit View to the editor and open that observation's detail panel
+function srrAuditFix(obsId){
+  // Switch back to editor view
+  _srrAuditOpen=true; srrToggleAuditView(); // toggles back to editor
+  // After a short delay (table renders), find and click that row
+  setTimeout(function(){
+    var row=document.querySelector('#srr-tbody tr[data-obsid="'+obsId+'"]');
+    if(row){ row.scrollIntoView({behavior:'smooth',block:'center'}); row.click(); }
+    else {
+      // Row may be filtered out — clear filters and retry
+      var sf=document.getElementById('srr-search'); if(sf) sf.value='';
+      var cf=document.getElementById('srr-cat-filter'); if(cf) cf.value='';
+      var ff=document.getElementById('srr-flag-filter'); if(ff) ff.value='';
+      srrApplyFilters();
+      setTimeout(function(){
+        var row2=document.querySelector('#srr-tbody tr[data-obsid="'+obsId+'"]');
+        if(row2){ row2.scrollIntoView({behavior:'smooth',block:'center'}); row2.click(); }
+      },300);
+    }
+  },200);
 }
 
 function _srrAuditPill(label,count,col,bg){
@@ -27657,17 +27674,44 @@ function dbmExportCSV(){
       <button onclick="srrToggleAuditView()" style="padding:4px 10px;background:#555;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;font-family:inherit">← Back to Editor</button>
     </div>
     <div id="srr-audit-summary" style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap"></div>
+
+    <!-- How to Fix guide -->
+    <div style="background:#fffbe8;border:1px solid #e0c840;border-radius:7px;padding:12px 16px;margin-bottom:14px;font-size:11.5px;line-height:1.7;color:#2a2a00">
+      <div style="font-size:12px;font-weight:800;color:#5a4a00;margin-bottom:6px">&#128161; How to Correct Fallback &amp; Weak Matches</div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap">
+        <div style="flex:1;min-width:220px">
+          <b>Step 1 — Identify</b><br>
+          Use the filter above to show <span style="background:#fde8cc;padding:1px 6px;border-radius:4px;font-weight:700;color:#8a3000">⚠ Fallback</span> or
+          <span style="background:#fffbe0;padding:1px 6px;border-radius:4px;font-weight:700;color:#6a5000">⬦ Weak</span> rows.
+          These are observations where BRAINS either found no keyword match (fallback) or only one keyword matched (weak).
+        </div>
+        <div style="flex:1;min-width:220px">
+          <b>Step 2 — Fix (per session)</b><br>
+          Click <span style="background:#1a3a5c;color:#fff;padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:700">✎ Fix</span> on any row.
+          This switches to the Editor, opens that observation's detail panel, and lets you select the correct Risk (SRR) from a dropdown.
+          The correction is saved in your session file.
+        </div>
+        <div style="flex:1;min-width:220px">
+          <b>Step 3 — Fix permanently (Administrator)</b><br>
+          Session-level fixes apply only to this report. For a permanent correction, an Administrator must add the missing keyword(s)
+          to the correct SRR's keyword list in the databank and export an updated app — so future reports auto-match correctly.
+          Use <b>Submit Risk Map</b> in the editor to flag changes to HO for databank update.
+        </div>
+      </div>
+    </div>
+
     <table id="srr-audit-table" style="width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);font-size:11.5px">
       <thead>
         <tr style="background:#1a3a5c;color:#fff">
-          <th style="padding:8px 10px;text-align:left;width:80px">Obs ID</th>
+          <th style="padding:8px 10px;text-align:left;width:75px">Obs ID</th>
           <th style="padding:8px 10px;text-align:left">Observation Title</th>
-          <th style="padding:8px 10px;text-align:left;width:150px">Category</th>
-          <th style="padding:8px 10px;text-align:center;width:55px">Score</th>
-          <th style="padding:8px 10px;text-align:left;width:110px">Matched SRR</th>
-          <th style="padding:8px 10px;text-align:left;width:170px">Risk (RR)</th>
-          <th style="padding:8px 10px;text-align:left;width:185px">Control Activity</th>
+          <th style="padding:8px 10px;text-align:left;width:145px">Category</th>
+          <th style="padding:8px 10px;text-align:center;width:52px">Score</th>
+          <th style="padding:8px 10px;text-align:left;width:105px">Matched SRR</th>
+          <th style="padding:8px 10px;text-align:left;width:165px">Risk (RR)</th>
+          <th style="padding:8px 10px;text-align:left;width:180px">Control Activity</th>
           <th style="padding:8px 10px;text-align:left">Keywords Matched</th>
+          <th style="padding:8px 10px;text-align:center;width:56px">Fix</th>
         </tr>
       </thead>
       <tbody id="srr-audit-tbody"></tbody>
