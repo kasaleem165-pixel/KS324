@@ -15558,6 +15558,15 @@ function buildAnalysisHtml(){
     if(!(ck in cosoCount)) ck='';
     cosoCount[ck]++; cosoObs[ck].push(lbl);
   }
+  // Sort label lists in each bucket numerically (e.g. 1.1, 1.2, 2.1, 2.3)
+  function _sortLabels(arr){
+    arr.sort(function(a,b){
+      var ap=a.split('.').map(Number), bp=b.split('.').map(Number);
+      return (ap[0]-bp[0])||((ap[1]||0)-(bp[1]||0));
+    });
+  }
+  for(var _si=0;_si<SENS_LEVELS.length;_si++) _sortLabels(sensObs[SENS_LEVELS[_si].key]);
+  for(var _ci=0;_ci<COSO_COMPS.length;_ci++)  _sortLabels(cosoObs[COSO_COMPS[_ci].key]);
 
   if(!total){
     return '<div style="padding:30px;text-align:center;color:#888;font-family:Inter,sans-serif">No observations selected. Generate the report first.</div>';
