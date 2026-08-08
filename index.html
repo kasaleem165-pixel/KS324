@@ -23169,7 +23169,7 @@ function srrRenderAudit(){
     var fixStyle=r.ra
       ? 'background:#e8f0fa;color:#888;border:1px solid #c8d8ec;cursor:default'
       : 'background:#1a3a5c;color:#fff;border:none;cursor:pointer';
-    var fixTitle=r.ra?'Already manually reassigned':'Open in Editor to reassign correct Risk (SRR)';
+    var fixTitle=r.ra?'Already proposed/reassigned — click to update proposal':'Propose a correction — select the correct Risk and suggest keywords';
     h+='<td style="padding:7px 10px;text-align:center">'
       +'<button onclick="srrAuditFix(\''+o.id+'\')" title="'+fixTitle+'" '
       +'style="padding:3px 9px;border-radius:4px;font-size:10.5px;font-weight:700;font-family:inherit;'
@@ -23181,321 +23181,333 @@ function srrRenderAudit(){
   tbody.innerHTML=h;
 }
 
-// ── SRR Keyword Proposals (Auditor → Admin workflow) ────────────────────────
-window._srrKwProposals = [];
 
-function _srrUpdateSubmitBtn(){
+// ── SRR Keyword Proposal Workflow ────────────────────────────────────────────
+// Mirrors the Duplicate Observations (updb) pattern:
+//   Auditor proposes → exports JSON → Admin imports → reviews → approves → exports updated app
+
+var _srrKwProposals = []; // [{obsId,obsTitle,category,currentSrrId,currentSrrName,proposedSrrId,proposedSrrName,suggestedKeywords[],note,proposedAt}]
+
+// ── Auditor: open Propose Fix modal ──────────────────────────────────────────
+function srrAuditFix(obsId){
+  // Find the observation
+  var all=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
+  var o=null; for(var i=0;i<all.length;i++){if(all[i].id===obsId){o=all[i];break;}}
+  if(!o) return;
+
+  var audit=_getObsSrrAudit(o);
+  var curId  = audit.srrId||'';
+  var curDef = curId?SRR_DEF[curId]:null;
+  var navy='#1a3a5c';
+
+  // Build SRR dropdown options grouped by domain
+  var domainLabels={'fin':'Financial','cash':'Cash & Bank','hr':'Human Resources','fa':'Fixed Assets',
+    'lib':'Library','stu':'Student Records','sec':'Safety & Security','lab':'Laboratory','gen':'General'};
+  var ddOpts='<option value="">— Select correct SRR —</option>';
+  var domains=Object.keys(SRR_AREA_ORDER);
+  for(var di=0;di<domains.length;di++){
+    var dk=domains[di];
+    var dArr=SRR_AREA_ORDER[dk];
+    if(!dArr||!dArr.length) continue;
+    ddOpts+='<optgroup label="'+(domainLabels[dk]||dk)+'">';
+    for(var si=0;si<dArr.length;si++){
+      var sd=SRR_DEF[dArr[si]]; if(!sd) continue;
+      var sel=(dArr[si]===curId)?' selected':'';
+      ddOpts+='<option value="'+dArr[si]+'"'+sel+'>'+dArr[si]+' — '+sd.name+'</option>';
+    }
+    ddOpts+='</optgroup>';
+  }
+
+  var existingProp=null;
+  for(var pi=0;pi<_srrKwProposals.length;pi++){if(_srrKwProposals[pi].obsId===obsId){existingProp=_srrKwProposals[pi];break;}}
+
+  var el=document.createElement('div');
+  el.id='srr-fix-modal';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99998;display:flex;align-items:center;justify-content:center';
+  el.innerHTML=
+    '<div style="background:#fff;border-radius:10px;width:540px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.35);font-family:Inter,sans-serif">'
+    // Header
+    +'<div style="background:'+navy+';color:#fff;padding:12px 16px;border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:space-between">'
+    +'<div><div style="font-size:10px;font-weight:700;letter-spacing:.6px;opacity:.75;text-transform:uppercase">Propose Risk Correction</div>'
+    +'<div style="font-size:14px;font-weight:800">'+_srrEsc(o.title||'')+'</div></div>'
+    +'<button onclick="document.getElementById(\'srr-fix-modal\').remove()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:15px;line-height:1">&#10005;</button>'
+    +'</div>'
+    // Body
+    +'<div style="padding:16px 20px">'
+    // Current mapping
+    +'<div style="background:#f5f8fc;border:1px solid #d0dcea;border-radius:7px;padding:10px 14px;margin-bottom:14px">'
+    +'<div style="font-size:10px;font-weight:700;color:#6a7a90;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Current Auto-Matched Risk</div>'
+    +(curDef
+      ?'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+        +'<span style="background:'+curDef.col+';color:#fff;padding:2px 9px;border-radius:4px;font-size:11px;font-weight:800">'+_srrEsc(curId)+'</span>'
+        +'<span style="font-size:12px;font-weight:600;color:#2a3a50">'+_srrEsc(curDef.name)+'</span>'
+        +(audit.isFallback?'<span style="background:#fde8cc;color:#8a3000;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">⚠ Fallback — no keyword matched</span>':'')
+        +'</div>'
+        +'<div style="font-size:10.5px;color:#5a6a80;margin-top:3px">Control Activity: '+_srrEsc(curDef.caName)+'</div>'
+      :'<span style="color:#aaa;font-size:12px">None assigned</span>')
+    +'</div>'
+    // Proposed SRR
+    +'<div style="margin-bottom:12px">'
+    +'<label style="display:block;font-size:11px;font-weight:700;color:'+navy+';margin-bottom:5px">&#128204; Select the Correct Risk (SRR)</label>'
+    +'<select id="srrfix-proposed" style="width:100%;padding:7px 10px;border:1px solid #b0c8e8;border-radius:5px;font-size:12px;font-family:inherit;color:#1a2a40">'
+    +ddOpts+'</select>'
+    +'</div>'
+    // Suggested keywords
+    +'<div style="margin-bottom:12px">'
+    +'<label style="display:block;font-size:11px;font-weight:700;color:'+navy+';margin-bottom:4px">&#128273; Suggested Keywords to Add <span style="font-weight:400;color:#888">(one per line — words from the observation title that should trigger this SRR)</span></label>'
+    +'<textarea id="srrfix-kw" rows="4" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #b0c8e8;border-radius:5px;font-size:12px;font-family:inherit;resize:vertical" placeholder="e.g.&#10;delay in providing livery&#10;livery delay">'
+    +(existingProp?existingProp.suggestedKeywords.join('\n'):'')+'</textarea>'
+    +'</div>'
+    // Note
+    +'<div style="margin-bottom:16px">'
+    +'<label style="display:block;font-size:11px;font-weight:700;color:'+navy+';margin-bottom:4px">&#128221; Reason / Note <span style="font-weight:400;color:#888">(explain why this SRR is more appropriate)</span></label>'
+    +'<textarea id="srrfix-note" rows="3" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #b0c8e8;border-radius:5px;font-size:12px;font-family:inherit;resize:vertical" placeholder="e.g. Livery delay is a benefits/payroll issue, not a code of conduct matter">'
+    +(existingProp?_srrEsc(existingProp.note):'')+'</textarea>'
+    +'</div>'
+    // Buttons
+    +'<div style="display:flex;gap:8px;justify-content:flex-end">'
+    +'<button onclick="document.getElementById(\'srr-fix-modal\').remove()" style="padding:7px 16px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit">Cancel</button>'
+    +'<button onclick="srrAddProposal(\''+obsId+'\')" style="padding:7px 18px;background:'+navy+';color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#10004; Add to Proposal List</button>'
+    +'</div>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(el);
+  // Pre-fill keyword suggestion from obs title words if blank
+  var kwTa=document.getElementById('srrfix-kw');
+  if(kwTa&&!kwTa.value.trim()){
+    kwTa.value=(o.title||'').toLowerCase();
+  }
+}
+
+function srrAddProposal(obsId){
+  var all=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
+  var o=null; for(var i=0;i<all.length;i++){if(all[i].id===obsId){o=all[i];break;}}
+  if(!o){alert('Observation not found.');return;}
+  var proposedId=(document.getElementById('srrfix-proposed')||{}).value||'';
+  if(!proposedId){alert('Please select the correct Risk (SRR) before adding.');return;}
+  var kwRaw=(document.getElementById('srrfix-kw')||{}).value||'';
+  var kws=kwRaw.split('\n').map(function(k){return k.trim().toLowerCase();}).filter(function(k){return k.length>0;});
+  var note=(document.getElementById('srrfix-note')||{}).value||'';
+  var audit=_getObsSrrAudit(o);
+  var curId=audit.srrId||'';
+  var curDef=curId?SRR_DEF[curId]:null;
+  var propDef=SRR_DEF[proposedId]||null;
+
+  // Remove existing proposal for this obs (replace)
+  _srrKwProposals=_srrKwProposals.filter(function(p){return p.obsId!==obsId;});
+  _srrKwProposals.push({
+    obsId:obsId, obsTitle:o.title||'', category:o.category||'',
+    currentSrrId:curId, currentSrrName:curDef?curDef.name:'',
+    proposedSrrId:proposedId, proposedSrrName:propDef?propDef.name:'',
+    suggestedKeywords:kws, note:note,
+    proposedAt:new Date().toISOString().slice(0,10)
+  });
+  document.getElementById('srr-fix-modal').remove();
+  _srrUpdateProposalBtn();
+  showToast('Proposal added. You have '+_srrKwProposals.length+' proposal(s) ready to submit.',3000);
+  // Refresh audit table to show updated state
+  if(_srrAuditOpen) srrRenderAudit();
+}
+
+function _srrUpdateProposalBtn(){
   var btn=document.getElementById('srr-submit-proposals-btn');
   if(!btn) return;
-  var n=window._srrKwProposals.length;
-  if(n>0){ btn.style.display='inline-block'; btn.innerHTML='&#128228; Submit Proposals ('+n+')'; }
-  else { btn.style.display='none'; }
+  var n=_srrKwProposals.length;
+  btn.style.display=n>0?'':'none';
+  btn.innerHTML='&#128228; Submit Proposals ('+n+')';
 }
 
-// Propose Fix modal — opened when auditor clicks ✎ Fix in Mapping Audit View
-function srrAuditFix(obsId){
-  var all=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
-  var obs=null; for(var i=0;i<all.length;i++){if(all[i].id===obsId){obs=all[i];break;}}
-  if(!obs){ alert('Observation not found.'); return; }
-
-  var currentSrrId=(srr_reassigned[obsId]||{}).srr_id || _obsSrrCache[obsId] || _getObsSrr(obs);
-  var currentDef=currentSrrId?SRR_DEF[currentSrrId]:null;
-  var currentSrrName=currentDef?currentDef.name:'Unknown';
-  var currentCol=currentDef?(currentDef.col||'#888'):'#888';
-
-  // Build SRR dropdown grouped by domain (rr)
-  var groups={};
-  Object.keys(SRR_DEF).forEach(function(k){
-    var d=SRR_DEF[k]; var rr=d.rr||'Other';
-    if(!groups[rr]) groups[rr]={rrName:d.rrName||rr, keys:[]};
-    groups[rr].keys.push(k);
-  });
-  var ddHtml='<option value="">— Select proposed SRR —</option>';
-  Object.keys(groups).sort().forEach(function(rr){
-    ddHtml+='<optgroup label="'+rr+' — '+groups[rr].rrName+'">';
-    groups[rr].keys.forEach(function(k){
-      ddHtml+='<option value="'+k+'"'+(k===currentSrrId?' selected':'')+'>'+k+' — '+SRR_DEF[k].name+'</option>';
-    });
-    ddHtml+='</optgroup>';
-  });
-
-  var existing=null;
-  for(var pi=0;pi<window._srrKwProposals.length;pi++){
-    if(window._srrKwProposals[pi].obsId===obsId){existing=window._srrKwProposals[pi];break;}
-  }
-
-  var m=document.createElement('div');
-  m.id='srrProposeModal';
-  m.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center';
-  m.innerHTML='<div style="background:#fff;border-radius:10px;padding:24px 28px;max-width:520px;width:95%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.3)">'
-    +'<div style="font-size:14px;font-weight:800;color:#1a3a5c;margin-bottom:4px">&#9998; Propose SRR Fix</div>'
-    +'<div style="font-size:11px;color:#666;margin-bottom:14px">Your proposal will be exported as a JSON file for Administrator review.</div>'
-    +'<div style="background:#f0f3f8;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:11.5px">'
-      +'<div style="font-weight:700;color:#1a3a5c">'+obsId+'</div>'
-      +'<div style="color:#333;margin-top:2px">'+obs.title+'</div>'
-      +'<div style="margin-top:6px"><span style="background:'+currentCol+';color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:2px 8px">'+currentSrrId+'</span> <span style="font-size:10.5px;color:#555;margin-left:6px">'+currentSrrName+'</span></div>'
-    +'</div>'
-    +'<div style="margin-bottom:12px">'
-      +'<label style="font-size:11.5px;font-weight:700;color:#2a3a50;display:block;margin-bottom:4px">Proposed Correct SRR</label>'
-      +'<select id="srr-prop-srr" style="width:100%;padding:7px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:11.5px;font-family:inherit">'+ddHtml+'</select>'
-    +'</div>'
-    +'<div style="margin-bottom:12px">'
-      +'<label style="font-size:11.5px;font-weight:700;color:#2a3a50;display:block;margin-bottom:4px">Suggested Keywords <span style="font-weight:400;color:#888">(one per line)</span></label>'
-      +'<textarea id="srr-prop-kw" rows="4" placeholder="e.g. delay in providing livery" style="width:100%;padding:7px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:11.5px;font-family:inherit;box-sizing:border-box;resize:vertical">'+(existing?(existing.suggestedKeywords||[]).join('\n'):'')+'</textarea>'
-    +'</div>'
-    +'<div style="margin-bottom:18px">'
-      +'<label style="font-size:11.5px;font-weight:700;color:#2a3a50;display:block;margin-bottom:4px">Note / Reasoning</label>'
-      +'<textarea id="srr-prop-note" rows="3" placeholder="Why should this SRR be used instead?" style="width:100%;padding:7px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:11.5px;font-family:inherit;box-sizing:border-box;resize:vertical">'+(existing?existing.note:'')+'</textarea>'
-    +'</div>'
-    +'<div style="display:flex;gap:10px">'
-      +'<button onclick="srrProposalAdd(\''+obsId+'\',\''+obs.title.replace(/'/g,'&#39;')+'\',\''+obs.category+'\',\''+currentSrrId+'\',\''+currentSrrName.replace(/'/g,'&#39;')+'\')" style="flex:1;padding:9px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Add to Proposal List</button>'
-      +'<button onclick="document.getElementById(\'srrProposeModal\').remove()" style="padding:9px 18px;background:#e8edf5;color:#444;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>'
-    +'</div>'
-  +'</div>';
-  document.body.appendChild(m);
-  m.addEventListener('click',function(e){if(e.target===m)m.remove();});
-}
-
-function srrProposalAdd(obsId,obsTitle,category,currentSrrId,currentSrrName){
-  var proposedSrrId=(document.getElementById('srr-prop-srr')||{}).value||'';
-  if(!proposedSrrId){ alert('Please select a proposed SRR.'); return; }
-  var proposedDef=SRR_DEF[proposedSrrId]||{};
-  var kwRaw=((document.getElementById('srr-prop-kw')||{}).value||'').split('\n').map(function(s){return s.trim();}).filter(Boolean);
-  var note=((document.getElementById('srr-prop-note')||{}).value||'').trim();
-  // Remove any existing proposal for this obsId
-  window._srrKwProposals=window._srrKwProposals.filter(function(p){return p.obsId!==obsId;});
-  window._srrKwProposals.push({
-    obsId:obsId, obsTitle:obsTitle, category:category,
-    currentSrrId:currentSrrId, currentSrrName:currentSrrName,
-    proposedSrrId:proposedSrrId, proposedSrrName:proposedDef.name||proposedSrrId,
-    suggestedKeywords:kwRaw, note:note, proposedAt:new Date().toISOString()
-  });
-  _srrUpdateSubmitBtn();
-  var m=document.getElementById('srrProposeModal'); if(m) m.remove();
-  showToast('Proposal added. ('+window._srrKwProposals.length+' total)',2500);
-}
-
+// ── Auditor: export proposals JSON ───────────────────────────────────────────
 function srrSubmitProposals(){
-  if(!window._srrKwProposals.length){ alert('No proposals to submit.'); return; }
-  var obj={type:'srrKwProposals',version:1,proposals:window._srrKwProposals};
-  var blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});
+  if(!_srrKwProposals.length){alert('No proposals yet. Use ✎ Fix on any row to add proposals first.');return;}
+  var payload={type:'srrKwProposals',version:1,proposals:_srrKwProposals};
+  var json=JSON.stringify(payload,null,2);
+  var blob=new Blob([json],{type:'application/json'});
   var url=URL.createObjectURL(blob);
-  var today=new Date().toISOString().slice(0,10).replace(/-/g,'');
-  var a=document.createElement('a'); a.href=url; a.download='SRR_Keyword_Proposals_'+today+'.json'; a.click();
+  var d=new Date().toISOString().slice(0,10).replace(/-/g,'');
+  var a=document.createElement('a'); a.href=url; a.download='SRR_Keyword_Proposals_'+d+'.json'; a.click();
   URL.revokeObjectURL(url);
-  setTimeout(function(){
-    alert('Proposals exported!\n\nPlease email the downloaded JSON file to the Administrator so they can review and apply the suggested keyword additions to the app databank.');
-  },400);
+  showToast('Proposals exported. Email this file to your Administrator for review and approval.',5000);
 }
 
-// ── Admin: Import SRR Keyword Proposals ─────────────────────────────────────
+// ── Admin: import proposals file ─────────────────────────────────────────────
 function srrImportProposalsClick(){
-  if(!window._hoAuthed){
-    showHOAuthModal(function(granted){ if(granted){ window._hoAuthed=true; srrImportProposalsClick(); } });
-    return;
-  }
-  var inp=document.getElementById('srr-proposals-input');
-  if(inp) inp.click();
+  showHOAuthModal(function(){
+    document.getElementById('srr-proposals-input').click();
+  });
 }
 
-function srrLoadProposalsFile(ev){
-  var file=ev.target.files&&ev.target.files[0]; if(!file) return;
+function srrLoadProposalsFile(evt){
+  var file=evt.target.files&&evt.target.files[0];
+  evt.target.value='';
+  if(!file) return;
   var reader=new FileReader();
   reader.onload=function(e){
-    var obj;
-    try{ obj=JSON.parse(e.target.result); }catch(ex){ alert('Invalid JSON file: '+ex.message); return; }
-    if(!obj||obj.type!=='srrKwProposals'||!Array.isArray(obj.proposals)){ alert('This file does not appear to be an SRR Keyword Proposals export.'); return; }
-    srrReviewProposals(obj.proposals);
+    var payload;
+    try{payload=JSON.parse(e.target.result);}catch(ex){alert('Could not parse file: '+ex.message);return;}
+    if(!payload||payload.type!=='srrKwProposals'||!Array.isArray(payload.proposals)){
+      alert('This file does not appear to be an SRR Keyword Proposals file.');return;
+    }
+    if(!payload.proposals.length){alert('The proposals file is empty.');return;}
+    srrReviewProposals(payload.proposals);
   };
   reader.readAsText(file);
-  ev.target.value='';
 }
 
+// ── Admin: review modal ───────────────────────────────────────────────────────
 function srrReviewProposals(proposals){
-  var existing=document.getElementById('srrReviewModal'); if(existing) existing.remove();
+  var existing=document.getElementById('srr-review-modal');
+  if(existing) existing.remove();
+  var navy='#1a3a5c';
+  // _approved[i] = true/false/null (pending)
+  var _approved=proposals.map(function(){return null;});
 
-  function cardHtml(p,idx){
-    var curDef=SRR_DEF[p.currentSrrId]||{}; var propDef=SRR_DEF[p.proposedSrrId]||{};
-    var curCol=curDef.col||'#888'; var propCol=propDef.col||'#1a3a5c';
-    var chips=(p.suggestedKeywords||[]).map(function(k){
-      return '<span style="background:#eef2fa;border:1px solid #c8d8ec;border-radius:12px;padding:2px 9px;font-size:10px;color:#2a3a60;display:inline-block;margin:2px">'+k+'</span>';
-    }).join('');
-    return '<div id="srr-prop-card-'+idx+'" data-state="pending" style="background:#fff;border:1.5px solid #dde6f0;border-radius:8px;padding:14px 16px;margin-bottom:12px">'
-      +'<div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">'
-        +'<div style="flex:1;min-width:220px">'
-          +'<div style="font-weight:700;color:#1a3a5c;font-size:12px">'+p.obsId+'</div>'
-          +'<div style="font-size:11.5px;color:#333;margin-top:2px;margin-bottom:8px">'+p.obsTitle+'</div>'
-          +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">'
-            +'<span style="background:'+curCol+';color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:2px 8px">'+p.currentSrrId+'</span>'
-            +'<span style="font-size:12px;color:#aaa">→</span>'
-            +'<span style="background:'+propCol+';color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:2px 8px">'+p.proposedSrrId+'</span>'
-            +'<span style="font-size:10.5px;color:#555">'+p.proposedSrrName+'</span>'
-          +'</div>'
-          +(chips?'<div style="margin-bottom:8px">'+chips+'</div>':'')
-          +(p.note?'<div style="font-size:10.5px;color:#666;background:#f8f8fc;border-radius:4px;padding:5px 8px;font-style:italic">'+p.note+'</div>':'')
+  var el=document.createElement('div');
+  el.id='srr-review-modal';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;display:flex;align-items:flex-start;justify-content:center;padding-top:30px;overflow-y:auto';
+
+  function _render(){
+    var pending=_approved.filter(function(v){return v===null;}).length;
+    var approved=_approved.filter(function(v){return v===true;}).length;
+    var rejected=_approved.filter(function(v){return v===false;}).length;
+
+    var cards='';
+    for(var i=0;i<proposals.length;i++){
+      var p=proposals[i];
+      var state=_approved[i]; // null=pending, true=approved, false=rejected
+      var cardBg=state===true?'#e8f8ee':state===false?'#fde8e8':'#fff';
+      var borderCol=state===true?'#27ae60':state===false?'#c0392b':'#d0dcea';
+      var curDef=p.currentSrrId?SRR_DEF[p.currentSrrId]:null;
+      var propDef=p.proposedSrrId?SRR_DEF[p.proposedSrrId]:null;
+      var kwChips=p.suggestedKeywords.map(function(k){
+        return '<span style="display:inline-block;padding:2px 8px;margin:2px;border-radius:10px;font-size:10.5px;background:#e0ecff;color:#1a3a7c;border:1px solid #b0d0f8">'+_srrEsc(k)+'</span>';
+      }).join('');
+      var sameRisk=p.currentSrrId===p.proposedSrrId;
+      cards+='<div style="background:'+cardBg+';border:1.5px solid '+borderCol+';border-radius:8px;padding:14px 16px;margin-bottom:12px">'
+        // Top row: obs info + approve/reject
+        +'<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">'
+        +'<div style="flex:1">'
+        +'<div style="font-size:10px;color:#888;font-weight:700;letter-spacing:.5px">'+_srrEsc(p.obsId)+' &nbsp;·&nbsp; '+_srrEsc(p.category)+'</div>'
+        +'<div style="font-size:13px;font-weight:700;color:#1a2a40;margin-top:2px">'+_srrEsc(p.obsTitle)+'</div>'
         +'</div>'
-        +'<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">'
-          +'<button id="srr-prop-approve-'+idx+'" onclick="srrPropCardState('+idx+',\'approved\')" style="padding:5px 14px;background:#1e7a40;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Approve</button>'
-          +'<button id="srr-prop-reject-'+idx+'" onclick="srrPropCardState('+idx+',\'rejected\')" style="padding:5px 14px;background:#c0392b;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#10007; Reject</button>'
+        +'<div style="display:flex;gap:6px;flex-shrink:0">'
+        +'<button onclick="(function(){_approved['+i+']=true;_render();})()" style="padding:5px 14px;background:'+(state===true?'#27ae60':'#eee')+';color:'+(state===true?'#fff':'#555')+';border:1.5px solid '+(state===true?'#1e8a50':'#ccc')+';border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Approve</button>'
+        +'<button onclick="(function(){_approved['+i+']=false;_render();})()" style="padding:5px 14px;background:'+(state===false?'#c0392b':'#eee')+';color:'+(state===false?'#fff':'#555')+';border:1.5px solid '+(state===false?'#a03020':'#ccc')+';border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#10005; Reject</button>'
         +'</div>'
+        +'</div>'
+        // Risk mapping change
+        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">'
+        +'<div style="font-size:10px;font-weight:700;color:#6a7a90;white-space:nowrap">CURRENT:</div>'
+        +(curDef?'<span style="background:'+(curDef.col||'#555')+';color:#fff;padding:2px 8px;border-radius:4px;font-size:10.5px;font-weight:800">'+_srrEsc(p.currentSrrId)+'</span><span style="font-size:11px;color:#4a5a70">'+_srrEsc(curDef.name)+'</span>':'<span style="color:#aaa;font-size:11px">None</span>')
+        +(sameRisk?'<span style="font-size:10px;color:#27ae60;font-weight:700;background:#e8f8ee;border-radius:10px;padding:1px 8px">SRR unchanged — keyword addition only</span>':'<span style="font-size:13px;color:#888">&#8594;</span><div style="font-size:10px;font-weight:700;color:#6a7a90;white-space:nowrap">PROPOSED:</div>'
+          +(propDef?'<span style="background:'+(propDef.col||'#555')+';color:#fff;padding:2px 8px;border-radius:4px;font-size:10.5px;font-weight:800">'+_srrEsc(p.proposedSrrId)+'</span><span style="font-size:11px;color:#4a5a70">'+_srrEsc(propDef.name)+'</span>':''))
+        +'</div>'
+        // Keywords
+        +(p.suggestedKeywords.length?'<div style="margin-bottom:6px"><span style="font-size:10px;font-weight:700;color:#6a7a90">KEYWORDS TO ADD: </span>'+kwChips+'</div>':'')
+        // Note
+        +(p.note?'<div style="background:rgba(0,0,0,.04);border-radius:4px;padding:6px 10px;font-size:11.5px;color:#3a4a60;font-style:italic">"'+_srrEsc(p.note)+'"</div>':'')
+        +'<div style="font-size:10px;color:#aaa;margin-top:6px">Proposed: '+_srrEsc(p.proposedAt||'')+'</div>'
+        +'</div>';
+    }
+
+    el.innerHTML=
+      '<div style="background:#fff;border-radius:10px;width:720px;max-width:96vw;box-shadow:0 8px 40px rgba(0,0,0,.35);font-family:Inter,sans-serif;margin-bottom:40px">'
+      // Header
+      +'<div style="background:'+navy+';color:#fff;padding:13px 18px;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:12px">'
+      +'<div style="flex:1"><div style="font-size:12px;font-weight:700;letter-spacing:.5px;opacity:.8">&#128273; ADMINISTRATOR REVIEW</div>'
+      +'<div style="font-size:15px;font-weight:800">SRR Keyword Proposals — '+proposals.length+' proposal'+(proposals.length!==1?'s':'')+'</div></div>'
+      +'<button onclick="document.getElementById(\'srr-review-modal\').remove()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:16px;line-height:1">&#10005;</button>'
       +'</div>'
-    +'</div>';
+      // Stats bar
+      +'<div style="background:#f4f7fb;border-bottom:1px solid #d8e4f0;padding:8px 18px;display:flex;gap:20px;font-size:12px">'
+      +'<span>Total: <b>'+proposals.length+'</b></span>'
+      +'<span style="color:#27ae60">&#10003; Approved: <b>'+approved+'</b></span>'
+      +'<span style="color:#c0392b">&#10005; Rejected: <b>'+rejected+'</b></span>'
+      +'<span style="color:#888">Pending: <b>'+pending+'</b></span>'
+      +'</div>'
+      // Cards
+      +'<div style="padding:16px 18px;max-height:60vh;overflow-y:auto">'+cards+'</div>'
+      // Footer
+      +'<div style="padding:13px 18px;border-top:1px solid #d8e4f0;display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap">'
+      +'<button onclick="(function(){for(var _i=0;_i<_approved.length;_i++)_approved[_i]=true;_render();})()" style="padding:6px 14px;background:#e8f8ee;border:1px solid #27ae60;border-radius:5px;font-size:12px;font-weight:700;color:#1a6030;cursor:pointer;font-family:inherit">&#10003; Approve All</button>'
+      +'<div style="flex:1"></div>'
+      +'<button onclick="document.getElementById(\'srr-review-modal\').remove()" style="padding:6px 16px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit">Cancel</button>'
+      +'<button onclick="(function(){var ap=proposals.filter(function(p,i){return _approved[i]===true;});if(!ap.length){alert(\'No proposals approved yet. Approve at least one before exporting.\');return;}srrApplyAndExportApp(ap);document.getElementById(\'srr-review-modal\').remove();})()" style="padding:6px 18px;background:'+navy+';color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Apply Approved &amp; Export Updated App</button>'
+      +'</div>'
+      +'</div>';
   }
-
-  var cardsHtml=''; for(var i=0;i<proposals.length;i++) cardsHtml+=cardHtml(proposals[i],i);
-
-  var overlay=document.createElement('div');
-  overlay.id='srrReviewModal';
-  overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;flex-direction:column';
-  overlay.innerHTML='<div style="background:#1a3a5c;color:#fff;padding:14px 22px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
-    +'<div style="font-size:14px;font-weight:800;flex:1">&#128273; SRR Keyword Proposals — Administrator Review</div>'
-    +'<div style="font-size:11px;color:#a0c0e0">'+proposals.length+' proposal(s) loaded</div>'
-  +'</div>'
-  +'<div style="flex:1;overflow-y:auto;padding:18px 22px;background:#f0f3f8" id="srr-review-cards">'+cardsHtml+'</div>'
-  +'<div style="background:#fff;border-top:1px solid #dde6f0;padding:12px 22px;display:flex;gap:10px;align-items:center;flex-shrink:0">'
-    +'<button onclick="srrPropApproveAll('+proposals.length+')" style="padding:8px 18px;background:#1e7a40;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Approve All</button>'
-    +'<button onclick="srrApplyAndExportApp(window._srrReviewProposals||[])" style="padding:8px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Apply Approved &amp; Export Updated App</button>'
-    +'<button onclick="document.getElementById(\'srrReviewModal\').remove();window._srrReviewProposals=[];" style="padding:8px 18px;background:#e8edf5;color:#444;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>'
-    +'<span style="flex:1"></span>'
-    +'<span style="font-size:10.5px;color:#888">Approved proposals will permanently update keyword lists in the app databank.</span>'
-  +'</div>';
-  document.body.appendChild(overlay);
-
-  // Store proposals for apply step
-  window._srrReviewProposals = proposals.map(function(p,i){ return Object.assign({},p,{_idx:i,_state:'pending'}); });
+  document.body.appendChild(el);
+  _render();
 }
 
-window._srrReviewProposals=[];
-
-function srrPropCardState(idx,state){
-  var card=document.getElementById('srr-prop-card-'+idx);
-  var p=window._srrReviewProposals&&window._srrReviewProposals[idx];
-  if(!card||!p) return;
-  p._state=state;
-  var prevState=card.getAttribute('data-state');
-  card.setAttribute('data-state',state);
-  card.style.borderColor=state==='approved'?'#1e7a40':state==='rejected'?'#c0392b':'#dde6f0';
-  card.style.background=state==='approved'?'#f0fdf4':state==='rejected'?'#fef0f0':'#fff';
-  var ab=document.getElementById('srr-prop-approve-'+idx);
-  var rb=document.getElementById('srr-prop-reject-'+idx);
-  if(ab) ab.style.opacity=state==='approved'?'1':'.45';
-  if(rb) rb.style.opacity=state==='rejected'?'1':'.45';
-}
-
-function srrPropApproveAll(n){
-  for(var i=0;i<n;i++) srrPropCardState(i,'approved');
-}
-
-function srrApplyAndExportApp(proposals){
-  var approved=(proposals||[]).filter(function(p){return p._state==='approved';});
-  if(!approved.length){ alert('No proposals are approved yet. Approve at least one proposal before exporting.'); return; }
-  if(!confirm('Apply '+approved.length+' approved proposal(s) and export updated app?\n\nThis will:\n• Reassign SRR for affected observations (where changed)\n• Add suggested keywords to SRR_DEF keyword lists\n• Download a new index.html')) return;
-
+// ── Admin: patch SRR_DEF keywords and export updated app ─────────────────────
+function srrApplyAndExportApp(approvedProposals){
   fetch(location.href)
-    .then(function(r){ return r.text(); })
+    .then(function(r){return r.text();})
     .then(function(html){
+      var patched=html;
 
-      // Apply SRR reassignments (in-session) and keyword patches (in source)
-      var modified=html;
-      approved.forEach(function(p){
-        // If SRR changed, record in-session reassignment
-        if(p.proposedSrrId && p.proposedSrrId!==p.currentSrrId){
-          var propDef=SRR_DEF[p.proposedSrrId]||{};
-          if(typeof srr_reassigned!=='undefined'){
-            srr_reassigned[p.obsId]={srr_id:p.proposedSrrId,srr_name:propDef.name||p.proposedSrrId,
-              rr_id:propDef.rr||'',rr_name:propDef.rrName||'',col:propDef.col||'#888',note:p.note||'',custom:false};
+      // For each approved proposal: add keywords to the target SRR's kw:[...] in source
+      var kwByTarget={};
+      for(var i=0;i<approvedProposals.length;i++){
+        var p=approvedProposals[i];
+        if(!p.suggestedKeywords||!p.suggestedKeywords.length) continue;
+        var tid=p.proposedSrrId||p.currentSrrId;
+        if(!tid) continue;
+        if(!kwByTarget[tid]) kwByTarget[tid]=[];
+        for(var ki=0;ki<p.suggestedKeywords.length;ki++){
+          var kw=p.suggestedKeywords[ki].toLowerCase().trim();
+          if(kw&&kwByTarget[tid].indexOf(kw)===-1) kwByTarget[tid].push(kw);
+        }
+      }
+
+      // Patch each SRR's kw array in the HTML source
+      var targets=Object.keys(kwByTarget);
+      for(var ti=0;ti<targets.length;ti++){
+        var srrId=targets[ti];
+        var newKws=kwByTarget[srrId];
+        if(!newKws.length) continue;
+        // Find the kw:[...] array for this specific SRR in the source
+        // Pattern: '<srrId>':{...kw:[...]}
+        var escaped=srrId.replace(/[-]/g,'\\-');
+        var re=new RegExp("('["+escaped.charAt(0)+"]"+escaped.slice(1)+"'\\s*:\\s*\\{[^}]+kw:\\s*\\[)([^\\]]+)(\\])","");
+        patched=patched.replace(re,function(match,open,existing,close){
+          // Parse existing keywords
+          var existKws=existing.split(',').map(function(s){return s.trim().replace(/^['"]|['"]$/g,'');}).filter(Boolean);
+          var added=0;
+          for(var ni=0;ni<newKws.length;ni++){
+            if(existKws.indexOf(newKws[ni])===-1){existKws.push(newKws[ni]);added++;}
           }
-        }
-        // Patch keywords into SRR_DEF in the fetched HTML source
-        if(p.suggestedKeywords&&p.suggestedKeywords.length){
-          var srrKey=p.proposedSrrId||p.currentSrrId;
-          if(!srrKey) return;
-          // Split on the SRR key definition; find kw:[...] in the first segment
-          var marker="'"+srrKey+"':{";
-          var splitIdx=modified.indexOf(marker);
-          if(splitIdx===-1) return;
-          var before=modified.slice(0,splitIdx+marker.length);
-          var after=modified.slice(splitIdx+marker.length);
-          // Find kw:[ in `after` (before next top-level key)
-          var kwIdx=after.indexOf('kw:[');
-          if(kwIdx===-1) return;
-          var kwStart=kwIdx+4; // after 'kw:['
-          var closeIdx=after.indexOf(']',kwStart);
-          if(closeIdx===-1) return;
-          var kwBody=after.slice(kwStart,closeIdx);
-          // Determine existing kws
-          var existingKws=kwBody.match(/'([^']+)'/g)||[];
-          var existingSet={};
-          existingKws.forEach(function(k){ existingSet[k.slice(1,-1).toLowerCase()]=true; });
-          var toAdd=p.suggestedKeywords.filter(function(k){ return !existingSet[k.toLowerCase()]; });
-          if(!toAdd.length) return;
-          var addStr=toAdd.map(function(k){ return "'"+k+"'"; }).join(',');
-          var sep=(kwBody.trim()&&!kwBody.trim().endsWith(','))?',':'';
-          after=after.slice(0,kwStart)+kwBody+sep+addStr+after.slice(closeIdx);
-          modified=before+after;
-        }
-      });
+          if(!added) return match; // nothing new
+          var newStr=existKws.map(function(k){return "'"+k+"'";}).join(',');
+          return open+newStr+close;
+        });
+      }
 
-      // Now replace the audit-data block with current DB
+      // Also bake existing updb/password patches (reuse same logic as updbExportApp)
       var dbJson=document.getElementById('audit-data').textContent;
-      var db; try{ db=JSON.parse(dbJson); }catch(e){ alert('Could not parse core databank JSON: '+e.message); return; }
-      // Merge approved extension observations
-      if(!db.observations) db.observations=[];
-      var extObs=sg(DB_EXT_KEY,[]);
-      var existingIds={};
-      for(var ii=0;ii<db.observations.length;ii++) existingIds[db.observations[ii].id]=true;
-      extObs.forEach(function(o){ if(!existingIds[o.id]){ db.observations.push(o); } });
+      var db; try{db=JSON.parse(dbJson);}catch(e){db=null;}
+      if(db){
+        var ext=sg(DB_EXT_KEY,[]);
+        var existingIds={};
+        for(var j=0;j<db.observations.length;j++) existingIds[db.observations[j].id]=true;
+        for(var ej=0;ej<ext.length;ej++){if(!existingIds[ext[ej].id]){db.observations.push(ext[ej]);}}
+        patched=patched.replace(
+          /(<script[^>]+id="audit-data"[^>]*>)([\s\S]*?)(<\/script>)/,
+          function(m,open,_old,close){return open+'\n'+JSON.stringify(db,null,2)+'\n'+close;}
+        );
+      }
 
-      var updated=modified.replace(
-        /(<script[^>]+id="audit-data"[^>]*>)([\s\S]*?)(<\/script>)/,
-        function(match,open,_old,close){ return open+'\n'+JSON.stringify(db,null,2)+'\n'+close; }
-      );
-      if(updated===modified){ alert('Could not locate the audit-data block. Export aborted.'); return; }
-
-      var blob=new Blob([updated],{type:'text/html'});
+      var blob=new Blob([patched],{type:'text/html'});
       var url=URL.createObjectURL(blob);
-      var today=new Date().toISOString().slice(0,10);
-      var a=document.createElement('a'); a.href=url; a.download='BRAINS_'+today+'.html'; a.click();
-      URL.revokeObjectURL(url);
-      var rm=document.getElementById('srrReviewModal'); if(rm) rm.remove();
-      window._srrReviewProposals=[];
-      showToast('Updated app exported with '+approved.length+' proposal(s) applied.',3000);
+      var a=document.createElement('a'); a.href=url; a.download='index.html';
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){URL.revokeObjectURL(url);a.remove();},1000);
+
+      var kwCount=Object.values?Object.values(kwByTarget).reduce(function(s,a){return s+a.length;},0):0;
+      showToast('✅ Updated app exported with '+approvedProposals.length+' approved proposal(s) and '+kwCount+' new keyword(s) added to SRR_DEF.',6000);
     })
-    .catch(function(e){ alert('Could not fetch app source: '+e.message); });
-}
-
-function _srrAuditPill(label,count,col,bg){
-  return '<div style="padding:5px 12px;border-radius:20px;background:'+bg+';border:1px solid '+col+'20;display:flex;align-items:center;gap:6px">'
-    +'<span style="font-size:18px;font-weight:800;color:'+col+'">'+count+'</span>'
-    +'<span style="font-size:10px;color:'+col+';max-width:100px;line-height:1.3">'+label+'</span>'
-    +'</div>';
-}
-
-function srrExportAudit(){
-  var all=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
-  var rows=[['Obs ID','Title','Category','Score','Fallback?','SRR ID','Risk (RR ID)','Risk Name','Control Activity','Keywords Matched','Manually Reassigned']];
-  all.forEach(function(o){
-    var ra=srr_reassigned[o.id];
-    var audit=_getObsSrrAudit(o);
-    var srrId  = ra ? (ra.srr_id||audit.srrId) : audit.srrId;
-    var srrDef = srrId ? SRR_DEF[srrId] : null;
-    rows.push([
-      o.id, o.title||'', o.category||'Others',
-      ra?'(manual)':audit.score,
-      (!ra&&audit.isFallback)?'YES':'no',
-      srrId||'',
-      srrDef?srrDef.rr:'',
-      srrDef?srrDef.rrName:'',
-      srrDef?srrDef.caName:'',
-      ra?'(reassigned)':audit.matchedKws.join('; '),
-      ra?'YES':'no'
-    ]);
-  });
-  var csv=rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
-  var blob=new Blob([csv],{type:'text/csv'});
-  var url=URL.createObjectURL(blob);
-  var a=document.createElement('a'); a.href=url; a.download='BSS_SRR_MappingAudit.csv'; a.click();
-  URL.revokeObjectURL(url);
+    .catch(function(e){alert('Export failed: '+e.message);});
 }
 
 // ── SRR File Upload ──────────────────────────────────────────────────────────
