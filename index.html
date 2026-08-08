@@ -12860,15 +12860,48 @@ function addIt(key){
 // ============================================================
 // TOOLBAR
 // ============================================================
+// ── PDF helper — opens blob HTML in a new window and triggers print ──────
+// Opens synchronously (avoids popup-blocker) then navigates to blob URL.
+// Falls back with a clear user message if the popup is still blocked.
+function _openPdfWindow(htmlContent, suggestedTitle){
+  // Open a blank window NOW — synchronous call from click handler bypasses
+  // popup blockers that would block window.open() inside setTimeout.
+  var pw = window.open('', '_blank');
+  if(!pw){
+    alert('PDF could not open — your browser blocked the popup.\n\n' +
+          'To save as PDF:\n' +
+          '1. Allow popups for this page in your browser settings, then try again, OR\n' +
+          '2. Download the HTML version and open it in your browser, then use\n' +
+          '   File → Print → Save as PDF.');
+    return;
+  }
+  var blob = new Blob([htmlContent], {type:'text/html'});
+  var url  = URL.createObjectURL(blob);
+  var _printed = false;
+  function _doPrint(){
+    if(_printed) return;
+    _printed = true;
+    try{ pw.focus(); pw.print(); }catch(e){}
+  }
+  pw.onload = _doPrint;
+  // Fallback: onload sometimes doesn't fire (cached blob, browser quirk)
+  setTimeout(_doPrint, 2500);
+  pw.location.href = url;
+  if(suggestedTitle) setTimeout(function(){ try{ pw.document.title=suggestedTitle; }catch(e){} }, 100);
+  // Revoke blob URL after print dialog has had enough time
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+}
+
 function downloadPDF(){
   renderRpt();
+  // 800ms gives large reports time to finish rendering before print fires
   setTimeout(function(){
     var prev=document.title;
     var H=getHdrVals();
     document.title='Audit Report'+(H.brcode?' – '+H.brcode:'')+(H.brname?' '+H.brname:'');
     window.print();
     document.title=prev;
-  },300);
+  },800);
 }
 
 function doCopy(){
@@ -14752,14 +14785,10 @@ function _roFmtSave(filename){
         baseDelay+=700;
       }
       if(doPdf){
-        (function(d){setTimeout(function(){
-          var pblob=new Blob([fh],{type:'text/html'});
-          var purl=URL.createObjectURL(pblob);
-          var pw=window.open(purl,'_blank');
-          if(pw){pw.onload=function(){pw.focus();pw.print();};}
-          setTimeout(function(){URL.revokeObjectURL(purl);},30000);
-          toast('Opened for PDF: '+fn);
-        },d);})(baseDelay);
+        (function(d,_fh,_fn){setTimeout(function(){
+          _openPdfWindow(_fh, _fn);
+          toast('Opened for PDF: '+_fn);
+        },d);})(baseDelay, fh, fn);
         baseDelay+=700;
       }
     })(items[ix], delay);
@@ -18789,11 +18818,8 @@ function saveSelected(){
   }
   if(pdf){
     (function(d){ setTimeout(function(){
-      var pblob=new Blob([pf.html],{type:'text/html'});
-      var purl=URL.createObjectURL(pblob);
-      var pw=window.open(purl,'_blank');
-      if(pw){ pw.onload=function(){ pw.focus(); pw.print(); }; }
-      setTimeout(function(){URL.revokeObjectURL(purl);},30000);
+      var H2=getHdrVals();
+      _openPdfWindow(pf.html, 'Audit Report'+(H2.brcode?' – '+H2.brcode:'')+(H2.brname?' '+H2.brname:''));
     }, d); })(delay);
   }
 
@@ -18869,11 +18895,8 @@ function saveAsFinal(fmt){
     lockBrInfo();
 
   } else if(fmt==='pdf'){
-    var pblob=new Blob([pf.html],{type:'text/html'});
-    var purl=URL.createObjectURL(pblob);
-    var pw=window.open(purl,'_blank');
-    if(pw){ pw.onload=function(){ pw.focus(); pw.print(); }; }
-    setTimeout(function(){URL.revokeObjectURL(purl);},30000);
+    var H3=getHdrVals();
+    _openPdfWindow(pf.html, 'Audit Report'+(H3.brcode?' – '+H3.brcode:'')+(H3.brname?' '+H3.brname:''));
     toast('Report opened — use Print → Save as PDF');
     lockBrInfo();
 
