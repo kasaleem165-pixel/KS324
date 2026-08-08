@@ -21801,7 +21801,40 @@ function generateReviewerHtml(role){
   rv+='  var a=document.createElement("a"); a.href=url; a.download=fname; a.click(); URL.revokeObjectURL(url);\n';
   rv+='  setTimeout(function(){ alert("\\u2705 Review submitted!\\nFile downloaded: "+fname+"\\n\\nSend this HTML file back to the auditor (for send-back) or forward as instructed."); },300);\n';
   rv+='}\n';
-  // On page load: if bss-decisions contains a send-back, display all RO/HO comments visibly
+  // ── Corrections Review JS ─────────────────────────────────────────────
+  if(_corrections&&Object.keys(_corrections.flags||{}).some(function(id){return _corrections.flags[id];})){
+    var _crIds=JSON.stringify(Object.keys(_corrections.flags||{}).filter(function(id){return _corrections.flags[id];}));
+    rv+='var _crDecisions={};\n';
+    rv+='var _crIds='+_crIds+';\n';
+    rv+='var _crTotal=_crIds.length;\n';
+    rv+='function _crDecide(id,approved){\n';
+    rv+='  _crDecisions[id]=approved;\n';
+    rv+='  var row=document.getElementById("cr-row-"+id);\n';
+    rv+='  if(row){ row.className=approved?"cr-approved-row":"cr-rejected-row"; }\n';
+    rv+='  var badge=document.getElementById("cr-status-"+id);\n';
+    rv+='  if(badge) badge.innerHTML=approved?"<span class=\\"cr-status-badge\\" style=\\"background:#d4edda;color:#155724\\">&#10003; Approved</span>":"<span class=\\"cr-status-badge\\" style=\\"background:#f8d7da;color:#721c24\\">&#8617; Needs More Work</span>";\n';
+    rv+='  var decided=Object.keys(_crDecisions).length;\n';
+    rv+='  var pct=Math.round(decided/_crTotal*100);\n';
+    rv+='  var bar=document.getElementById("cr-prog-bar"); if(bar) bar.style.width=pct+"%";\n';
+    rv+='  var lbl=document.getElementById("cr-prog-lbl"); if(lbl) lbl.textContent=decided+" / "+_crTotal;\n';
+    rv+='  var cnt=document.getElementById("cr-count"); if(cnt) cnt.textContent=decided;\n';
+    rv+='  if(decided===_crTotal){\n';
+    rv+='    var allOk=_crIds.every(function(i){return _crDecisions[i]===true;});\n';
+    rv+='    var anyMore=_crIds.some(function(i){return _crDecisions[i]===false;});\n';
+    rv+='    var fwdBtn=document.getElementById("btn-fwd-main");\n';
+    rv+='    var ftMsg=document.getElementById("cr-footer-msg");\n';
+    rv+='    var ftBtns=document.getElementById("cr-footer-btns");\n';
+    rv+='    if(allOk){\n';
+    rv+='      if(fwdBtn){ fwdBtn.disabled=false; fwdBtn.style.opacity="1"; fwdBtn.style.cursor="pointer"; fwdBtn.title=""; }\n';
+    rv+='      if(ftMsg) ftMsg.innerHTML="<span style=\\"color:#1a6030;font-weight:700\\">&#9989; All corrections approved — you may now forward/issue.</span>";\n';
+    rv+='      if(ftBtns) ftBtns.innerHTML="";\n';
+    rv+='    } else if(anyMore){\n';
+    rv+='      if(fwdBtn){ fwdBtn.disabled=true; fwdBtn.style.opacity=".35"; fwdBtn.style.cursor="not-allowed"; }\n';
+    rv+='      if(ftMsg) ftMsg.innerHTML="<span style=\\"color:#c0392b;font-weight:700\\">&#9888; Some items need more work — use Send Back.</span>";\n';
+    rv+='    }\n';
+    rv+='  }\n';
+    rv+='}\n';
+  }
   rv+='window.addEventListener("load",function(){\n';
   rv+='  var decEl=document.getElementById("bss-decisions");\n';
   rv+='  if(!decEl||!decEl.textContent||decEl.textContent.trim()==="null") return;\n';
