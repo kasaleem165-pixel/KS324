@@ -23041,6 +23041,176 @@ function srrExport(){
   URL.revokeObjectURL(url);
 }
 
+// ── Mapping Audit View ───────────────────────────────────────────────────────
+var _srrAuditOpen = false;
+
+function srrToggleAuditView(){
+  _srrAuditOpen = !_srrAuditOpen;
+  var auditWrap = document.getElementById('srr-audit-wrap');
+  var body      = document.getElementById('srr-body');
+  var btn       = document.getElementById('srr-audit-btn');
+  if(!auditWrap||!body) return;
+  if(_srrAuditOpen){
+    auditWrap.style.display='block';
+    body.style.display='none';
+    if(btn){ btn.innerHTML='← Back to Editor'; btn.style.background='#555'; }
+    srrRenderAudit();
+  } else {
+    auditWrap.style.display='none';
+    body.style.display='flex';
+    if(btn){ btn.innerHTML='&#128270; Mapping Audit View'; btn.style.background='#1a3a5c'; }
+  }
+}
+
+// Extended version of _getObsSrr that also returns score and matched keywords
+function _getObsSrrAudit(o){
+  var area=getFwKey(o.category||'');
+  var tl=(o.title||'').toLowerCase();
+  var order=SRR_AREA_ORDER[area]||[];
+  var best=null,bestScore=0,bestKws=[];
+  for(var i=0;i<order.length;i++){
+    var def=SRR_DEF[order[i]];
+    if(!def) continue;
+    var sc=0, matchedKws=[];
+    for(var k=0;k<def.kw.length;k++){
+      if(tl.indexOf(def.kw[k])!==-1){ sc++; matchedKws.push(def.kw[k]); }
+    }
+    if(sc>bestScore){ bestScore=sc; best=order[i]; bestKws=matchedKws; }
+  }
+  var finalId = best||(order.length?order[order.length-1]:null);
+  return { srrId:finalId, score:bestScore, matchedKws:bestKws, isFallback:(bestScore===0&&!!finalId) };
+}
+
+function srrRenderAudit(){
+  var all=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
+  var catFilter   = (document.getElementById('srr-audit-cat')   ||{}).value||'';
+  var qualFilter  = (document.getElementById('srr-audit-quality')||{}).value||'';
+
+  // Populate category dropdown if empty
+  var catSel = document.getElementById('srr-audit-cat');
+  if(catSel && catSel.options.length<=1){
+    var cats={};
+    all.forEach(function(o){ cats[o.category||'Others']=1; });
+    Object.keys(cats).sort().forEach(function(c){
+      var opt=document.createElement('option'); opt.value=c; opt.textContent=c; catSel.appendChild(opt);
+    });
+  }
+
+  var rows=[], fallbackCount=0, weakCount=0, goodCount=0;
+  all.forEach(function(o){
+    // Check if there's a manual reassignment
+    var ra=srr_reassigned[o.id];
+    var audit=_getObsSrrAudit(o);
+    var srrId  = ra ? (ra.srr_id||audit.srrId) : audit.srrId;
+    var srrDef = srrId ? SRR_DEF[srrId] : null;
+    var score  = ra ? '(manual)' : audit.score;
+    var kws    = ra ? ['Manually reassigned'] : audit.matchedKws;
+    var isFallback = !ra && audit.isFallback;
+    var cat    = o.category||'Others';
+
+    if(catFilter && cat!==catFilter) return;
+    if(qualFilter==='fallback' && (!isFallback||ra)) return;
+    if(qualFilter==='weak' && (ra||audit.score!==1)) return;
+    if(qualFilter==='good' && (ra||audit.score<2)) return;
+
+    if(!ra){
+      if(isFallback) fallbackCount++;
+      else if(audit.score===1) weakCount++;
+      else goodCount++;
+    }
+    rows.push({o:o,srrId:srrId,srrDef:srrDef,score:score,kws:kws,isFallback:isFallback,ra:!!ra});
+  });
+
+  // Summary pills
+  var sumEl=document.getElementById('srr-audit-summary');
+  if(sumEl){
+    var totalAll=all.length;
+    var manualCount=Object.keys(srr_reassigned).length;
+    sumEl.innerHTML=
+      _srrAuditPill('Total',totalAll,'#1a3a5c','#e8f0fa')+
+      _srrAuditPill('⚠ Fallback (no keyword match)',fallbackCount,'#8a4000','#fff3e0')+
+      _srrAuditPill('⬦ Weak match (1 keyword)',weakCount,'#5a5000','#fffbe0')+
+      _srrAuditPill('✓ Good match (2+ keywords)',goodCount,'#1a6030','#e8f8ee')+
+      _srrAuditPill('✎ Manually reassigned',manualCount,'#4a1a7c','#f4eeff');
+  }
+
+  // Update fallback stat in stats bar
+  var fbStat=document.getElementById('srr-stat-fallback');
+  var fbCnt=document.getElementById('srr-stat-fallback-count');
+  if(fbStat){ fbStat.style.display=fallbackCount>0?'':'none'; }
+  if(fbCnt) fbCnt.textContent=fallbackCount;
+
+  // Render table
+  var tbody=document.getElementById('srr-audit-tbody');
+  if(!tbody) return;
+  var h='';
+  for(var ri=0;ri<rows.length;ri++){
+    var r=rows[ri];
+    var o=r.o; var srrDef=r.srrDef;
+    var rowBg=ri%2===0?'#fff':'#f8fafd';
+    var scoreBg='#e8f8ee',scoreCol='#1a6030';
+    if(r.isFallback){ rowBg=ri%2===0?'#fff8f0':'#fff3e6'; scoreBg='#fde8cc'; scoreCol='#8a3000'; }
+    else if(r.score===1){ scoreBg='#fffbe0'; scoreCol='#6a5000'; }
+    else if(r.ra){ scoreBg='#f4eeff'; scoreCol='#4a1a7c'; }
+    var scoreLabel = r.ra ? '<span title="Manually reassigned" style="font-size:10px">✎ manual</span>'
+                          : (r.isFallback ? '<span title="No keyword matched — fallback used" style="color:#c0390b;font-weight:800;font-size:13px">⚠</span> 0'
+                          : String(r.score));
+    var kwHtml='';
+    if(r.kws.length){
+      kwHtml=r.kws.map(function(k){
+        return '<span style="display:inline-block;padding:1px 6px;margin:1px;border-radius:10px;font-size:10px;background:#e0ecff;color:#1a3a7c;border:1px solid #c0d8f8">'+_srrEsc(k)+'</span>';
+      }).join('');
+    } else {
+      kwHtml='<span style="color:#c0390b;font-size:10.5px;font-style:italic">No keywords matched — fallback applied</span>';
+    }
+    var caName=srrDef?srrDef.caName:'—';
+    var srrCol=srrDef?srrDef.col:'#888';
+    h+='<tr style="background:'+rowBg+';border-bottom:1px solid #e8eef6">';
+    h+='<td style="padding:7px 10px;font-size:10.5px;color:#888;white-space:nowrap">'+_srrEsc(o.id)+'</td>';
+    h+='<td style="padding:7px 10px;font-size:11.5px;color:#1a2a40;font-weight:600">'+_srrEsc(o.title||'')+'</td>';
+    h+='<td style="padding:7px 10px;font-size:10.5px;color:#4a6080">'+_srrEsc(o.category||'Others')+'</td>';
+    h+='<td style="padding:7px 10px;text-align:center;background:'+scoreBg+';color:'+scoreCol+';font-weight:700">'+scoreLabel+'</td>';
+    h+='<td style="padding:7px 10px">'+(r.srrId?'<span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:800;background:'+srrCol+';color:#fff">'+_srrEsc(r.srrId)+'</span>':'<span style="color:#aaa">—</span>')+'</td>';
+    h+='<td style="padding:7px 10px;font-size:10.5px;color:#2a4a60;line-height:1.4">'+_srrEsc(caName)+'</td>';
+    h+='<td style="padding:7px 10px">'+kwHtml+'</td>';
+    h+='</tr>';
+  }
+  if(!h) h='<tr><td colspan="7" style="padding:24px;text-align:center;color:#888;font-size:12px">No observations match the selected filters.</td></tr>';
+  tbody.innerHTML=h;
+}
+
+function _srrAuditPill(label,count,col,bg){
+  return '<div style="padding:5px 12px;border-radius:20px;background:'+bg+';border:1px solid '+col+'20;display:flex;align-items:center;gap:6px">'
+    +'<span style="font-size:18px;font-weight:800;color:'+col+'">'+count+'</span>'
+    +'<span style="font-size:10px;color:'+col+';max-width:100px;line-height:1.3">'+label+'</span>'
+    +'</div>';
+}
+
+function srrExportAudit(){
+  var all=(DB&&DB.observations?DB.observations:[]).concat(typeof customs!=='undefined'?customs:[]);
+  var rows=[['Obs ID','Title','Category','Score','Fallback?','SRR ID','Control Activity','Keywords Matched','Manually Reassigned']];
+  all.forEach(function(o){
+    var ra=srr_reassigned[o.id];
+    var audit=_getObsSrrAudit(o);
+    var srrId  = ra ? (ra.srr_id||audit.srrId) : audit.srrId;
+    var srrDef = srrId ? SRR_DEF[srrId] : null;
+    rows.push([
+      o.id, o.title||'', o.category||'Others',
+      ra?'(manual)':audit.score,
+      (!ra&&audit.isFallback)?'YES':'no',
+      srrId||'',
+      srrDef?srrDef.caName:'',
+      ra?'(reassigned)':audit.matchedKws.join('; '),
+      ra?'YES':'no'
+    ]);
+  });
+  var csv=rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+  var blob=new Blob([csv],{type:'text/csv'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=url; a.download='BSS_SRR_MappingAudit.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ── SRR File Upload ──────────────────────────────────────────────────────────
 var srr_files = []; // [{name, type, dataUrl}]
 
@@ -27452,11 +27622,50 @@ function dbmExportCSV(){
     <button onclick="srrClearFiles()" style="font-size:10px;padding:2px 8px;background:#fde8e8;color:#8b1a1a;border:1px solid #f0a0a0;border-radius:4px;cursor:pointer;font-family:inherit;flex-shrink:0">&#10005; Clear All</button>
   </div>
   <!-- Stats bar -->
-  <div style="background:#fff;border-bottom:1px solid #dde6f0;padding:6px 16px;display:flex;gap:16px">
+  <div style="background:#fff;border-bottom:1px solid #dde6f0;padding:6px 16px;display:flex;gap:16px;align-items:center">
     <span style="font-size:11px;color:#1a3a5c">Total: <b id="srr-stat-total">0</b></span>
     <span style="font-size:11px;color:#c0392b">Flagged: <b id="srr-stat-flagged">0</b></span>
     <span style="font-size:11px;color:#8e44ad">Reassigned: <b id="srr-stat-reassigned">0</b></span>
     <span style="font-size:11px;color:#888">Showing: <b id="srr-stat-showing">0</b></span>
+    <span id="srr-stat-fallback" style="font-size:11px;color:#b06000;display:none">⚠ Fallback (no keyword match): <b id="srr-stat-fallback-count">0</b></span>
+    <div style="flex:1"></div>
+    <button id="srr-audit-btn" onclick="srrToggleAuditView()" title="Switch to Mapping Audit view — shows match quality, matched keywords, and fallback warnings for every observation"
+      style="padding:4px 12px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px">
+      &#128270; Mapping Audit View
+    </button>
+  </div>
+  <!-- ── Mapping Audit View ─────────────────────────────────────────── -->
+  <div id="srr-audit-wrap" style="display:none;padding:14px 16px;overflow-x:auto">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="font-size:13px;font-weight:800;color:#1a3a5c">&#128270; Risk–Control Activity Mapping Audit</div>
+      <div style="font-size:11px;color:#666;flex:1">Every observation showing its auto-matched SRR, keyword score, matched keywords, and Control Activity. ⚠ = fallback used (no keyword matched — likely mismatch).</div>
+      <select id="srr-audit-cat" onchange="srrRenderAudit()" style="padding:4px 8px;border:1px solid #c8d8ec;border-radius:4px;font-size:11.5px;font-family:inherit">
+        <option value="">All Categories</option>
+      </select>
+      <select id="srr-audit-quality" onchange="srrRenderAudit()" style="padding:4px 8px;border:1px solid #c8d8ec;border-radius:4px;font-size:11.5px;font-family:inherit">
+        <option value="">All matches</option>
+        <option value="fallback">⚠ Fallback only (score = 0)</option>
+        <option value="weak">Weak only (score = 1)</option>
+        <option value="good">Good only (score ≥ 2)</option>
+      </select>
+      <button onclick="srrExportAudit()" style="padding:4px 10px;background:#1e5c3a;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;font-family:inherit">&#11123; Export Audit CSV</button>
+      <button onclick="srrToggleAuditView()" style="padding:4px 10px;background:#555;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;font-family:inherit">← Back to Editor</button>
+    </div>
+    <div id="srr-audit-summary" style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap"></div>
+    <table id="srr-audit-table" style="width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);font-size:11.5px">
+      <thead>
+        <tr style="background:#1a3a5c;color:#fff">
+          <th style="padding:8px 10px;text-align:left;width:80px">Obs ID</th>
+          <th style="padding:8px 10px;text-align:left">Observation Title</th>
+          <th style="padding:8px 10px;text-align:left;width:160px">Category</th>
+          <th style="padding:8px 10px;text-align:center;width:60px">Score</th>
+          <th style="padding:8px 10px;text-align:left;width:120px">Matched SRR</th>
+          <th style="padding:8px 10px;text-align:left;width:200px">Control Activity</th>
+          <th style="padding:8px 10px;text-align:left">Keywords Matched</th>
+        </tr>
+      </thead>
+      <tbody id="srr-audit-tbody"></tbody>
+    </table>
   </div>
   <!-- Body: table + detail side by side -->
   <div id="srr-body" style="display:flex;align-items:flex-start;min-height:calc(100vh - 130px)">
