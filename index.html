@@ -14558,9 +14558,15 @@ function updbExportApp(){
       a.click();
       setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
       _clearExportPending();
+      // Clear pending amendments — they are now baked into the exported app
+      var _amendCount=Object.keys(sg(DB_AMEND_KEY,{})).length;
+      ss(DB_AMEND_KEY,{});
+      pendingAmendments={};
+      _updatePendingAmendmentsBadge();
       var exportMsg = '✅ Updated app exported';
       if(added) exportMsg += ' — '+added+' new observation(s) added';
-      if(suppressed) exportMsg += (added?' &bull; ':' — ')+suppressed+' suppressed observation(s) permanently removed';
+      if(_amendCount) exportMsg += (added?' &bull; ':' — ')+_amendCount+' amendment(s) baked in';
+      if(suppressed) exportMsg += ' &bull; '+suppressed+' suppressed observation(s) removed';
       exportMsg += '. Upload index.html to Netlify to update all users.';
       showToast(exportMsg, 6000);
     })
@@ -22518,6 +22524,7 @@ function generateReviewerHtml(role){
   } else {
     rv+='<button class="btn-sb" onclick="showSBComment();doAction(\'send_back_to_ro\')">&#8617; Send Back to RO</button>';
     rv+='<button class="btn-issue" id="btn-fwd-main"'+(_crLocked?' disabled title="Complete Corrections Review above before issuing" style="opacity:.45;cursor:not-allowed"':'')+' onclick="doAction(\'issue\')">&#10003; Issue Report</button>';
+    rv+='<button class="btn-fwd" id="btn-fwd-db" style="display:none;background:#c07000" onclick="doAction(\'forward_db\')">&#128190; Forward for Databank Update</button>';
   }
   rv+='</div>';
   if(_crLocked) rv+='<div style="font-size:11px;color:#e07030;text-align:center;margin-top:5px">&#9888; Complete the <strong>Corrections Review</strong> section above before proceeding.</div>';
@@ -22584,18 +22591,67 @@ function generateReviewerHtml(role){
   rv+='    sb.style.display="block";\n';
   rv+='    if(!sb.value.trim()){ sb.scrollIntoView({behavior:"smooth"}); sb.focus(); alert("Please enter an overall send-back comment before submitting."); return; }\n';
   rv+='  }\n';
+  rv+='  // For HO Issue action: block if pending amendments exist\n';
+  rv+='  if(action==="issue"){\n';
+  rv+='    var _sess=null; try{ var _sEl=document.getElementById("bss-session"); if(_sEl) _sess=JSON.parse(_sEl.textContent); }catch(e){}\n';
+  rv+='    var _wc=(_sess&&_sess.wordingChanges)||{};\n';
+  rv+='    var _roAcc=(_sess&&_sess.roAccepted)||{};\n';
+  rv+='    var _roCust=(_sess&&_sess.roCustomApprovals)||{};\n';
+  rv+='    var _hasPendingAmend=false;\n';
+  rv+='    // Check wording changes: both RO and HO accepted obs or rec\n';
+  rv+='    var _wcIds=Object.keys(_wc);\n';
+  rv+='    for(var _wi=0;_wi<_wcIds.length;_wi++){\n';
+  rv+='      var _wid=_wcIds[_wi]; var _wcEntry=_wc[_wid];\n';
+  rv+='      if(!_wcEntry) continue;\n';
+  rv+='      var _roAccObs=_roAcc[_wid]&&_roAcc[_wid].obs===true;\n';
+  rv+='      var _roAccRec=_roAcc[_wid]&&_roAcc[_wid].rec===true;\n';
+  rv+='      var _hoObsEl=document.getElementById("wcdv-obs-"+_wid);\n';
+  rv+='      var _hoRecEl=document.getElementById("wcdv-rec-"+_wid);\n';
+  rv+='      var _hoAccObs=_hoObsEl&&_hoObsEl.value==="accept";\n';
+  rv+='      var _hoAccRec=_hoRecEl&&_hoRecEl.value==="accept";\n';
+  rv+='      if((_wcEntry.obsEdit!=null&&_roAccObs&&_hoAccObs)||(_wcEntry.recEdit!=null&&_roAccRec&&_hoAccRec)){\n';
+  rv+='        _hasPendingAmend=true; break;\n';
+  rv+='      }\n';
+  rv+='    }\n';
+  rv+='    // Check custom obs approvals: both RO and HO approved\n';
+  rv+='    if(!_hasPendingAmend){\n';
+  rv+='      var _custApprIds=Object.keys(_roCust);\n';
+  rv+='      for(var _ci=0;_ci<_custApprIds.length;_ci++){\n';
+  rv+='        var _cid=_custApprIds[_ci];\n';
+  rv+='        if(_roCust[_cid]&&_roCust[_cid].decision==="approved"){\n';
+  rv+='          var _hoCapEl=document.getElementById("capdec-"+_cid);\n';
+  rv+='          if(_hoCapEl&&_hoCapEl.value==="approved"){ _hasPendingAmend=true; break; }\n';
+  rv+='        }\n';
+  rv+='      }\n';
+  rv+='    }\n';
+  rv+='    if(_hasPendingAmend){\n';
+  rv+='      var _issBtn=document.getElementById("btn-fwd-main");\n';
+  rv+='      var _fwdBtn=document.getElementById("btn-fwd-db");\n';
+  rv+='      if(_issBtn){ _issBtn.style.display="none"; }\n';
+  rv+='      if(_fwdBtn){ _fwdBtn.style.display="inline-block"; }\n';
+  rv+='      var _warn=document.getElementById("amend-block-warn");\n';
+  rv+='      if(!_warn){\n';
+  rv+='        _warn=document.createElement("div"); _warn.id="amend-block-warn";\n';
+  rv+='        _warn.style.cssText="background:#fff3cd;border:2px solid #f0a500;border-radius:6px;padding:10px 14px;margin-top:8px;font-size:12px;color:#7a4800;font-weight:600";\n';
+  rv+='        _warn.innerHTML="&#9888; Pending databank amendments exist (wording changes or new observations accepted by both RO &amp; HO). Please use <strong>Forward for Databank Update</strong> — the Administrator must bake these into the app before final issuance.";\n';
+  rv+='        var _ab=document.querySelector(".action-bar"); if(_ab) _ab.appendChild(_warn);\n';
+  rv+='      }\n';
+  rv+='      return;\n';
+  rv+='    }\n';
+  rv+='  }\n';
   rv+='  var dec=collectDecisions(action);\n';
   rv+='  var dj=JSON.stringify(dec).replace(/<\\/script>/gi,"<\\\\/script>");\n';
   rv+='  var html="<!DOCTYPE html>\\n"+document.documentElement.outerHTML;\n';
   rv+='  html=html.replace(/<script type="application\\/json" id="bss-decisions">[\\s\\S]*?<\\/script>/,\'<script type="application/json" id="bss-decisions">\'+dj+\'<\\/script>\');\n';
-  rv+='  var suffix=action==="send_back"?"_SendBack":action==="forward_ho"?"_ForHO":action==="send_back_to_ro"?"_SentBackRO":"_Issued";\n';
+  rv+='  var suffix=action==="send_back"?"_SendBack":action==="forward_ho"?"_ForHO":action==="send_back_to_ro"?"_SentBackRO":action==="forward_db"?"_ForDB":"_Issued";\n';
   rv+='  var sess=JSON.parse(document.getElementById("bss-session").textContent);\n';
   rv+='  var br=(sess.brname||"").replace(/[^a-zA-Z0-9]/g,"_").slice(0,18);\n';
   rv+='  var fname="BSS_Review_"+(sess.reviewRole||"RO").toUpperCase()+suffix+(br?"_"+br:"")+".html";\n';
   rv+='  var blob=new Blob([html],{type:"text/html"});\n';
   rv+='  var url=URL.createObjectURL(blob);\n';
   rv+='  var a=document.createElement("a"); a.href=url; a.download=fname; a.click(); URL.revokeObjectURL(url);\n';
-  rv+='  setTimeout(function(){ alert("\\u2705 Review submitted!\\nFile downloaded: "+fname+"\\n\\nSend this HTML file back to the auditor (for send-back) or forward as instructed."); },300);\n';
+  rv+='  var _alertMsg=action==="forward_db"?"\\u2705 Forwarded for Databank Update!\\nFile downloaded: "+fname+"\\n\\nSend this file to the Administrator to apply amendments.":"\\u2705 Review submitted!\\nFile downloaded: "+fname+"\\n\\nSend this HTML file back to the auditor (for send-back) or forward as instructed.";\n';
+  rv+='  setTimeout(function(){ alert(_alertMsg); },300);\n';
   rv+='}\n';
   // ── Corrections Review JS ─────────────────────────────────────────────
   if(_corrections&&Object.keys(_corrections.flags||{}).some(function(id){return _corrections.flags[id];})){
