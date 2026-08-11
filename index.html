@@ -9327,6 +9327,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <button class="tb-dd-item locked" id="chpw-btn" onclick="showChangePwModal();tbDDClose()" disabled><span class="di">&#128274;</span> Change Password</button>
         <div class="tb-dd-sep"></div>
         <button class="tb-dd-item" id="admin-pending-btn" onclick="showPendingDatabankModal();tbDDClose()"><span class="di">&#128196;</span> Pending Databank Additions <span id="admin-pending-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
+        <button class="tb-dd-item" id="admin-amend-btn" onclick="showPendingAmendmentsModal();tbDDClose()"><span class="di">&#9999;</span> Pending Databank Amendments <span id="admin-amend-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
         <div class="tb-dd-sep"></div>
         <button class="tb-dd-item" onclick="showClearSessionModal();tbDDClose()"><span class="di">&#128465;</span> Clear Session</button>
         <button class="tb-dd-item" onclick="updbExportApp();tbDDClose()"><span class="di">&#128229;</span> Export Updated App</button>
@@ -9997,7 +9998,8 @@ function _raReportsClear(){
 // New observations approved from final reports are stored here
 // and merged into DB.observations so all existing code sees them
 // ============================================================
-var DB_EXT_KEY = 'bss_dbext_v1';
+var DB_EXT_KEY   = 'bss_dbext_v1';
+var DB_AMEND_KEY = 'bss_dbamend_v1'; // obsId → {obsText, recText, title, amendedAt}
 (function initDbExt(){
   var ext = sg(DB_EXT_KEY, []);
   // Merge into DB.observations — only add if ID not already present
@@ -11540,6 +11542,7 @@ var hoAccepted      = {}; // obsId → true
 var respAmendments  = {}; // obsId → {amendedBy,original,amended,reason,evidenceFile,evidenceData,ts}
 var roCustomApprovals = {}; // obsId → {decision:'approved'|'changes'|'rejected', comment:''}
 var hoCustomApprovals = {}; // obsId → {decision:'approved'|'changes'|'rejected', comment:''}
+var pendingAmendments = {}; // obsId → {obsText, recText, title, detectedAt} — both RO+HO accepted wording changes
 
 function WC_detect(obsId){
   var obs = _getObsRecord(obsId); if(!obs) return;
@@ -11670,6 +11673,7 @@ function captureSession() {
     respAmendments: respAmendments,
     roCustomApprovals: roCustomApprovals,
     hoCustomApprovals: hoCustomApprovals,
+    pendingAmendments: pendingAmendments,
     customs  : customs,
     responseLoaded: responseLoaded,
     wfSentAuditee: _wfSentAuditee, wfReceivedBack: _wfReceivedBack, wfSentRO: _wfSentRO,
@@ -11731,6 +11735,7 @@ function restoreSession(sess) {
   respAmendments  = sess.respAmendments  || {};
   roCustomApprovals = sess.roCustomApprovals || {};
   hoCustomApprovals = sess.hoCustomApprovals || {};
+  pendingAmendments = sess.pendingAmendments || {};
   // Restore responseLoaded — also infer it if assessMap or respMap has entries
   responseLoaded = sess.responseLoaded || Object.keys(assessMap).length>0 || Object.keys(sess.respMap||{}).length>0;
   _wfSentAuditee  = sess.wfSentAuditee  || false;
@@ -13222,6 +13227,125 @@ function doCopy(){
   });
 }
 
+function _detectPendingAmendments(){
+  // Find observations where BOTH RO and HO accepted a wording change
+  // Branch-specific notes are not part of wordingChanges — so this is safe
+  var ids=Object.keys(wordingChanges);
+  for(var i=0;i<ids.length;i++){
+    var id=ids[i];
+    var wc=wordingChanges[id];
+    if(!wc) continue;
+    var roDecObs=roAccepted[id]&&roAccepted[id].obs===true;
+    var roDecRec=roAccepted[id]&&roAccepted[id].rec===true;
+    var hoDecObs=hoAccepted[id]&&hoAccepted[id].obs===true;
+    var hoDecRec=hoAccepted[id]&&hoAccepted[id].rec===true;
+    var obsAccepted=(wc.obsEdit!=null)&&roDecObs&&hoDecObs;
+    var recAccepted=(wc.recEdit!=null)&&roDecRec&&hoDecRec;
+    if(obsAccepted||recAccepted){
+      if(!pendingAmendments[id]){
+        var title=_getObsTitle(id)||id;
+        pendingAmendments[id]={
+          title: title,
+          obsText: obsAccepted?wc.obsEdit:null,
+          recText: recAccepted?wc.recEdit:null,
+          detectedAt: new Date().toISOString()
+        };
+      }
+    }
+  }
+  _updatePendingAmendmentsBadge();
+}
+
+function _updatePendingAmendmentsBadge(){
+  var count=Object.keys(pendingAmendments).length;
+  var badge=document.getElementById('admin-amend-badge');
+  if(badge){ badge.textContent=count; badge.style.display=count?'inline':'none'; }
+}
+
+function showPendingAmendmentsModal(){
+  var ids=Object.keys(pendingAmendments);
+  var mo=document.createElement('div');
+  mo.id='pendingAmendModal';
+  mo.style.cssText='position:fixed;inset:0;background:rgba(10,20,40,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+  var rows='';
+  if(!ids.length){
+    rows='<div style="text-align:center;padding:30px;color:#888;font-size:13px">&#10003; No pending amendments — both RO and HO must accept a wording change for it to appear here.</div>';
+  } else {
+    for(var i=0;i<ids.length;i++){
+      var id=ids[i]; var am=pendingAmendments[id];
+      var orig=_getObsRecord(id);
+      rows+='<div style="border:1px solid #c8d8ec;border-left:4px solid #1a3a5c;border-radius:5px;margin-bottom:12px;overflow:hidden">';
+      rows+='<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f0f4ff;border-bottom:1px solid #c8d8ec">';
+      rows+='<span style="flex:1;font-size:13px;font-weight:700;color:#1e2d40">'+esc(am.title)+'</span>';
+      rows+='<span style="font-size:9px;font-weight:700;color:#1a3a5c;background:#d0e4f8;border-radius:4px;padding:2px 7px">&#10003; RO &amp; HO Accepted</span>';
+      rows+='</div>';
+      rows+='<div style="padding:10px 12px">';
+      if(am.obsText!=null){
+        rows+='<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#c0392b;margin-bottom:3px">Observation — Change</div>';
+        rows+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">';
+        rows+='<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">Original</div><div style="font-size:11.5px;line-height:1.5;color:#5a1010;background:#ffe8e8;border-left:3px solid #c0392b;border-radius:0 4px 4px 0;padding:6px 8px;white-space:pre-wrap">'+esc(orig?orig.observation||'':'')+'</div></div>';
+        rows+='<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">Amended</div><div style="font-size:11.5px;line-height:1.5;color:#105a10;background:#e8f8e8;border-left:3px solid #27ae60;border-radius:0 4px 4px 0;padding:6px 8px;white-space:pre-wrap">'+esc(am.obsText)+'</div></div>';
+        rows+='</div>';
+      }
+      if(am.recText!=null){
+        rows+='<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#c0392b;margin-bottom:3px">Recommendation — Change</div>';
+        rows+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">';
+        rows+='<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">Original</div><div style="font-size:11.5px;line-height:1.5;color:#5a1010;background:#ffe8e8;border-left:3px solid #c0392b;border-radius:0 4px 4px 0;padding:6px 8px;white-space:pre-wrap">'+esc(orig?orig.recommendation||'':'')+'</div></div>';
+        rows+='<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">Amended</div><div style="font-size:11.5px;line-height:1.5;color:#105a10;background:#e8f8e8;border-left:3px solid #27ae60;border-radius:0 4px 4px 0;padding:6px 8px;white-space:pre-wrap">'+esc(am.recText)+'</div></div>';
+        rows+='</div>';
+      }
+      rows+='<button onclick="applyAmendmentToDatabank(\''+esc(id)+'\')" style="padding:7px 16px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128190; Apply Amendment to Databank</button>';
+      rows+='</div></div>';
+    }
+  }
+  mo.innerHTML=
+    '<div style="background:#fff;border-radius:12px;max-width:720px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.4);overflow:hidden;font-family:Inter,Arial,sans-serif">'
+    +'<div style="background:linear-gradient(90deg,#1a3a5c,#2a5080);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0">'
+      +'<span style="font-size:20px">&#9999;</span>'
+      +'<div><div style="font-size:14px;font-weight:800">Pending Databank Amendments</div>'
+        +'<div style="font-size:11px;opacity:.8;margin-top:2px">Wording changes accepted by both RO and HO Supervisors — ready for permanent databank update</div></div>'
+      +'<button onclick="document.getElementById(\'pendingAmendModal\').remove()" style="margin-left:auto;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;width:28px;height:28px;font-size:16px;cursor:pointer;font-family:inherit">&#10005;</button>'
+    +'</div>'
+    +'<div style="padding:16px;overflow-y:auto;flex:1">'+rows+'</div>'
+    +'<div style="padding:12px 16px;border-top:1px solid #eee;background:#f8fafc;display:flex;justify-content:flex-end;flex-shrink:0">'
+      +'<button onclick="document.getElementById(\'pendingAmendModal\').remove()" style="padding:7px 18px;background:#eef1f5;color:#555;border:1px solid #c0ccd8;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Close</button>'
+    +'</div>'
+  +'</div>';
+  document.body.appendChild(mo);
+}
+
+function applyAmendmentToDatabank(obsId){
+  var am=pendingAmendments[obsId]; if(!am){ toast('Amendment not found.'); return; }
+  // Store in DB_AMEND_KEY for export
+  var amends=sg(DB_AMEND_KEY,{});
+  amends[obsId]={ obsText:am.obsText, recText:am.recText, title:am.title, amendedAt:new Date().toISOString() };
+  ss(DB_AMEND_KEY,amends);
+  // Apply to live DB in memory
+  for(var i=0;i<DB.observations.length;i++){
+    if(DB.observations[i].id===obsId){
+      if(am.obsText!=null) DB.observations[i].observation=am.obsText;
+      if(am.recText!=null) DB.observations[i].recommendation=am.recText;
+      break;
+    }
+  }
+  // Also apply to ext observations
+  var ext=sg(DB_EXT_KEY,[]);
+  for(var j=0;j<ext.length;j++){
+    if(ext[j].id===obsId){
+      if(am.obsText!=null) ext[j].observation=am.obsText;
+      if(am.recText!=null) ext[j].recommendation=am.recText;
+      break;
+    }
+  }
+  ss(DB_EXT_KEY,ext);
+  _setExportPending();
+  delete pendingAmendments[obsId];
+  _updatePendingAmendmentsBadge();
+  var mo=document.getElementById('pendingAmendModal');
+  if(mo){ mo.remove(); showPendingAmendmentsModal(); }
+  toast('✅ Amendment applied. Use Export Updated App to make it permanent.');
+}
+
 function _updatePendingDatabankBadge(){
   var count=0;
   for(var id in hoCustomApprovals){ if(hoCustomApprovals[id]&&hoCustomApprovals[id].decision==='approved') count++; }
@@ -13360,7 +13484,7 @@ function showClearSessionModal(){
 function _performFullClear(){
   // Data maps
   selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
-  roCustomApprovals={}; hoCustomApprovals={};
+  roCustomApprovals={}; hoCustomApprovals={}; pendingAmendments={};
   // SRR / Risk Mapping state
   if(typeof srr_flagged!=='undefined') srr_flagged={};
   if(typeof srr_reassigned!=='undefined') srr_reassigned={};
@@ -14364,6 +14488,21 @@ function updbExportApp(){
         if(!existingIds[ext[j].id]){
           db.observations.push(ext[j]);
           added++;
+        }
+      }
+
+      // Apply approved amendments to existing observations
+      var amends=sg(DB_AMEND_KEY,{});
+      var amendIds=Object.keys(amends);
+      for(var ai=0;ai<amendIds.length;ai++){
+        var aid=amendIds[ai]; var am=amends[aid];
+        for(var aoi=0;aoi<db.observations.length;aoi++){
+          if(db.observations[aoi].id===aid){
+            if(am.obsText!=null) db.observations[aoi].observation=am.obsText;
+            if(am.recText!=null) db.observations[aoi].recommendation=am.recText;
+            db.observations[aoi]._lastAmendedAt=am.amendedAt;
+            break;
+          }
         }
       }
 
@@ -22639,6 +22778,7 @@ function loadReviewerHtml(evt, role){
       var ham=dec.amendments||{};
       Object.keys(ham).forEach(function(id){ if(ham[id]&&ham[id].amended) respAmendments[id]=ham[id]; });
       AT_log({type:'review_loaded',role:'HO',reviewer:dec.reviewerName||'',action:action,date:dec.reviewDate||''});
+      _detectPendingAmendments();
       _updatePendingDatabankBadge();
       if(action==='send_back_to_ro'){
         showToast('⚠ Report sent back by HO to RO.\nHO: '+(dec.reviewerName||''), 5000);
