@@ -9326,6 +9326,8 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       <div class="tb-dd-menu">
         <button class="tb-dd-item locked" id="chpw-btn" onclick="showChangePwModal();tbDDClose()" disabled><span class="di">&#128274;</span> Change Password</button>
         <div class="tb-dd-sep"></div>
+        <button class="tb-dd-item" id="admin-pending-btn" onclick="showPendingDatabankModal();tbDDClose()"><span class="di">&#128196;</span> Pending Databank Additions <span id="admin-pending-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
+        <div class="tb-dd-sep"></div>
         <button class="tb-dd-item" onclick="showClearSessionModal();tbDDClose()"><span class="di">&#128465;</span> Clear Session</button>
         <button class="tb-dd-item" onclick="updbExportApp();tbDDClose()"><span class="di">&#128229;</span> Export Updated App</button>
       </div>
@@ -11536,6 +11538,8 @@ var hoComments      = {}; // obsId → string
 var hoCorrections   = {}; // obsId → string
 var hoAccepted      = {}; // obsId → true
 var respAmendments  = {}; // obsId → {amendedBy,original,amended,reason,evidenceFile,evidenceData,ts}
+var roCustomApprovals = {}; // obsId → {decision:'approved'|'changes'|'rejected', comment:''}
+var hoCustomApprovals = {}; // obsId → {decision:'approved'|'changes'|'rejected', comment:''}
 
 function WC_detect(obsId){
   var obs = _getObsRecord(obsId); if(!obs) return;
@@ -11664,6 +11668,8 @@ function captureSession() {
     roFlags: roFlags, roComments: roComments, roCorrections: roCorrections, roAccepted: roAccepted,
     hoFlags: hoFlags, hoComments: hoComments, hoCorrections: hoCorrections, hoAccepted: hoAccepted,
     respAmendments: respAmendments,
+    roCustomApprovals: roCustomApprovals,
+    hoCustomApprovals: hoCustomApprovals,
     customs  : customs,
     responseLoaded: responseLoaded,
     wfSentAuditee: _wfSentAuditee, wfReceivedBack: _wfReceivedBack, wfSentRO: _wfSentRO,
@@ -11723,6 +11729,8 @@ function restoreSession(sess) {
   hoCorrections   = sess.hoCorrections   || {};
   hoAccepted      = sess.hoAccepted      || {};
   respAmendments  = sess.respAmendments  || {};
+  roCustomApprovals = sess.roCustomApprovals || {};
+  hoCustomApprovals = sess.hoCustomApprovals || {};
   // Restore responseLoaded — also infer it if assessMap or respMap has entries
   responseLoaded = sess.responseLoaded || Object.keys(assessMap).length>0 || Object.keys(sess.respMap||{}).length>0;
   _wfSentAuditee  = sess.wfSentAuditee  || false;
@@ -13214,6 +13222,100 @@ function doCopy(){
   });
 }
 
+function _updatePendingDatabankBadge(){
+  var count=0;
+  for(var id in hoCustomApprovals){ if(hoCustomApprovals[id]&&hoCustomApprovals[id].decision==='approved') count++; }
+  var badge=document.getElementById('admin-pending-badge');
+  if(badge){ badge.textContent=count; badge.style.display=count?'inline':'none'; }
+}
+
+function showPendingDatabankModal(){
+  // Collect HO-approved custom observations
+  var pending=[];
+  for(var id in hoCustomApprovals){
+    if(hoCustomApprovals[id]&&hoCustomApprovals[id].decision==='approved'){
+      var obs=null;
+      for(var ci=0;ci<customs.length;ci++){ if(customs[ci].id===id){ obs=customs[ci]; break; } }
+      if(obs) pending.push({obs:obs,approval:hoCustomApprovals[id]});
+    }
+  }
+  var mo=document.createElement('div');
+  mo.id='pendingDbModal';
+  mo.style.cssText='position:fixed;inset:0;background:rgba(10,20,40,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+  var rows='';
+  if(!pending.length){
+    rows='<div style="text-align:center;padding:30px;color:#888;font-size:13px">&#10003; No HO-approved custom observations pending databank addition.</div>';
+  } else {
+    for(var pi=0;pi<pending.length;pi++){
+      var p=pending[pi];
+      var obsText=(obsEdits[p.obs.id]&&obsEdits[p.obs.id].observation!=null)?obsEdits[p.obs.id].observation:p.obs.observation||'';
+      var recText=(obsEdits[p.obs.id]&&obsEdits[p.obs.id].recommendation!=null)?obsEdits[p.obs.id].recommendation:p.obs.recommendation||'';
+      rows+='<div style="border:1px solid #c8ddc8;border-left:4px solid #1a6030;border-radius:5px;margin-bottom:12px;overflow:hidden">';
+      rows+='<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f0fff4;border-bottom:1px solid #c8ddc8">';
+      rows+='<span style="background:#1a6030;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">Custom</span>';
+      rows+='<span style="flex:1;font-size:13px;font-weight:700;color:#1e2d40">'+esc(p.obs.title)+'</span>';
+      rows+='<span style="font-size:10px;color:#555;background:#e8f8e8;border-radius:4px;padding:2px 7px">'+esc(p.obs.category||'Others')+'</span>';
+      rows+='<span style="font-size:9px;font-weight:700;color:#1a6030;background:#d4edda;border-radius:4px;padding:2px 7px">&#10003; HO Approved</span>';
+      rows+='</div>';
+      rows+='<div style="padding:10px 12px">';
+      rows+='<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a3a5c;margin-bottom:3px">Observation</div>';
+      rows+='<div style="font-size:12px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:7px 9px;margin-bottom:7px;white-space:pre-wrap">'+esc(obsText)+'</div>';
+      rows+='<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a3a5c;margin-bottom:3px">Recommendation</div>';
+      rows+='<div style="font-size:12px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:7px 9px;margin-bottom:10px;white-space:pre-wrap">'+esc(recText)+'</div>';
+      rows+='<button onclick="addCustomObsToDatabank(\''+esc(p.obs.id)+'\')" style="padding:7px 16px;background:#1a6030;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128190; Add to Databank</button>';
+      rows+='</div></div>';
+    }
+  }
+  mo.innerHTML=
+    '<div style="background:#fff;border-radius:12px;max-width:660px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.4);overflow:hidden;font-family:Inter,Arial,sans-serif">'
+    +'<div style="background:linear-gradient(90deg,#1a6030,#2a8050);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0">'
+      +'<span style="font-size:20px">&#128196;</span>'
+      +'<div><div style="font-size:14px;font-weight:800">Pending Databank Additions</div>'
+        +'<div style="font-size:11px;opacity:.8;margin-top:2px">HO-approved custom observations ready to be added to the permanent databank</div></div>'
+      +'<button onclick="document.getElementById(\'pendingDbModal\').remove()" style="margin-left:auto;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;width:28px;height:28px;font-size:16px;cursor:pointer;font-family:inherit">&#10005;</button>'
+    +'</div>'
+    +'<div style="padding:16px;overflow-y:auto;flex:1">'+rows+'</div>'
+    +'<div style="padding:12px 16px;border-top:1px solid #eee;background:#f8fafc;display:flex;justify-content:flex-end;flex-shrink:0">'
+      +'<button onclick="document.getElementById(\'pendingDbModal\').remove()" style="padding:7px 18px;background:#eef1f5;color:#555;border:1px solid #c0ccd8;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Close</button>'
+    +'</div>'
+  +'</div>';
+  document.body.appendChild(mo);
+}
+
+function addCustomObsToDatabank(obsId){
+  var obs=null;
+  for(var ci=0;ci<customs.length;ci++){ if(customs[ci].id===obsId){ obs=customs[ci]; break; } }
+  if(!obs){ toast('Observation not found.'); return; }
+  // Build the obs object to add — apply any edits
+  var o={
+    id: obs.id,
+    title: obs.title,
+    category: obs.category||'Others',
+    type: obs.type||'New',
+    observation: (obsEdits[obs.id]&&obsEdits[obs.id].observation!=null)?obsEdits[obs.id].observation:obs.observation||'',
+    recommendation: (obsEdits[obs.id]&&obsEdits[obs.id].recommendation!=null)?obsEdits[obs.id].recommendation:obs.recommendation||'',
+    custom: true,
+    _dbAddedAt: new Date().toISOString(),
+    _approvedByHO: true
+  };
+  var ext=sg(DB_EXT_KEY,[]);
+  var exists=false;
+  for(var ei=0;ei<ext.length;ei++){ if(ext[ei].id===o.id){ exists=true; break; } }
+  if(exists){ toast('This observation is already in the databank extension.'); return; }
+  ext.push(o);
+  ss(DB_EXT_KEY,ext);
+  DB.observations.push(o);
+  buildObsSrrCache();
+  _setExportPending();
+  // Remove from hoCustomApprovals so it doesn't show again
+  delete hoCustomApprovals[obsId];
+  _updatePendingDatabankBadge();
+  // Refresh modal
+  var mo=document.getElementById('pendingDbModal');
+  if(mo){ mo.remove(); showPendingDatabankModal(); }
+  toast('✅ "'+esc(o.title)+'" added to databank. Use Export Updated App to make it permanent.');
+}
+
 function showClearSessionModal(){
   var mo=document.createElement('div');
   mo.id='clearSessModal';
@@ -13258,6 +13360,7 @@ function showClearSessionModal(){
 function _performFullClear(){
   // Data maps
   selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  roCustomApprovals={}; hoCustomApprovals={};
   // SRR / Risk Mapping state
   if(typeof srr_flagged!=='undefined') srr_flagged={};
   if(typeof srr_reassigned!=='undefined') srr_reassigned={};
@@ -21982,6 +22085,72 @@ function generateReviewerHtml(role){
   rv+='<div class="stat"><div class="num" id="stat-amended">0</div><div class="lbl">Amended</div></div>';
   rv+='</div>\n';
 
+  // ── Custom Observation Approval Section ──────────────────────────────────
+  var customObsForApproval=[];
+  if(role==='ro'){
+    // RO sees all selected custom observations
+    for(var _cai=0;_cai<customs.length;_cai++){
+      if(selIds[customs[_cai].id]) customObsForApproval.push(customs[_cai]);
+    }
+  } else {
+    // HO sees only RO-approved custom observations
+    for(var _hcai=0;_hcai<customs.length;_hcai++){
+      var _hco=customs[_hcai];
+      if(selIds[_hco.id]&&roCustomApprovals[_hco.id]&&roCustomApprovals[_hco.id].decision==='approved') customObsForApproval.push(_hco);
+    }
+  }
+  if(customObsForApproval.length){
+    rv+='<div style="background:#fff;border-radius:8px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.10);overflow:hidden;border:2px solid #1a6030">';
+    rv+='<div style="background:linear-gradient(90deg,#1a6030,#2a8050);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px">';
+    rv+='<span style="font-size:18px">&#128196;</span>';
+    rv+='<div><div style="font-size:14px;font-weight:800">Custom Observation Approval</div>';
+    rv+='<div style="font-size:11px;opacity:.75;margin-top:2px">Review each custom observation and approve, suggest changes, or reject for databank inclusion.</div></div>';
+    rv+='<div style="margin-left:auto;background:rgba(255,255,255,.2);border-radius:6px;padding:4px 12px;text-align:center">';
+    rv+='<div style="font-size:18px;font-weight:800">'+customObsForApproval.length+'</div>';
+    rv+='<div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px">Pending</div>';
+    rv+='</div></div>';
+    for(var _cap=0;_cap<customObsForApproval.length;_cap++){
+      var _co=customObsForApproval[_cap];
+      var _coOt=(obsEdits[_co.id]&&obsEdits[_co.id].observation!=null)?obsEdits[_co.id].observation:_co.observation||'';
+      var _coRt=(obsEdits[_co.id]&&obsEdits[_co.id].recommendation!=null)?obsEdits[_co.id].recommendation:_co.recommendation||'';
+      rv+='<div style="padding:14px 16px;border-bottom:1px solid #e0ece8" id="cap-card-'+esc(_co.id)+'">';
+      rv+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+      rv+='<span style="background:#1a6030;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">Custom</span>';
+      rv+='<span style="font-size:13px;font-weight:700;color:#1e2d40;flex:1">'+esc(_co.title)+'</span>';
+      rv+='<span style="font-size:10px;color:#888;background:#f0f0f0;border-radius:4px;padding:2px 7px">'+esc(_co.category||'Others')+'</span>';
+      rv+='</div>';
+      rv+='<div style="font-size:9.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Observation</div>';
+      rv+='<div style="font-size:12.5px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:8px 10px;margin-bottom:8px;white-space:pre-wrap">'+esc(_coOt)+'</div>';
+      rv+='<div style="font-size:9.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Recommendation</div>';
+      rv+='<div style="font-size:12.5px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:8px 10px;margin-bottom:10px;white-space:pre-wrap">'+esc(_coRt)+'</div>';
+      rv+='<div style="font-size:10px;font-weight:700;color:#1a3a5c;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Decision</div>';
+      rv+='<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">';
+      rv+='<button onclick="setCapDec(\''+esc(_co.id)+'\',\'approved\')" id="capbtn-appr-'+esc(_co.id)+'" style="flex:1;padding:8px;border:2px solid #27ae60;border-radius:6px;background:#fff;color:#27ae60;font-weight:700;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">&#10003; Approve</button>';
+      rv+='<button onclick="setCapDec(\''+esc(_co.id)+'\',\'changes\')" id="capbtn-chng-'+esc(_co.id)+'" style="flex:1;padding:8px;border:2px solid #e67e22;border-radius:6px;background:#fff;color:#e67e22;font-weight:700;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">&#9999; Suggest Changes</button>';
+      rv+='<button onclick="setCapDec(\''+esc(_co.id)+'\',\'rejected\')" id="capbtn-rejt-'+esc(_co.id)+'" style="flex:1;padding:8px;border:2px solid #c0392b;border-radius:6px;background:#fff;color:#c0392b;font-weight:700;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">&#10007; Reject</button>';
+      rv+='</div>';
+      rv+='<input type="hidden" id="capdec-'+esc(_co.id)+'" data-obsid="'+esc(_co.id)+'" value="">';
+      rv+='<textarea id="cap-cmt-'+esc(_co.id)+'" style="width:100%;padding:7px 9px;border:1px solid #dde2ea;border-radius:4px;font-family:Inter,sans-serif;font-size:12px;color:#2a3a50;resize:vertical;min-height:50px;box-sizing:border-box;display:none" placeholder="Comment (required for Suggest Changes or Reject)..."></textarea>';
+      rv+='</div>';
+    }
+    rv+='</div>\n';
+    // JS for custom approval buttons in reviewer file
+    rv+='<script>\n';
+    rv+='function setCapDec(id,dec){\n';
+    rv+='  document.getElementById("capdec-"+id).value=dec;\n';
+    rv+='  var cmt=document.getElementById("cap-cmt-"+id);\n';
+    rv+='  if(cmt) cmt.style.display=(dec==="changes"||dec==="rejected")?"block":"none";\n';
+    rv+='  var card=document.getElementById("cap-card-"+id);\n';
+    rv+='  if(card) card.style.background=dec==="approved"?"#f0fff4":dec==="changes"?"#fff8f0":"#fff5f5";\n';
+    rv+='  var ba=document.getElementById("capbtn-appr-"+id);\n';
+    rv+='  var bc=document.getElementById("capbtn-chng-"+id);\n';
+    rv+='  var br=document.getElementById("capbtn-rejt-"+id);\n';
+    rv+='  if(ba) ba.style.background=dec==="approved"?"#27ae60":"#fff"; if(ba) ba.style.color=dec==="approved"?"#fff":"#27ae60";\n';
+    rv+='  if(bc) bc.style.background=dec==="changes"?"#e67e22":"#fff"; if(bc) bc.style.color=dec==="changes"?"#fff":"#e67e22";\n';
+    rv+='  if(br) br.style.background=dec==="rejected"?"#c0392b":"#fff"; if(br) br.style.color=dec==="rejected"?"#fff":"#c0392b";\n';
+    rv+='}\n';
+    rv+='<\/script>\n';
+  }
   // ── Corrections Review Section (only present on corrected re-submissions) ─
   if(_corrections){
     var _crFlagged=Object.keys(_corrections.flags||{}).filter(function(id){return _corrections.flags[id];});
@@ -22264,7 +22433,9 @@ function generateReviewerHtml(role){
   rv+='  });\n';
   rv+='  var name=(document.getElementById("reviewer-name")||{}).value||"";\n';
   rv+='  var sbCmt=(document.getElementById("sendback-comment")||{}).value||"";\n';
-  rv+='  return {action:action,reviewerName:name,reviewDate:new Date().toISOString().slice(0,10),flags:flags,comments:comments,wordingDecisions:wordingDec,amendments:amendments,sendBackComment:sbCmt};\n';
+  rv+='  var customApprovals={};\n';
+  rv+='  document.querySelectorAll("input[id^=capdec-]").forEach(function(inp){ var id=inp.getAttribute("data-obsid"); var dec=inp.value; if(dec){ var cmtEl=document.getElementById("cap-cmt-"+id); customApprovals[id]={decision:dec,comment:cmtEl?cmtEl.value.trim():""}; } });\n';
+  rv+='  return {action:action,reviewerName:name,reviewDate:new Date().toISOString().slice(0,10),flags:flags,comments:comments,wordingDecisions:wordingDec,amendments:amendments,sendBackComment:sbCmt,customApprovals:customApprovals};\n';
   rv+='}\n';
   rv+='function doAction(action){\n';
   rv+='  var name=(document.getElementById("reviewer-name")||{}).value||"";\n';
@@ -22442,6 +22613,7 @@ function loadReviewerHtml(evt, role){
       roFlags   =dec.flags||{};
       roComments=dec.comments||{};
       roAccepted=dec.wordingDecisions||{};
+      roCustomApprovals=dec.customApprovals||{};
       // Apply wording decisions
       Object.keys(roAccepted).forEach(function(id){
         if(wordingChanges[id]) wordingChanges[id].roDecision=roAccepted[id];
@@ -22460,12 +22632,14 @@ function loadReviewerHtml(evt, role){
       hoFlags   =dec.flags||{};
       hoComments=dec.comments||{};
       hoAccepted=dec.wordingDecisions||{};
+      hoCustomApprovals=dec.customApprovals||{};
       Object.keys(hoAccepted).forEach(function(id){
         if(wordingChanges[id]) wordingChanges[id].hoDecision=hoAccepted[id];
       });
       var ham=dec.amendments||{};
       Object.keys(ham).forEach(function(id){ if(ham[id]&&ham[id].amended) respAmendments[id]=ham[id]; });
       AT_log({type:'review_loaded',role:'HO',reviewer:dec.reviewerName||'',action:action,date:dec.reviewDate||''});
+      _updatePendingDatabankBadge();
       if(action==='send_back_to_ro'){
         showToast('⚠ Report sent back by HO to RO.\nHO: '+(dec.reviewerName||''), 5000);
         _showReviewSendBackModal(dec,'HO');
