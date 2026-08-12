@@ -23424,37 +23424,33 @@ function _showReviewSendBackModal(dec, fromRole){
 }
 
 function _cgGoTo(id){
-  // Always reset filters so applyFilter populates #rlist with all DB observations
-  var qEl=document.getElementById('qinp');
-  var catEl=document.getElementById('scat');
-  if(qEl) qEl.value='';
-  if(catEl) catEl.value='All Categories';
-  if(typeof applyFilter==='function') applyFilter();
-
+  // Scroll to the observation CARD in the right-panel draft report (id="oc-{id}").
+  // Do NOT touch the left-panel search / applyFilter — that would make the checkbox
+  // clickable and risk the auditor accidentally unchecking (removing) the observation.
   setTimeout(function(){
-    var el=document.getElementById('ri-'+id);
-    if(el){
-      el.scrollIntoView({behavior:'smooth',block:'center'});
-      el.style.transition='box-shadow .2s';
-      el.style.boxShadow='0 0 0 3px #f0c030';
-      setTimeout(function(){ el.style.boxShadow=''; },1800);
+    var card=document.getElementById('oc-'+id);
+    if(card){
+      card.scrollIntoView({behavior:'smooth',block:'start'});
+      // Brief highlight so the auditor can see which card was jumped to
+      card.style.transition='outline .1s';
+      card.style.outline='3px solid #f0c030';
+      card.style.borderRadius='6px';
+      setTimeout(function(){ card.style.outline=''; card.style.borderRadius=''; },2000);
       return;
     }
-    // Fallback: custom observation or report preview card
+    // Fallback: data-obsid attribute (custom obs or other card variants)
     var found=false;
     var rpcont=document.getElementById('rpcont');
     if(rpcont){
-      var all=rpcont.querySelectorAll('[data-obsid]');
-      for(var i=0;i<all.length;i++){
-        if(all[i].getAttribute('data-obsid')===id){ all[i].scrollIntoView({behavior:'smooth',block:'center'}); found=true; break; }
+      var nodes=rpcont.querySelectorAll('[data-obsid]');
+      for(var i=0;i<nodes.length;i++){
+        if(nodes[i].getAttribute('data-obsid')===id){
+          nodes[i].scrollIntoView({behavior:'smooth',block:'start'});
+          found=true; break;
+        }
       }
     }
-    if(!found){
-      // Try any element whose id contains the observation id
-      var generic=document.querySelector('[id*="'+id+'"]');
-      if(generic){ generic.scrollIntoView({behavior:'smooth',block:'center'}); found=true; }
-    }
-    if(!found) showToast('Observation not found — ensure it is selected in the report.', 3000);
+    if(!found) showToast('Observation card not found in draft report — make sure it is selected.', 3000);
   }, 80);
 }
 
