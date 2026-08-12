@@ -22517,6 +22517,81 @@ function generateReviewerHtml(role){
   rv+='<div style="margin-bottom:90px">';
   rv+='<textarea id="sendback-comment" class="sb-cmt" placeholder="Overall comment for send-back (required when sending back)..."></textarea>';
   rv+='</div>\n';
+
+  // ── Annexures Section ────────────────────────────────────────────────────
+  // Render annexures from session data (text + embedded files) so the reviewer
+  // can view all supporting evidence without needing any other file.
+  syncAnnexTextFromDom();
+  var _revAnnexes = (sess.annexures||[]).filter(function(a){
+    return (a.files&&a.files.length)||(a.text&&a.text.trim());
+  });
+  if(_revAnnexes.length){
+    rv+='<div id="anx-section" style="background:#fff;border-radius:8px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden;border:2px solid #1a3a5c">';
+    rv+='<div style="background:linear-gradient(90deg,#1a3a5c,#2a5080);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px">';
+    rv+='<span style="font-size:18px">&#128196;</span>';
+    rv+='<div style="font-size:14px;font-weight:800">Annexures</div>';
+    rv+='<div style="font-size:11px;opacity:.75;margin-left:4px">('+_revAnnexes.length+' attached)</div>';
+    rv+='</div>';
+    rv+='<div style="padding:14px 16px">';
+    for(var _ai=0;_ai<_revAnnexes.length;_ai++){
+      var _ax=_revAnnexes[_ai];
+      rv+='<div style="margin-bottom:22px;padding-bottom:16px;'+ (_ai<_revAnnexes.length-1?'border-bottom:1px solid #dde2ea;':'') +'">';
+      rv+='<div style="font-size:13px;font-weight:800;color:#1a3a5c;margin-bottom:6px">'+esc(_ax.label||('Annexure-'+(_ai+1)));
+      if(_ax.title) rv+=' &mdash; '+esc(_ax.title);
+      rv+='</div>';
+      // Text content
+      if(_ax.text&&_ax.text.trim()){
+        // Convert pipe-table lines to HTML, plain lines to paragraphs
+        var _axLines=_ax.text.split('\n');
+        var _axHtml='';
+        var _inTbl=false;
+        for(var _li=0;_li<_axLines.length;_li++){
+          var _ln=_axLines[_li];
+          if(_ln.indexOf('|')>=0){
+            if(!_inTbl){ _axHtml+='<table style="border-collapse:collapse;width:100%;font-size:11.5px;margin-bottom:8px">'; _inTbl=true; }
+            if(/^\s*\|[-| :]+\|\s*$/.test(_ln)) continue; // separator row
+            var _cells=_ln.split('|').map(function(c){return c.trim();}).filter(function(c,ci,arr){return ci>0&&ci<arr.length-1;});
+            _axHtml+='<tr>';
+            for(var _ci2=0;_ci2<_cells.length;_ci2++) _axHtml+='<td style="border:1px solid #dde2ea;padding:4px 8px">'+esc(_cells[_ci2])+'</td>';
+            _axHtml+='</tr>';
+          } else {
+            if(_inTbl){ _axHtml+='</table>'; _inTbl=false; }
+            if(_ln.trim()) _axHtml+='<p style="font-size:12.5px;line-height:1.6;color:#2a3a50;margin-bottom:5px;white-space:pre-wrap">'+esc(_ln)+'</p>';
+          }
+        }
+        if(_inTbl) _axHtml+='</table>';
+        rv+=_axHtml;
+      }
+      // Files
+      if(_ax.files&&_ax.files.length){
+        for(var _fi=0;_fi<_ax.files.length;_fi++){
+          var _f=_ax.files[_fi];
+          if(!_f.dataUrl){
+            rv+='<div style="font-size:12px;color:#b05000;font-style:italic;margin-bottom:6px">&#9888; '+esc(_f.name)+' — not available (re-attach needed)</div>';
+            continue;
+          }
+          var _isImg=_f.type&&_f.type.indexOf('image/')===0;
+          var _isPdf=_f.type&&_f.type==='application/pdf';
+          rv+='<div style="margin-bottom:10px">';
+          if(_isImg){
+            rv+='<div style="font-size:11px;color:#6a7888;margin-bottom:4px">'+esc(_f.name)+'</div>';
+            rv+='<img src="'+_f.dataUrl+'" style="max-width:100%;border:1px solid #dde2ea;border-radius:4px;display:block">';
+          } else if(_isPdf){
+            rv+='<div style="font-size:11px;color:#6a7888;margin-bottom:4px">'+esc(_f.name)+'</div>';
+            rv+='<embed src="'+_f.dataUrl+'" type="application/pdf" style="width:100%;height:480px;border:1px solid #dde2ea;border-radius:4px">';
+            rv+='<div style="margin-top:4px"><a href="'+_f.dataUrl+'" download="'+esc(_f.name)+'" style="font-size:12px;color:#1a3a5c;font-weight:600">&#8595; Download PDF</a></div>';
+          } else {
+            // Other files — data-URI download link
+            rv+='<a href="'+_f.dataUrl+'" download="'+esc(_f.name)+'" style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12.5px;font-weight:600;color:#1a3a5c;text-decoration:none">&#128229; '+esc(_f.name)+'</a>';
+          }
+          rv+='</div>';
+        }
+      }
+      rv+='</div>'; // end annexure item
+    }
+    rv+='</div></div>\n'; // end padding + anx-section
+  }
+
   var _crLocked=(_corrections&&_corrections.flags&&Object.keys(_corrections.flags).some(function(id){return _corrections.flags[id];}));
   rv+='<div class="action-bar"><div class="action-btns">';
   if(role==='ro'){
