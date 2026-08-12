@@ -10847,8 +10847,13 @@ function setObsType(id, val) {
   // Update LARR in-place if the input already exists in the DOM
   var lrInp=document.getElementById('lr-'+id);
   if(val==='Repeated'){
-    if(!lastRefMap[id]){
+    // Fill LARR if missing, or if it's just a bare ref number (old session format — upgrade to full sentence)
+    var _existingLarr=lastRefMap[id]||'';
+    var _larrIsBarenumber=_existingLarr&&_existingLarr.length<40&&!/please refer/i.test(_existingLarr);
+    if(!_existingLarr||_larrIsBarenumber){
       var _lrrSentence=_larrAutoFillFromRA(id);
+      // If bare number, pass it into the sentence builder so the ref is preserved
+      if(_larrIsBarenumber&&!_lrrSentence) _lrrSentence=_buildLarrSentence(_existingLarr,'');
       setLastRef(id, _lrrSentence||_buildLarrSentence('',''));
     }
     if(lrInp && !lrInp.value && lastRefMap[id]) lrInp.value=lastRefMap[id];
@@ -21935,7 +21940,7 @@ function _applyRepeatSelections(){
   }
   var modal=document.getElementById('rd-modal');
   if(modal) modal.remove();
-  doSearch();
+  renderRpt();
   autoSaveNow();
   if(applied) ra_toast(applied+' observation(s) marked as Repeated with LARR auto-filled.');
   else ra_toast('No observations marked — all were unticked.');
