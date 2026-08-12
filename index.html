@@ -10086,7 +10086,8 @@ var actMap   = {};   // {obsId: action taken text}
 var respMap  = {};   // {obsId: auditee response text}
 var respBHMap= {};   // {obsId: Head of School response}
 var respROMap= {};   // {obsId: RO/HO Supervisor response (formal review chain)}
-var respHistory= {}; // {obsId: [{round,response,loadedAt}]} — previous rounds kept for audit trail
+var respHistory   = {}; // {obsId: [{round,response,loadedAt}]} — previous rounds kept for audit trail
+var respAttachMap = {}; // {obsId: [{name,type,dataUrl}]} — files attached by auditee as evidence
 var respSectROMap={};// {obsId: RO section head response (from RO Copy)}
 var respSectHOMap={};// {obsId: HO section head response (from HO Copy)}
 var obsNotesMap={};  // {obsId: branch-specific notes/tables text}
@@ -11665,7 +11666,8 @@ function captureSession() {
     respMap  : respMap,
     respBHMap: respBHMap,
     respROMap: respROMap,
-    respHistory: respHistory,
+    respHistory:   respHistory,
+    respAttachMap: respAttachMap,
     respSectROMap: respSectROMap,
     respSectHOMap: respSectHOMap,
     obsNotesMap: obsNotesMap,
@@ -11724,6 +11726,7 @@ function restoreSession(sess) {
   respBHMap     = sess.respBHMap     || {};
   respROMap     = sess.respROMap     || {};
   respHistory   = sess.respHistory   || {};
+  respAttachMap = sess.respAttachMap || {};
   respSectROMap = sess.respSectROMap || {};
   respSectHOMap = sess.respSectHOMap || {};
   obsNotesMap     = sess.obsNotesMap     || {};
@@ -12725,6 +12728,30 @@ function renderRpt(){
           h+='<div class="osl">Auditee Response</div>';
           h+='<textarea class="oresp" id="r-'+o.id+'" readonly style="background:#f0f4f8;color:#3a4a5c;cursor:default;border-color:#b0c0d8" title="Auditee response is locked after loading">'+esc(resp)+'</textarea>';
         }
+        // Auditee evidence attachments — collapsible thumbnails/downloads
+        var atts=respAttachMap[o.id]||[];
+        if(atts.length){
+          var aid='ra-'+o.id;
+          h+='<div class="no-print" style="margin-top:6px">';
+          h+='<button onclick="var d=document.getElementById(\''+aid+'\');d.style.display=d.style.display===\'none\'?\'block\':\'none\'" ';
+          h+='style="font-size:11px;color:#1a6030;background:none;border:none;cursor:pointer;padding:2px 0;font-family:Inter,sans-serif;font-weight:600;text-decoration:underline">&#128206; '+atts.length+' Auditee Evidence File'+(atts.length>1?'s':'')+'</button>';
+          h+='<div id="'+aid+'" style="display:none;margin-top:6px;display:flex;flex-wrap:wrap;gap:8px">';
+          for(var ati=0;ati<atts.length;ati++){
+            var af=atts[ati];
+            var isImg=af.type&&af.type.indexOf('image/')===0;
+            var isPdf=af.type==='application/pdf';
+            if(isImg){
+              h+='<div style="border:1px solid #c8d8ec;border-radius:4px;overflow:hidden;max-width:160px">';
+              h+='<img src="'+af.dataUrl+'" style="max-width:160px;max-height:120px;display:block" title="'+esc(af.name)+'">';
+              h+='<div style="font-size:10px;color:#6a7888;padding:2px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(af.name)+'</div>';
+              h+='</div>';
+            } else {
+              h+='<a href="'+af.dataUrl+'" download="'+esc(af.name)+'" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:4px;font-size:12px;font-weight:600;color:#1a3a5c;text-decoration:none">';
+              h+=(isPdf?'&#128196;':'&#128229;')+' '+esc(af.name)+'</a>';
+            }
+          }
+          h+='</div></div>';
+        }
         // Previous response rounds (history) — collapsible, auditor-only, not printed
         var hist=respHistory[o.id]||[];
         if(hist.length){
@@ -13513,7 +13540,7 @@ function showClearSessionModal(){
 
 function _performFullClear(){
   // Data maps
-  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; respHistory={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; respHistory={}; respAttachMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
   roCustomApprovals={}; hoCustomApprovals={}; pendingAmendments={};
   // SRR / Risk Mapping state
   if(typeof srr_flagged!=='undefined') srr_flagged={};
@@ -13564,7 +13591,7 @@ function _performFullClear(){
 function doClear(){
   if(!confirm('Clear all selected observations and reset the report draft? Branch information will be kept.'))return;
   // Clear only observation selections and report content — keep branch/header fields intact
-  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; respHistory={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; respHistory={}; respAttachMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
   if(typeof srr_flagged!=='undefined') srr_flagged={};
   if(typeof srr_reassigned!=='undefined') srr_reassigned={};
   if(typeof srr_files!=='undefined') srr_files=[];
@@ -15805,6 +15832,14 @@ function downloadSoftCopy(){
     h+='<input type="text" name="eta_'+esc(o.id)+'" style="flex:1;border:none;border-bottom:2px solid #1a6030;background:transparent;padding:3px 6px;font-family:Inter,sans-serif;font-size:13px;font-weight:600;color:#1a6030;outline:none" placeholder="State estimated time frame...">';
     h+='</div>';
     h+='</div>';
+    // Evidence attachments
+    h+='<div style="margin-top:10px;padding-top:8px;border-top:1px dashed #c8d8e8">';
+    h+='<div style="font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#5b3fa0;margin-bottom:6px">&#128206; Attach Evidence Files <span style="font-size:9px;color:#888;font-weight:400;text-transform:none">(Optional — max 5 files, 8 MB total)</span></div>';
+    h+='<div id="att-list-'+esc(o.id)+'" style="margin-bottom:6px"></div>';
+    h+='<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:5px 12px;background:#f0eeff;border:1px solid #c0a8e8;border-radius:4px;font-size:12px;font-weight:600;color:#5b3fa0">';
+    h+='<input type="file" data-obsid="'+esc(o.id)+'" class="att-inp" multiple accept="image/*,.pdf,.xlsx,.xls,.docx,.doc,.csv,.txt" style="display:none" onchange="_attAdd(this)">';
+    h+='&#10133; Add File(s)</label>';
+    h+='</div>';
     h+='</div>';
     h+='</div></div>';
     return h;
@@ -15936,18 +15971,73 @@ function downloadSoftCopy(){
   softHtml+='  a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);\n';
   softHtml+='  setTimeout(function(){URL.revokeObjectURL(url);},2000);\n';
   softHtml+='}\n';
+  // In-memory attachment store: {obsId: [{name,type,dataUrl}]}
+  softHtml+='var _attStore={};\n';
+  // Add files for an observation
+  softHtml+='function _attAdd(inp){\n';
+  softHtml+='  var id=inp.getAttribute("data-obsid"); if(!id) return;\n';
+  softHtml+='  if(!_attStore[id]) _attStore[id]=[];\n';
+  softHtml+='  var files=Array.prototype.slice.call(inp.files||[]); inp.value="";\n';
+  softHtml+='  var MAX=5, MB8=8*1024*1024;\n';
+  softHtml+='  var cur=_attStore[id];\n';
+  softHtml+='  var totalSize=cur.reduce(function(s,f){return s+(f.dataUrl?Math.round(f.dataUrl.length*0.75):0);},0);\n';
+  softHtml+='  var added=0;\n';
+  softHtml+='  function readNext(i){\n';
+  softHtml+='    if(i>=files.length){_attRender(id);return;}\n';
+  softHtml+='    if(cur.length>=MAX){alert("Maximum 5 files per observation.");_attRender(id);return;}\n';
+  softHtml+='    var f=files[i];\n';
+  softHtml+='    var rdr=new FileReader();\n';
+  softHtml+='    rdr.onload=function(e){\n';
+  softHtml+='      var du=e.target.result;\n';
+  softHtml+='      totalSize+=Math.round(du.length*0.75);\n';
+  softHtml+='      if(totalSize>MB8){alert("Total attachment size exceeds 8 MB. File \\""+f.name+"\\" was not added.");readNext(i+1);return;}\n';
+  softHtml+='      cur.push({name:f.name,type:f.type,dataUrl:du});\n';
+  softHtml+='      readNext(i+1);\n';
+  softHtml+='    };\n';
+  softHtml+='    rdr.readAsDataURL(f);\n';
+  softHtml+='  }\n';
+  softHtml+='  readNext(0);\n';
+  softHtml+='}\n';
+  // Remove a file
+  softHtml+='function _attRemove(id,idx){\n';
+  softHtml+='  if(_attStore[id]) _attStore[id].splice(idx,1);\n';
+  softHtml+='  _attRender(id);\n';
+  softHtml+='}\n';
+  // Render attachment list for an observation
+  softHtml+='function _attRender(id){\n';
+  softHtml+='  var el=document.getElementById("att-list-"+id); if(!el) return;\n';
+  softHtml+='  var files=_attStore[id]||[];\n';
+  softHtml+='  var h="";\n';
+  softHtml+='  for(var i=0;i<files.length;i++){\n';
+  softHtml+='    var f=files[i];\n';
+  softHtml+='    h+=\'<div style="display:flex;align-items:center;gap:8px;padding:4px 8px;background:#f8f5ff;border:1px solid #c0a8e8;border-radius:4px;margin-bottom:4px;font-size:12px">\'\n';
+  softHtml+='      +\'<span style="font-size:14px">\'+(_isImg(f.type)?"&#128247;":_isPdf(f.type)?"&#128196;":"&#128209;")+\'</span>\'\n';
+  softHtml+='      +\'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#3a2a70">\'+f.name+\'</span>\'\n';
+  softHtml+='      +\'<button onclick="_attRemove(\\\'\'+id+\'\\\',\'+i+\')" style="background:#c0392b;color:#fff;border:none;border-radius:3px;padding:1px 7px;font-size:11px;cursor:pointer;font-family:inherit">&#10005;</button></div>\';\n';
+  softHtml+='  }\n';
+  softHtml+='  el.innerHTML=h;\n';
+  softHtml+='}\n';
+  softHtml+='function _isImg(t){return t&&t.indexOf("image/")===0;}\n';
+  softHtml+='function _isPdf(t){return t==="application/pdf";}\n';
   // Collect all editable fields
   softHtml+='function collectData(){\n';
   softHtml+='  var d={};\n';
   softHtml+='  document.querySelectorAll("textarea[name],input[name^=\\"eta_\\"]").forEach(function(el){if(el.name)d[el.name]=el.value;});\n';
+  softHtml+='  // Embed attachments per observation\n';
+  softHtml+='  Object.keys(_attStore).forEach(function(id){if(_attStore[id]&&_attStore[id].length) d["attach_"+id]=_attStore[id];});\n';
   softHtml+='  return d;\n';
   softHtml+='}\n';
   // Restore fields from data object
   softHtml+='function restoreData(d){\n';
   softHtml+='  if(!d) return;\n';
   softHtml+='  Object.keys(d).forEach(function(k){\n';
-  softHtml+='    var el=document.querySelector("[name=\\""+k+"\\"]");\n';
-  softHtml+='    if(el) el.value=d[k]||"";\n';
+  softHtml+='    if(k.indexOf("attach_")===0){\n';
+  softHtml+='      var id=k.slice(7);\n';
+  softHtml+='      if(Array.isArray(d[k])&&d[k].length){ _attStore[id]=d[k]; _attRender(id); }\n';
+  softHtml+='    } else {\n';
+  softHtml+='      var el=document.querySelector("[name=\\""+k+"\\"]");\n';
+  softHtml+='      if(el) el.value=d[k]||"";\n';
+  softHtml+='    }\n';
   softHtml+='  });\n';
   softHtml+='  updateProgress();\n';
   softHtml+='}\n';
@@ -16700,6 +16790,9 @@ function loadAuditeeFile(evt){
             if(rval){ roComments[rnid]=rval; if(loadedObs.indexOf(rnid)<0) loadedObs.push(rnid); }
           } else if(rnm.indexOf('act_')===0){
             if(rval) actMap[rnm.slice(4)]=rval;
+          } else if(rnm.indexOf('attach_')===0){
+            var attId=rnm.slice(7);
+            if(rval&&rval.length) respAttachMap[attId]=rval;
           }
         }
         window._isFollowUpLoad = _isFollowUpFile;
@@ -17488,6 +17581,30 @@ function finalizeReport(){
     if(bhFin!==null) h+=sl('Auditee Response – HOS')+st(bhFin);
     if(roFin!==null) h+='<div style="font-size:11.5px;font-weight:700;color:#5b3fa0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Auditee Response – RO/HO</div>'+'<div style="font-size:13px;line-height:1.6;color:#3a2a70;margin-bottom:10px;white-space:pre-wrap;background:#f8f5ff;padding:6px 10px;border-radius:4px;border-left:3px solid #9b6fd0">'+esc(roFin)+'</div>';
     if(bhFin===null&&roFin===null&&respStored) h+=sl('Auditee Response')+st(respStored);
+    // Auditee evidence attachments — shown in Final Report
+    var finAtts=respAttachMap[o.id]||[];
+    if(finAtts.length){
+      h+='<div style="margin-top:8px;padding:8px 10px;background:#f8f5ff;border:1px solid #c0a8e8;border-radius:5px">';
+      h+='<div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#5b3fa0;margin-bottom:8px">&#128206; Evidence Attached by Auditee ('+finAtts.length+' file'+(finAtts.length>1?'s':'')+')</div>';
+      for(var fai=0;fai<finAtts.length;fai++){
+        var fa=finAtts[fai];
+        var faIsImg=fa.type&&fa.type.indexOf('image/')===0;
+        var faIsPdf=fa.type==='application/pdf';
+        h+='<div style="margin-bottom:10px">';
+        if(faIsImg){
+          h+='<div style="font-size:11px;color:#5b3fa0;font-weight:600;margin-bottom:4px">'+esc(fa.name)+'</div>';
+          h+='<img src="'+fa.dataUrl+'" style="max-width:100%;border:1px solid #c0a8e8;border-radius:4px;display:block">';
+        } else if(faIsPdf){
+          h+='<div style="font-size:11px;color:#5b3fa0;font-weight:600;margin-bottom:4px">'+esc(fa.name)+'</div>';
+          h+='<embed src="'+fa.dataUrl+'" type="application/pdf" style="width:100%;height:480px;border:1px solid #c0a8e8;border-radius:4px">';
+          h+='<div style="margin-top:4px"><a href="'+fa.dataUrl+'" download="'+esc(fa.name)+'" style="font-size:12px;color:#5b3fa0;font-weight:600">&#8595; Download PDF</a></div>';
+        } else {
+          h+='<a href="'+fa.dataUrl+'" download="'+esc(fa.name)+'" style="display:inline-flex;align-items:center;gap:8px;padding:7px 14px;background:#ede8ff;border:1px solid #c0a8e8;border-radius:5px;font-size:12.5px;font-weight:600;color:#5b3fa0;text-decoration:none">&#128229; '+esc(fa.name)+'</a>';
+        }
+        h+='</div>';
+      }
+      h+='</div>';
+    }
     var sectROFin=respSectROMap[o.id]||null;
     var sectHOFin=respSectHOMap[o.id]||null;
     if(sectROFin) h+='<div style="font-size:11.5px;font-weight:700;color:#1a5c3a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">RO Section Response</div>'+'<div style="font-size:13px;line-height:1.6;color:#1a3a2a;margin-bottom:10px;white-space:pre-wrap;background:#f0fff8;padding:6px 10px;border-radius:4px;border-left:3px solid #3a9a6a">'+esc(sectROFin)+'</div>';
