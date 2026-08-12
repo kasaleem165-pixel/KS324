@@ -14076,14 +14076,8 @@ function dupobsSaveDraft(){
       return { obs: g.obs, decision: g.decision, keepIdxSet: g.keepIdxSet||[] };
     })
   };
-  var blob = new Blob([JSON.stringify(draft, null, 2)], {type:'application/json'});
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
   var ts = new Date().toISOString().slice(0,16).replace('T','_').replace(':','');
-  a.download = 'BRAINS_DupObs_Draft_'+ts+'.json';
-  document.body.appendChild(a); a.click();
-  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
+  saveFileAs(new Blob([JSON.stringify(draft, null, 2)], {type:'application/json'}), 'BRAINS_DupObs_Draft_'+ts+'.json');
   showToast('&#128190; Draft saved — send this file to the Administrator for approval.', 4000);
 }
 
@@ -14451,15 +14445,8 @@ function updbSaveDraft(){
   }
   // Export as downloadable file (Scenario B)
   try{
-    var blob = new Blob([JSON.stringify(draft, null, 2)], {type:'application/json'});
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
     var ts = new Date().toISOString().slice(0,16).replace('T','_').replace(':','');
-    a.download = 'BRAINS_DataMgmt_Draft_'+ts+'.json';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
+    saveFileAs(new Blob([JSON.stringify(draft, null, 2)], {type:'application/json'}), 'BRAINS_DataMgmt_Draft_'+ts+'.json');
     showToast('✅ Draft exported — '+draft.candidates.length+' observation(s). Email this file to the Administrator to load and approve.', 4500);
   }catch(e){
     alert('Could not export draft: '+e.message);
@@ -14618,14 +14605,7 @@ function updbExportApp(){
         );
       }
 
-      var blob = new Blob([updated], {type:'text/html'});
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'index.html';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
+      saveFileAs(new Blob([updated], {type:'text/html'}), 'index.html');
       _clearExportPending();
       // Clear pending amendments — they are now baked into the exported app
       var _amendCount=Object.keys(sg(DB_AMEND_KEY,{})).length;
@@ -19799,7 +19779,7 @@ function saveSelected(){
 
   var delay = 0;
   if(html){
-    (function(d){ setTimeout(function(){ _saveFileAsLegacy(new Blob([pf.html],{type:'text/html'}), pf.fname); }, d); })(delay);
+    (function(d){ setTimeout(function(){ saveFileAs(new Blob([pf.html],{type:'text/html'}), pf.fname); }, d); })(delay);
     delay += 600;
   }
   if(word){
@@ -19815,13 +19795,13 @@ function saveSelected(){
       pf.html.replace(/<!DOCTYPE[^>]*>/i,'').replace(/<html[^>]*>/i,'').replace(/<\/html>/i,'')
       .replace(/<head>[\s\S]*?<\/head>/i,'').replace(/<body[^>]*>/i,'').replace(/<\/body>/i,'')
       +'</body></html>';
-    (function(d,wh){ setTimeout(function(){ _saveFileAsLegacy(new Blob([wh],{type:'application/msword'}), pf.fname.replace(/\.html?$/i,'.doc')); }, d); })(delay, wordHtml);
+    (function(d,wh){ setTimeout(function(){ saveFileAs(new Blob([wh],{type:'application/msword'}), pf.fname.replace(/\.html?$/i,'.doc')); }, d); })(delay, wordHtml);
     delay += 600;
   }
   if(json){
     var sess = pf.sess || captureSession();
     var jstr = JSON.stringify(sess,null,2);
-    (function(d,js){ setTimeout(function(){ _saveFileAsLegacy(new Blob([js],{type:'application/json'}), pf.fname.replace(/\.html?$/i,'_session.json')); }, d); })(delay, jstr);
+    (function(d,js){ setTimeout(function(){ saveFileAs(new Blob([js],{type:'application/json'}), pf.fname.replace(/\.html?$/i,'_session.json')); }, d); })(delay, jstr);
     delay += 600;
   }
   if(pdf){
@@ -19845,9 +19825,8 @@ function saveAsFinal(fmt){
   if(!pf) return;
 
   if(fmt==='all'){
-    // Download HTML, Word, and JSON together; PDF must be done separately
-    var htmlBlob=new Blob([pf.html],{type:'text/html'});
-    _saveFileAsLegacy(htmlBlob, pf.fname);
+    // Save HTML, Word, and JSON together (each triggers its own Save As dialog); PDF separately
+    saveFileAs(new Blob([pf.html],{type:'text/html'}), pf.fname);
 
     var wordHtmlAll='<html xmlns:o="urn:schemas-microsoft-com:office:office" '+
       'xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'+
@@ -19862,12 +19841,10 @@ function saveAsFinal(fmt){
       .replace(/<head>[\s\S]*?<\/head>/i,'')
       .replace(/<body[^>]*>/i,'').replace(/<\/body>/i,'')
       +'</body></html>';
-    var wblobAll=new Blob([wordHtmlAll],{type:'application/msword'});
-    setTimeout(function(){ _saveFileAsLegacy(wblobAll, pf.fname.replace(/\.html?$/i,'.doc')); }, 600);
+    setTimeout(function(){ saveFileAs(new Blob([wordHtmlAll],{type:'application/msword'}), pf.fname.replace(/\.html?$/i,'.doc')); }, 600);
 
     var sessAll=pf.sess||captureSession();
-    var jblobAll=new Blob([JSON.stringify(sessAll,null,2)],{type:'application/json'});
-    setTimeout(function(){ _saveFileAsLegacy(jblobAll, pf.fname.replace(/\.html?$/i,'_session.json')); }, 1200);
+    setTimeout(function(){ saveFileAs(new Blob([JSON.stringify(sessAll,null,2)],{type:'application/json'}), pf.fname.replace(/\.html?$/i,'_session.json')); }, 1200);
 
     toast('3 files saved: HTML, Word, and Session. For PDF — use the PDF option separately.');
     lockBrInfo();
