@@ -10054,6 +10054,13 @@ var DEF_PB=['Senior Officer','Asst. Manager','Deputy Manager'];
 var DEF_TY=["All Types","New","Repeated"]; // "All Types" kept as default value only
 var DEF_CA=['All Categories'].concat(["Branch Imprest, Payments & Accounts","Cash and Bank","Recruitment, Payroll & Employee Record","Student Record","Fixed Assets","Library","Science Laboratory","Safety & Security","Others"]);
 
+// Converts an annexure label into a safe HTML id for anchor linking.
+// Both the annexure section and the observation reference use this same function
+// so they always match regardless of what the auditor typed as the label.
+function _anxId(label){
+  return 'anx-'+(label||'').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+}
+
 // Returns category keys in the same order as the live CATS array (Filter panel order),
 // unknown/custom categories appended at end.
 function catOrderByDef(catsObj){
@@ -12702,8 +12709,8 @@ function renderRpt(){
         h+='</div>';
       }
       h+='</div>';
-      // 4. Annexure Data (if set)
-      if(ax) h+='<div class="oax"><strong>Annexure Data:</strong> '+esc(ax)+'</div>';
+      // 4. Annexure Data (if set) — clickable link scrolls to annexure section below
+      if(ax) h+='<div class="oax"><strong>Annexure Data:</strong> <a href="#'+_anxId(ax)+'" style="color:#1a3a5c;font-weight:700;text-decoration:underline;cursor:pointer" title="Click to view annexure below">'+esc(ax)+'</a></div>';
       // 4. Auditee Response — only show after response is loaded/uploaded; split by HOS / RO/HO
       if(responseLoaded){
         var bhResp=respBHMap[o.id]!=null?respBHMap[o.id]:null;
@@ -15820,7 +15827,7 @@ function downloadSoftCopy(){
     var scBsNotes=obsNotesMap[o.id]||'';
     if(scObsText){h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Observation</div>';h+=_renderText(scObsText,{fontSize:'12.5px',lineHeight:'1.65',color:'#2a3a50',marginBottom:'4px'});if(scBsNotes)h+=_renderText(scBsNotes,{fontSize:'12.5px',color:'#2a3a50',lineHeight:'1.65',marginBottom:'10px'});else h+='<div style="margin-bottom:10px"></div>';}
     if(scRecText){h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Recommendation</div>';h+=_renderText(scRecText,{fontSize:'12.5px',lineHeight:'1.65',color:'#2a3a50',marginBottom:'10px'});}
-    if(ax) h+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> '+esc(ax)+'</div>';
+    if(ax) h+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> <a href="#'+_anxId(ax)+'" style="color:#1a3a5c;font-weight:700;text-decoration:underline;cursor:pointer" title="Click to view annexure below">'+esc(ax)+'</a></div>';
     // Auditee Response — always blank in soft copy, with ETR as sub-section inside
     h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Auditee Response <span style="color:#c0392b;font-size:9px">(Required)</span></div>';
     h+='<div style="border:1px dashed #b0c0d8;border-radius:4px;background:#fffef0;padding:8px 9px">';
@@ -16692,9 +16699,10 @@ function buildAnnexHtml(inline, obsNumMap, filterObsIds){
   h+='<h2 style="font-family:Merriweather,serif;font-size:16px;font-weight:700;color:'+navy+';margin-bottom:20px;text-align:center;letter-spacing:1px">ANNEXURES</h2>';
   for(var i=0;i<activeAnnexures.length;i++){
     var a=activeAnnexures[i];
-    h+='<div style="margin-bottom:28px;page-break-inside:avoid">';
+    var _aLabel=a.label||('Annexure-'+(i+1));
+    h+='<div id="'+_anxId(_aLabel)+'" style="margin-bottom:28px;page-break-inside:avoid;scroll-margin-top:16px">';
     h+='<div style="font-family:Merriweather,serif;font-size:13px;font-weight:700;color:'+navy+';border-bottom:2px solid '+gbor+';padding-bottom:6px;margin-bottom:4px">';
-    h+=esc(a.label||('Annexure-'+(i+1)));
+    h+=esc(_aLabel);
     if(a.title) h+=' &mdash; '+esc(a.title);
     h+='</div>';
     // Referenced-by line
@@ -17575,7 +17583,7 @@ function finalizeReport(){
     var finBsNotes=obsNotesMap[o.id]||'';
     if(obsText){h+=sl('Observation')+st(obsText);if(finBsNotes)h+=st(finBsNotes);}
     if(recText) h+=sl('Recommendation')+st(recText);
-    if(ax)               h+='<div style="display:flex;align-items:center;gap:7px;margin:8px 0;padding:7px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> '+esc(ax)+'</div>';
+    if(ax)               h+='<div style="display:flex;align-items:center;gap:7px;margin:8px 0;padding:7px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> <a href="#'+_anxId(ax)+'" style="color:#1a3a5c;font-weight:700;text-decoration:underline;cursor:pointer" title="Click to view annexure below">'+esc(ax)+'</a></div>';
     var bhFin=respBHMap[o.id]!=null?respBHMap[o.id]:null;
     var roFin=respROMap[o.id]!=null?respROMap[o.id]:null;
     if(bhFin!==null) h+=sl('Auditee Response – HOS')+st(bhFin);
@@ -22795,7 +22803,7 @@ function generateReviewerHtml(role){
     var rvBsNotes=obsNotesMap[o.id]||'';
     rv+='<div class="sec-lbl">Observation</div><div style="font-size:12.5px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:8px 10px;word-break:break-word">'+_renderText(o.observation,{fontSize:'12.5px',color:'#2a3a50',lineHeight:'1.6'})+(rvBsNotes?_renderText(rvBsNotes,{fontSize:'12.5px',color:'#2a3a50',lineHeight:'1.6'}):'')+'</div>';
     rv+='<div class="sec-lbl">Recommendation</div><div style="font-size:12.5px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:8px 10px;word-break:break-word">'+_renderText(o.recommendation,{fontSize:'12.5px',color:'#2a3a50',lineHeight:'1.6'})+'</div>';
-    if(o.annex) rv+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">&#128203; Annexure Ref:</strong> <span style="color:#1a3a5c;font-weight:600">'+esc(o.annex)+'</span></div>';
+    if(o.annex) rv+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">&#128203; Annexure Ref:</strong> <a href="#'+_anxId(o.annex)+'" style="color:#1a3a5c;font-weight:700;text-decoration:underline;cursor:pointer" title="Click to view annexure below">'+esc(o.annex)+'</a></div>';
     // Auditee responses — show split BH/RO responses if available, else combined
     var rvBhResp=respBHMap[o.id]!=null?respBHMap[o.id]:null;
     var rvRoResp=respROMap[o.id]!=null?respROMap[o.id]:null;
@@ -22881,8 +22889,10 @@ function generateReviewerHtml(role){
     rv+='<div style="padding:14px 16px">';
     for(var _ai=0;_ai<_revAnnexes.length;_ai++){
       var _ax=_revAnnexes[_ai];
-      rv+='<div style="margin-bottom:22px;padding-bottom:16px;'+ (_ai<_revAnnexes.length-1?'border-bottom:1px solid #dde2ea;':'') +'">';
-      rv+='<div style="font-size:13px;font-weight:800;color:#1a3a5c;margin-bottom:6px">'+esc(_ax.label||('Annexure-'+(_ai+1)));
+      var _axLbl=_ax.label||('Annexure-'+(_ai+1));
+      var _axAnchorId=_anxId(_axLbl);
+      rv+='<div id="'+_axAnchorId+'" style="margin-bottom:22px;padding-bottom:16px;scroll-margin-top:16px;'+ (_ai<_revAnnexes.length-1?'border-bottom:1px solid #dde2ea;':'') +'">';
+      rv+='<div style="font-size:13px;font-weight:800;color:#1a3a5c;margin-bottom:6px">'+esc(_axLbl);
       if(_ax.title) rv+=' &mdash; '+esc(_ax.title);
       rv+='</div>';
       // Text content
