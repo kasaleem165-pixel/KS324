@@ -20097,12 +20097,17 @@ function awsGetObsState(id){
   return aws_state.obs[id];
 }
 
+// A status counts as "work done" for % purposes when nothing further needs to be done on that item.
+function _awsIsDone(status){
+  return status==='Checked & Clear'||status==='Not Applicable'||status==='Sampled Out';
+}
+
 function awsGetCatStats(catName){
   var list=AWS_OBS_DATA.obs[catName]||[];
   var total=list.length, checked=0;
   for(var i=0;i<list.length;i++){
     var st=aws_state.obs[list[i].id];
-    if(st&&st.status==='Checked & Clear') checked++;
+    if(st&&_awsIsDone(st.status)) checked++;
   }
   return{total:total,checked:checked,pct:total>0?Math.round(checked/total*100):0};
 }
@@ -20119,7 +20124,8 @@ function awsGetCatDetailStats(catName){
     else if(status==='Sampled Out')    so++;
     else pending++;
   }
-  return{total:total,clear:clear,inprog:inprog,na:na,so:so,pending:pending,pct:total>0?Math.round(clear/total*100):0};
+  var done=clear+na+so; // all three mean work is complete for that item
+  return{total:total,clear:clear,inprog:inprog,na:na,so:so,pending:pending,pct:total>0?Math.round(done/total*100):0};
 }
 
 function awsGetTotalStats(){
