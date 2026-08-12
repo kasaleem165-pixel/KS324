@@ -9270,6 +9270,9 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <button class="tb-dd-item rpt-btn" onclick="downloadSoftCopy();tbDDClose()"><span class="di">&#128233;</span> Auditee Copy</button>
         <button class="tb-dd-item rpt-btn" onclick="triggerLoad();tbDDClose()"><span class="di">&#128194;</span> Load Auditee Response</button>
         <div class="tb-dd-sep"></div>
+        <button class="tb-dd-item rpt-btn" onclick="showFollowUpModal();tbDDClose()"><span class="di">&#128260;</span> Follow-up Response Request</button>
+        <button class="tb-dd-item rpt-btn" onclick="document.getElementById('followup-fileinp').click();tbDDClose()"><span class="di">&#128194;</span> Load Follow-up Response</button>
+        <div class="tb-dd-sep"></div>
         <button class="tb-dd-item rpt-btn" onclick="showDraftModal('ro');tbDDClose()"><span class="di">&#128196;</span> Refer to RO</button>
         <button class="tb-dd-item rpt-btn" onclick="showDraftModal('ho');tbDDClose()"><span class="di">&#128196;</span> Refer to HO</button>
         <div class="tb-dd-sep"></div>
@@ -9482,6 +9485,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
 </div>
 
 <input type="file" id="fileinp" accept=".html" style="display:none" onchange="loadAuditeeFile(event)">
+<input type="file" id="followup-fileinp" accept=".html" style="display:none" onchange="loadAuditeeFile(event)">
 <input type="file" id="sessioninp" accept=".json" style="display:none" onchange="importSessionFile(event)">
 <input type="file" id="fullbackupinp" accept=".json" style="display:none" onchange="importFullBackup(event)">
 <input type="file" id="rptinp" accept=".html,.htm,.json" style="display:none" onchange="loadReportFile(event)">
@@ -10050,10 +10054,21 @@ var DEF_PB=['Senior Officer','Asst. Manager','Deputy Manager'];
 var DEF_TY=["All Types","New","Repeated"]; // "All Types" kept as default value only
 var DEF_CA=['All Categories'].concat(["Branch Imprest, Payments & Accounts","Cash and Bank","Recruitment, Payroll & Employee Record","Student Record","Fixed Assets","Library","Science Laboratory","Safety & Security","Others"]);
 
-// Returns category keys in DEF_CA canonical order, unknown cats appended at end
+// Converts an annexure label into a safe HTML id for anchor linking.
+// Both the annexure section and the observation reference use this same function
+// so they always match regardless of what the auditor typed as the label.
+function _anxId(label){
+  return 'anx-'+(label||'').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+}
+
+// Returns category keys in the same order as the live CATS array (Filter panel order),
+// unknown/custom categories appended at end.
 function catOrderByDef(catsObj){
   var order=[];
-  for(var _di=1;_di<DEF_CA.length;_di++){if(catsObj[DEF_CA[_di]]) order.push(DEF_CA[_di]);}
+  for(var _di=0;_di<CATS.length;_di++){
+    if(CATS[_di]==='All Categories') continue;
+    if(catsObj[CATS[_di]]) order.push(CATS[_di]);
+  }
   for(var _c in catsObj){if(order.indexOf(_c)<0) order.push(_c);}
   return order;
 }
@@ -10078,6 +10093,8 @@ var actMap   = {};   // {obsId: action taken text}
 var respMap  = {};   // {obsId: auditee response text}
 var respBHMap= {};   // {obsId: Head of School response}
 var respROMap= {};   // {obsId: RO/HO Supervisor response (formal review chain)}
+var respHistory   = {}; // {obsId: [{round,response,loadedAt}]} — previous rounds kept for audit trail
+var respAttachMap = {}; // {obsId: [{name,type,dataUrl}]} — files attached by auditee as evidence
 var respSectROMap={};// {obsId: RO section head response (from RO Copy)}
 var respSectHOMap={};// {obsId: HO section head response (from HO Copy)}
 var obsNotesMap={};  // {obsId: branch-specific notes/tables text}
@@ -11656,6 +11673,8 @@ function captureSession() {
     respMap  : respMap,
     respBHMap: respBHMap,
     respROMap: respROMap,
+    respHistory:   respHistory,
+    respAttachMap: respAttachMap,
     respSectROMap: respSectROMap,
     respSectHOMap: respSectHOMap,
     obsNotesMap: obsNotesMap,
@@ -11713,6 +11732,8 @@ function restoreSession(sess) {
   respMap   = sess.respMap   || {};
   respBHMap     = sess.respBHMap     || {};
   respROMap     = sess.respROMap     || {};
+  respHistory   = sess.respHistory   || {};
+  respAttachMap = sess.respAttachMap || {};
   respSectROMap = sess.respSectROMap || {};
   respSectHOMap = sess.respSectHOMap || {};
   obsNotesMap     = sess.obsNotesMap     || {};
@@ -12688,8 +12709,8 @@ function renderRpt(){
         h+='</div>';
       }
       h+='</div>';
-      // 4. Annexure Data (if set)
-      if(ax) h+='<div class="oax"><strong>Annexure Data:</strong> '+esc(ax)+'</div>';
+      // 4. Annexure Data (if set) — clickable link scrolls to annexure section below
+      if(ax) h+='<div class="oax"><strong>Annexure Data:</strong> <a href="#'+_anxId(ax)+'" style="color:#1a3a5c;font-weight:700;text-decoration:underline;cursor:pointer" title="Click to view annexure below">'+esc(ax)+'</a></div>';
       // 4. Auditee Response — only show after response is loaded/uploaded; split by HOS / RO/HO
       if(responseLoaded){
         var bhResp=respBHMap[o.id]!=null?respBHMap[o.id]:null;
@@ -12713,6 +12734,48 @@ function renderRpt(){
         if(bhResp===null&&roResp===null&&resp){
           h+='<div class="osl">Auditee Response</div>';
           h+='<textarea class="oresp" id="r-'+o.id+'" readonly style="background:#f0f4f8;color:#3a4a5c;cursor:default;border-color:#b0c0d8" title="Auditee response is locked after loading">'+esc(resp)+'</textarea>';
+        }
+        // Auditee evidence attachments — collapsible thumbnails/downloads
+        var atts=respAttachMap[o.id]||[];
+        if(atts.length){
+          var aid='ra-'+o.id;
+          h+='<div class="no-print" style="margin-top:6px">';
+          h+='<button onclick="var d=document.getElementById(\''+aid+'\');d.style.display=d.style.display===\'none\'?\'block\':\'none\'" ';
+          h+='style="font-size:11px;color:#1a6030;background:none;border:none;cursor:pointer;padding:2px 0;font-family:Inter,sans-serif;font-weight:600;text-decoration:underline">&#128206; '+atts.length+' Auditee Evidence File'+(atts.length>1?'s':'')+'</button>';
+          h+='<div id="'+aid+'" style="display:none;margin-top:6px;display:flex;flex-wrap:wrap;gap:8px">';
+          for(var ati=0;ati<atts.length;ati++){
+            var af=atts[ati];
+            var isImg=af.type&&af.type.indexOf('image/')===0;
+            var isPdf=af.type==='application/pdf';
+            if(isImg){
+              h+='<div style="border:1px solid #c8d8ec;border-radius:4px;overflow:hidden;max-width:160px">';
+              h+='<img src="'+af.dataUrl+'" style="max-width:160px;max-height:120px;display:block" title="'+esc(af.name)+'">';
+              h+='<div style="font-size:10px;color:#6a7888;padding:2px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(af.name)+'</div>';
+              h+='</div>';
+            } else {
+              h+='<a href="'+af.dataUrl+'" download="'+esc(af.name)+'" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:4px;font-size:12px;font-weight:600;color:#1a3a5c;text-decoration:none">';
+              h+=(isPdf?'&#128196;':'&#128229;')+' '+esc(af.name)+'</a>';
+            }
+          }
+          h+='</div></div>';
+        }
+        // Previous response rounds (history) — collapsible, auditor-only, not printed
+        var hist=respHistory[o.id]||[];
+        if(hist.length){
+          var hid='rh-'+o.id;
+          h+='<div class="no-print" style="margin-top:6px">';
+          h+='<button onclick="var d=document.getElementById(\''+hid+'\');d.style.display=d.style.display===\'none\'?\'block\':\'none\'" ';
+          h+='style="font-size:11px;color:#5b3fa0;background:none;border:none;cursor:pointer;padding:2px 0;font-family:Inter,sans-serif;font-weight:600;text-decoration:underline">&#128337; '+hist.length+' Previous Response'+(hist.length>1?'s':'')+'</button>';
+          h+='<div id="'+hid+'" style="display:none;margin-top:6px">';
+          for(var hi=hist.length-1;hi>=0;hi--){
+            var hr=hist[hi];
+            var hrDate=hr.loadedAt?hr.loadedAt.slice(0,10):'';
+            h+='<div style="margin-bottom:8px;border-left:3px solid #c0a8e8;padding:6px 10px;background:#f8f5ff;border-radius:0 4px 4px 0">';
+            h+='<div style="font-size:10px;font-weight:700;color:#5b3fa0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Round '+(hr.round)+' Response'+(hrDate?' &nbsp;|&nbsp; '+hrDate:'')+'</div>';
+            h+='<div style="font-size:12px;color:#3a2a70;line-height:1.6;white-space:pre-wrap">'+esc(hr.response||'(blank)')+'</div>';
+            h+='</div>';
+          }
+          h+='</div></div>';
         }
         // Section head responses
         var sectROResp=respSectROMap[o.id]||null;
@@ -13484,7 +13547,7 @@ function showClearSessionModal(){
 
 function _performFullClear(){
   // Data maps
-  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; respHistory={}; respAttachMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
   roCustomApprovals={}; hoCustomApprovals={}; pendingAmendments={};
   // SRR / Risk Mapping state
   if(typeof srr_flagged!=='undefined') srr_flagged={};
@@ -13535,7 +13598,7 @@ function _performFullClear(){
 function doClear(){
   if(!confirm('Clear all selected observations and reset the report draft? Branch information will be kept.'))return;
   // Clear only observation selections and report content — keep branch/header fields intact
-  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; respHistory={}; respAttachMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
   if(typeof srr_flagged!=='undefined') srr_flagged={};
   if(typeof srr_reassigned!=='undefined') srr_reassigned={};
   if(typeof srr_files!=='undefined') srr_files=[];
@@ -15764,7 +15827,7 @@ function downloadSoftCopy(){
     var scBsNotes=obsNotesMap[o.id]||'';
     if(scObsText){h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Observation</div>';h+=_renderText(scObsText,{fontSize:'12.5px',lineHeight:'1.65',color:'#2a3a50',marginBottom:'4px'});if(scBsNotes)h+=_renderText(scBsNotes,{fontSize:'12.5px',color:'#2a3a50',lineHeight:'1.65',marginBottom:'10px'});else h+='<div style="margin-bottom:10px"></div>';}
     if(scRecText){h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Recommendation</div>';h+=_renderText(scRecText,{fontSize:'12.5px',lineHeight:'1.65',color:'#2a3a50',marginBottom:'10px'});}
-    if(ax) h+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> '+esc(ax)+'</div>';
+    if(ax) h+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> <a href="#'+_anxId(ax)+'" style="color:#1a3a5c;font-weight:700;text-decoration:underline;cursor:pointer" title="Click to view annexure below">'+esc(ax)+'</a></div>';
     // Auditee Response — always blank in soft copy, with ETR as sub-section inside
     h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Auditee Response <span style="color:#c0392b;font-size:9px">(Required)</span></div>';
     h+='<div style="border:1px dashed #b0c0d8;border-radius:4px;background:#fffef0;padding:8px 9px">';
@@ -15775,6 +15838,14 @@ function downloadSoftCopy(){
     h+='<span style="font-size:12px;color:#1a6030;white-space:nowrap">The above observation will be resolved within:</span>';
     h+='<input type="text" name="eta_'+esc(o.id)+'" style="flex:1;border:none;border-bottom:2px solid #1a6030;background:transparent;padding:3px 6px;font-family:Inter,sans-serif;font-size:13px;font-weight:600;color:#1a6030;outline:none" placeholder="State estimated time frame...">';
     h+='</div>';
+    h+='</div>';
+    // Evidence attachments
+    h+='<div style="margin-top:10px;padding-top:8px;border-top:1px dashed #c8d8e8">';
+    h+='<div style="font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#5b3fa0;margin-bottom:6px">&#128206; Attach Evidence Files <span style="font-size:9px;color:#888;font-weight:400;text-transform:none">(Optional — max 5 files, 8 MB total)</span></div>';
+    h+='<div id="att-list-'+esc(o.id)+'" style="margin-bottom:6px"></div>';
+    h+='<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:5px 12px;background:#f0eeff;border:1px solid #c0a8e8;border-radius:4px;font-size:12px;font-weight:600;color:#5b3fa0">';
+    h+='<input type="file" data-obsid="'+esc(o.id)+'" class="att-inp" multiple accept="image/*,.pdf,.xlsx,.xls,.docx,.doc,.csv,.txt" style="display:none" onchange="_attAdd(this)">';
+    h+='&#10133; Add File(s)</label>';
     h+='</div>';
     h+='</div>';
     h+='</div></div>';
@@ -15907,18 +15978,73 @@ function downloadSoftCopy(){
   softHtml+='  a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);\n';
   softHtml+='  setTimeout(function(){URL.revokeObjectURL(url);},2000);\n';
   softHtml+='}\n';
+  // In-memory attachment store: {obsId: [{name,type,dataUrl}]}
+  softHtml+='var _attStore={};\n';
+  // Add files for an observation
+  softHtml+='function _attAdd(inp){\n';
+  softHtml+='  var id=inp.getAttribute("data-obsid"); if(!id) return;\n';
+  softHtml+='  if(!_attStore[id]) _attStore[id]=[];\n';
+  softHtml+='  var files=Array.prototype.slice.call(inp.files||[]); inp.value="";\n';
+  softHtml+='  var MAX=5, MB8=8*1024*1024;\n';
+  softHtml+='  var cur=_attStore[id];\n';
+  softHtml+='  var totalSize=cur.reduce(function(s,f){return s+(f.dataUrl?Math.round(f.dataUrl.length*0.75):0);},0);\n';
+  softHtml+='  var added=0;\n';
+  softHtml+='  function readNext(i){\n';
+  softHtml+='    if(i>=files.length){_attRender(id);return;}\n';
+  softHtml+='    if(cur.length>=MAX){alert("Maximum 5 files per observation.");_attRender(id);return;}\n';
+  softHtml+='    var f=files[i];\n';
+  softHtml+='    var rdr=new FileReader();\n';
+  softHtml+='    rdr.onload=function(e){\n';
+  softHtml+='      var du=e.target.result;\n';
+  softHtml+='      totalSize+=Math.round(du.length*0.75);\n';
+  softHtml+='      if(totalSize>MB8){alert("Total attachment size exceeds 8 MB. File \\""+f.name+"\\" was not added.");readNext(i+1);return;}\n';
+  softHtml+='      cur.push({name:f.name,type:f.type,dataUrl:du});\n';
+  softHtml+='      readNext(i+1);\n';
+  softHtml+='    };\n';
+  softHtml+='    rdr.readAsDataURL(f);\n';
+  softHtml+='  }\n';
+  softHtml+='  readNext(0);\n';
+  softHtml+='}\n';
+  // Remove a file
+  softHtml+='function _attRemove(id,idx){\n';
+  softHtml+='  if(_attStore[id]) _attStore[id].splice(idx,1);\n';
+  softHtml+='  _attRender(id);\n';
+  softHtml+='}\n';
+  // Render attachment list for an observation
+  softHtml+='function _attRender(id){\n';
+  softHtml+='  var el=document.getElementById("att-list-"+id); if(!el) return;\n';
+  softHtml+='  var files=_attStore[id]||[];\n';
+  softHtml+='  var h="";\n';
+  softHtml+='  for(var i=0;i<files.length;i++){\n';
+  softHtml+='    var f=files[i];\n';
+  softHtml+='    h+=\'<div style="display:flex;align-items:center;gap:8px;padding:4px 8px;background:#f8f5ff;border:1px solid #c0a8e8;border-radius:4px;margin-bottom:4px;font-size:12px">\'\n';
+  softHtml+='      +\'<span style="font-size:14px">\'+(_isImg(f.type)?"&#128247;":_isPdf(f.type)?"&#128196;":"&#128209;")+\'</span>\'\n';
+  softHtml+='      +\'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#3a2a70">\'+f.name+\'</span>\'\n';
+  softHtml+='      +\'<button onclick="_attRemove(\\\'\'+id+\'\\\',\'+i+\')" style="background:#c0392b;color:#fff;border:none;border-radius:3px;padding:1px 7px;font-size:11px;cursor:pointer;font-family:inherit">&#10005;</button></div>\';\n';
+  softHtml+='  }\n';
+  softHtml+='  el.innerHTML=h;\n';
+  softHtml+='}\n';
+  softHtml+='function _isImg(t){return t&&t.indexOf("image/")===0;}\n';
+  softHtml+='function _isPdf(t){return t==="application/pdf";}\n';
   // Collect all editable fields
   softHtml+='function collectData(){\n';
   softHtml+='  var d={};\n';
   softHtml+='  document.querySelectorAll("textarea[name],input[name^=\\"eta_\\"]").forEach(function(el){if(el.name)d[el.name]=el.value;});\n';
+  softHtml+='  // Embed attachments per observation\n';
+  softHtml+='  Object.keys(_attStore).forEach(function(id){if(_attStore[id]&&_attStore[id].length) d["attach_"+id]=_attStore[id];});\n';
   softHtml+='  return d;\n';
   softHtml+='}\n';
   // Restore fields from data object
   softHtml+='function restoreData(d){\n';
   softHtml+='  if(!d) return;\n';
   softHtml+='  Object.keys(d).forEach(function(k){\n';
-  softHtml+='    var el=document.querySelector("[name=\\""+k+"\\"]");\n';
-  softHtml+='    if(el) el.value=d[k]||"";\n';
+  softHtml+='    if(k.indexOf("attach_")===0){\n';
+  softHtml+='      var id=k.slice(7);\n';
+  softHtml+='      if(Array.isArray(d[k])&&d[k].length){ _attStore[id]=d[k]; _attRender(id); }\n';
+  softHtml+='    } else {\n';
+  softHtml+='      var el=document.querySelector("[name=\\""+k+"\\"]");\n';
+  softHtml+='      if(el) el.value=d[k]||"";\n';
+  softHtml+='    }\n';
   softHtml+='  });\n';
   softHtml+='  updateProgress();\n';
   softHtml+='}\n';
@@ -16573,9 +16699,10 @@ function buildAnnexHtml(inline, obsNumMap, filterObsIds){
   h+='<h2 style="font-family:Merriweather,serif;font-size:16px;font-weight:700;color:'+navy+';margin-bottom:20px;text-align:center;letter-spacing:1px">ANNEXURES</h2>';
   for(var i=0;i<activeAnnexures.length;i++){
     var a=activeAnnexures[i];
-    h+='<div style="margin-bottom:28px;page-break-inside:avoid">';
+    var _aLabel=a.label||('Annexure-'+(i+1));
+    h+='<div id="'+_anxId(_aLabel)+'" style="margin-bottom:28px;page-break-inside:avoid;scroll-margin-top:16px">';
     h+='<div style="font-family:Merriweather,serif;font-size:13px;font-weight:700;color:'+navy+';border-bottom:2px solid '+gbor+';padding-bottom:6px;margin-bottom:4px">';
-    h+=esc(a.label||('Annexure-'+(i+1)));
+    h+=esc(_aLabel);
     if(a.title) h+=' &mdash; '+esc(a.title);
     h+='</div>';
     // Referenced-by line
@@ -16656,6 +16783,7 @@ function loadAuditeeFile(evt){
       try{
         var rawJson=(respDataEl.textContent||respDataEl.innerHTML||'').trim();
         var respData=JSON.parse(rawJson);
+        var _isFollowUpFile=respData._isFollowUp===true;
         var rkeys=Object.keys(respData);
         for(var ri=0;ri<rkeys.length;ri++){
           var rnm=rkeys[ri];
@@ -16670,8 +16798,12 @@ function loadAuditeeFile(evt){
             if(rval){ roComments[rnid]=rval; if(loadedObs.indexOf(rnid)<0) loadedObs.push(rnid); }
           } else if(rnm.indexOf('act_')===0){
             if(rval) actMap[rnm.slice(4)]=rval;
+          } else if(rnm.indexOf('attach_')===0){
+            var attId=rnm.slice(7);
+            if(rval&&rval.length) respAttachMap[attId]=rval;
           }
         }
+        window._isFollowUpLoad = _isFollowUpFile;
       }catch(ex){ loadedObs=[]; }
     }
 
@@ -16702,7 +16834,8 @@ function loadAuditeeFile(evt){
     // Ask user whether this response is HOS, RO/HO, or both
     var parsedResp={};
     for(var px=0;px<loadedObs.length;px++) parsedResp[loadedObs[px]]=respMap[loadedObs[px]]||'';
-    window._pendingRespLoad = { loadedObs: loadedObs, parsedResp: parsedResp };
+    window._pendingRespLoad = { loadedObs: loadedObs, parsedResp: parsedResp, isFollowUp: window._isFollowUpLoad||false };
+    window._isFollowUpLoad = false;
     window._pendingRespDoc = doc;
     showRespTypeModal(doc, loadedObs);
     return; // rest of logic handled in applyRespLoad()
@@ -16748,10 +16881,18 @@ function applyRespLoad(){
   var loadedObs=pending.loadedObs||[];
   var parsed=pending.parsedResp||{};
   var doc=window._pendingRespDoc;
+  var isFollowUp=pending.isFollowUp||false;
+  var loadedAt=new Date().toISOString();
 
   for(var i=0;i<loadedObs.length;i++){
     var id=loadedObs[i];
     var val=parsed[id]||'';
+    // If follow-up: push existing response to history before overwriting
+    if(isFollowUp && respMap[id]!=null && respMap[id]!==''){
+      if(!respHistory[id]) respHistory[id]=[];
+      var prevRound=respHistory[id].length+1;
+      respHistory[id].push({round:prevRound, response:respMap[id], loadedAt:loadedAt});
+    }
     // Only clear the map being loaded into — preserve the other so both can coexist
     if(isBH){ delete respBHMap[id]; respBHMap[id]=val; }
     if(isRO){ delete respROMap[id]; respROMap[id]=val; }
@@ -16790,6 +16931,195 @@ function applyRespLoad(){
   applyFilter();
   renderRpt();
   toast('Loaded '+loadedObs.length+' response(s) — '+(isBH&&isRO?'HOS + RO/HO':isBH?'Head of School':'RO/HO')+'.');
+}
+
+// ============================================================
+// FOLLOW-UP RESPONSE REQUEST
+// ============================================================
+function showFollowUpModal(){
+  // Build list of all selected observations
+  var allObs=[];
+  var dbObs=DB&&DB.observations?DB.observations:[];
+  for(var i=0;i<dbObs.length;i++){
+    if(selIds[dbObs[i].id]) allObs.push({id:dbObs[i].id, title:dbObs[i].title||dbObs[i].id});
+  }
+  for(var ci=0;ci<customs.length;ci++){
+    if(selIds[customs[ci].id]) allObs.push({id:customs[ci].id, title:customs[ci].title||customs[ci].id});
+  }
+  if(!allObs.length){ toast('No observations selected.'); return; }
+
+  var existing=document.getElementById('followUpModal');
+  if(existing) existing.parentNode.removeChild(existing);
+  var el=document.createElement('div');
+  el.id='followUpModal';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center';
+
+  var rows='';
+  for(var oi=0;oi<allObs.length;oi++){
+    var o=allObs[oi];
+    var hasResp=!!(respMap[o.id]||respBHMap[o.id]||respROMap[o.id]);
+    var hist=respHistory[o.id]||[];
+    var badge=hist.length?'<span style="font-size:10px;background:#5b3fa0;color:#fff;border-radius:8px;padding:1px 6px;margin-left:6px">Round '+(hist.length+1)+'</span>':'';
+    rows+='<label style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:5px;cursor:pointer;'+(oi%2===0?'background:#f8f9fb':'background:#fff')+'">';
+    rows+='<input type="checkbox" class="fu-chk" data-obsid="'+o.id+'" style="margin-top:2px;width:15px;height:15px;accent-color:#1a3a5c"'+(hasResp?' checked':'')+'>';
+    rows+='<div style="flex:1"><div style="font-size:12.5px;font-weight:600;color:#1e2d40">'+esc(o.title)+badge+'</div>';
+    if(hasResp){
+      var cur=respBHMap[o.id]||respROMap[o.id]||respMap[o.id]||'';
+      rows+='<div style="font-size:11px;color:#6a7888;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:400px">Current: '+esc(cur.slice(0,80))+(cur.length>80?'…':'')+'</div>';
+    } else {
+      rows+='<div style="font-size:11px;color:#aaa;margin-top:2px;font-style:italic">No response yet</div>';
+    }
+    rows+='</div></label>';
+  }
+
+  el.innerHTML=
+    '<div style="background:#fff;border-radius:8px;width:90%;max-width:560px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.25);font-family:Inter,sans-serif">'+
+    '<div style="background:linear-gradient(90deg,#1a3a5c,#2a5080);color:#fff;padding:14px 18px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:10px">'+
+    '<span style="font-size:18px">&#128260;</span>'+
+    '<div><div style="font-size:14px;font-weight:800">Generate Follow-up Response Request</div>'+
+    '<div style="font-size:11px;opacity:.75;margin-top:2px">Select observations needing a revised/additional auditee response</div></div>'+
+    '<button onclick="document.getElementById(\'followUpModal\').remove()" style="margin-left:auto;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;width:28px;height:28px;font-size:16px;cursor:pointer;font-family:inherit">&#10005;</button>'+
+    '</div>'+
+    '<div style="padding:10px 14px;border-bottom:1px solid #e5eaf0;display:flex;gap:8px">'+
+    '<button onclick="document.querySelectorAll(\'.fu-chk\').forEach(function(c){c.checked=true;})" style="font-size:11.5px;padding:4px 12px;border:1px solid #c8d8ec;border-radius:4px;background:#f0f5fb;cursor:pointer;font-family:inherit;color:#1a3a5c;font-weight:600">Select All</button>'+
+    '<button onclick="document.querySelectorAll(\'.fu-chk\').forEach(function(c){c.checked=false;})" style="font-size:11.5px;padding:4px 12px;border:1px solid #c8d8ec;border-radius:4px;background:#f0f5fb;cursor:pointer;font-family:inherit;color:#1a3a5c;font-weight:600">Clear All</button>'+
+    '</div>'+
+    '<div style="overflow-y:auto;flex:1;padding:6px 8px">'+rows+'</div>'+
+    '<div style="padding:14px 16px;border-top:1px solid #e5eaf0;display:flex;gap:10px;justify-content:flex-end">'+
+    '<button onclick="document.getElementById(\'followUpModal\').remove()" style="padding:8px 18px;border:1px solid #c8d8ec;border-radius:5px;background:#f0f4f8;font-family:Inter,sans-serif;font-size:13px;cursor:pointer;color:#4a6080">Cancel</button>'+
+    '<button onclick="generateFollowUpFile()" style="padding:8px 20px;border:none;border-radius:5px;background:#1a3a5c;color:#fff;font-family:Inter,sans-serif;font-size:13px;font-weight:700;cursor:pointer">&#128228; Generate Follow-up File</button>'+
+    '</div></div>';
+  document.body.appendChild(el);
+}
+
+function generateFollowUpFile(){
+  // Collect selected obs IDs
+  var chks=document.querySelectorAll('.fu-chk:checked');
+  if(!chks.length){ alert('Please select at least one observation.'); return; }
+  var selectedIds=[];
+  for(var ci=0;ci<chks.length;ci++) selectedIds.push(chks[ci].getAttribute('data-obsid'));
+
+  // Close modal
+  var m=document.getElementById('followUpModal');
+  if(m) m.parentNode.removeChild(m);
+
+  // Build obs list for selected
+  var selObsList=[];
+  var dbObs=DB&&DB.observations?DB.observations:[];
+  for(var i=0;i<dbObs.length;i++){
+    if(selectedIds.indexOf(dbObs[i].id)>=0){
+      var o=dbObs[i];
+      var ot=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:o.observation||'';
+      var rt=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
+      selObsList.push({id:o.id,title:o.title,observation:ot,recommendation:rt});
+    }
+  }
+  for(var ci2=0;ci2<customs.length;ci2++){
+    var co=customs[ci2];
+    if(selectedIds.indexOf(co.id)>=0){
+      var cot=(obsEdits[co.id]&&obsEdits[co.id].observation!=null)?obsEdits[co.id].observation:co.observation||'';
+      var crt=(obsEdits[co.id]&&obsEdits[co.id].recommendation!=null)?obsEdits[co.id].recommendation:co.recommendation||'';
+      selObsList.push({id:co.id,title:co.title,observation:cot,recommendation:crt});
+    }
+  }
+  if(!selObsList.length){ toast('No matching observations found.'); return; }
+
+  var H=getHdrVals();
+  var branch=H.brname||'Branch';
+  var dt=new Date().toISOString().slice(0,10);
+  var round=0;
+  // Determine round number from history
+  for(var si=0;si<selObsList.length;si++){
+    var hist=respHistory[selObsList[si].id]||[];
+    if(hist.length+1>round) round=hist.length+1;
+  }
+  if(round<2) round=2;
+
+  // Build bhs-resp-data JSON with current (pre-filled) responses and follow-up marker
+  var respData={_isFollowUp:true};
+  for(var oi=0;oi<selObsList.length;oi++){
+    var cur=respBHMap[selObsList[oi].id]||respROMap[selObsList[oi].id]||respMap[selObsList[oi].id]||'';
+    respData['resp_'+selObsList[oi].id]=cur;
+  }
+  var respJson=JSON.stringify(respData).replace(/<\/script>/gi,'<\\/script>');
+
+  // Build HTML
+  var h='<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">';
+  h+='<title>Follow-up Response Request — Round '+round+' — '+esc(branch)+'</title>';
+  h+='<script type="application/json" id="bhs-resp-data">'+respJson+'<\/script>';
+  h+='<style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}';
+  h+='body{font-family:Inter,Arial,sans-serif;font-size:13px;color:#1e2d40;background:#f3f5f8;padding:20px}';
+  h+='#wrap{max-width:860px;margin:0 auto}';
+  h+='.card{background:#fff;border-radius:6px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.1);border-left:4px solid #1a3a5c;overflow:hidden}';
+  h+='.card-hdr{background:#f8f9fb;padding:10px 14px;border-bottom:1px solid #e5eaf0;font-size:13.5px;font-weight:700;color:#1e2d40}';
+  h+='.card-body{padding:12px 14px}';
+  h+='.lbl{font-size:9.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:4px;margin-top:10px}';
+  h+='.lbl:first-child{margin-top:0}';
+  h+='.txt{font-size:12.5px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:8px 10px;white-space:pre-wrap;margin-bottom:2px}';
+  h+='.prev-resp{font-size:12px;line-height:1.55;color:#3a2a70;background:#f8f5ff;border-left:3px solid #c0a8e8;border-radius:0 4px 4px 0;padding:7px 10px;margin-bottom:8px;white-space:pre-wrap}';
+  h+='.resp-ta{width:100%;padding:8px 10px;border:2px solid #1a3a5c;border-radius:5px;font-family:Inter,Arial,sans-serif;font-size:13px;color:#1e2d40;resize:vertical;min-height:80px;box-sizing:border-box;margin-top:6px}';
+  h+='.resp-ta:focus{outline:none;border-color:#2070b8}';
+  h+='@media print{.no-print{display:none!important}}';
+  h+='</style></head><body>';
+
+  // Header banner
+  h+='<div style="text-align:center;background:#1a3a5c;color:#fff;padding:14px 20px;border-radius:6px;margin-bottom:20px">';
+  h+='<div style="font-size:9px;letter-spacing:2px;color:#c9c070;text-transform:uppercase;margin-bottom:4px">Beaconhouse Group &nbsp;|&nbsp; Systems &amp; Audit</div>';
+  h+='<div style="font-size:17px;font-weight:700;letter-spacing:.5px">FOLLOW-UP RESPONSE REQUEST — ROUND '+round+'</div>';
+  h+='<div style="font-size:11px;color:#a8d8ff;margin-top:4px">Branch: '+esc(branch)+' &nbsp;|&nbsp; Date: '+dt+' &nbsp;|&nbsp; '+selObsList.length+' Observation(s)</div>';
+  h+='</div>';
+
+  h+='<div id="wrap">';
+  h+='<div style="background:#fff3cd;border:1px solid #f0c040;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12.5px;line-height:1.55">';
+  h+='&#9888; <strong>Instructions:</strong> Please review the observations below. Your previous response is pre-filled for reference. ';
+  h+='Revise or replace it as appropriate, then save this file and return it to the auditor.';
+  h+='</div>';
+
+  for(var ii=0;ii<selObsList.length;ii++){
+    var obs=selObsList[ii];
+    var prevResp=respBHMap[obs.id]||respROMap[obs.id]||respMap[obs.id]||'';
+    var prevHist=respHistory[obs.id]||[];
+    h+='<div class="card">';
+    h+='<div class="card-hdr">'+(ii+1)+'. '+esc(obs.title)+'</div>';
+    h+='<div class="card-body">';
+    h+='<div class="lbl">Observation</div><div class="txt">'+esc(obs.observation)+'</div>';
+    h+='<div class="lbl">Recommendation</div><div class="txt">'+esc(obs.recommendation)+'</div>';
+    if(prevResp){
+      h+='<div class="lbl" style="color:#5b3fa0">Previous Response (Round '+(prevHist.length+1)+')</div>';
+      h+='<div class="prev-resp">'+esc(prevResp)+'</div>';
+    }
+    h+='<div class="lbl" style="color:#1a6030">Your Revised Response (Round '+round+')</div>';
+    h+='<textarea class="resp-ta" name="resp_'+obs.id+'" placeholder="Enter revised or additional response here...">'+esc(prevResp)+'</textarea>';
+    h+='</div></div>';
+  }
+
+  // Submit button
+  h+='<div class="no-print" style="text-align:center;margin:20px 0">';
+  h+='<button onclick="submitFollowUp()" style="padding:12px 32px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px">&#10003; Save &amp; Return Follow-up File</button>';
+  h+='</div></div>';
+
+  // Inline JS to collect and save
+  h+='<script>\n';
+  h+='function submitFollowUp(){\n';
+  h+='  var data=JSON.parse(document.getElementById("bhs-resp-data").textContent);\n';
+  h+='  var tas=document.querySelectorAll("textarea[name]");\n';
+  h+='  for(var i=0;i<tas.length;i++){ data[tas[i].name]=tas[i].value; }\n';
+  h+='  var json=JSON.stringify(data).replace(/<\\/script>/gi,"<\\\\/script>");\n';
+  h+='  var html=document.documentElement.outerHTML;\n';
+  h+='  html=html.replace(/<script type="application\\/json" id="bhs-resp-data">[\\s\\S]*?<\\/script>/,\'<script type="application/json" id="bhs-resp-data">\'+json+\'<\\/script>\');\n';
+  h+='  var blob=new Blob([html],{type:"text/html"});\n';
+  h+='  var url=URL.createObjectURL(blob);\n';
+  h+='  var a=document.createElement("a"); a.href=url; a.download="'+esc(branch.replace(/[^a-zA-Z0-9]/g,'_').slice(0,20))+'_FollowUp_Round'+round+'_Response.html"; a.click(); URL.revokeObjectURL(url);\n';
+  h+='  setTimeout(function(){ alert("\\u2705 Follow-up response saved!\\nSend this file back to the auditor to load via Load Follow-up Response."); },300);\n';
+  h+='}\n';
+  h+='<\/script></body></html>';
+
+  var blob=new Blob([h],{type:'text/html'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url; a.download=branch.replace(/[^a-zA-Z0-9]/g,'_').slice(0,20)+'_FollowUp_Round'+round+'_Request.html';
+  a.click(); URL.revokeObjectURL(url);
+  showToast('Follow-up request file generated — Round '+round+'. Send to auditee.', 3500);
 }
 
 // ============================================================
@@ -17253,12 +17583,36 @@ function finalizeReport(){
     var finBsNotes=obsNotesMap[o.id]||'';
     if(obsText){h+=sl('Observation')+st(obsText);if(finBsNotes)h+=st(finBsNotes);}
     if(recText) h+=sl('Recommendation')+st(recText);
-    if(ax)               h+='<div style="display:flex;align-items:center;gap:7px;margin:8px 0;padding:7px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> '+esc(ax)+'</div>';
+    if(ax)               h+='<div style="display:flex;align-items:center;gap:7px;margin:8px 0;padding:7px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> <a href="#'+_anxId(ax)+'" style="color:#1a3a5c;font-weight:700;text-decoration:underline;cursor:pointer" title="Click to view annexure below">'+esc(ax)+'</a></div>';
     var bhFin=respBHMap[o.id]!=null?respBHMap[o.id]:null;
     var roFin=respROMap[o.id]!=null?respROMap[o.id]:null;
     if(bhFin!==null) h+=sl('Auditee Response – HOS')+st(bhFin);
     if(roFin!==null) h+='<div style="font-size:11.5px;font-weight:700;color:#5b3fa0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Auditee Response – RO/HO</div>'+'<div style="font-size:13px;line-height:1.6;color:#3a2a70;margin-bottom:10px;white-space:pre-wrap;background:#f8f5ff;padding:6px 10px;border-radius:4px;border-left:3px solid #9b6fd0">'+esc(roFin)+'</div>';
     if(bhFin===null&&roFin===null&&respStored) h+=sl('Auditee Response')+st(respStored);
+    // Auditee evidence attachments — shown in Final Report
+    var finAtts=respAttachMap[o.id]||[];
+    if(finAtts.length){
+      h+='<div style="margin-top:8px;padding:8px 10px;background:#f8f5ff;border:1px solid #c0a8e8;border-radius:5px">';
+      h+='<div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#5b3fa0;margin-bottom:8px">&#128206; Evidence Attached by Auditee ('+finAtts.length+' file'+(finAtts.length>1?'s':'')+')</div>';
+      for(var fai=0;fai<finAtts.length;fai++){
+        var fa=finAtts[fai];
+        var faIsImg=fa.type&&fa.type.indexOf('image/')===0;
+        var faIsPdf=fa.type==='application/pdf';
+        h+='<div style="margin-bottom:10px">';
+        if(faIsImg){
+          h+='<div style="font-size:11px;color:#5b3fa0;font-weight:600;margin-bottom:4px">'+esc(fa.name)+'</div>';
+          h+='<img src="'+fa.dataUrl+'" style="max-width:100%;border:1px solid #c0a8e8;border-radius:4px;display:block">';
+        } else if(faIsPdf){
+          h+='<div style="font-size:11px;color:#5b3fa0;font-weight:600;margin-bottom:4px">'+esc(fa.name)+'</div>';
+          h+='<embed src="'+fa.dataUrl+'" type="application/pdf" style="width:100%;height:480px;border:1px solid #c0a8e8;border-radius:4px">';
+          h+='<div style="margin-top:4px"><a href="'+fa.dataUrl+'" download="'+esc(fa.name)+'" style="font-size:12px;color:#5b3fa0;font-weight:600">&#8595; Download PDF</a></div>';
+        } else {
+          h+='<a href="'+fa.dataUrl+'" download="'+esc(fa.name)+'" style="display:inline-flex;align-items:center;gap:8px;padding:7px 14px;background:#ede8ff;border:1px solid #c0a8e8;border-radius:5px;font-size:12.5px;font-weight:600;color:#5b3fa0;text-decoration:none">&#128229; '+esc(fa.name)+'</a>';
+        }
+        h+='</div>';
+      }
+      h+='</div>';
+    }
     var sectROFin=respSectROMap[o.id]||null;
     var sectHOFin=respSectHOMap[o.id]||null;
     if(sectROFin) h+='<div style="font-size:11.5px;font-weight:700;color:#1a5c3a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">RO Section Response</div>'+'<div style="font-size:13px;line-height:1.6;color:#1a3a2a;margin-bottom:10px;white-space:pre-wrap;background:#f0fff8;padding:6px 10px;border-radius:4px;border-left:3px solid #3a9a6a">'+esc(sectROFin)+'</div>';
@@ -22449,7 +22803,7 @@ function generateReviewerHtml(role){
     var rvBsNotes=obsNotesMap[o.id]||'';
     rv+='<div class="sec-lbl">Observation</div><div style="font-size:12.5px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:8px 10px;word-break:break-word">'+_renderText(o.observation,{fontSize:'12.5px',color:'#2a3a50',lineHeight:'1.6'})+(rvBsNotes?_renderText(rvBsNotes,{fontSize:'12.5px',color:'#2a3a50',lineHeight:'1.6'}):'')+'</div>';
     rv+='<div class="sec-lbl">Recommendation</div><div style="font-size:12.5px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:8px 10px;word-break:break-word">'+_renderText(o.recommendation,{fontSize:'12.5px',color:'#2a3a50',lineHeight:'1.6'})+'</div>';
-    if(o.annex) rv+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">&#128203; Annexure Ref:</strong> <span style="color:#1a3a5c;font-weight:600">'+esc(o.annex)+'</span></div>';
+    if(o.annex) rv+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">&#128203; Annexure Ref:</strong> <a href="#'+_anxId(o.annex)+'" style="color:#1a3a5c;font-weight:700;text-decoration:underline;cursor:pointer" title="Click to view annexure below">'+esc(o.annex)+'</a></div>';
     // Auditee responses — show split BH/RO responses if available, else combined
     var rvBhResp=respBHMap[o.id]!=null?respBHMap[o.id]:null;
     var rvRoResp=respROMap[o.id]!=null?respROMap[o.id]:null;
@@ -22517,6 +22871,83 @@ function generateReviewerHtml(role){
   rv+='<div style="margin-bottom:90px">';
   rv+='<textarea id="sendback-comment" class="sb-cmt" placeholder="Overall comment for send-back (required when sending back)..."></textarea>';
   rv+='</div>\n';
+
+  // ── Annexures Section ────────────────────────────────────────────────────
+  // Render annexures from session data (text + embedded files) so the reviewer
+  // can view all supporting evidence without needing any other file.
+  syncAnnexTextFromDom();
+  var _revAnnexes = (sess.annexures||[]).filter(function(a){
+    return (a.files&&a.files.length)||(a.text&&a.text.trim());
+  });
+  if(_revAnnexes.length){
+    rv+='<div id="anx-section" style="background:#fff;border-radius:8px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden;border:2px solid #1a3a5c">';
+    rv+='<div style="background:linear-gradient(90deg,#1a3a5c,#2a5080);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px">';
+    rv+='<span style="font-size:18px">&#128196;</span>';
+    rv+='<div style="font-size:14px;font-weight:800">Annexures</div>';
+    rv+='<div style="font-size:11px;opacity:.75;margin-left:4px">('+_revAnnexes.length+' attached)</div>';
+    rv+='</div>';
+    rv+='<div style="padding:14px 16px">';
+    for(var _ai=0;_ai<_revAnnexes.length;_ai++){
+      var _ax=_revAnnexes[_ai];
+      var _axLbl=_ax.label||('Annexure-'+(_ai+1));
+      var _axAnchorId=_anxId(_axLbl);
+      rv+='<div id="'+_axAnchorId+'" style="margin-bottom:22px;padding-bottom:16px;scroll-margin-top:16px;'+ (_ai<_revAnnexes.length-1?'border-bottom:1px solid #dde2ea;':'') +'">';
+      rv+='<div style="font-size:13px;font-weight:800;color:#1a3a5c;margin-bottom:6px">'+esc(_axLbl);
+      if(_ax.title) rv+=' &mdash; '+esc(_ax.title);
+      rv+='</div>';
+      // Text content
+      if(_ax.text&&_ax.text.trim()){
+        // Convert pipe-table lines to HTML, plain lines to paragraphs
+        var _axLines=_ax.text.split('\n');
+        var _axHtml='';
+        var _inTbl=false;
+        for(var _li=0;_li<_axLines.length;_li++){
+          var _ln=_axLines[_li];
+          if(_ln.indexOf('|')>=0){
+            if(!_inTbl){ _axHtml+='<table style="border-collapse:collapse;width:100%;font-size:11.5px;margin-bottom:8px">'; _inTbl=true; }
+            if(/^\s*\|[-| :]+\|\s*$/.test(_ln)) continue; // separator row
+            var _cells=_ln.split('|').map(function(c){return c.trim();}).filter(function(c,ci,arr){return ci>0&&ci<arr.length-1;});
+            _axHtml+='<tr>';
+            for(var _ci2=0;_ci2<_cells.length;_ci2++) _axHtml+='<td style="border:1px solid #dde2ea;padding:4px 8px">'+esc(_cells[_ci2])+'</td>';
+            _axHtml+='</tr>';
+          } else {
+            if(_inTbl){ _axHtml+='</table>'; _inTbl=false; }
+            if(_ln.trim()) _axHtml+='<p style="font-size:12.5px;line-height:1.6;color:#2a3a50;margin-bottom:5px;white-space:pre-wrap">'+esc(_ln)+'</p>';
+          }
+        }
+        if(_inTbl) _axHtml+='</table>';
+        rv+=_axHtml;
+      }
+      // Files
+      if(_ax.files&&_ax.files.length){
+        for(var _fi=0;_fi<_ax.files.length;_fi++){
+          var _f=_ax.files[_fi];
+          if(!_f.dataUrl){
+            rv+='<div style="font-size:12px;color:#b05000;font-style:italic;margin-bottom:6px">&#9888; '+esc(_f.name)+' — not available (re-attach needed)</div>';
+            continue;
+          }
+          var _isImg=_f.type&&_f.type.indexOf('image/')===0;
+          var _isPdf=_f.type&&_f.type==='application/pdf';
+          rv+='<div style="margin-bottom:10px">';
+          if(_isImg){
+            rv+='<div style="font-size:11px;color:#6a7888;margin-bottom:4px">'+esc(_f.name)+'</div>';
+            rv+='<img src="'+_f.dataUrl+'" style="max-width:100%;border:1px solid #dde2ea;border-radius:4px;display:block">';
+          } else if(_isPdf){
+            rv+='<div style="font-size:11px;color:#6a7888;margin-bottom:4px">'+esc(_f.name)+'</div>';
+            rv+='<embed src="'+_f.dataUrl+'" type="application/pdf" style="width:100%;height:480px;border:1px solid #dde2ea;border-radius:4px">';
+            rv+='<div style="margin-top:4px"><a href="'+_f.dataUrl+'" download="'+esc(_f.name)+'" style="font-size:12px;color:#1a3a5c;font-weight:600">&#8595; Download PDF</a></div>';
+          } else {
+            // Other files — data-URI download link
+            rv+='<a href="'+_f.dataUrl+'" download="'+esc(_f.name)+'" style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12.5px;font-weight:600;color:#1a3a5c;text-decoration:none">&#128229; '+esc(_f.name)+'</a>';
+          }
+          rv+='</div>';
+        }
+      }
+      rv+='</div>'; // end annexure item
+    }
+    rv+='</div></div>\n'; // end padding + anx-section
+  }
+
   var _crLocked=(_corrections&&_corrections.flags&&Object.keys(_corrections.flags).some(function(id){return _corrections.flags[id];}));
   rv+='<div class="action-bar"><div class="action-btns">';
   if(role==='ro'){
