@@ -15836,7 +15836,8 @@ function downloadSoftCopy(){
     // Auditee Response — always blank in soft copy, with ETR as sub-section inside
     h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Auditee Response <span style="color:#c0392b;font-size:9px">(Required)</span></div>';
     h+='<div style="border:1px dashed #b0c0d8;border-radius:4px;background:#fffef0;padding:8px 9px">';
-    h+='<textarea name="resp_'+esc(o.id)+'" data-obs-num="'+num+'" style="width:100%;border:none;border-bottom:1px solid #d0dde8;background:transparent;padding:0 0 7px 0;font-family:Inter,sans-serif;font-size:12.5px;color:#2a3a50;resize:vertical;min-height:60px;outline:none;box-sizing:border-box" placeholder="Please enter auditee response here..."></textarea>';
+    h+='<textarea name="resp_'+esc(o.id)+'" data-obs-num="'+num+'" style="width:100%;border:none;border-bottom:1px solid #d0dde8;background:transparent;padding:0 0 7px 0;font-family:Inter,sans-serif;font-size:12.5px;color:#2a3a50;resize:vertical;min-height:60px;outline:none;box-sizing:border-box" placeholder="Please enter auditee response here (minimum 10 letters)..."></textarea>';
+    h+='<div id="rh_resp_'+esc(o.id)+'" style="display:none;font-size:11px;color:#c0392b;margin-top:3px;margin-bottom:4px"></div>';
     h+='<div style="margin-top:8px;padding-top:8px">';
     h+='<div style="font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#1a6030;margin-bottom:5px">Estimated Time to Resolve <span style="font-size:9px;color:#888;font-weight:400;text-transform:none">(e.g. 2 weeks, 30 days, by 31-Dec-2025)</span></div>';
     h+='<div style="display:flex;align-items:center;gap:10px;background:#f0faf4;border:1px solid #90d0a8;border-radius:4px;padding:7px 10px">';
@@ -16097,18 +16098,24 @@ function downloadSoftCopy(){
   softHtml+='}\n';
   // Progress bar
   softHtml+='function updateProgress(){\n';
+  // Count alphabetic characters only (a-z, A-Z)
+  softHtml+='function countAlpha(s){var n=0;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);if((c>=65&&c<=90)||(c>=97&&c<=122))n++;}return n;}\n';
+  softHtml+='var MIN_ALPHA=10;\n';
+  softHtml+='function updateProgress(){\n';
   softHtml+='  var tas=document.querySelectorAll("textarea[name^=\\"resp_\\"]"),total=tas.length,done=0;\n';
-  softHtml+='  for(var i=0;i<tas.length;i++){if(tas[i].value.trim())done++;}\n';
+  softHtml+='  for(var i=0;i<tas.length;i++){if(countAlpha(tas[i].value)>=MIN_ALPHA)done++;}\n';
   softHtml+='  var pct=total?Math.round(done/total*100):0;\n';
   softHtml+='  var fill=document.getElementById("progressfill"),lbl=document.getElementById("progresslbl");\n';
   softHtml+='  if(fill)fill.style.width=pct+"%";\n';
   softHtml+='  if(lbl)lbl.textContent=done+" of "+total+" responses completed";\n';
+  // Show/hide inline hint for each textarea
+  softHtml+='  for(var j=0;j<tas.length;j++){var hint=document.getElementById("rh_"+tas[j].name);if(!hint)continue;var al=countAlpha(tas[j].value);if(tas[j].value.trim()&&al<MIN_ALPHA){hint.textContent="\\u26a0\\ufe0f Response must contain at least "+MIN_ALPHA+" letters ("+al+" so far).";hint.style.display="block";}else{hint.style.display="none";}}\n';
   softHtml+='}\n';
-  // Check all resp fields complete
+  // Check all resp fields complete and long enough
   softHtml+='function checkComplete(){\n';
-  softHtml+='  var tas=document.querySelectorAll("textarea[name^=\\"resp_\\"]"),blank=[];\n';
-  softHtml+='  for(var i=0;i<tas.length;i++){if(!tas[i].value.trim())blank.push("Obs. "+(tas[i].getAttribute("data-obs-num")||String(i+1)));}\n';
-  softHtml+='  return blank;\n';
+  softHtml+='  var tas=document.querySelectorAll("textarea[name^=\\"resp_\\"]"),blank=[],short=[];\n';
+  softHtml+='  for(var i=0;i<tas.length;i++){var label="Obs. "+(tas[i].getAttribute("data-obs-num")||String(i+1));if(!tas[i].value.trim())blank.push(label);else if(countAlpha(tas[i].value)<MIN_ALPHA)short.push(label);}\n';
+  softHtml+='  return{blank:blank,short:short};\n';
   softHtml+='}\n';
   // Build response HTML — full formatted document with embedded JSON for import
   softHtml+='function buildHtml(data,isDraft){\n';
@@ -16174,8 +16181,9 @@ function downloadSoftCopy(){
   softHtml+='}\n';
   // Submit Final
   softHtml+='function saveResponses(){\n';
-  softHtml+='  var blank=checkComplete();\n';
-  softHtml+='  if(blank.length){alert("Please complete all Auditee Response fields before submitting.\\n\\nIncomplete:\\n"+blank.join(", "));return;}\n';
+  softHtml+='  var chk=checkComplete();\n';
+  softHtml+='  if(chk.blank.length){alert("Please complete all Auditee Response fields before submitting.\\n\\nIncomplete:\\n"+chk.blank.join(", "));return;}\n';
+  softHtml+='  if(chk.short.length){alert("Each response must contain at least 10 letters.\\nPlease expand the following responses:\\n\\n"+chk.short.join(", "));return;}\n';
   softHtml+='  var blob=new Blob([buildHtml(collectData(),false)],{type:"text/html"});\n';
   softHtml+='  saveFileAs(blob,document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_BH_Responded.html");\n';
   softHtml+='  try{localStorage.removeItem(_KEY);}catch(e){}\n';
@@ -17094,7 +17102,8 @@ function generateFollowUpFile(){
       h+='<div class="prev-resp">'+esc(prevResp)+'</div>';
     }
     h+='<div class="lbl" style="color:#1a6030">Your Revised Response (Round '+round+')</div>';
-    h+='<textarea class="resp-ta" name="resp_'+obs.id+'" placeholder="Enter revised or additional response here...">'+esc(prevResp)+'</textarea>';
+    h+='<textarea class="resp-ta" name="resp_'+obs.id+'" placeholder="Enter revised or additional response here (minimum 10 letters)..." oninput="fuCheckHint(this)">'+esc(prevResp)+'</textarea>';
+    h+='<div id="rh_resp_'+obs.id+'" style="display:none;font-size:11px;color:#c0392b;margin-top:3px"></div>';
     h+='</div></div>';
   }
 
@@ -17105,9 +17114,15 @@ function generateFollowUpFile(){
 
   // Inline JS to collect and save
   h+='<script>\n';
+  h+='function fuCountAlpha(s){var n=0;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);if((c>=65&&c<=90)||(c>=97&&c<=122))n++;}return n;}\n';
+  h+='function fuCheckHint(ta){var hint=document.getElementById("rh_resp_"+ta.name.replace("resp_",""));if(!hint)return;var al=fuCountAlpha(ta.value);if(ta.value.trim()&&al<10){hint.textContent="\\u26a0\\ufe0f Response must contain at least 10 letters ("+al+" so far).";hint.style.display="block";}else{hint.style.display="none";}}\n';
   h+='function submitFollowUp(){\n';
-  h+='  var data=JSON.parse(document.getElementById("bhs-resp-data").textContent);\n';
   h+='  var tas=document.querySelectorAll("textarea[name]");\n';
+  h+='  var blank=[],short=[];\n';
+  h+='  for(var i=0;i<tas.length;i++){var al=fuCountAlpha(tas[i].value);var num=String(i+1);if(!tas[i].value.trim())blank.push("Obs. "+num);else if(al<10)short.push("Obs. "+num+" ("+al+" letters)");}\n';
+  h+='  if(blank.length){alert("Please enter a response for all observations before submitting.\\n\\nMissing responses:\\n"+blank.join(", "));return;}\n';
+  h+='  if(short.length){alert("Each response must contain at least 10 letters.\\nPlease expand the following responses:\\n\\n"+short.join(", "));return;}\n';
+  h+='  var data=JSON.parse(document.getElementById("bhs-resp-data").textContent);\n';
   h+='  for(var i=0;i<tas.length;i++){ data[tas[i].name]=tas[i].value; }\n';
   h+='  var json=JSON.stringify(data).replace(/<\\/script>/gi,"<\\\\/script>");\n';
   h+='  var html=document.documentElement.outerHTML;\n';
