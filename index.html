@@ -600,6 +600,10 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
     if(cu&&cu.role==='administrator'){
       window._hoAuthed=true;
     }
+    if(cu&&cu.role==='viewer'){
+      window._hoAuthed=true; // lets viewer open all tabs without auth prompts
+      window._viewerMode=true; // blocks destructive admin actions
+    }
     // Apply role-based UI restrictions on page reload (all non-admin roles)
     if(cu&&(cu.role==='ro_supervisor'||cu.role==='ho_supervisor'||cu.role==='auditor')){
       setTimeout(_applyRoleUI, 0);
@@ -650,6 +654,18 @@ function pwCheck(){
     return;
   }
 
+  // Built-in Viewer (Tester) account — all tabs visible, admin actions blocked
+  var _defViewer='View@2026';
+  var _curViewer=''; try{_curViewer=localStorage.getItem('sa_pw_viewer')||_defViewer;}catch(e){_curViewer=_defViewer;}
+  if(v===_curViewer){
+    try{sessionStorage.setItem('sa_auth_2026','1'); sessionStorage.setItem('sa_current_user', JSON.stringify({role:'viewer'}));}catch(e){}
+    window._hoAuthed=true;   // lets all tabs open without auth prompts
+    window._viewerMode=true; // blocks destructive admin actions
+    try{_hoActivateBtns();}catch(e){}
+    document.getElementById('pw-screen').style.display='none';
+    return;
+  }
+
   var err=document.getElementById('pw-err');
   err.textContent='Incorrect password. Please try again.';
   document.getElementById('pw-input').value='';
@@ -674,6 +690,9 @@ function pwCheck(){
         </label>
         <label style="cursor:pointer;border:2px solid #c8d8ec;border-radius:6px;padding:8px 10px;font-size:12px;display:flex;align-items:center;gap:6px;transition:border .15s" id="chpw-lbl-ho_sup">
           <input type="radio" name="chpw-acct" value="ho_sup" onchange="chpwAcctChange()" style="accent-color:#1a3a5c"> HO Supervisor
+        </label>
+        <label style="cursor:pointer;border:2px solid #c8d8ec;border-radius:6px;padding:8px 10px;font-size:12px;display:flex;align-items:center;gap:6px;transition:border .15s" id="chpw-lbl-viewer">
+          <input type="radio" name="chpw-acct" value="viewer" onchange="chpwAcctChange()" style="accent-color:#1a3a5c"> Viewer
         </label>
         <label style="cursor:pointer;border:2px solid #c8d8ec;border-radius:6px;padding:8px 10px;font-size:12px;display:flex;align-items:center;gap:6px;transition:border .15s" id="chpw-lbl-ho">
           <input type="radio" name="chpw-acct" value="ho" onchange="chpwAcctChange()" style="accent-color:#1a3a5c"> Administrator
@@ -743,12 +762,18 @@ function _userRole(){
 }
 function _canSendHO(){ var r=_userRole(); return r==='administrator'||r==='ro_supervisor'||r==='ho_supervisor'; }
 function _canIssue(){  var r=_userRole(); return r==='administrator'; }
+// Returns true and shows a message if the current user is a Viewer (tester) — blocks destructive admin actions
+function _viewerBlocked(){
+  if(!window._viewerMode) return false;
+  alert('This action is not available in Viewer mode.\n\nViewer accounts can browse all tabs and reports but cannot execute administrator actions (Issue Report, Export Updated App, Approve Databank changes).');
+  return true;
+}
 
 // Apply toolbar visibility based on logged-in role.
 // Called after login and on page startup if already authenticated.
 function _applyRoleUI(){
   var r = _userRole();
-  if(r === 'administrator') return; // Administrator sees everything
+  if(r === 'administrator' || r === 'viewer') return; // Both see all tabs
 
   function hide(id){ var el=document.getElementById(id); if(el) el.style.display='none'; }
 
@@ -798,7 +823,7 @@ function hideChangePwModal(){
 }
 function chpwAcctChange(){
   var v=document.querySelector('input[name="chpw-acct"]:checked').value;
-  ['user','ro','ho_sup','ho'].forEach(function(k){
+  ['user','ro','ho_sup','viewer','ho'].forEach(function(k){
     var el=document.getElementById('chpw-lbl-'+k);
     if(el) el.style.borderColor=(v===k?'#1a3a5c':'#c8d8ec');
   });
@@ -811,6 +836,7 @@ function _getActivePw(type){
   if(type==='user')   return 'S&A2026';
   if(type==='ro')     return 'RO$2026';
   if(type==='ho_sup') return 'HOSuper@2026';
+  if(type==='viewer') return 'View@2026';
   if(type==='ho')     return [72,79,64,83,38,65,50,48,50,54].map(function(c){return String.fromCharCode(c);}).join('');
   return '';
 }
@@ -843,7 +869,7 @@ function doChangePw(){
     return;
   }
   hideChangePwModal();
-  var _lblMap={user:'Auditor',ro:'RO Supervisor',ho_sup:'HO Supervisor',ho:'Administrator'};
+  var _lblMap={user:'Auditor',ro:'RO Supervisor',ho_sup:'HO Supervisor',viewer:'Viewer',ho:'Administrator'};
   var label=_lblMap[acct]||acct;
   setTimeout(function(){ alert('Password for '+label+' account updated successfully.'); },100);
 }
@@ -13386,6 +13412,7 @@ function showPendingAmendmentsModal(){
 }
 
 function applyAmendmentToDatabank(obsId){
+  if(_viewerBlocked()) return;
   var am=pendingAmendments[obsId]; if(!am){ toast('Amendment not found.'); return; }
   // Store in DB_AMEND_KEY for export
   var amends=sg(DB_AMEND_KEY,{});
@@ -14523,6 +14550,7 @@ function updbDiscardDraft(){
 }
 
 function updbExportApp(){
+  if(_viewerBlocked()) return;
   var ext = sg(DB_EXT_KEY, []);
   var supKeys = Object.keys(_dbmSuppressed);
   if(!ext.length && !supKeys.length){
@@ -14760,6 +14788,7 @@ function updbClearCandidates(){
 }
 
 function updbApproveSelected(){
+  if(_viewerBlocked()) return;
   var chks = document.querySelectorAll('.updb-cand-chk');
   var approved = [];
   for(var i=0;i<chks.length;i++){
@@ -17968,6 +17997,7 @@ function finalizeReport(){
 // ISSUED REPORT — polished interactive HTML (matching sample)
 // ============================================================
 function generateIssuedReport(forROCopy){
+  if(!forROCopy && _viewerBlocked()) return; // block final Issue action only, not internal review generation
   var isReview=(forROCopy==='ro_review'||forROCopy==='ho_review');
   var reviewRole=isReview?forROCopy.replace('_review',''):null;
   var stageLabel=reviewRole==='ro'?'RO Manager Review':reviewRole==='ho'?'HO Final Review':'';
