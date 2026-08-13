@@ -3,9 +3,18 @@
 ## Project Overview
 Standalone single-file HTML app (`animal_sales/AnimalSales.html`) for managing animal sales, collections, customers, and budgeting. All data stored in `localStorage` key `AnimalSalesDB`. No backend, no build step.
 
-## Git
+## Git — Animal Sales Pro
 - **Feature branch**: `claude/animal-sales-receipts-pofPs`
-- **Always push to both**: `git push origin claude/animal-sales-receipts-pofPs` AND `git push origin claude/animal-sales-receipts-pofPs:main`
+- **Always push to both**: `git push origin claude/animal-sales-receipts-pofPs` AND `git push origin claude/animal-sales-receipts-pofPs:main --force`
+
+## Git — BRAINS (index.html)
+- **Feature branch**: `claude/optimistic-mccarthy-NPnuj`
+- **Always push to both** (feature branch first, then force-update main):
+  ```
+  git push origin claude/optimistic-mccarthy-NPnuj
+  git push origin claude/optimistic-mccarthy-NPnuj:main --force
+  ```
+- **Why `--force` on main**: Multiple sessions push to `main`; it can diverge from the feature branch. The feature branch is always the canonical source of truth, so `--force` is correct and expected here. Never do a plain push to `main` — it will fail with "non-fast-forward".
 
 ## Database Structure
 ```javascript
