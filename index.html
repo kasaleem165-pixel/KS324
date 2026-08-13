@@ -16227,9 +16227,40 @@ var ANX_LABELS=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P',
 
 // Returns {obsId: "1.1"|"2.3"} labels matching the obsOrder-based sequence used in renderRpt()
 function getObsReportLabels(){
+  // Labels MUST follow the same area-grouped traversal used by renderRpt() and
+  // _buildRptNavPanel(). renderRpt() groups observations by category/area before
+  // numbering them, so interleaved multi-category obsOrders produce different
+  // numbers than a pure obsOrder sequence. Both places must produce identical labels.
   var labels={};
-  for(var ri=0;ri<obsOrder.repeated.length;ri++) labels[obsOrder.repeated[ri]]='1.'+(ri+1);
-  for(var ni=0;ni<obsOrder.new.length;ni++)      labels[obsOrder.new[ni]]='2.'+(ni+1);
+  // Build a lookup of all obs so we can read each obs's category
+  var obsById={};
+  for(var j=0;j<DB.observations.length;j++) obsById[DB.observations[j].id]=DB.observations[j];
+  for(var k=0;k<customs.length;k++)          obsById[customs[k].id]=customs[k];
+
+  var sections=[
+    {pfx:'1', ids: obsOrder.repeated},
+    {pfx:'2', ids: obsOrder.new}
+  ];
+  for(var si=0;si<sections.length;si++){
+    var sec=sections[si];
+    // Replicate renderRpt()'s area-grouping: area order = first appearance in obsOrder
+    var areaOrder=[], areaGroups={};
+    for(var _ai=0;_ai<sec.ids.length;_ai++){
+      var id=sec.ids[_ai];
+      var ob=obsById[id]; if(!ob) continue;
+      var cat=(ob.category||'Others').trim()||'Others';
+      if(!areaGroups[cat]){areaOrder.push(cat);areaGroups[cat]=[];}
+      areaGroups[cat].push(id);
+    }
+    var num=0;
+    for(var ai=0;ai<areaOrder.length;ai++){
+      var grp=areaGroups[areaOrder[ai]];
+      for(var oi=0;oi<grp.length;oi++){
+        num++;
+        labels[grp[oi]]=sec.pfx+'.'+num;
+      }
+    }
+  }
   return labels;
 }
 function buildCatGroupsFor(obsList){
