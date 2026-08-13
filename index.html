@@ -22948,8 +22948,24 @@ function generateReviewerHtml(role){
   // Render annexures from session data (text + embedded files) so the reviewer
   // can view all supporting evidence without needing any other file.
   syncAnnexTextFromDom();
+  // Include every annexure that is referenced by at least one selected observation
+  // (even if it has no content yet) so the anchor links in observation cards always
+  // find their target element on the page.
+  var _refAnnexLabels={};
+  for(var _rax=0;_rax<allObs.length;_rax++){
+    if(allObs[_rax].annex){
+      var _axParts=allObs[_rax].annex.split(',');
+      for(var _axp=0;_axp<_axParts.length;_axp++){
+        var _axTrim=_axParts[_axp].trim();
+        if(_axTrim) _refAnnexLabels[_axTrim]=true;
+      }
+    }
+  }
+  var _pdfIdx=0;      // counter for unique PDF/file element IDs
+  var _pdfScripts=''; // JS lines pushed during annexure rendering; injected into <script> block
   var _revAnnexes = (sess.annexures||[]).filter(function(a){
-    return (a.files&&a.files.length)||(a.text&&a.text.trim());
+    var lbl=(a.label||'').trim();
+    return _refAnnexLabels[lbl] || (a.files&&a.files.length) || (a.text&&a.text.trim());
   });
   if(_revAnnexes.length){
     rv+='<div id="anx-section" style="background:#fff;border-radius:8px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden;border:2px solid #1a3a5c">';
@@ -23005,12 +23021,20 @@ function generateReviewerHtml(role){
             rv+='<div style="font-size:11px;color:#6a7888;margin-bottom:4px">'+esc(_f.name)+'</div>';
             rv+='<img src="'+_f.dataUrl+'" style="max-width:100%;border:1px solid #dde2ea;border-radius:4px;display:block">';
           } else if(_isPdf){
+            // Chrome blocks data: URIs in <embed> and blocks data: URI downloads on file:// pages.
+            // Store data in a JS variable; on load, convert to blob: URL for iframe + download link.
+            var _pdfId='rvpdf-'+(_pdfIdx++);
+            var _safeDataUrl=_f.dataUrl.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            _pdfScripts+='_rvPdfs.push({id:\''+_pdfId+'\',name:'+JSON.stringify(_f.name)+',data:\''+_safeDataUrl+'\'});\n';
             rv+='<div style="font-size:11px;color:#6a7888;margin-bottom:4px">'+esc(_f.name)+'</div>';
-            rv+='<embed src="'+_f.dataUrl+'" type="application/pdf" style="width:100%;height:480px;border:1px solid #dde2ea;border-radius:4px">';
-            rv+='<div style="margin-top:4px"><a href="'+_f.dataUrl+'" download="'+esc(_f.name)+'" style="font-size:12px;color:#1a3a5c;font-weight:600">&#8595; Download PDF</a></div>';
+            rv+='<iframe id="'+_pdfId+'" src="about:blank" style="width:100%;height:480px;border:1px solid #dde2ea;border-radius:4px"></iframe>';
+            rv+='<div style="margin-top:4px"><a id="'+_pdfId+'-dl" href="#" style="font-size:12px;color:#1a3a5c;font-weight:600">&#8595; Download PDF</a></div>';
           } else {
-            // Other files — data-URI download link
-            rv+='<a href="'+_f.dataUrl+'" download="'+esc(_f.name)+'" style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12.5px;font-weight:600;color:#1a3a5c;text-decoration:none">&#128229; '+esc(_f.name)+'</a>';
+            // Other files — convert to blob: URL on load for cross-origin/file:// compatibility
+            var _fileId='rvfile-'+(_pdfIdx++);
+            var _safeDataUrl2=_f.dataUrl.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            _pdfScripts+='_rvPdfs.push({id:\''+_fileId+'\',name:'+JSON.stringify(_f.name)+',data:\''+_safeDataUrl2+'\'});\n';
+            rv+='<a id="'+_fileId+'-dl" href="#" style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12.5px;font-weight:600;color:#1a3a5c;text-decoration:none">&#128229; '+esc(_f.name)+'</a>';
           }
           rv+='</div>';
         }
@@ -23036,6 +23060,28 @@ function generateReviewerHtml(role){
 
   // ── Inline JS ─────────────────────────────────────────────────────────
   rv+='<script>\n';
+  // PDF / file blob: URL conversion — Chrome blocks data: URIs in <embed> and
+  // blocks data: URI downloads from file:// pages. Convert to blob: URLs on load.
+  rv+='var _rvPdfs=[];\n';
+  rv+=_pdfScripts; // per-file push lines collected during annexure rendering
+  rv+='(function(){\n';
+  rv+='  function _dataToBlob(dataUrl){\n';
+  rv+='    var arr=dataUrl.split(","),mime=arr[0].match(/:(.*?);/)[1];\n';
+  rv+='    var bstr=atob(arr[1]),n=bstr.length,u8=new Uint8Array(n);\n';
+  rv+='    for(var i=0;i<n;i++) u8[i]=bstr.charCodeAt(i);\n';
+  rv+='    return new Blob([u8],{type:mime});\n';
+  rv+='  }\n';
+  rv+='  for(var _pi=0;_pi<_rvPdfs.length;_pi++){\n';
+  rv+='    try{\n';
+  rv+='      var _pe=_rvPdfs[_pi];\n';
+  rv+='      var _burl=URL.createObjectURL(_dataToBlob(_pe.data));\n';
+  rv+='      var _frm=document.getElementById(_pe.id);\n';
+  rv+='      if(_frm) _frm.src=_burl;\n'; // iframe for PDF
+  rv+='      var _dl=document.getElementById(_pe.id+"-dl");\n';
+  rv+='      if(_dl){ _dl.href=_burl; _dl.download=_pe.name; }\n';
+  rv+='    }catch(e){}\n';
+  rv+='  }\n';
+  rv+='})();\n';
   rv+='var _evidenceStore={};\n';
   rv+='function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}\n';
   rv+='function onFlag(id,cb){\n';
