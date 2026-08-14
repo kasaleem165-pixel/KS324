@@ -576,8 +576,12 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
     if(cu&&cu.role==='administrator'){
       window._hoAuthed=true;
     }
-    // Apply role-based UI restrictions for supervisors on page reload
-    if(cu&&(cu.role==='ro_supervisor'||cu.role==='ho_supervisor')){
+    if(cu&&cu.role==='viewer'){
+      window._hoAuthed=true; // lets viewer open all tabs without auth prompts
+      window._viewerMode=true; // blocks destructive admin actions
+    }
+    // Apply role-based UI restrictions on page reload (all non-admin roles)
+    if(cu&&(cu.role==='ro_supervisor'||cu.role==='ho_supervisor'||cu.role==='auditor')){
       setTimeout(_applyRoleUI, 0);
     }
   }}catch(e){}
@@ -625,6 +629,18 @@ function pwCheck(){
     return;
   }
 
+  // Built-in Viewer (Tester) account — all tabs visible, admin actions blocked
+  var _defViewer='View@2026';
+  var _curViewer=''; try{_curViewer=localStorage.getItem('sa_pw_viewer')||_defViewer;}catch(e){_curViewer=_defViewer;}
+  if(v===_curViewer){
+    try{sessionStorage.setItem('sa_auth_2026','1'); sessionStorage.setItem('sa_current_user', JSON.stringify({role:'viewer'}));}catch(e){}
+    window._hoAuthed=true;   // lets all tabs open without auth prompts
+    window._viewerMode=true; // blocks destructive admin actions
+    try{_hoActivateBtns();}catch(e){}
+    document.getElementById('pw-screen').style.display='none';
+    return;
+  }
+
   var err=document.getElementById('pw-err');
   err.textContent='Incorrect password. Please try again.';
   document.getElementById('pw-input').value='';
@@ -649,6 +665,9 @@ function pwCheck(){
         </label>
         <label style="cursor:pointer;border:2px solid #c8d8ec;border-radius:6px;padding:8px 10px;font-size:12px;display:flex;align-items:center;gap:6px;transition:border .15s" id="chpw-lbl-ho_sup">
           <input type="radio" name="chpw-acct" value="ho_sup" onchange="chpwAcctChange()" style="accent-color:#1a3a5c"> HO Supervisor
+        </label>
+        <label style="cursor:pointer;border:2px solid #c8d8ec;border-radius:6px;padding:8px 10px;font-size:12px;display:flex;align-items:center;gap:6px;transition:border .15s" id="chpw-lbl-viewer">
+          <input type="radio" name="chpw-acct" value="viewer" onchange="chpwAcctChange()" style="accent-color:#1a3a5c"> Viewer
         </label>
         <label style="cursor:pointer;border:2px solid #c8d8ec;border-radius:6px;padding:8px 10px;font-size:12px;display:flex;align-items:center;gap:6px;transition:border .15s" id="chpw-lbl-ho">
           <input type="radio" name="chpw-acct" value="ho" onchange="chpwAcctChange()" style="accent-color:#1a3a5c"> Administrator
@@ -717,17 +736,35 @@ function _userRole(){
   return window._hoAuthed?'administrator':'auditor';
 }
 function _canSendHO(){ var r=_userRole(); return r==='administrator'||r==='ro_supervisor'||r==='ho_supervisor'; }
-function _canIssue(){  var r=_userRole(); return r==='administrator'||r==='ho_supervisor'; }
+function _canIssue(){  var r=_userRole(); return r==='administrator'; }
+// Returns true and shows a message if the current user is a Viewer (tester) — blocks destructive admin actions
+function _viewerBlocked(){
+  if(!window._viewerMode) return false;
+  alert('This action is not available in Viewer mode.\n\nViewer accounts can browse all tabs and reports but cannot execute administrator actions (Issue Report, Export Updated App, Approve Databank changes).');
+  return true;
+}
 
 // Apply toolbar visibility based on logged-in role.
 // Called after login and on page startup if already authenticated.
 function _applyRoleUI(){
   var r = _userRole();
-  var isRO  = r === 'ro_supervisor';
-  var isHO  = r === 'ho_supervisor';
-  if(!isRO && !isHO) return; // Auditor and Administrator see everything
+  if(r === 'administrator' || r === 'viewer') return; // Both see all tabs
 
   function hide(id){ var el=document.getElementById(id); if(el) el.style.display='none'; }
+
+  // Auditor: hide Admin, Tools, Issue Report, Send to HO, Load HO Review,
+  // Refer to HO, Load HO Response (auditor must route through RO only),
+  // Pending Databank Additions/Amendments, Methodology and admin-only RA tabs
+  if(r === 'auditor'){
+    ['dd-admin','dd-tools','rev-issue','rev-send-ho','rev-load-ho',
+     'dist-refer-ho','dist-load-ho',
+     'admin-pending-btn','admin-amend-btn','ra-method-btn','ra-stab-23','ra-stab-cx'].forEach(hide);
+    var s1=document.getElementById('ra-stab-1'); if(s1) s1.style.borderRadius='4px 4px 0 0';
+    return;
+  }
+
+  var isRO = r === 'ro_supervisor';
+  var isHO = r === 'ho_supervisor';
 
   // Both supervisors: hide Build, Distribute, Tools, Admin tabs
   ['dd-build','dd-dist','dd-tools','dd-admin'].forEach(hide);
@@ -759,7 +796,7 @@ function hideChangePwModal(){
 }
 function chpwAcctChange(){
   var v=document.querySelector('input[name="chpw-acct"]:checked').value;
-  ['user','ro','ho_sup','ho'].forEach(function(k){
+  ['user','ro','ho_sup','viewer','ho'].forEach(function(k){
     var el=document.getElementById('chpw-lbl-'+k);
     if(el) el.style.borderColor=(v===k?'#1a3a5c':'#c8d8ec');
   });
@@ -772,6 +809,7 @@ function _getActivePw(type){
   if(type==='user')   return 'S&A2026';
   if(type==='ro')     return 'RO$2026';
   if(type==='ho_sup') return 'HOSuper@2026';
+  if(type==='viewer') return 'View@2026';
   if(type==='ho')     return [72,79,64,83,38,65,50,48,50,54].map(function(c){return String.fromCharCode(c);}).join('');
   return '';
 }
@@ -804,7 +842,7 @@ function doChangePw(){
     return;
   }
   hideChangePwModal();
-  var _lblMap={user:'Auditor',ro:'RO Supervisor',ho_sup:'HO Supervisor',ho:'Administrator'};
+  var _lblMap={user:'Auditor',ro:'RO Supervisor',ho_sup:'HO Supervisor',viewer:'Viewer',ho:'Administrator'};
   var label=_lblMap[acct]||acct;
   setTimeout(function(){ alert('Password for '+label+' account updated successfully.'); },100);
 }
@@ -5767,13 +5805,16 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <button class="tb-dd-item rpt-btn" onclick="downloadSoftCopy();tbDDClose()"><span class="di">&#128233;</span> Auditee Copy</button>
         <button class="tb-dd-item rpt-btn" onclick="triggerLoad();tbDDClose()"><span class="di">&#128194;</span> Load Auditee Response</button>
         <div class="tb-dd-sep"></div>
+        <button class="tb-dd-item rpt-btn" onclick="showFollowUpModal();tbDDClose()"><span class="di">&#128260;</span> Follow-up Response Request</button>
+        <button class="tb-dd-item rpt-btn" onclick="document.getElementById('followup-fileinp').click();tbDDClose()"><span class="di">&#128194;</span> Load Follow-up Response</button>
+        <div class="tb-dd-sep"></div>
         <button class="tb-dd-item rpt-btn" onclick="showDraftModal('ro');tbDDClose()"><span class="di">&#128196;</span> Refer to RO</button>
-        <button class="tb-dd-item rpt-btn" onclick="showDraftModal('ho');tbDDClose()"><span class="di">&#128196;</span> Refer to HO</button>
+        <button id="dist-refer-ho" class="tb-dd-item rpt-btn" onclick="showDraftModal('ho');tbDDClose()"><span class="di">&#128196;</span> Refer to HO</button>
         <div class="tb-dd-sep"></div>
         <button class="tb-dd-item rpt-btn" onclick="triggerLoadSectResponse('ro');tbDDClose()"><span class="di">&#128194;</span> Load RO Response</button>
-        <button class="tb-dd-item rpt-btn" onclick="triggerLoadSectResponse('ho');tbDDClose()"><span class="di">&#128194;</span> Load HO Response</button>
+        <button id="dist-load-ho" class="tb-dd-item rpt-btn" onclick="triggerLoadSectResponse('ho');tbDDClose()"><span class="di">&#128194;</span> Load HO Response</button>
         <div class="tb-dd-sep"></div>
-        <button class="tb-dd-item rpt-btn" onclick="showSaveDialog();tbDDClose()"><span class="di">&#9989;</span> Finalize Report</button>
+        <button class="tb-dd-item rpt-btn" onclick="showSaveDialog();tbDDClose()"><span class="di">&#9989;</span> Validate &amp; Save Report</button>
       </div>
     </div>
 
@@ -5787,6 +5828,9 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <button id="rev-load-ho" class="tb-dd-item rpt-btn" onclick="if(_canIssue()){triggerLoadReviewerHtml('ho');tbDDClose();}else{tbDDClose();showHOAuthModal(function(){triggerLoadReviewerHtml('ho');});}"><span class="di">&#128194;</span> Load HO Supervisor Review</button>
         <div id="rev-sep-2" class="tb-dd-sep"></div>
         <button id="rev-issue" class="tb-dd-item rpt-btn" onclick="if(_canIssue()){generateIssuedReport();tbDDClose();}else{tbDDClose();showHOAuthModal(function(){generateIssuedReport();});}"><span class="di">&#10003;</span> Issue Report</button>
+        <div class="tb-dd-sep"></div>
+        <button class="tb-dd-item" id="admin-pending-btn" onclick="showPendingDatabankModal();tbDDClose()"><span class="di">&#128196;</span> Pending Databank Additions <span id="admin-pending-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
+        <button class="tb-dd-item" id="admin-amend-btn" onclick="showPendingAmendmentsModal();tbDDClose()"><span class="di">&#9999;</span> Pending Databank Amendments <span id="admin-amend-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
       </div>
     </div>
 
@@ -5811,6 +5855,8 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       <div class="tb-dd-menu">
         <button class="tb-dd-item locked" id="chpw-btn" onclick="showChangePwModal();tbDDClose()" disabled><span class="di">&#128274;</span> Change Password</button>
         <div class="tb-dd-sep"></div>
+        <div class="tb-dd-sep"></div>
+        <button class="tb-dd-item" onclick="showClearSessionModal();tbDDClose()"><span class="di">&#128465;</span> Clear Session</button>
         <button class="tb-dd-item" onclick="updbExportApp();tbDDClose()"><span class="di">&#128229;</span> Export Updated App</button>
       </div>
     </div>
@@ -5941,6 +5987,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
   <div id="aws-cat-sections"></div>
 </div>
 <input type="file" id="fileinp" accept=".html" style="display:none" onchange="loadAuditeeFile(event)">
+<input type="file" id="followup-fileinp" accept=".html" style="display:none" onchange="loadAuditeeFile(event)">
 <input type="file" id="sessioninp" accept=".json" style="display:none" onchange="importSessionFile(event)">
 <input type="file" id="fullbackupinp" accept=".json" style="display:none" onchange="importFullBackup(event)">
 <input type="file" id="rptinp" accept=".html,.htm,.json" style="display:none" onchange="loadReportFile(event)">
@@ -6449,7 +6496,8 @@ function _raReportsClear(){
 // New observations approved from final reports are stored here
 // and merged into DB.observations so all existing code sees them
 // ============================================================
-var DB_EXT_KEY = 'bss_dbext_v1';
+var DB_EXT_KEY   = 'bss_dbext_v1';
+var DB_AMEND_KEY = 'bss_dbamend_v1'; // obsId → {obsText, recText, title, amendedAt}
 (function initDbExt(){
   var ext = sg(DB_EXT_KEY, []);
   // Merge into DB.observations — only add if ID not already present
@@ -6499,10 +6547,21 @@ var DEF_PB=['Senior Officer','Asst. Manager','Deputy Manager'];
 var DEF_TY=["All Types","New","Repeated"]; // "All Types" kept as default value only
 var DEF_CA=['All Categories'].concat(["Revenue & Guest Billing","Cash, Bank & Imprest","Procurement & Payables","Fixed Assets","Store & Inventory","Recruitment, Payroll & Employee Records","Security & Related Controls","Food Safety & HACCP","Others"]);
 
-// Returns category keys in DEF_CA canonical order, unknown cats appended at end
+// Converts an annexure label into a safe HTML id for anchor linking.
+// Both the annexure section and the observation reference use this same function
+// so they always match regardless of what the auditor typed as the label.
+function _anxId(label){
+  return 'anx-'+(label||'').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+}
+
+// Returns category keys in the same order as the live CATS array (Filter panel order),
+// unknown/custom categories appended at end.
 function catOrderByDef(catsObj){
   var order=[];
-  for(var _di=1;_di<DEF_CA.length;_di++){if(catsObj[DEF_CA[_di]]) order.push(DEF_CA[_di]);}
+  for(var _di=0;_di<CATS.length;_di++){
+    if(CATS[_di]==='All Categories') continue;
+    if(catsObj[CATS[_di]]) order.push(CATS[_di]);
+  }
   for(var _c in catsObj){if(order.indexOf(_c)<0) order.push(_c);}
   return order;
 }
@@ -6527,6 +6586,8 @@ var actMap   = {};   // {obsId: action taken text}
 var respMap  = {};   // {obsId: auditee response text}
 var respBHMap= {};   // {obsId: Branch Head response}
 var respROMap= {};   // {obsId: RO/HO Supervisor response (formal review chain)}
+var respHistory   = {}; // {obsId: [{round,response,loadedAt}]} — previous rounds kept for audit trail
+var respAttachMap = {}; // {obsId: [{name,type,dataUrl}]} — files attached by auditee as evidence
 var respSectROMap={};// {obsId: RO section head response (from RO Copy)}
 var respSectHOMap={};// {obsId: HO section head response (from HO Copy)}
 var obsNotesMap={};  // {obsId: branch-specific notes/tables text}
@@ -6676,41 +6737,109 @@ window.onload = function() {
 function pad(n){return n<10?'0'+n:n;}
 
 function showWelcomeBack(branchName, savedAt, wasAuto){
-  // Remove any existing banner first
+  // Remove any stale banner/modal first
   var old = document.getElementById('wb-banner');
   if(old) old.remove();
-
-  var banner = document.createElement('div');
-  banner.id = 'wb-banner';
-  banner.style.cssText = 'position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:9998;'+
-    'background:#1a3a5c;color:#fff;padding:10px 20px 10px 16px;border-radius:8px;'+
-    'box-shadow:0 4px 16px rgba(0,0,0,.35);display:flex;align-items:center;gap:14px;'+
-    'font-family:Inter,Arial,sans-serif;font-size:12.5px;min-width:300px;max-width:90vw;'+
-    'border-left:4px solid #f0c040;animation:wbSlide .35s ease';
-  banner.innerHTML =
-    '<span style="font-size:20px">&#128075;</span>'+
-    '<div style="flex:1">'+
-      '<div style="font-weight:700;color:#f0c040;font-size:13px">Welcome back!</div>'+
-      '<div style="margin-top:2px;color:#cce">'+
-        'Restored: <strong style="color:#fff">'+esc(branchName)+'</strong>'+
-        (savedAt ? ' &nbsp;·&nbsp; Last saved: '+savedAt : '')+
-        (wasAuto ? ' &nbsp;<span style="font-size:10px;background:#c9962a;color:#111;padding:1px 6px;border-radius:8px;font-weight:700">AUTO</span>' : '')+
-      '</div>'+
-    '</div>'+
-    '<button onclick="document.getElementById(\'wb-banner\').remove()" '+
-      'style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;padding:0 0 0 8px;line-height:1">&#10005;</button>';
+  var oldM = document.getElementById('wb-modal');
+  if(oldM) oldM.remove();
 
   // Add keyframe if not present
   if(!document.getElementById('wb-style')){
     var st = document.createElement('style');
     st.id = 'wb-style';
-    st.textContent = '@keyframes wbSlide{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}';
+    st.textContent = '@keyframes wbSlide{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}'+
+      '@keyframes wbFadeIn{from{opacity:0}to{opacity:1}}';
     document.head.appendChild(st);
   }
 
-  document.body.appendChild(banner);
-  // Auto-dismiss after 6 seconds
-  setTimeout(function(){ if(banner.parentNode) banner.remove(); }, 6000);
+  // --- Modal: force an explicit choice so auditors never accidentally work on the wrong branch ---
+  var modal = document.createElement('div');
+  modal.id = 'wb-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;'+
+    'display:flex;align-items:center;justify-content:center;padding:16px;'+
+    'animation:wbFadeIn .25s ease;font-family:Inter,Arial,sans-serif';
+
+  var savedLabel = savedAt ? ('<span style="color:#8aabcc">Last saved: '+savedAt+'</span>') : '';
+  var autoTag = wasAuto ? '<span style="font-size:10px;background:#c9962a;color:#111;padding:1px 7px;border-radius:8px;font-weight:700;vertical-align:middle;margin-left:6px">AUTO-SAVED</span>' : '';
+
+  modal.innerHTML =
+    '<div style="background:#fff;border-radius:14px;width:500px;max-width:96vw;'+
+      'box-shadow:0 12px 48px rgba(0,0,0,.35);overflow:hidden">'+
+
+      // Header
+      '<div style="background:#1a3a5c;padding:16px 20px;display:flex;align-items:center;gap:12px">'+
+        '<span style="font-size:28px">&#128075;</span>'+
+        '<div>'+
+          '<div style="font-size:15px;font-weight:700;color:#f0c040">Welcome Back!</div>'+
+          '<div style="font-size:11.5px;color:#aac4e0;margin-top:2px">A saved session was found from your last visit.</div>'+
+        '</div>'+
+      '</div>'+
+
+      // Body
+      '<div style="padding:20px 20px 8px">'+
+        '<div style="background:#f0f4fa;border-radius:8px;padding:12px 14px;margin-bottom:18px;border-left:4px solid #1a3a5c">'+
+          '<div style="font-size:12px;color:#666;margin-bottom:3px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Saved Session</div>'+
+          '<div style="font-size:14px;font-weight:700;color:#1a3a5c">&#127970; '+esc(branchName)+autoTag+'</div>'+
+          (savedLabel ? '<div style="font-size:11.5px;margin-top:4px">'+savedLabel+'</div>' : '')+
+        '</div>'+
+
+        '<div style="font-size:12.5px;color:#444;margin-bottom:14px;line-height:1.6">'+
+          'Are you continuing work on <strong>'+esc(branchName)+'</strong>, or starting a new audit for a different branch?'+
+        '</div>'+
+
+        // Buttons
+        '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">'+
+
+          // Resume button
+          '<button id="wb-resume" style="display:flex;align-items:center;gap:12px;padding:13px 16px;'+
+            'border:2px solid #27ae60;border-radius:8px;background:#f0fff4;cursor:pointer;'+
+            'text-align:left;font-family:inherit;transition:background .15s" '+
+            'onmouseover="this.style.background=\'#d4f5e0\'" onmouseout="this.style.background=\'#f0fff4\'">'+
+            '<span style="font-size:24px;flex-shrink:0">&#9654;&#65039;</span>'+
+            '<div>'+
+              '<div style="font-size:13px;font-weight:700;color:#1a5c30">Resume — Continue with '+esc(branchName)+'</div>'+
+              '<div style="font-size:11.5px;color:#3a7050;margin-top:2px">Load all saved observations, responses, and report data.</div>'+
+            '</div>'+
+          '</button>'+
+
+          // New Report button
+          '<button id="wb-newrpt" style="display:flex;align-items:center;gap:12px;padding:13px 16px;'+
+            'border:2px solid #c0392b;border-radius:8px;background:#fff5f5;cursor:pointer;'+
+            'text-align:left;font-family:inherit;transition:background .15s" '+
+            'onmouseover="this.style.background=\'#fde0de\'" onmouseout="this.style.background=\'#fff5f5\'">'+
+            '<span style="font-size:24px;flex-shrink:0">&#128196;</span>'+
+            '<div>'+
+              '<div style="font-size:13px;font-weight:700;color:#7b1a1a">New Report — Different Branch / Fresh Start</div>'+
+              '<div style="font-size:11.5px;color:#8b3030;margin-top:2px">Clear the saved session completely and begin a blank new report.</div>'+
+            '</div>'+
+          '</button>'+
+        '</div>'+
+
+        '<div style="font-size:11px;color:#999;text-align:center;padding-bottom:12px">'+
+          'If you choose <em>New Report</em>, the saved session for <strong>'+esc(branchName)+'</strong> will be permanently removed.'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+
+  document.body.appendChild(modal);
+
+  // Resume: just close the modal — session is already restored
+  document.getElementById('wb-resume').addEventListener('click', function(){
+    modal.remove();
+    toast('Session resumed — '+branchName);
+  });
+
+  // New Report: wipe everything, then show the new-report type picker
+  document.getElementById('wb-newrpt').addEventListener('click', function(){
+    modal.remove();
+    // Erase the auto-saved session so it does not restore again on next open
+    try{ idbSet(AS_KEY, null); }catch(e){}
+    try{ idbSet(VH_KEY, []); }catch(e){}
+    try{ localStorage.removeItem(AS_KEY); }catch(e){}
+    _performFullClear();
+    // Reuse the existing New Report flow so the auditor picks first-time vs returning
+    doNewReport();
+  });
 }
 
 // ============================================================
@@ -7315,15 +7444,14 @@ function setObsType(id, val) {
   var lrx=document.getElementById('lrx-'+id);
   var lrInp=document.getElementById('lr-'+id);
   if(val==='Repeated'){
-    // Auto-fill LARR from prior detection results if not already set
-    if(!lastRefMap[id]){
-      var _rdm=window._rdMatches||[];
-      for(var _rmi=0;_rmi<_rdm.length;_rmi++){
-        if(_rdm[_rmi].obsId===id){
-          setLastRef(id, _buildLarrSentence(_rdm[_rmi].ref||'', _rdm[_rmi].year||''));
-          break;
-        }
-      }
+    // Fill LARR if missing, or if it's just a bare ref number (old session format — upgrade to full sentence)
+    var _existingLarr=lastRefMap[id]||'';
+    var _larrIsBarenumber=_existingLarr&&_existingLarr.length<40&&!/please refer/i.test(_existingLarr);
+    if(!_existingLarr||_larrIsBarenumber){
+      var _lrrSentence=_larrAutoFillFromRA(id);
+      // If bare number, pass it into the sentence builder so the ref is preserved
+      if(_larrIsBarenumber&&!_lrrSentence) _lrrSentence=_buildLarrSentence(_existingLarr,'');
+      setLastRef(id, _lrrSentence||_buildLarrSentence('',''));
     }
     if(!lrx){
       var newRow=document.createElement('div');
@@ -7930,6 +8058,9 @@ var hoComments      = {}; // obsId → string
 var hoCorrections   = {}; // obsId → string
 var hoAccepted      = {}; // obsId → true
 var respAmendments  = {}; // obsId → {amendedBy,original,amended,reason,evidenceFile,evidenceData,ts}
+var roCustomApprovals = {}; // obsId → {decision:'approved'|'changes'|'rejected', comment:''}
+var hoCustomApprovals = {}; // obsId → {decision:'approved'|'changes'|'rejected', comment:''}
+var pendingAmendments = {}; // obsId → {obsText, recText, title, detectedAt} — both RO+HO accepted wording changes
 
 function WC_detect(obsId){
   var obs = _getObsRecord(obsId); if(!obs) return;
@@ -8042,6 +8173,8 @@ function captureSession() {
     respMap  : respMap,
     respBHMap: respBHMap,
     respROMap: respROMap,
+    respHistory:   respHistory,
+    respAttachMap: respAttachMap,
     respSectROMap: respSectROMap,
     respSectHOMap: respSectHOMap,
     obsNotesMap: obsNotesMap,
@@ -8058,6 +8191,9 @@ function captureSession() {
     roFlags: roFlags, roComments: roComments, roCorrections: roCorrections, roAccepted: roAccepted,
     hoFlags: hoFlags, hoComments: hoComments, hoCorrections: hoCorrections, hoAccepted: hoAccepted,
     respAmendments: respAmendments,
+    roCustomApprovals: roCustomApprovals,
+    hoCustomApprovals: hoCustomApprovals,
+    pendingAmendments: pendingAmendments,
     customs  : customs,
     responseLoaded: responseLoaded,
     wfSentAuditee: _wfSentAuditee, wfReceivedBack: _wfReceivedBack, wfSentRO: _wfSentRO,
@@ -8072,6 +8208,9 @@ function captureSession() {
 
 function restoreSession(sess) {
   if(!sess) return;
+  // Wipe all in-memory state before loading the incoming session so no
+  // data from a previous report can bleed through into the restored one.
+  _performFullClear();
   // Temporarily enable fields so values can be set, then re-lock
   setBrInfoDisabled(false);
   // Restore form fields
@@ -8095,6 +8234,8 @@ function restoreSession(sess) {
   respMap   = sess.respMap   || {};
   respBHMap     = sess.respBHMap     || {};
   respROMap     = sess.respROMap     || {};
+  respHistory   = sess.respHistory   || {};
+  respAttachMap = sess.respAttachMap || {};
   respSectROMap = sess.respSectROMap || {};
   respSectHOMap = sess.respSectHOMap || {};
   obsNotesMap     = sess.obsNotesMap     || {};
@@ -8116,6 +8257,9 @@ function restoreSession(sess) {
   hoCorrections   = sess.hoCorrections   || {};
   hoAccepted      = sess.hoAccepted      || {};
   respAmendments  = sess.respAmendments  || {};
+  roCustomApprovals = sess.roCustomApprovals || {};
+  hoCustomApprovals = sess.hoCustomApprovals || {};
+  pendingAmendments = sess.pendingAmendments || {};
   // Restore responseLoaded — also infer it if assessMap or respMap has entries
   responseLoaded = sess.responseLoaded || Object.keys(assessMap).length>0 || Object.keys(sess.respMap||{}).length>0;
   _wfSentAuditee  = sess.wfSentAuditee  || false;
@@ -8149,6 +8293,10 @@ function restoreSession(sess) {
   lockBrInfo();
   renderAnnexList();
   renderRpt();
+  // Refresh left-panel search results so the observation list reflects the loaded session.
+  // Without this call, the left panel stays in the blank "Select a filter" prompt state
+  // after session import, making the user think no data was loaded.
+  applyFilter();
   // If Duplicate Observations modal is open, refresh scan with newly loaded session
   if(document.getElementById('updbModal')) updbScanLiveSession(true);
 }
@@ -8990,8 +9138,8 @@ function renderRpt(){
         h+='</div>';
       }
       h+='</div>';
-      // 4. Annexure Data (if set)
-      if(ax) h+='<div class="oax"><strong>Annexure Data:</strong> '+esc(ax)+'</div>';
+      // 4. Annexure Data (if set) — clickable link scrolls to annexure section below
+      if(ax) h+='<div class="oax"><strong>Annexure Data:</strong> <a href="#'+_anxId(ax)+'" style="color:#1a3a5c;font-weight:700;text-decoration:underline;cursor:pointer" title="Click to view annexure below">'+esc(ax)+'</a></div>';
       // 4. Auditee Response — only show after response is loaded/uploaded; split by BH / RO/HO
       if(responseLoaded){
         var bhResp=respBHMap[o.id]!=null?respBHMap[o.id]:null;
@@ -9015,6 +9163,48 @@ function renderRpt(){
         if(bhResp===null&&roResp===null&&resp){
           h+='<div class="osl">Auditee Response</div>';
           h+='<textarea class="oresp" id="r-'+o.id+'" readonly style="background:#f0f4f8;color:#3a4a5c;cursor:default;border-color:#b0c0d8" title="Auditee response is locked after loading">'+esc(resp)+'</textarea>';
+        }
+        // Auditee evidence attachments — collapsible thumbnails/downloads
+        var atts=respAttachMap[o.id]||[];
+        if(atts.length){
+          var aid='ra-'+o.id;
+          h+='<div class="no-print" style="margin-top:6px">';
+          h+='<button onclick="var d=document.getElementById(\''+aid+'\');d.style.display=d.style.display===\'none\'?\'block\':\'none\'" ';
+          h+='style="font-size:11px;color:#1a6030;background:none;border:none;cursor:pointer;padding:2px 0;font-family:Inter,sans-serif;font-weight:600;text-decoration:underline">&#128206; '+atts.length+' Auditee Evidence File'+(atts.length>1?'s':'')+'</button>';
+          h+='<div id="'+aid+'" style="display:none;margin-top:6px;display:flex;flex-wrap:wrap;gap:8px">';
+          for(var ati=0;ati<atts.length;ati++){
+            var af=atts[ati];
+            var isImg=af.type&&af.type.indexOf('image/')===0;
+            var isPdf=af.type==='application/pdf';
+            if(isImg){
+              h+='<div style="border:1px solid #c8d8ec;border-radius:4px;overflow:hidden;max-width:160px">';
+              h+='<img src="'+af.dataUrl+'" style="max-width:160px;max-height:120px;display:block" title="'+esc(af.name)+'">';
+              h+='<div style="font-size:10px;color:#6a7888;padding:2px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(af.name)+'</div>';
+              h+='</div>';
+            } else {
+              h+='<a href="'+af.dataUrl+'" download="'+esc(af.name)+'" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:4px;font-size:12px;font-weight:600;color:#1a3a5c;text-decoration:none">';
+              h+=(isPdf?'&#128196;':'&#128229;')+' '+esc(af.name)+'</a>';
+            }
+          }
+          h+='</div></div>';
+        }
+        // Previous response rounds (history) — collapsible, auditor-only, not printed
+        var hist=respHistory[o.id]||[];
+        if(hist.length){
+          var hid='rh-'+o.id;
+          h+='<div class="no-print" style="margin-top:6px">';
+          h+='<button onclick="var d=document.getElementById(\''+hid+'\');d.style.display=d.style.display===\'none\'?\'block\':\'none\'" ';
+          h+='style="font-size:11px;color:#5b3fa0;background:none;border:none;cursor:pointer;padding:2px 0;font-family:Inter,sans-serif;font-weight:600;text-decoration:underline">&#128337; '+hist.length+' Previous Response'+(hist.length>1?'s':'')+'</button>';
+          h+='<div id="'+hid+'" style="display:none;margin-top:6px">';
+          for(var hi=hist.length-1;hi>=0;hi--){
+            var hr=hist[hi];
+            var hrDate=hr.loadedAt?hr.loadedAt.slice(0,10):'';
+            h+='<div style="margin-bottom:8px;border-left:3px solid #c0a8e8;padding:6px 10px;background:#f8f5ff;border-radius:0 4px 4px 0">';
+            h+='<div style="font-size:10px;font-weight:700;color:#5b3fa0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Round '+(hr.round)+' Response'+(hrDate?' &nbsp;|&nbsp; '+hrDate:'')+'</div>';
+            h+='<div style="font-size:12px;color:#3a2a70;line-height:1.6;white-space:pre-wrap">'+esc(hr.response||'(blank)')+'</div>';
+            h+='</div>';
+          }
+          h+='</div></div>';
         }
         // Section head responses
         var sectROResp=respSectROMap[o.id]||null;
@@ -9252,9 +9442,265 @@ function doCopy(){
   });
 }
 
+function _detectPendingAmendments(){
+  // Find observations where BOTH RO and HO accepted a wording change
+  // Branch-specific notes are not part of wordingChanges — so this is safe
+  var ids=Object.keys(wordingChanges);
+  for(var i=0;i<ids.length;i++){
+    var id=ids[i];
+    var wc=wordingChanges[id];
+    if(!wc) continue;
+    var roDecObs=roAccepted[id]&&roAccepted[id].obs===true;
+    var roDecRec=roAccepted[id]&&roAccepted[id].rec===true;
+    var hoDecObs=hoAccepted[id]&&hoAccepted[id].obs===true;
+    var hoDecRec=hoAccepted[id]&&hoAccepted[id].rec===true;
+    var obsAccepted=(wc.obsEdit!=null)&&roDecObs&&hoDecObs;
+    var recAccepted=(wc.recEdit!=null)&&roDecRec&&hoDecRec;
+    if(obsAccepted||recAccepted){
+      if(!pendingAmendments[id]){
+        var title=_getObsTitle(id)||id;
+        pendingAmendments[id]={
+          title: title,
+          obsText: obsAccepted?wc.obsEdit:null,
+          recText: recAccepted?wc.recEdit:null,
+          detectedAt: new Date().toISOString()
+        };
+      }
+    }
+  }
+  _updatePendingAmendmentsBadge();
+}
+
+function _updatePendingAmendmentsBadge(){
+  var count=Object.keys(pendingAmendments).length;
+  var badge=document.getElementById('admin-amend-badge');
+  if(badge){ badge.textContent=count; badge.style.display=count?'inline':'none'; }
+}
+
+function showPendingAmendmentsModal(){
+  var ids=Object.keys(pendingAmendments);
+  var mo=document.createElement('div');
+  mo.id='pendingAmendModal';
+  mo.style.cssText='position:fixed;inset:0;background:rgba(10,20,40,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+  var rows='';
+  if(!ids.length){
+    rows='<div style="text-align:center;padding:30px;color:#888;font-size:13px">&#10003; No pending amendments — both RO and HO must accept a wording change for it to appear here.</div>';
+  } else {
+    for(var i=0;i<ids.length;i++){
+      var id=ids[i]; var am=pendingAmendments[id];
+      var orig=_getObsRecord(id);
+      rows+='<div style="border:1px solid #c8d8ec;border-left:4px solid #1a3a5c;border-radius:5px;margin-bottom:12px;overflow:hidden">';
+      rows+='<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f0f4ff;border-bottom:1px solid #c8d8ec">';
+      rows+='<span style="flex:1;font-size:13px;font-weight:700;color:#1e2d40">'+esc(am.title)+'</span>';
+      rows+='<span style="font-size:9px;font-weight:700;color:#1a3a5c;background:#d0e4f8;border-radius:4px;padding:2px 7px">&#10003; RO &amp; HO Accepted</span>';
+      rows+='</div>';
+      rows+='<div style="padding:10px 12px">';
+      if(am.obsText!=null){
+        rows+='<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#c0392b;margin-bottom:3px">Observation — Change</div>';
+        rows+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">';
+        rows+='<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">Original</div><div style="font-size:11.5px;line-height:1.5;color:#5a1010;background:#ffe8e8;border-left:3px solid #c0392b;border-radius:0 4px 4px 0;padding:6px 8px;white-space:pre-wrap">'+esc(orig?orig.observation||'':'')+'</div></div>';
+        rows+='<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">Amended</div><div style="font-size:11.5px;line-height:1.5;color:#105a10;background:#e8f8e8;border-left:3px solid #27ae60;border-radius:0 4px 4px 0;padding:6px 8px;white-space:pre-wrap">'+esc(am.obsText)+'</div></div>';
+        rows+='</div>';
+      }
+      if(am.recText!=null){
+        rows+='<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#c0392b;margin-bottom:3px">Recommendation — Change</div>';
+        rows+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">';
+        rows+='<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">Original</div><div style="font-size:11.5px;line-height:1.5;color:#5a1010;background:#ffe8e8;border-left:3px solid #c0392b;border-radius:0 4px 4px 0;padding:6px 8px;white-space:pre-wrap">'+esc(orig?orig.recommendation||'':'')+'</div></div>';
+        rows+='<div><div style="font-size:9px;font-weight:700;color:#888;margin-bottom:2px">Amended</div><div style="font-size:11.5px;line-height:1.5;color:#105a10;background:#e8f8e8;border-left:3px solid #27ae60;border-radius:0 4px 4px 0;padding:6px 8px;white-space:pre-wrap">'+esc(am.recText)+'</div></div>';
+        rows+='</div>';
+      }
+      rows+='<button onclick="applyAmendmentToDatabank(\''+esc(id)+'\')" style="padding:7px 16px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128190; Apply Amendment to Databank</button>';
+      rows+='</div></div>';
+    }
+  }
+  mo.innerHTML=
+    '<div style="background:#fff;border-radius:12px;max-width:720px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.4);overflow:hidden;font-family:Inter,Arial,sans-serif">'
+    +'<div style="background:linear-gradient(90deg,#1a3a5c,#2a5080);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0">'
+      +'<span style="font-size:20px">&#9999;</span>'
+      +'<div><div style="font-size:14px;font-weight:800">Pending Databank Amendments</div>'
+        +'<div style="font-size:11px;opacity:.8;margin-top:2px">Wording changes accepted by both RO and HO Supervisors — ready for permanent databank update</div></div>'
+      +'<button onclick="document.getElementById(\'pendingAmendModal\').remove()" style="margin-left:auto;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;width:28px;height:28px;font-size:16px;cursor:pointer;font-family:inherit">&#10005;</button>'
+    +'</div>'
+    +'<div style="padding:16px;overflow-y:auto;flex:1">'+rows+'</div>'
+    +'<div style="padding:12px 16px;border-top:1px solid #eee;background:#f8fafc;display:flex;justify-content:flex-end;flex-shrink:0">'
+      +'<button onclick="document.getElementById(\'pendingAmendModal\').remove()" style="padding:7px 18px;background:#eef1f5;color:#555;border:1px solid #c0ccd8;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Close</button>'
+    +'</div>'
+  +'</div>';
+  document.body.appendChild(mo);
+}
+
+function applyAmendmentToDatabank(obsId){
+  if(_viewerBlocked()) return;
+  var am=pendingAmendments[obsId]; if(!am){ toast('Amendment not found.'); return; }
+  // Store in DB_AMEND_KEY for export
+  var amends=sg(DB_AMEND_KEY,{});
+  amends[obsId]={ obsText:am.obsText, recText:am.recText, title:am.title, amendedAt:new Date().toISOString() };
+  ss(DB_AMEND_KEY,amends);
+  // Apply to live DB in memory
+  for(var i=0;i<DB.observations.length;i++){
+    if(DB.observations[i].id===obsId){
+      if(am.obsText!=null) DB.observations[i].observation=am.obsText;
+      if(am.recText!=null) DB.observations[i].recommendation=am.recText;
+      break;
+    }
+  }
+  // Also apply to ext observations
+  var ext=sg(DB_EXT_KEY,[]);
+  for(var j=0;j<ext.length;j++){
+    if(ext[j].id===obsId){
+      if(am.obsText!=null) ext[j].observation=am.obsText;
+      if(am.recText!=null) ext[j].recommendation=am.recText;
+      break;
+    }
+  }
+  ss(DB_EXT_KEY,ext);
+  _setExportPending();
+  delete pendingAmendments[obsId];
+  _updatePendingAmendmentsBadge();
+  var mo=document.getElementById('pendingAmendModal');
+  if(mo){ mo.remove(); showPendingAmendmentsModal(); }
+  toast('✅ Amendment applied. Use Export Updated App to make it permanent.');
+}
+
+function _updatePendingDatabankBadge(){
+  var count=0;
+  for(var id in hoCustomApprovals){ if(hoCustomApprovals[id]&&hoCustomApprovals[id].decision==='approved') count++; }
+  var badge=document.getElementById('admin-pending-badge');
+  if(badge){ badge.textContent=count; badge.style.display=count?'inline':'none'; }
+}
+
+function showPendingDatabankModal(){
+  // Collect HO-approved custom observations
+  var pending=[];
+  for(var id in hoCustomApprovals){
+    if(hoCustomApprovals[id]&&hoCustomApprovals[id].decision==='approved'){
+      var obs=null;
+      for(var ci=0;ci<customs.length;ci++){ if(customs[ci].id===id){ obs=customs[ci]; break; } }
+      if(obs) pending.push({obs:obs,approval:hoCustomApprovals[id]});
+    }
+  }
+  var mo=document.createElement('div');
+  mo.id='pendingDbModal';
+  mo.style.cssText='position:fixed;inset:0;background:rgba(10,20,40,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+  var rows='';
+  if(!pending.length){
+    rows='<div style="text-align:center;padding:30px;color:#888;font-size:13px">&#10003; No HO-approved custom observations pending databank addition.</div>';
+  } else {
+    for(var pi=0;pi<pending.length;pi++){
+      var p=pending[pi];
+      var obsText=(obsEdits[p.obs.id]&&obsEdits[p.obs.id].observation!=null)?obsEdits[p.obs.id].observation:p.obs.observation||'';
+      var recText=(obsEdits[p.obs.id]&&obsEdits[p.obs.id].recommendation!=null)?obsEdits[p.obs.id].recommendation:p.obs.recommendation||'';
+      rows+='<div style="border:1px solid #c8ddc8;border-left:4px solid #1a6030;border-radius:5px;margin-bottom:12px;overflow:hidden">';
+      rows+='<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f0fff4;border-bottom:1px solid #c8ddc8">';
+      rows+='<span style="background:#1a6030;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">Custom</span>';
+      rows+='<span style="flex:1;font-size:13px;font-weight:700;color:#1e2d40">'+esc(p.obs.title)+'</span>';
+      rows+='<span style="font-size:10px;color:#555;background:#e8f8e8;border-radius:4px;padding:2px 7px">'+esc(p.obs.category||'Others')+'</span>';
+      rows+='<span style="font-size:9px;font-weight:700;color:#1a6030;background:#d4edda;border-radius:4px;padding:2px 7px">&#10003; HO Approved</span>';
+      rows+='</div>';
+      rows+='<div style="padding:10px 12px">';
+      rows+='<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a3a5c;margin-bottom:3px">Observation</div>';
+      rows+='<div style="font-size:12px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:7px 9px;margin-bottom:7px;white-space:pre-wrap">'+esc(obsText)+'</div>';
+      rows+='<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a3a5c;margin-bottom:3px">Recommendation</div>';
+      rows+='<div style="font-size:12px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:7px 9px;margin-bottom:10px;white-space:pre-wrap">'+esc(recText)+'</div>';
+      rows+='<button onclick="addCustomObsToDatabank(\''+esc(p.obs.id)+'\')" style="padding:7px 16px;background:#1a6030;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128190; Add to Databank</button>';
+      rows+='</div></div>';
+    }
+  }
+  mo.innerHTML=
+    '<div style="background:#fff;border-radius:12px;max-width:660px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.4);overflow:hidden;font-family:Inter,Arial,sans-serif">'
+    +'<div style="background:linear-gradient(90deg,#1a6030,#2a8050);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0">'
+      +'<span style="font-size:20px">&#128196;</span>'
+      +'<div><div style="font-size:14px;font-weight:800">Pending Databank Additions</div>'
+        +'<div style="font-size:11px;opacity:.8;margin-top:2px">HO-approved custom observations ready to be added to the permanent databank</div></div>'
+      +'<button onclick="document.getElementById(\'pendingDbModal\').remove()" style="margin-left:auto;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;width:28px;height:28px;font-size:16px;cursor:pointer;font-family:inherit">&#10005;</button>'
+    +'</div>'
+    +'<div style="padding:16px;overflow-y:auto;flex:1">'+rows+'</div>'
+    +'<div style="padding:12px 16px;border-top:1px solid #eee;background:#f8fafc;display:flex;justify-content:flex-end;flex-shrink:0">'
+      +'<button onclick="document.getElementById(\'pendingDbModal\').remove()" style="padding:7px 18px;background:#eef1f5;color:#555;border:1px solid #c0ccd8;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Close</button>'
+    +'</div>'
+  +'</div>';
+  document.body.appendChild(mo);
+}
+
+function addCustomObsToDatabank(obsId){
+  var obs=null;
+  for(var ci=0;ci<customs.length;ci++){ if(customs[ci].id===obsId){ obs=customs[ci]; break; } }
+  if(!obs){ toast('Observation not found.'); return; }
+  // Build the obs object to add — apply any edits
+  var o={
+    id: obs.id,
+    title: obs.title,
+    category: obs.category||'Others',
+    type: obs.type||'New',
+    observation: (obsEdits[obs.id]&&obsEdits[obs.id].observation!=null)?obsEdits[obs.id].observation:obs.observation||'',
+    recommendation: (obsEdits[obs.id]&&obsEdits[obs.id].recommendation!=null)?obsEdits[obs.id].recommendation:obs.recommendation||'',
+    custom: true,
+    _dbAddedAt: new Date().toISOString(),
+    _approvedByHO: true
+  };
+  var ext=sg(DB_EXT_KEY,[]);
+  var exists=false;
+  for(var ei=0;ei<ext.length;ei++){ if(ext[ei].id===o.id){ exists=true; break; } }
+  if(exists){ toast('This observation is already in the databank extension.'); return; }
+  ext.push(o);
+  ss(DB_EXT_KEY,ext);
+  DB.observations.push(o);
+  buildObsSrrCache();
+  _setExportPending();
+  // Remove from hoCustomApprovals so it doesn't show again
+  delete hoCustomApprovals[obsId];
+  _updatePendingDatabankBadge();
+  // Refresh modal
+  var mo=document.getElementById('pendingDbModal');
+  if(mo){ mo.remove(); showPendingDatabankModal(); }
+  toast('✅ "'+esc(o.title)+'" added to databank. Use Export Updated App to make it permanent.');
+}
+
+function showClearSessionModal(){
+  var mo=document.createElement('div');
+  mo.id='clearSessModal';
+  mo.style.cssText='position:fixed;inset:0;background:rgba(10,20,40,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+  mo.innerHTML=
+    '<div style="background:#fff;border-radius:12px;max-width:480px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.4);overflow:hidden;font-family:Inter,Arial,sans-serif">'
+    // Header
+    +'<div style="background:linear-gradient(90deg,#8a1a1a,#c0392b);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px">'
+      +'<span style="font-size:22px">&#9888;</span>'
+      +'<div>'
+        +'<div style="font-size:14px;font-weight:800;letter-spacing:.3px">Clear Session — Warning</div>'
+        +'<div style="font-size:11px;opacity:.85;margin-top:2px">This action cannot be undone</div>'
+      +'</div>'
+    +'</div>'
+    // Warning body
+    +'<div style="padding:18px 20px">'
+      +'<div style="background:#fff8e0;border:2px solid #f0c000;border-radius:8px;padding:12px 14px;margin-bottom:14px">'
+        +'<div style="font-size:11px;font-weight:800;color:#7a4800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">&#9997; Save Your Work First</div>'
+        +'<div style="font-size:12.5px;color:#4a3000;line-height:1.6">If you have an active audit report in progress, please <strong>save it before clearing</strong>. Clearing the session will permanently wipe all current data including:</div>'
+        +'<ul style="font-size:12px;color:#4a3000;line-height:1.8;margin:8px 0 0 16px">'
+          +'<li>Branch information</li>'
+          +'<li>Selected observations &amp; custom observations</li>'
+          +'<li>Auditee responses &amp; audit views</li>'
+          +'<li>Report introduction &amp; annexures</li>'
+          +'<li>All session data</li>'
+        +'</ul>'
+      +'</div>'
+      +'<div style="font-size:12px;color:#555;margin-bottom:16px;line-height:1.6">Click <strong>Save My Work First</strong> to go to Save / Versions and save your report. Once saved, return here and click Clear Session again.</div>'
+      // Buttons
+      +'<div style="display:flex;gap:10px;flex-wrap:wrap">'
+        +'<button onclick="document.getElementById(\'clearSessModal\').remove();showVersionHistory();" style="flex:1;padding:10px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-family:Inter,Arial,sans-serif;font-size:12.5px;font-weight:700;cursor:pointer">&#128190; Save My Work First</button>'
+        +'<button onclick="document.getElementById(\'clearSessModal\').remove();_performFullClear();toast(\'Session cleared — app is ready for a clean export.\');" style="flex:1;padding:10px;background:#c0392b;color:#fff;border:none;border-radius:6px;font-family:Inter,Arial,sans-serif;font-size:12.5px;font-weight:700;cursor:pointer">&#128465; Proceed — Clear Session</button>'
+      +'</div>'
+      +'<div style="text-align:center;margin-top:10px">'
+        +'<button onclick="document.getElementById(\'clearSessModal\').remove();" style="padding:6px 20px;background:#eef1f5;color:#555;border:1px solid #c0ccd8;border-radius:6px;font-family:Inter,Arial,sans-serif;font-size:12px;font-weight:600;cursor:pointer">&#10005; Cancel</button>'
+      +'</div>'
+    +'</div>'
+  +'</div>';
+  document.body.appendChild(mo);
+}
+
 function _performFullClear(){
   // Data maps
-  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; respHistory={}; respAttachMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  roCustomApprovals={}; hoCustomApprovals={}; pendingAmendments={};
   // SRR / Risk Mapping state
   if(typeof srr_flagged!=='undefined') srr_flagged={};
   if(typeof srr_reassigned!=='undefined') srr_reassigned={};
@@ -9304,7 +9750,7 @@ function _performFullClear(){
 function doClear(){
   if(!confirm('Clear all selected observations and reset the report draft? Branch information will be kept.'))return;
   // Clear only observation selections and report content — keep branch/header fields intact
-  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; respHistory={}; respAttachMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
   if(typeof srr_flagged!=='undefined') srr_flagged={};
   if(typeof srr_reassigned!=='undefined') srr_reassigned={};
   if(typeof srr_files!=='undefined') srr_files=[];
@@ -9732,14 +10178,8 @@ function dupobsSaveDraft(){
       return { obs: g.obs, decision: g.decision, keepIdxSet: g.keepIdxSet||[] };
     })
   };
-  var blob = new Blob([JSON.stringify(draft, null, 2)], {type:'application/json'});
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
   var ts = new Date().toISOString().slice(0,16).replace('T','_').replace(':','');
-  a.download = 'BRAINS_DupObs_Draft_'+ts+'.json';
-  document.body.appendChild(a); a.click();
-  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
+  saveFileAs(new Blob([JSON.stringify(draft, null, 2)], {type:'application/json'}), 'BRAINS_DupObs_Draft_'+ts+'.json');
   showToast('&#128190; Draft saved — send this file to the Administrator for approval.', 4000);
 }
 
@@ -10081,15 +10521,8 @@ function updbSaveDraft(){
   }
   // Export as downloadable file (Scenario B)
   try{
-    var blob = new Blob([JSON.stringify(draft, null, 2)], {type:'application/json'});
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
     var ts = new Date().toISOString().slice(0,16).replace('T','_').replace(':','');
-    a.download = 'BRAINS_DataMgmt_Draft_'+ts+'.json';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
+    saveFileAs(new Blob([JSON.stringify(draft, null, 2)], {type:'application/json'}), 'BRAINS_DataMgmt_Draft_'+ts+'.json');
     showToast('✅ Draft exported — '+draft.candidates.length+' observation(s). Email this file to the Administrator to load and approve.', 4500);
   }catch(e){
     alert('Could not export draft: '+e.message);
@@ -10164,6 +10597,7 @@ function updbDiscardDraft(){
 }
 
 function updbExportApp(){
+  if(_viewerBlocked()) return;
   var ext = sg(DB_EXT_KEY, []);
   if(!ext.length){
     if(!confirm('No approved observations in the databank extension yet.\nExport the app file anyway (it will be identical to the current version)?')) return;
@@ -10188,6 +10622,26 @@ function updbExportApp(){
           added++;
         }
       }
+
+      // Apply approved amendments to existing observations
+      var amends=sg(DB_AMEND_KEY,{});
+      var amendIds=Object.keys(amends);
+      for(var ai=0;ai<amendIds.length;ai++){
+        var aid=amendIds[ai]; var am=amends[aid];
+        for(var aoi=0;aoi<db.observations.length;aoi++){
+          if(db.observations[aoi].id===aid){
+            if(am.obsText!=null) db.observations[aoi].observation=am.obsText;
+            if(am.recText!=null) db.observations[aoi].recommendation=am.recText;
+            db.observations[aoi]._lastAmendedAt=am.amendedAt;
+            break;
+          }
+        }
+      }
+
+      // Remove suppressed observations from exported databank permanently
+      var supSet = _dbmSuppressed;
+      var suppressed = db.observations.filter(function(o){ return supSet[o.id]; }).length;
+      db.observations = db.observations.filter(function(o){ return !supSet[o.id]; });
 
       // Replace the audit-data block in the fetched HTML
       var updated = html.replace(
@@ -10227,16 +10681,19 @@ function updbExportApp(){
         );
       }
 
-      var blob = new Blob([updated], {type:'text/html'});
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'index.html';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
+      saveFileAs(new Blob([updated], {type:'text/html'}), 'index.html');
       _clearExportPending();
-      showToast('✅ Updated app exported — '+added+' new observation(s) baked in. Upload index.html to Netlify to update all users.', 5000);
+      // Clear pending amendments — they are now baked into the exported app
+      var _amendCount=Object.keys(sg(DB_AMEND_KEY,{})).length;
+      ss(DB_AMEND_KEY,{});
+      pendingAmendments={};
+      _updatePendingAmendmentsBadge();
+      var exportMsg = '✅ Updated app exported';
+      if(added) exportMsg += ' — '+added+' new observation(s) added';
+      if(_amendCount) exportMsg += (added?' &bull; ':' — ')+_amendCount+' amendment(s) baked in';
+      if(suppressed) exportMsg += ' &bull; '+suppressed+' suppressed observation(s) removed';
+      exportMsg += '. Upload index.html to Netlify to update all users.';
+      showToast(exportMsg, 6000);
     })
     .catch(function(e){ alert('Could not fetch app source: '+e.message+'\n\nTry running from the deployed Netlify URL, not a local file.'); });
 }
@@ -10377,6 +10834,7 @@ function updbClearCandidates(){
 }
 
 function updbApproveSelected(){
+  if(_viewerBlocked()) return;
   var chks = document.querySelectorAll('.updb-cand-chk');
   var approved = [];
   for(var i=0;i<chks.length;i++){
@@ -11407,17 +11865,26 @@ function downloadSoftCopy(){
     if(scRecText){h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Recommendation</div>';h+=_renderText(scRecText,{fontSize:'12.5px',lineHeight:'1.65',color:'#2a3a50',marginBottom:'10px'});}
     var scBsNotes=obsNotesMap[o.id]||'';
     if(scBsNotes){h+='<div style="margin:6px 0 8px;padding:8px 10px;background:#fffdf0;border:1px solid #e0d080;border-radius:6px"><div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#6a5a00;margin-bottom:4px">&#128203; Branch-Specific Notes</div><div style="font-size:12.5px;line-height:1.6;color:#2a3a00;white-space:pre-wrap">'+esc(scBsNotes)+'</div></div>';}
-    if(ax) h+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> '+esc(ax)+'</div>';
+    if(ax) h+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> <a href="#'+_anxId(ax)+'" style="color:#1a3a5c;font-weight:700;text-decoration:underline;cursor:pointer" title="Click to view annexure below">'+esc(ax)+'</a></div>';
     // Auditee Response — always blank in soft copy, with ETR as sub-section inside
     h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Auditee Response <span style="color:#c0392b;font-size:9px">(Required)</span></div>';
     h+='<div style="border:1px dashed #b0c0d8;border-radius:4px;background:#fffef0;padding:8px 9px">';
-    h+='<textarea name="resp_'+esc(o.id)+'" data-obs-num="'+num+'" style="width:100%;border:none;border-bottom:1px solid #d0dde8;background:transparent;padding:0 0 7px 0;font-family:Inter,sans-serif;font-size:12.5px;color:#2a3a50;resize:vertical;min-height:60px;outline:none;box-sizing:border-box" placeholder="Please enter auditee response here..."></textarea>';
+    h+='<textarea name="resp_'+esc(o.id)+'" data-obs-num="'+num+'" style="width:100%;border:none;border-bottom:1px solid #d0dde8;background:transparent;padding:0 0 7px 0;font-family:Inter,sans-serif;font-size:12.5px;color:#2a3a50;resize:vertical;min-height:60px;outline:none;box-sizing:border-box" placeholder="Please enter auditee response here (minimum 10 letters)..."></textarea>';
+    h+='<div id="rh_resp_'+esc(o.id)+'" style="display:none;font-size:11px;color:#c0392b;margin-top:3px;margin-bottom:4px"></div>';
     h+='<div style="margin-top:8px;padding-top:8px">';
     h+='<div style="font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#1a6030;margin-bottom:5px">Estimated Time to Resolve <span style="font-size:9px;color:#888;font-weight:400;text-transform:none">(e.g. 2 weeks, 30 days, by 31-Dec-2025)</span></div>';
     h+='<div style="display:flex;align-items:center;gap:10px;background:#f0faf4;border:1px solid #90d0a8;border-radius:4px;padding:7px 10px">';
     h+='<span style="font-size:12px;color:#1a6030;white-space:nowrap">The above observation will be resolved within:</span>';
     h+='<input type="text" name="eta_'+esc(o.id)+'" style="flex:1;border:none;border-bottom:2px solid #1a6030;background:transparent;padding:3px 6px;font-family:Inter,sans-serif;font-size:13px;font-weight:600;color:#1a6030;outline:none" placeholder="State estimated time frame...">';
     h+='</div>';
+    h+='</div>';
+    // Evidence attachments
+    h+='<div style="margin-top:10px;padding-top:8px;border-top:1px dashed #c8d8e8">';
+    h+='<div style="font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#5b3fa0;margin-bottom:6px">&#128206; Attach Evidence Files <span style="font-size:9px;color:#888;font-weight:400;text-transform:none">(Optional — max 5 files, 8 MB total)</span></div>';
+    h+='<div id="att-list-'+esc(o.id)+'" style="margin-bottom:6px"></div>';
+    h+='<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:5px 12px;background:#f0eeff;border:1px solid #c0a8e8;border-radius:4px;font-size:12px;font-weight:600;color:#5b3fa0">';
+    h+='<input type="file" data-obsid="'+esc(o.id)+'" class="att-inp" multiple accept="image/*,.pdf,.xlsx,.xls,.docx,.doc,.csv,.txt" style="display:none" onchange="_attAdd(this)">';
+    h+='&#10133; Add File(s)</label>';
     h+='</div>';
     h+='</div>';
     h+='</div></div>';
@@ -11541,8 +12008,8 @@ function downloadSoftCopy(){
   softHtml+='  if(window.showSaveFilePicker){\n';
   softHtml+='    window.showSaveFilePicker({suggestedName:name,types:[{description:tm[2],accept:{[tm[0]]:tm[1]}}]})\n';
   softHtml+='      .then(function(h){return h.createWritable();})\n';
-  softHtml+='      .then(function(w){w.write(blob).then(function(){w.close();});});\n';
-  softHtml+='      /*.catch used below*/\n';
+  softHtml+='      .then(function(w){return w.write(blob).then(function(){return w.close();}); })\n';
+  softHtml+='      .catch(function(e){if(e&&e.name!=="AbortError")_legacySave(blob,name);});\n';
   softHtml+='  } else { _legacySave(blob,name); }\n';
   softHtml+='}\n';
   softHtml+='function _legacySave(blob,name){\n';
@@ -11550,18 +12017,73 @@ function downloadSoftCopy(){
   softHtml+='  a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);\n';
   softHtml+='  setTimeout(function(){URL.revokeObjectURL(url);},2000);\n';
   softHtml+='}\n';
+  // In-memory attachment store: {obsId: [{name,type,dataUrl}]}
+  softHtml+='var _attStore={};\n';
+  // Add files for an observation
+  softHtml+='function _attAdd(inp){\n';
+  softHtml+='  var id=inp.getAttribute("data-obsid"); if(!id) return;\n';
+  softHtml+='  if(!_attStore[id]) _attStore[id]=[];\n';
+  softHtml+='  var files=Array.prototype.slice.call(inp.files||[]); inp.value="";\n';
+  softHtml+='  var MAX=5, MB8=8*1024*1024;\n';
+  softHtml+='  var cur=_attStore[id];\n';
+  softHtml+='  var totalSize=cur.reduce(function(s,f){return s+(f.dataUrl?Math.round(f.dataUrl.length*0.75):0);},0);\n';
+  softHtml+='  var added=0;\n';
+  softHtml+='  function readNext(i){\n';
+  softHtml+='    if(i>=files.length){_attRender(id);return;}\n';
+  softHtml+='    if(cur.length>=MAX){alert("Maximum 5 files per observation.");_attRender(id);return;}\n';
+  softHtml+='    var f=files[i];\n';
+  softHtml+='    var rdr=new FileReader();\n';
+  softHtml+='    rdr.onload=function(e){\n';
+  softHtml+='      var du=e.target.result;\n';
+  softHtml+='      totalSize+=Math.round(du.length*0.75);\n';
+  softHtml+='      if(totalSize>MB8){alert("Total attachment size exceeds 8 MB. File \\""+f.name+"\\" was not added.");readNext(i+1);return;}\n';
+  softHtml+='      cur.push({name:f.name,type:f.type,dataUrl:du});\n';
+  softHtml+='      readNext(i+1);\n';
+  softHtml+='    };\n';
+  softHtml+='    rdr.readAsDataURL(f);\n';
+  softHtml+='  }\n';
+  softHtml+='  readNext(0);\n';
+  softHtml+='}\n';
+  // Remove a file
+  softHtml+='function _attRemove(id,idx){\n';
+  softHtml+='  if(_attStore[id]) _attStore[id].splice(idx,1);\n';
+  softHtml+='  _attRender(id);\n';
+  softHtml+='}\n';
+  // Render attachment list for an observation
+  softHtml+='function _attRender(id){\n';
+  softHtml+='  var el=document.getElementById("att-list-"+id); if(!el) return;\n';
+  softHtml+='  var files=_attStore[id]||[];\n';
+  softHtml+='  var h="";\n';
+  softHtml+='  for(var i=0;i<files.length;i++){\n';
+  softHtml+='    var f=files[i];\n';
+  softHtml+='    h+=\'<div style="display:flex;align-items:center;gap:8px;padding:4px 8px;background:#f8f5ff;border:1px solid #c0a8e8;border-radius:4px;margin-bottom:4px;font-size:12px">\'\n';
+  softHtml+='      +\'<span style="font-size:14px">\'+(_isImg(f.type)?"&#128247;":_isPdf(f.type)?"&#128196;":"&#128209;")+\'</span>\'\n';
+  softHtml+='      +\'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#3a2a70">\'+f.name+\'</span>\'\n';
+  softHtml+='      +\'<button onclick="_attRemove(\\\'\'+id+\'\\\',\'+i+\')" style="background:#c0392b;color:#fff;border:none;border-radius:3px;padding:1px 7px;font-size:11px;cursor:pointer;font-family:inherit">&#10005;</button></div>\';\n';
+  softHtml+='  }\n';
+  softHtml+='  el.innerHTML=h;\n';
+  softHtml+='}\n';
+  softHtml+='function _isImg(t){return t&&t.indexOf("image/")===0;}\n';
+  softHtml+='function _isPdf(t){return t==="application/pdf";}\n';
   // Collect all editable fields
   softHtml+='function collectData(){\n';
   softHtml+='  var d={};\n';
   softHtml+='  document.querySelectorAll("textarea[name],input[name^=\\"eta_\\"]").forEach(function(el){if(el.name)d[el.name]=el.value;});\n';
+  softHtml+='  // Embed attachments per observation\n';
+  softHtml+='  Object.keys(_attStore).forEach(function(id){if(_attStore[id]&&_attStore[id].length) d["attach_"+id]=_attStore[id];});\n';
   softHtml+='  return d;\n';
   softHtml+='}\n';
   // Restore fields from data object
   softHtml+='function restoreData(d){\n';
   softHtml+='  if(!d) return;\n';
   softHtml+='  Object.keys(d).forEach(function(k){\n';
-  softHtml+='    var el=document.querySelector("[name=\\""+k+"\\"]");\n';
-  softHtml+='    if(el) el.value=d[k]||"";\n';
+  softHtml+='    if(k.indexOf("attach_")===0){\n';
+  softHtml+='      var id=k.slice(7);\n';
+  softHtml+='      if(Array.isArray(d[k])&&d[k].length){ _attStore[id]=d[k]; _attRender(id); }\n';
+  softHtml+='    } else {\n';
+  softHtml+='      var el=document.querySelector("[name=\\""+k+"\\"]");\n';
+  softHtml+='      if(el) el.value=d[k]||"";\n';
+  softHtml+='    }\n';
   softHtml+='  });\n';
   softHtml+='  updateProgress();\n';
   softHtml+='}\n';
@@ -11607,20 +12129,25 @@ function downloadSoftCopy(){
   softHtml+='  reader.readAsText(file);\n';
   softHtml+='  e.target.value="";\n';
   softHtml+='}\n';
+  // Count alphabetic characters and minimum — must be global so checkComplete() can see them
+  softHtml+='function countAlpha(s){var n=0;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);if((c>=65&&c<=90)||(c>=97&&c<=122))n++;}return n;}\n';
+  softHtml+='var MIN_ALPHA=10;\n';
   // Progress bar
   softHtml+='function updateProgress(){\n';
   softHtml+='  var tas=document.querySelectorAll("textarea[name^=\\"resp_\\"]"),total=tas.length,done=0;\n';
-  softHtml+='  for(var i=0;i<tas.length;i++){if(tas[i].value.trim())done++;}\n';
+  softHtml+='  for(var i=0;i<tas.length;i++){if(countAlpha(tas[i].value)>=MIN_ALPHA)done++;}\n';
   softHtml+='  var pct=total?Math.round(done/total*100):0;\n';
   softHtml+='  var fill=document.getElementById("progressfill"),lbl=document.getElementById("progresslbl");\n';
   softHtml+='  if(fill)fill.style.width=pct+"%";\n';
   softHtml+='  if(lbl)lbl.textContent=done+" of "+total+" responses completed";\n';
+  // Show/hide inline hint for each textarea
+  softHtml+='  for(var j=0;j<tas.length;j++){var hint=document.getElementById("rh_"+tas[j].name);if(!hint)continue;var al=countAlpha(tas[j].value);if(tas[j].value.trim()&&al<MIN_ALPHA){hint.textContent="\\u26a0\\ufe0f Response must contain at least "+MIN_ALPHA+" letters ("+al+" so far).";hint.style.display="block";}else{hint.style.display="none";}}\n';
   softHtml+='}\n';
-  // Check all resp fields complete
+  // Check all resp fields complete and long enough
   softHtml+='function checkComplete(){\n';
-  softHtml+='  var tas=document.querySelectorAll("textarea[name^=\\"resp_\\"]"),blank=[];\n';
-  softHtml+='  for(var i=0;i<tas.length;i++){if(!tas[i].value.trim())blank.push("Obs. "+(tas[i].getAttribute("data-obs-num")||String(i+1)));}\n';
-  softHtml+='  return blank;\n';
+  softHtml+='  var tas=document.querySelectorAll("textarea[name^=\\"resp_\\"]"),blank=[],short=[];\n';
+  softHtml+='  for(var i=0;i<tas.length;i++){var label="Obs. "+(tas[i].getAttribute("data-obs-num")||String(i+1));if(!tas[i].value.trim())blank.push(label);else if(countAlpha(tas[i].value)<MIN_ALPHA)short.push(label);}\n';
+  softHtml+='  return{blank:blank,short:short};\n';
   softHtml+='}\n';
   // Build response HTML — full formatted document with embedded JSON for import
   softHtml+='function buildHtml(data,isDraft){\n';
@@ -11686,8 +12213,9 @@ function downloadSoftCopy(){
   softHtml+='}\n';
   // Submit Final
   softHtml+='function saveResponses(){\n';
-  softHtml+='  var blank=checkComplete();\n';
-  softHtml+='  if(blank.length){alert("Please complete all Auditee Response fields before submitting.\\n\\nIncomplete:\\n"+blank.join(", "));return;}\n';
+  softHtml+='  var chk=checkComplete();\n';
+  softHtml+='  if(chk.blank.length){alert("Please complete all Auditee Response fields before submitting.\\n\\nIncomplete:\\n"+chk.blank.join(", "));return;}\n';
+  softHtml+='  if(chk.short.length){alert("Each response must contain at least 10 letters.\\nPlease expand the following responses:\\n\\n"+chk.short.join(", "));return;}\n';
   softHtml+='  var blob=new Blob([buildHtml(collectData(),false)],{type:"text/html"});\n';
   softHtml+='  saveFileAs(blob,document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_BH_Responded.html");\n';
   softHtml+='  try{localStorage.removeItem(_KEY);}catch(e){}\n';
@@ -11716,9 +12244,40 @@ var ANX_LABELS=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P',
 
 // Returns {obsId: "1.1"|"2.3"} labels matching the obsOrder-based sequence used in renderRpt()
 function getObsReportLabels(){
+  // Labels MUST follow the same area-grouped traversal used by renderRpt() and
+  // _buildRptNavPanel(). renderRpt() groups observations by category/area before
+  // numbering them, so interleaved multi-category obsOrders produce different
+  // numbers than a pure obsOrder sequence. Both places must produce identical labels.
   var labels={};
-  for(var ri=0;ri<obsOrder.repeated.length;ri++) labels[obsOrder.repeated[ri]]='1.'+(ri+1);
-  for(var ni=0;ni<obsOrder.new.length;ni++)      labels[obsOrder.new[ni]]='2.'+(ni+1);
+  // Build a lookup of all obs so we can read each obs's category
+  var obsById={};
+  for(var j=0;j<DB.observations.length;j++) obsById[DB.observations[j].id]=DB.observations[j];
+  for(var k=0;k<customs.length;k++)          obsById[customs[k].id]=customs[k];
+
+  var sections=[
+    {pfx:'1', ids: obsOrder.repeated},
+    {pfx:'2', ids: obsOrder.new}
+  ];
+  for(var si=0;si<sections.length;si++){
+    var sec=sections[si];
+    // Replicate renderRpt()'s area-grouping: area order = first appearance in obsOrder
+    var areaOrder=[], areaGroups={};
+    for(var _ai=0;_ai<sec.ids.length;_ai++){
+      var id=sec.ids[_ai];
+      var ob=obsById[id]; if(!ob) continue;
+      var cat=(ob.category||'Others').trim()||'Others';
+      if(!areaGroups[cat]){areaOrder.push(cat);areaGroups[cat]=[];}
+      areaGroups[cat].push(id);
+    }
+    var num=0;
+    for(var ai=0;ai<areaOrder.length;ai++){
+      var grp=areaGroups[areaOrder[ai]];
+      for(var oi=0;oi<grp.length;oi++){
+        num++;
+        labels[grp[oi]]=sec.pfx+'.'+num;
+      }
+    }
+  }
   return labels;
 }
 function buildCatGroupsFor(obsList){
@@ -12203,9 +12762,10 @@ function buildAnnexHtml(inline, obsNumMap, filterObsIds){
   h+='<h2 style="font-family:Merriweather,serif;font-size:16px;font-weight:700;color:'+navy+';margin-bottom:20px;text-align:center;letter-spacing:1px">ANNEXURES</h2>';
   for(var i=0;i<activeAnnexures.length;i++){
     var a=activeAnnexures[i];
-    h+='<div style="margin-bottom:28px;page-break-inside:avoid">';
+    var _aLabel=a.label||('Annexure-'+(i+1));
+    h+='<div id="'+_anxId(_aLabel)+'" style="margin-bottom:28px;page-break-inside:avoid;scroll-margin-top:16px">';
     h+='<div style="font-family:Merriweather,serif;font-size:13px;font-weight:700;color:'+navy+';border-bottom:2px solid '+gbor+';padding-bottom:6px;margin-bottom:4px">';
-    h+=esc(a.label||('Annexure-'+(i+1)));
+    h+=esc(_aLabel);
     if(a.title) h+=' &mdash; '+esc(a.title);
     h+='</div>';
     // Referenced-by line
@@ -12286,6 +12846,7 @@ function loadAuditeeFile(evt){
       try{
         var rawJson=(respDataEl.textContent||respDataEl.innerHTML||'').trim();
         var respData=JSON.parse(rawJson);
+        var _isFollowUpFile=respData._isFollowUp===true;
         var rkeys=Object.keys(respData);
         for(var ri=0;ri<rkeys.length;ri++){
           var rnm=rkeys[ri];
@@ -12300,8 +12861,12 @@ function loadAuditeeFile(evt){
             if(rval){ roComments[rnid]=rval; if(loadedObs.indexOf(rnid)<0) loadedObs.push(rnid); }
           } else if(rnm.indexOf('act_')===0){
             if(rval) actMap[rnm.slice(4)]=rval;
+          } else if(rnm.indexOf('attach_')===0){
+            var attId=rnm.slice(7);
+            if(rval&&rval.length) respAttachMap[attId]=rval;
           }
         }
+        window._isFollowUpLoad = _isFollowUpFile;
       }catch(ex){ loadedObs=[]; }
     }
 
@@ -12332,7 +12897,8 @@ function loadAuditeeFile(evt){
     // Ask user whether this response is BH, RO/HO, or both
     var parsedResp={};
     for(var px=0;px<loadedObs.length;px++) parsedResp[loadedObs[px]]=respMap[loadedObs[px]]||'';
-    window._pendingRespLoad = { loadedObs: loadedObs, parsedResp: parsedResp };
+    window._pendingRespLoad = { loadedObs: loadedObs, parsedResp: parsedResp, isFollowUp: window._isFollowUpLoad||false };
+    window._isFollowUpLoad = false;
     window._pendingRespDoc = doc;
     showRespTypeModal(doc, loadedObs);
     return; // rest of logic handled in applyRespLoad()
@@ -12378,10 +12944,18 @@ function applyRespLoad(){
   var loadedObs=pending.loadedObs||[];
   var parsed=pending.parsedResp||{};
   var doc=window._pendingRespDoc;
+  var isFollowUp=pending.isFollowUp||false;
+  var loadedAt=new Date().toISOString();
 
   for(var i=0;i<loadedObs.length;i++){
     var id=loadedObs[i];
     var val=parsed[id]||'';
+    // If follow-up: push existing response to history before overwriting
+    if(isFollowUp && respMap[id]!=null && respMap[id]!==''){
+      if(!respHistory[id]) respHistory[id]=[];
+      var prevRound=respHistory[id].length+1;
+      respHistory[id].push({round:prevRound, response:respMap[id], loadedAt:loadedAt});
+    }
     // Only clear the map being loaded into — preserve the other so both can coexist
     if(isBH){ delete respBHMap[id]; respBHMap[id]=val; }
     if(isRO){ delete respROMap[id]; respROMap[id]=val; }
@@ -12420,6 +12994,202 @@ function applyRespLoad(){
   applyFilter();
   renderRpt();
   toast('Loaded '+loadedObs.length+' response(s) — '+(isBH&&isRO?'BH + RO/HO':isBH?'Branch Head':'RO/HO')+'.');
+}
+
+// ============================================================
+// FOLLOW-UP RESPONSE REQUEST
+// ============================================================
+function showFollowUpModal(){
+  // Build list of all selected observations
+  var allObs=[];
+  var dbObs=DB&&DB.observations?DB.observations:[];
+  for(var i=0;i<dbObs.length;i++){
+    if(selIds[dbObs[i].id]) allObs.push({id:dbObs[i].id, title:dbObs[i].title||dbObs[i].id});
+  }
+  for(var ci=0;ci<customs.length;ci++){
+    if(selIds[customs[ci].id]) allObs.push({id:customs[ci].id, title:customs[ci].title||customs[ci].id});
+  }
+  if(!allObs.length){ toast('No observations selected.'); return; }
+
+  var existing=document.getElementById('followUpModal');
+  if(existing) existing.parentNode.removeChild(existing);
+  var el=document.createElement('div');
+  el.id='followUpModal';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center';
+
+  var rows='';
+  for(var oi=0;oi<allObs.length;oi++){
+    var o=allObs[oi];
+    var hasResp=!!(respMap[o.id]||respBHMap[o.id]||respROMap[o.id]);
+    var hist=respHistory[o.id]||[];
+    var badge=hist.length?'<span style="font-size:10px;background:#5b3fa0;color:#fff;border-radius:8px;padding:1px 6px;margin-left:6px">Round '+(hist.length+1)+'</span>':'';
+    rows+='<label style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:5px;cursor:pointer;'+(oi%2===0?'background:#f8f9fb':'background:#fff')+'">';
+    rows+='<input type="checkbox" class="fu-chk" data-obsid="'+o.id+'" style="margin-top:2px;width:15px;height:15px;accent-color:#1a3a5c"'+(hasResp?' checked':'')+'>';
+    rows+='<div style="flex:1"><div style="font-size:12.5px;font-weight:600;color:#1e2d40">'+esc(o.title)+badge+'</div>';
+    if(hasResp){
+      var cur=respBHMap[o.id]||respROMap[o.id]||respMap[o.id]||'';
+      rows+='<div style="font-size:11px;color:#6a7888;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:400px">Current: '+esc(cur.slice(0,80))+(cur.length>80?'…':'')+'</div>';
+    } else {
+      rows+='<div style="font-size:11px;color:#aaa;margin-top:2px;font-style:italic">No response yet</div>';
+    }
+    rows+='</div></label>';
+  }
+
+  el.innerHTML=
+    '<div style="background:#fff;border-radius:8px;width:90%;max-width:560px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.25);font-family:Inter,sans-serif">'+
+    '<div style="background:linear-gradient(90deg,#1a3a5c,#2a5080);color:#fff;padding:14px 18px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:10px">'+
+    '<span style="font-size:18px">&#128260;</span>'+
+    '<div><div style="font-size:14px;font-weight:800">Generate Follow-up Response Request</div>'+
+    '<div style="font-size:11px;opacity:.75;margin-top:2px">Select observations needing a revised/additional auditee response</div></div>'+
+    '<button onclick="document.getElementById(\'followUpModal\').remove()" style="margin-left:auto;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;width:28px;height:28px;font-size:16px;cursor:pointer;font-family:inherit">&#10005;</button>'+
+    '</div>'+
+    '<div style="padding:10px 14px;border-bottom:1px solid #e5eaf0;display:flex;gap:8px">'+
+    '<button onclick="document.querySelectorAll(\'.fu-chk\').forEach(function(c){c.checked=true;})" style="font-size:11.5px;padding:4px 12px;border:1px solid #c8d8ec;border-radius:4px;background:#f0f5fb;cursor:pointer;font-family:inherit;color:#1a3a5c;font-weight:600">Select All</button>'+
+    '<button onclick="document.querySelectorAll(\'.fu-chk\').forEach(function(c){c.checked=false;})" style="font-size:11.5px;padding:4px 12px;border:1px solid #c8d8ec;border-radius:4px;background:#f0f5fb;cursor:pointer;font-family:inherit;color:#1a3a5c;font-weight:600">Clear All</button>'+
+    '</div>'+
+    '<div style="overflow-y:auto;flex:1;padding:6px 8px">'+rows+'</div>'+
+    '<div style="padding:14px 16px;border-top:1px solid #e5eaf0;display:flex;gap:10px;justify-content:flex-end">'+
+    '<button onclick="document.getElementById(\'followUpModal\').remove()" style="padding:8px 18px;border:1px solid #c8d8ec;border-radius:5px;background:#f0f4f8;font-family:Inter,sans-serif;font-size:13px;cursor:pointer;color:#4a6080">Cancel</button>'+
+    '<button onclick="generateFollowUpFile()" style="padding:8px 20px;border:none;border-radius:5px;background:#1a3a5c;color:#fff;font-family:Inter,sans-serif;font-size:13px;font-weight:700;cursor:pointer">&#128228; Generate Follow-up File</button>'+
+    '</div></div>';
+  document.body.appendChild(el);
+}
+
+function generateFollowUpFile(){
+  // Collect selected obs IDs
+  var chks=document.querySelectorAll('.fu-chk:checked');
+  if(!chks.length){ alert('Please select at least one observation.'); return; }
+  var selectedIds=[];
+  for(var ci=0;ci<chks.length;ci++) selectedIds.push(chks[ci].getAttribute('data-obsid'));
+
+  // Close modal
+  var m=document.getElementById('followUpModal');
+  if(m) m.parentNode.removeChild(m);
+
+  // Build obs list for selected
+  var selObsList=[];
+  var dbObs=DB&&DB.observations?DB.observations:[];
+  for(var i=0;i<dbObs.length;i++){
+    if(selectedIds.indexOf(dbObs[i].id)>=0){
+      var o=dbObs[i];
+      var ot=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:o.observation||'';
+      var rt=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
+      selObsList.push({id:o.id,title:o.title,observation:ot,recommendation:rt});
+    }
+  }
+  for(var ci2=0;ci2<customs.length;ci2++){
+    var co=customs[ci2];
+    if(selectedIds.indexOf(co.id)>=0){
+      var cot=(obsEdits[co.id]&&obsEdits[co.id].observation!=null)?obsEdits[co.id].observation:co.observation||'';
+      var crt=(obsEdits[co.id]&&obsEdits[co.id].recommendation!=null)?obsEdits[co.id].recommendation:co.recommendation||'';
+      selObsList.push({id:co.id,title:co.title,observation:cot,recommendation:crt});
+    }
+  }
+  if(!selObsList.length){ toast('No matching observations found.'); return; }
+
+  var H=getHdrVals();
+  var branch=H.brname||'Branch';
+  var dt=new Date().toISOString().slice(0,10);
+  var round=0;
+  // Determine round number from history
+  for(var si=0;si<selObsList.length;si++){
+    var hist=respHistory[selObsList[si].id]||[];
+    if(hist.length+1>round) round=hist.length+1;
+  }
+  if(round<2) round=2;
+
+  // Build bhs-resp-data JSON with current (pre-filled) responses and follow-up marker
+  var respData={_isFollowUp:true};
+  for(var oi=0;oi<selObsList.length;oi++){
+    var cur=respBHMap[selObsList[oi].id]||respROMap[selObsList[oi].id]||respMap[selObsList[oi].id]||'';
+    respData['resp_'+selObsList[oi].id]=cur;
+  }
+  var respJson=JSON.stringify(respData).replace(/<\/script>/gi,'<\\/script>');
+
+  // Build HTML
+  var h='<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">';
+  h+='<title>Follow-up Response Request — Round '+round+' — '+esc(branch)+'</title>';
+  h+='<script type="application/json" id="bhs-resp-data">'+respJson+'<\/script>';
+  h+='<style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}';
+  h+='body{font-family:Inter,Arial,sans-serif;font-size:13px;color:#1e2d40;background:#f3f5f8;padding:20px}';
+  h+='#wrap{max-width:860px;margin:0 auto}';
+  h+='.card{background:#fff;border-radius:6px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.1);border-left:4px solid #1a3a5c;overflow:hidden}';
+  h+='.card-hdr{background:#f8f9fb;padding:10px 14px;border-bottom:1px solid #e5eaf0;font-size:13.5px;font-weight:700;color:#1e2d40}';
+  h+='.card-body{padding:12px 14px}';
+  h+='.lbl{font-size:9.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:4px;margin-top:10px}';
+  h+='.lbl:first-child{margin-top:0}';
+  h+='.txt{font-size:12.5px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:8px 10px;white-space:pre-wrap;margin-bottom:2px}';
+  h+='.prev-resp{font-size:12px;line-height:1.55;color:#3a2a70;background:#f8f5ff;border-left:3px solid #c0a8e8;border-radius:0 4px 4px 0;padding:7px 10px;margin-bottom:8px;white-space:pre-wrap}';
+  h+='.resp-ta{width:100%;padding:8px 10px;border:2px solid #1a3a5c;border-radius:5px;font-family:Inter,Arial,sans-serif;font-size:13px;color:#1e2d40;resize:vertical;min-height:80px;box-sizing:border-box;margin-top:6px}';
+  h+='.resp-ta:focus{outline:none;border-color:#2070b8}';
+  h+='@media print{.no-print{display:none!important}}';
+  h+='</style></head><body>';
+
+  // Header banner
+  h+='<div style="text-align:center;background:#1a3a5c;color:#fff;padding:14px 20px;border-radius:6px;margin-bottom:20px">';
+  h+='<div style="font-size:9px;letter-spacing:2px;color:#c9c070;text-transform:uppercase;margin-bottom:4px">FHS &nbsp;|&nbsp; Systems &amp; Audit</div>';
+  h+='<div style="font-size:17px;font-weight:700;letter-spacing:.5px">FOLLOW-UP RESPONSE REQUEST — ROUND '+round+'</div>';
+  h+='<div style="font-size:11px;color:#a8d8ff;margin-top:4px">Branch: '+esc(branch)+' &nbsp;|&nbsp; Date: '+dt+' &nbsp;|&nbsp; '+selObsList.length+' Observation(s)</div>';
+  h+='</div>';
+
+  h+='<div id="wrap">';
+  h+='<div style="background:#fff3cd;border:1px solid #f0c040;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12.5px;line-height:1.55">';
+  h+='&#9888; <strong>Instructions:</strong> Please review the observations below. Your previous response is pre-filled for reference. ';
+  h+='Revise or replace it as appropriate, then save this file and return it to the auditor.';
+  h+='</div>';
+
+  for(var ii=0;ii<selObsList.length;ii++){
+    var obs=selObsList[ii];
+    var prevResp=respBHMap[obs.id]||respROMap[obs.id]||respMap[obs.id]||'';
+    var prevHist=respHistory[obs.id]||[];
+    h+='<div class="card">';
+    h+='<div class="card-hdr">'+(ii+1)+'. '+esc(obs.title)+'</div>';
+    h+='<div class="card-body">';
+    h+='<div class="lbl">Observation</div><div class="txt">'+esc(obs.observation)+'</div>';
+    h+='<div class="lbl">Recommendation</div><div class="txt">'+esc(obs.recommendation)+'</div>';
+    if(prevResp){
+      h+='<div class="lbl" style="color:#5b3fa0">Previous Response (Round '+(prevHist.length+1)+')</div>';
+      h+='<div class="prev-resp">'+esc(prevResp)+'</div>';
+    }
+    h+='<div class="lbl" style="color:#1a6030">Your Revised Response (Round '+round+')</div>';
+    h+='<textarea class="resp-ta" name="resp_'+obs.id+'" placeholder="Enter revised or additional response here (minimum 10 letters)..." oninput="fuCheckHint(this)">'+esc(prevResp)+'</textarea>';
+    h+='<div id="rh_resp_'+obs.id+'" style="display:none;font-size:11px;color:#c0392b;margin-top:3px"></div>';
+    h+='</div></div>';
+  }
+
+  // Submit button
+  h+='<div class="no-print" style="text-align:center;margin:20px 0">';
+  h+='<button onclick="submitFollowUp()" style="padding:12px 32px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-family:Inter,Arial,sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px">&#10003; Save &amp; Return Follow-up File</button>';
+  h+='</div></div>';
+
+  // Inline JS to collect and save
+  h+='<script>\n';
+  h+='function fuCountAlpha(s){var n=0;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);if((c>=65&&c<=90)||(c>=97&&c<=122))n++;}return n;}\n';
+  h+='function fuCheckHint(ta){var hint=document.getElementById("rh_resp_"+ta.name.replace("resp_",""));if(!hint)return;var al=fuCountAlpha(ta.value);if(ta.value.trim()&&al<10){hint.textContent="\\u26a0\\ufe0f Response must contain at least 10 letters ("+al+" so far).";hint.style.display="block";}else{hint.style.display="none";}}\n';
+  h+='function submitFollowUp(){\n';
+  h+='  var tas=document.querySelectorAll("textarea[name]");\n';
+  h+='  var blank=[],short=[];\n';
+  h+='  for(var i=0;i<tas.length;i++){var al=fuCountAlpha(tas[i].value);var num=String(i+1);if(!tas[i].value.trim())blank.push("Obs. "+num);else if(al<10)short.push("Obs. "+num+" ("+al+" letters)");}\n';
+  h+='  if(blank.length){alert("Please enter a response for all observations before submitting.\\n\\nMissing responses:\\n"+blank.join(", "));return;}\n';
+  h+='  if(short.length){alert("Each response must contain at least 10 letters.\\nPlease expand the following responses:\\n\\n"+short.join(", "));return;}\n';
+  h+='  var data=JSON.parse(document.getElementById("bhs-resp-data").textContent);\n';
+  h+='  for(var i=0;i<tas.length;i++){ data[tas[i].name]=tas[i].value; }\n';
+  h+='  var json=JSON.stringify(data).replace(/<\\/script>/gi,"<\\\\/script>");\n';
+  h+='  var html=document.documentElement.outerHTML;\n';
+  h+='  html=html.replace(/<script type="application\\/json" id="bhs-resp-data">[\\s\\S]*?<\\/script>/,\'<script type="application/json" id="bhs-resp-data">\'+json+\'<\\/script>\');\n';
+  h+='  var blob=new Blob([html],{type:"text/html"});\n';
+  h+='  var url=URL.createObjectURL(blob);\n';
+  h+='  var a=document.createElement("a"); a.href=url; a.download="'+esc(branch.replace(/[^a-zA-Z0-9]/g,'_').slice(0,20))+'_FollowUp_Round'+round+'_Response.html"; a.click(); URL.revokeObjectURL(url);\n';
+  h+='  setTimeout(function(){ alert("\\u2705 Follow-up response saved!\\nSend this file back to the auditor to load via Load Follow-up Response."); },300);\n';
+  h+='}\n';
+  h+='<\/script></body></html>';
+
+  var blob=new Blob([h],{type:'text/html'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url; a.download=branch.replace(/[^a-zA-Z0-9]/g,'_').slice(0,20)+'_FollowUp_Round'+round+'_Request.html';
+  a.click(); URL.revokeObjectURL(url);
+  showToast('Follow-up request file generated — Round '+round+'. Send to auditee.', 3500);
 }
 
 // ============================================================
@@ -12830,12 +13600,36 @@ function finalizeReport(){
     if(recText) h+=sl('Recommendation')+st(recText);
     var finBsNotes=obsNotesMap[o.id]||'';
     if(finBsNotes) h+='<div style="margin:6px 0 8px;padding:8px 10px;background:#fffdf0;border:1px solid #e0d080;border-radius:6px"><div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#6a5a00;margin-bottom:4px">&#128203; Branch-Specific Notes</div><div style="font-size:12.5px;line-height:1.6;color:#2a3a00;white-space:pre-wrap">'+esc(finBsNotes)+'</div></div>';
-    if(ax)               h+='<div style="display:flex;align-items:center;gap:7px;margin:8px 0;padding:7px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> '+esc(ax)+'</div>';
+    if(ax)               h+='<div style="display:flex;align-items:center;gap:7px;margin:8px 0;padding:7px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> <a href="#'+_anxId(ax)+'" style="color:#1a3a5c;font-weight:700;text-decoration:underline;cursor:pointer" title="Click to view annexure below">'+esc(ax)+'</a></div>';
     var bhFin=respBHMap[o.id]!=null?respBHMap[o.id]:null;
     var roFin=respROMap[o.id]!=null?respROMap[o.id]:null;
     if(bhFin!==null) h+=sl('Auditee Response – BH')+st(bhFin);
     if(roFin!==null) h+='<div style="font-size:11.5px;font-weight:700;color:#5b3fa0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Auditee Response – RO/HO</div>'+'<div style="font-size:13px;line-height:1.6;color:#3a2a70;margin-bottom:10px;white-space:pre-wrap;background:#f8f5ff;padding:6px 10px;border-radius:4px;border-left:3px solid #9b6fd0">'+esc(roFin)+'</div>';
     if(bhFin===null&&roFin===null&&respStored) h+=sl('Auditee Response')+st(respStored);
+    // Auditee evidence attachments — shown in Final Report
+    var finAtts=respAttachMap[o.id]||[];
+    if(finAtts.length){
+      h+='<div style="margin-top:8px;padding:8px 10px;background:#f8f5ff;border:1px solid #c0a8e8;border-radius:5px">';
+      h+='<div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#5b3fa0;margin-bottom:8px">&#128206; Evidence Attached by Auditee ('+finAtts.length+' file'+(finAtts.length>1?'s':'')+')</div>';
+      for(var fai=0;fai<finAtts.length;fai++){
+        var fa=finAtts[fai];
+        var faIsImg=fa.type&&fa.type.indexOf('image/')===0;
+        var faIsPdf=fa.type==='application/pdf';
+        h+='<div style="margin-bottom:10px">';
+        if(faIsImg){
+          h+='<div style="font-size:11px;color:#5b3fa0;font-weight:600;margin-bottom:4px">'+esc(fa.name)+'</div>';
+          h+='<img src="'+fa.dataUrl+'" style="max-width:100%;border:1px solid #c0a8e8;border-radius:4px;display:block">';
+        } else if(faIsPdf){
+          h+='<div style="font-size:11px;color:#5b3fa0;font-weight:600;margin-bottom:4px">'+esc(fa.name)+'</div>';
+          h+='<embed src="'+fa.dataUrl+'" type="application/pdf" style="width:100%;height:480px;border:1px solid #c0a8e8;border-radius:4px">';
+          h+='<div style="margin-top:4px"><a href="'+fa.dataUrl+'" download="'+esc(fa.name)+'" style="font-size:12px;color:#5b3fa0;font-weight:600">&#8595; Download PDF</a></div>';
+        } else {
+          h+='<a href="'+fa.dataUrl+'" download="'+esc(fa.name)+'" style="display:inline-flex;align-items:center;gap:8px;padding:7px 14px;background:#ede8ff;border:1px solid #c0a8e8;border-radius:5px;font-size:12.5px;font-weight:600;color:#5b3fa0;text-decoration:none">&#128229; '+esc(fa.name)+'</a>';
+        }
+        h+='</div>';
+      }
+      h+='</div>';
+    }
     var sectROFin=respSectROMap[o.id]||null;
     var sectHOFin=respSectHOMap[o.id]||null;
     if(sectROFin) h+='<div style="font-size:11.5px;font-weight:700;color:#1a5c3a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">RO Section Response</div>'+'<div style="font-size:13px;line-height:1.6;color:#1a3a2a;margin-bottom:10px;white-space:pre-wrap;background:#f0fff8;padding:6px 10px;border-radius:4px;border-left:3px solid #3a9a6a">'+esc(sectROFin)+'</div>';
@@ -12862,6 +13656,22 @@ function finalizeReport(){
       h+='<div style="margin-top:9px;padding:6px 12px;background:#fff8f0;border:1px solid #e0a060;border-left:4px solid #c06020;border-radius:0 5px 5px 0;font-size:12px;color:#1e2d40">'
         +'<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#c06020">&#8635; Last Audit Report Reference (LARR):</span>'
         +' <strong>'+esc(finLrRef)+'</strong></div>';
+    }
+    // RO Supervisor Review Notes
+    var roNoteFin=roComments[o.id]||'';
+    if(roNoteFin){
+      h+='<div style="margin-top:10px;background:#fff8e0;border:2px solid #f0c000;border-radius:6px;padding:10px 13px">';
+      h+='<div style="font-size:10.5px;font-weight:800;color:#7a4800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">&#9997; RO Manager Review Notes — Action Required</div>';
+      h+='<div style="font-size:12.5px;color:#4a3000;line-height:1.6;white-space:pre-wrap">'+esc(roNoteFin)+'</div>';
+      h+='</div>';
+    }
+    // HO Supervisor Review Notes
+    var hoNoteFin=hoComments[o.id]||'';
+    if(hoNoteFin){
+      h+='<div style="margin-top:10px;background:#eef4ff;border:2px solid #4a7fc1;border-radius:6px;padding:10px 13px">';
+      h+='<div style="font-size:10.5px;font-weight:800;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">&#9997; HO Supervisor Review Notes — Action Required</div>';
+      h+='<div style="font-size:12.5px;color:#1a2a5a;line-height:1.6;white-space:pre-wrap">'+esc(hoNoteFin)+'</div>';
+      h+='</div>';
     }
     // Risk-Based Framework panel (hidden by default; shown by toggleFramework())
     var fw=getFw(o);
@@ -13173,6 +13983,7 @@ function finalizeReport(){
 // ISSUED REPORT — polished interactive HTML (matching sample)
 // ============================================================
 function generateIssuedReport(forROCopy){
+  if(!forROCopy && _viewerBlocked()) return; // block final Issue action only, not internal review generation
   var isReview=(forROCopy==='ro_review'||forROCopy==='ho_review');
   var reviewRole=isReview?forROCopy.replace('_review',''):null;
   var stageLabel=reviewRole==='ro'?'RO Manager Review':reviewRole==='ho'?'HO Final Review':'';
@@ -14878,8 +15689,8 @@ function showSaveDialog(){
           +'<span style="font-size:11px;color:#888;flex:1">&#128161; After editing an observation, click the floating bar (bottom-right) to recheck.</span>'
           +'<button id="_pfClose" style="padding:.45rem .9rem;background:#eef1f5;color:#1a3557;border:1px solid #c0ccd8;border-radius:7px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#10005; Close</button>'
           +(_pfBlocking
-            ?'<button disabled title="Resolve all Must Fix items first" style="padding:.45rem 1.1rem;background:#ccc;color:#fff;border:none;border-radius:7px;font-size:.85rem;font-weight:700;cursor:not-allowed;font-family:inherit">&#128229; Finalize Report</button>'
-            :'<button id="_pfProceed" style="padding:.45rem 1.1rem;background:#1a6030;color:#fff;border:none;border-radius:7px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Proceed &amp; Finalize</button>')
+            ?'<button disabled title="Resolve all Must Fix items first" style="padding:.45rem 1.1rem;background:#ccc;color:#fff;border:none;border-radius:7px;font-size:.85rem;font-weight:700;cursor:not-allowed;font-family:inherit">&#128229; Validate &amp; Save Report</button>'
+            :'<button id="_pfProceed" style="padding:.45rem 1.1rem;background:#1a6030;color:#fff;border:none;border-radius:7px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">&#128229; Validate &amp; Save Report</button>')
         +'</div>'
         +'</div>';
       document.body.appendChild(_pfOv);
@@ -14908,7 +15719,7 @@ function showSaveDialog(){
   el.className='vh-bg'; el.id='sdModal';
   el.innerHTML=
     '<div class="vh-box" style="width:480px">'+
-    '<div class="vh-head"><h3>&#9989; Finalize &amp; Save Report</h3><button onclick="document.getElementById(\'sdModal\').remove()">&#10005;</button></div>'+
+    '<div class="vh-head"><h3>&#9989; Validate &amp; Save Report</h3><button onclick="document.getElementById(\'sdModal\').remove()">&#10005;</button></div>'+
     '<div class="vh-body">'+
     '<p style="margin-bottom:14px">Tick the formats you want, then click <strong>Save Selected</strong>.</p>'+
 
@@ -14979,7 +15790,7 @@ function saveSelected(){
 
   var delay = 0;
   if(html){
-    (function(d){ setTimeout(function(){ _saveFileAsLegacy(new Blob([pf.html],{type:'text/html'}), pf.fname); }, d); })(delay);
+    (function(d){ setTimeout(function(){ saveFileAs(new Blob([pf.html],{type:'text/html'}), pf.fname); }, d); })(delay);
     delay += 600;
   }
   if(word){
@@ -14995,13 +15806,13 @@ function saveSelected(){
       pf.html.replace(/<!DOCTYPE[^>]*>/i,'').replace(/<html[^>]*>/i,'').replace(/<\/html>/i,'')
       .replace(/<head>[\s\S]*?<\/head>/i,'').replace(/<body[^>]*>/i,'').replace(/<\/body>/i,'')
       +'</body></html>';
-    (function(d,wh){ setTimeout(function(){ _saveFileAsLegacy(new Blob([wh],{type:'application/msword'}), pf.fname.replace(/\.html?$/i,'.doc')); }, d); })(delay, wordHtml);
+    (function(d,wh){ setTimeout(function(){ saveFileAs(new Blob([wh],{type:'application/msword'}), pf.fname.replace(/\.html?$/i,'.doc')); }, d); })(delay, wordHtml);
     delay += 600;
   }
   if(json){
     var sess = pf.sess || captureSession();
     var jstr = JSON.stringify(sess,null,2);
-    (function(d,js){ setTimeout(function(){ _saveFileAsLegacy(new Blob([js],{type:'application/json'}), pf.fname.replace(/\.html?$/i,'_session.json')); }, d); })(delay, jstr);
+    (function(d,js){ setTimeout(function(){ saveFileAs(new Blob([js],{type:'application/json'}), pf.fname.replace(/\.html?$/i,'_session.json')); }, d); })(delay, jstr);
     delay += 600;
   }
   if(pdf){
@@ -15028,9 +15839,8 @@ function saveAsFinal(fmt){
   if(!pf) return;
 
   if(fmt==='all'){
-    // Download HTML, Word, and JSON together; PDF must be done separately
-    var htmlBlob=new Blob([pf.html],{type:'text/html'});
-    _saveFileAsLegacy(htmlBlob, pf.fname);
+    // Save HTML, Word, and JSON together (each triggers its own Save As dialog); PDF separately
+    saveFileAs(new Blob([pf.html],{type:'text/html'}), pf.fname);
 
     var wordHtmlAll='<html xmlns:o="urn:schemas-microsoft-com:office:office" '+
       'xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'+
@@ -15045,12 +15855,10 @@ function saveAsFinal(fmt){
       .replace(/<head>[\s\S]*?<\/head>/i,'')
       .replace(/<body[^>]*>/i,'').replace(/<\/body>/i,'')
       +'</body></html>';
-    var wblobAll=new Blob([wordHtmlAll],{type:'application/msword'});
-    setTimeout(function(){ _saveFileAsLegacy(wblobAll, pf.fname.replace(/\.html?$/i,'.doc')); }, 600);
+    setTimeout(function(){ saveFileAs(new Blob([wordHtmlAll],{type:'application/msword'}), pf.fname.replace(/\.html?$/i,'.doc')); }, 600);
 
     var sessAll=pf.sess||captureSession();
-    var jblobAll=new Blob([JSON.stringify(sessAll,null,2)],{type:'application/json'});
-    setTimeout(function(){ _saveFileAsLegacy(jblobAll, pf.fname.replace(/\.html?$/i,'_session.json')); }, 1200);
+    setTimeout(function(){ saveFileAs(new Blob([JSON.stringify(sessAll,null,2)],{type:'application/json'}), pf.fname.replace(/\.html?$/i,'_session.json')); }, 1200);
 
     toast('3 files saved: HTML, Word, and Session. For PDF — use the PDF option separately.');
     lockBrInfo();
@@ -15229,7 +16037,7 @@ var aws_rptTab = 'table';
 
 var AWS_OBS_DATA = {"cats": ["Revenue & Guest Billing", "Cash, Bank & Imprest", "Procurement & Payables", "Fixed Assets", "Store & Inventory", "Recruitment, Payroll & Employee Records", "Security & Related Controls", "Food Safety & HACCP", "Others"], "obs": {"Revenue & Guest Billing": [{"id": "OBS_FHS_024", "title": "Revenue Reconciliation not in Practice"}, {"id": "OBS_FHS_025", "title": "Need for Guidelines on Ancillary Charges and Rebates"}, {"id": "OBS_FHS_026", "title": "Non-Adherence to Credit Limits for Corporate Clients"}, {"id": "OBS_FHS_027", "title": "Non-Compliance with Guest Advance Payment Policy"}, {"id": "OBS_FHS_102", "title": "Missing Information in Guest Folios (Opera)"}, {"id": "OBS_FHS_103", "title": "Early Check-In and Late Check-Out Charges not Applied"}, {"id": "OBS_FHS_104", "title": "Discrepancies Found in Guest Refund Payments"}, {"id": "OBS_FHS_105", "title": "Lack of Proper Authorization & Details Missing in Paid Out Slips"}, {"id": "OBS_FHS_106", "title": "Guest Registration Crad not Prepare by FO"}, {"id": "OBS_FHS_107", "title": "Non-Adherence to Credit Limits for Corporate Clients"}, {"id": "OBS_FHS_108", "title": "Long Outstanding Receivables from BTC Clients"}, {"id": "OBS_FHS_109", "title": "Recordkeeping of BTC Client Data Outside Opera System"}, {"id": "OBS_FHS_110", "title": "Guest Folios of BTC Clients not Available in Hotel"}, {"id": "OBS_FHS_111", "title": "Balances of Munshi not Transfer in Opera (Receivables and Advances)"}, {"id": "OBS_FHS_112", "title": "Sale Cash Used by Front Office for Expenses"}, {"id": "OBS_FHS_113", "title": "Bank Reconciliation not in Practice both at Hotel and Head Office"}, {"id": "OBS_FHS_114", "title": "Revenue Reconciliation not in Practice"}, {"id": "OBS_FHS_115", "title": "Use of a Shared Bank Account for Revenue Collection"}, {"id": "OBS_FHS_116", "title": "Incomplete Information/Documentation in Cash Drop Envelopes"}, {"id": "OBS_FHS_117", "title": "Calculation Errors in Cash Drop Envelopes"}, {"id": "OBS_FHS_118", "title": "Discrepancies Founds in Guest Advance Deposit Slips"}], "Cash, Bank & Imprest": [{"id": "OBS_FHS_001", "title": "Fake Receiving Signatures Identified"}, {"id": "OBS_FHS_002", "title": "Submission of Bogus Bills"}, {"id": "OBS_FHS_004", "title": "Excess Payment of Mobile Billing Allowance"}, {"id": "OBS_FHS_005", "title": "Missing Vouchers"}, {"id": "OBS_FHS_006", "title": "Unapproved Vouchers"}, {"id": "OBS_FHS_007", "title": "Vouchers Posted Through Irrelevant Voucher Types"}, {"id": "OBS_FHS_008", "title": "Voucher Files not Properly Maintained"}, {"id": "OBS_FHS_009", "title": "Missing Cheque Copies with Bank Payment Vouchers"}, {"id": "OBS_FHS_011", "title": "Long Outstanding Advance (Rs. 138,750) to Employee"}, {"id": "OBS_FHS_015", "title": "Withholding Tax Deposited with Delay"}, {"id": "OBS_FHS_016", "title": "Debit Balance Observed in Withholding Income Tax Payable (u/s 155)"}, {"id": "OBS_FHS_019", "title": "Unapproved Payment for Water Supply"}, {"id": "OBS_FHS_022", "title": "Non-Compliance in Voucher Processing"}, {"id": "OBS_FHS_028", "title": "Time-Barred Cheques"}, {"id": "OBS_FHS_029", "title": "Negative Bank Balances and Mismatch with Bank Statement"}, {"id": "OBS_FHS_030", "title": "Cheque Number/Digital Transfer Detail not Properly Recorded in BEAMS"}, {"id": "OBS_FHS_031", "title": "Askari Bank Account Detail not Reflected in Trial Balance"}, {"id": "OBS_FHS_032", "title": "Cash in Hand Exceeded the Prescribed Limit"}, {"id": "OBS_FHS_033", "title": "Payment Exceeding Rs. 10,000 Made in Cash"}, {"id": "OBS_FHS_034", "title": "Delay in Deposit of Cash Sales"}, {"id": "OBS_FHS_035", "title": "House Cash Limits not Defined"}, {"id": "OBS_FHS_036", "title": "House Cash Balances not Updated in Trial Balance"}, {"id": "OBS_FHS_119", "title": "Delay in Deposit of Cash Sales"}, {"id": "OBS_FHS_120", "title": "Imprest Bank Account not Open"}, {"id": "OBS_FHS_121", "title": "Payment Exceeding PKR 10,000 Made in Cash"}, {"id": "OBS_FHS_122", "title": "Negative Balance of Cash Collection Report"}], "Procurement & Payables": [{"id": "OBS_FHS_003", "title": "Purchase to Pay Process not Followed"}, {"id": "OBS_FHS_010", "title": "Advances to Vendors (Approx. 79M)"}, {"id": "OBS_FHS_012", "title": "Expenses Payable (Rs. 2M)"}, {"id": "OBS_FHS_013", "title": "Transactions not Routed Through Vendor Ledger"}, {"id": "OBS_FHS_014", "title": "No Ledger for Bills in Hand"}, {"id": "OBS_FHS_020", "title": "Balance Confirmation Certificates not Shared"}, {"id": "OBS_FHS_023", "title": "List of Registered Vendors not Available at Hotel"}, {"id": "OBS_FHS_148", "title": "Non-Compliance of Procurement Policy (PR, PO & GRN not in Practice)"}, {"id": "OBS_FHS_149", "title": "List of Common/Register Vendors not Available at Hotel"}, {"id": "OBS_FHS_150", "title": "Discrepancies in Kitchen Inventory"}], "Fixed Assets": [{"id": "OBS_FHS_123", "title": "Out of Order Assets Found in Hotel"}, {"id": "OBS_FHS_124", "title": "Underutilized and Surplus Fixed Assets Found in Hotel"}, {"id": "OBS_FHS_125", "title": "Inclusion of Below-Threshold Items in Fixed Asset Register"}, {"id": "OBS_FHS_126", "title": "Unreliability of Fixed Asset Inventory Record Provided by HO"}, {"id": "OBS_FHS_127", "title": "Incomplete FA Inventory Register – Unrecorded Paintings (PKR 5.4 Million)"}, {"id": "OBS_FHS_128", "title": "Physical Verification of Fixed Assets not Conducted"}, {"id": "OBS_FHS_129", "title": "Fixed Asset Codes/Tags not Provided by HO"}, {"id": "OBS_FHS_130", "title": "Untraced / Missing Assets"}, {"id": "OBS_FHS_131", "title": "Complete Inventory Record of Security Assets not Maintained at Hotel"}, {"id": "OBS_FHS_132", "title": "AIDN for Damaged/Discarded Linen Items not Prepared"}, {"id": "OBS_FHS_133", "title": "Excess Asset Inventory Found in Hotel"}, {"id": "OBS_FHS_134", "title": "Duplicate Assets Found in Department-Wise Inventory Record"}, {"id": "OBS_FHS_135", "title": "Unrecorded Assets Found in Hotel"}, {"id": "OBS_FHS_136", "title": "Inventory Record Updated During Audit Exercise by Maintenance Department"}], "Store & Inventory": [{"id": "OBS_FHS_043", "title": "Inventory Record not Updated"}, {"id": "OBS_FHS_044", "title": "Untraced and Unrecorded Stock in Store"}, {"id": "OBS_FHS_045", "title": "Discrepancies in Stock Issuance"}, {"id": "OBS_FHS_046", "title": "Unauthorized Changes in Requisitions"}, {"id": "OBS_FHS_047", "title": "Misclassification and Duplication in Inventory Record"}, {"id": "OBS_FHS_048", "title": "Periodic Stock Count not Performed"}, {"id": "OBS_FHS_049", "title": "Negative Stock Appearing in Inventory Record"}, {"id": "OBS_FHS_050", "title": "Absence of Minimum Stock Level Monitoring in Inventory Module"}, {"id": "OBS_FHS_051", "title": "Inventory Record of Printed Stationery and Packing Items (Received from HO) not Maintained"}, {"id": "OBS_FHS_052", "title": "Kitchen and House Keeping Inventory not Maintained in System"}, {"id": "OBS_FHS_053", "title": "AIDN for Damaged/Discarded Linen Items not Prepared"}, {"id": "OBS_FHS_054", "title": "Inventory Record for Minibar Items not Maintained"}, {"id": "OBS_FHS_055", "title": "Missing Inventory"}, {"id": "OBS_FHS_056", "title": "Unrecorded Inventory"}, {"id": "OBS_FHS_057", "title": "Non-Updated Recipes in System Module"}, {"id": "OBS_FHS_137", "title": "Inventory Record not Updated on Daily/Real-time Basis"}, {"id": "OBS_FHS_138", "title": "Stock Found Short in Store (PKR 38,209)"}, {"id": "OBS_FHS_139", "title": "Unrecorded Stock Found in Store"}, {"id": "OBS_FHS_140", "title": "Discrepancies in Store Requisition Slips"}, {"id": "OBS_FHS_141", "title": "Errors and Discrepancies in System-Generated Stock Inventory Report"}, {"id": "OBS_FHS_142", "title": "Safety and Security Equipment not Installed in Store"}, {"id": "OBS_FHS_143", "title": "Periodic Stock Count not Performed"}, {"id": "OBS_FHS_144", "title": "Complete & Authentic Inventory Record of Linen not Available"}, {"id": "OBS_FHS_145", "title": "Kitchen and House Keeping Inventory not Maintain in System"}, {"id": "OBS_FHS_146", "title": "Inventory Record not Available with Housekeeping Department"}, {"id": "OBS_FHS_147", "title": "Inventory Record of Printed Stationery and Packing Items (Received from HO) not Maintained"}], "Recruitment, Payroll & Employee Records": [{"id": "OBS_FHS_037", "title": "Employee File of Accounts Staff Placed in Ambiance Resorts, Hunza"}, {"id": "OBS_FHS_038", "title": "Handing/Taking Over of Accountant not Conducted"}, {"id": "OBS_FHS_039", "title": "Handing Over/Taking Over not Conducted for FA Incharge (Manager Engineering)"}, {"id": "OBS_FHS_040", "title": "Handing Over/Taking Over not Conducted for HR Personnel"}, {"id": "OBS_FHS_041", "title": "Final Settlement Records of Employees not Available"}, {"id": "OBS_FHS_042", "title": "Missing Documents in Employee Files"}, {"id": "OBS_FHS_155", "title": "Employee Attendance not Marked through Biometric Attendance Device"}, {"id": "OBS_FHS_156", "title": "Final Settlement Claim Processed with Delay"}, {"id": "OBS_FHS_157", "title": "Employee Salaries Paid from Hotel Imprest"}, {"id": "OBS_FHS_158", "title": "Discrepancy in Final Settlement Cheque Issuance Date"}, {"id": "OBS_FHS_159", "title": "Delay in Confirmation of Employee"}], "Security & Related Controls": [{"id": "OBS_FHS_058", "title": "Security Equipment not Provided as per Contract Terms"}, {"id": "OBS_FHS_059", "title": "Visitor Register not Maintained as per Standard Practice"}, {"id": "OBS_FHS_060", "title": "Labour Stayed in Hotel Without Proper Authorization and Records"}, {"id": "OBS_FHS_061", "title": "Incomplete and Unverified Guard Attendance Records"}, {"id": "OBS_FHS_062", "title": "Security Manual / Security Plan Needs to be Devised"}, {"id": "OBS_FHS_063", "title": "No Communication Mechanism Established Among Security Guards"}, {"id": "OBS_FHS_064", "title": "No Security Supervisor in the Hotel"}, {"id": "OBS_FHS_065", "title": "Improper Placement of Luggage X-Ray Machine"}, {"id": "OBS_FHS_066", "title": "Limitation of X-Ray Luggage Scanner for Standard Baggage"}, {"id": "OBS_FHS_067", "title": "Blind Spots of CCTV Cameras"}, {"id": "OBS_FHS_068", "title": "Unauthorized Access Risk"}, {"id": "OBS_FHS_069", "title": "Entry Record for Labour, Vendor, and Third-Party Personnel etc. not Properly Maintained"}, {"id": "OBS_FHS_070", "title": "Un-Approved Gate Passes"}, {"id": "OBS_FHS_071", "title": "Improper Placement of Water and Sanitation Pipes in Panel Room"}, {"id": "OBS_FHS_151", "title": "Blind Spots of CCTV Cameras"}, {"id": "OBS_FHS_152", "title": "Discrepancies Regarding Luggage X-Ray Machine"}, {"id": "OBS_FHS_153", "title": "Discrepancies Observed in Gate Passes Record and Utilization"}, {"id": "OBS_FHS_154", "title": "Absence of Maintenance Contract for CCTV and Walkthrough Gates"}], "Food Safety & HACCP": [{"id": "OBS_FHS_072", "title": "No Temperature Guns and Monitoring of Chillers Temperature"}, {"id": "OBS_FHS_073", "title": "No Proper Placement of Storage Racks"}, {"id": "OBS_FHS_074", "title": "No Inspection of Raw Material & Incoming Vehicle / Missing Certificate of Analysis"}, {"id": "OBS_FHS_075", "title": "Insects Killers & Rodent Traps Seem to be Missing"}, {"id": "OBS_FHS_076", "title": "Food Safety Policy not Displayed"}, {"id": "OBS_FHS_077", "title": "No Separate Area for Rejected Items"}, {"id": "OBS_FHS_078", "title": "Supplier Evaluation not Conducted"}, {"id": "OBS_FHS_079", "title": "No Defined Raw Material Inspection Criteria"}, {"id": "OBS_FHS_080", "title": "Material Safety Data Sheet Missing"}, {"id": "OBS_FHS_081", "title": "No Proper Documentation Available for Cleaning & Sanitation"}, {"id": "OBS_FHS_082", "title": "No Segregation of Food and Non-Food Material"}, {"id": "OBS_FHS_083", "title": "Medical Tests of Store Staff Missing"}, {"id": "OBS_FHS_084", "title": "HACCP Documentation Found to Be Missing"}, {"id": "OBS_FHS_085", "title": "Non-Compliance with Allergen Management Requirements"}, {"id": "OBS_FHS_086", "title": "Visitor Entrance Protocols not Found in Kitchen"}, {"id": "OBS_FHS_087", "title": "No Allergens Mentioned in Menu"}, {"id": "OBS_FHS_088", "title": "Unavailability of Training Records"}, {"id": "OBS_FHS_089", "title": "Use of Non-Food-Grade Wooden Utensils in Food Handling Areas"}, {"id": "OBS_FHS_090", "title": "Chillers Temperature not Being Monitored"}, {"id": "OBS_FHS_091", "title": "Non-Maintenance of Mandatory Food Safety Records and Logs"}, {"id": "OBS_FHS_092", "title": "Missing Required Documents"}, {"id": "OBS_FHS_093", "title": "Environmental & Engineering Monitoring Process not in Place"}, {"id": "OBS_FHS_094", "title": "Calibration of Measuring and Monitoring Devices not Done"}, {"id": "OBS_FHS_095", "title": "Non-Compliance in Laboratory Testing of Raw and Final Products"}, {"id": "OBS_FHS_160", "title": "No Inspection of Raw Material & Incoming Vehicle/ Missing Certificate of Analysis"}, {"id": "OBS_FHS_161", "title": "No Proper Placement of Storage Racks"}, {"id": "OBS_FHS_162", "title": "Food Safety Policy Not Displayed"}, {"id": "OBS_FHS_163", "title": "No Separate Area for Rejected Items"}, {"id": "OBS_FHS_164", "title": "Supplier Evaluation not Conducted"}, {"id": "OBS_FHS_165", "title": "No Defined Raw Material Inspection Criteria"}, {"id": "OBS_FHS_166", "title": "Insects Killers & Rodent Traps Seems to be Missing"}, {"id": "OBS_FHS_167", "title": "Material Safety Data Sheet Missing"}, {"id": "OBS_FHS_168", "title": "No Temperature Guns and Monitoring of Chillers Temperature"}, {"id": "OBS_FHS_169", "title": "No Proper Documentation Available for Cleaning & Sanitation"}, {"id": "OBS_FHS_170", "title": "No Segregation of Food and Non-Food Material"}, {"id": "OBS_FHS_171", "title": "Medical Test of Store Staff Found to Be Missing"}, {"id": "OBS_FHS_172", "title": "HACCP Documentation Found to Be Missing"}, {"id": "OBS_FHS_173", "title": "Non-Compliance with Allergen Management Requirements"}, {"id": "OBS_FHS_174", "title": "Visitor Entrance Protocols not Found in Kitchen"}, {"id": "OBS_FHS_175", "title": "No Allergens Mentioned in Menu"}, {"id": "OBS_FHS_176", "title": "Unavailability No Training Records"}, {"id": "OBS_FHS_177", "title": "Use of Non-Food-Grade Wooden Utensils in Food Handling Areas"}, {"id": "OBS_FHS_178", "title": "Non-Food Graded Sauces Bottles & Packaging Material"}, {"id": "OBS_FHS_179", "title": "Chillers Temperature not Being Monitored"}, {"id": "OBS_FHS_180", "title": "Use of Manual Garbage Bins"}, {"id": "OBS_FHS_181", "title": "Non-Maintenance of Mandatory Food Safety Records and Logs"}, {"id": "OBS_FHS_182", "title": "HACCP Documentation not Maintained"}, {"id": "OBS_FHS_183", "title": "Expired Syrup Bottles Found in Kitchen"}, {"id": "OBS_FHS_184", "title": "Missing Required Documents"}, {"id": "OBS_FHS_185", "title": "Environmental & Engineering Monitoring Process not in Place"}, {"id": "OBS_FHS_186", "title": "Calibration of Measuring and Monitoring Devices not Done"}, {"id": "OBS_FHS_187", "title": "Non-Compliance in Laboratory Testing of Raw and Final Products"}], "Others": [{"id": "OBS_FHS_017", "title": "Copy of Generator Rental Contract not Available at Hotel"}, {"id": "OBS_FHS_018", "title": "Copy of Logbook not Attached with Fuel Bills"}, {"id": "OBS_FHS_021", "title": "Repair & Maintenance Log Book not Maintained"}, {"id": "OBS_FHS_096", "title": "Logbook for Pool Bike not Maintained"}, {"id": "OBS_FHS_097", "title": "Vehicle (BRV) Log Book not Properly Maintained"}, {"id": "OBS_FHS_098", "title": "Water Bowser Log Book not Properly Maintained"}, {"id": "OBS_FHS_099", "title": "Generators Log Book not Properly Maintained"}, {"id": "OBS_FHS_100", "title": "Fuel Average Monitoring not Conducted"}, {"id": "OBS_FHS_101", "title": "Google Mini and Nest Devices not Properly Configured"}, {"id": "OBS_FHS_188", "title": "Missing Record of Third-Party Assets"}]}};
 
-var AWS_STATUS_OPTS = ['Not Started','In Progress','Checked with Observation','Checked & Clear','Not Applicable'];
+var AWS_STATUS_OPTS = ['Not Started','In Progress','Checked & Clear','Not Applicable','Sampled Out'];
 
 function setRptBtnsDisabled(disabled){
   var btns=document.querySelectorAll('.rpt-btn');
@@ -15296,30 +16104,35 @@ function awsGetObsState(id){
   return aws_state.obs[id];
 }
 
+// A status counts as "work done" for % purposes when nothing further needs to be done on that item.
+function _awsIsDone(status){
+  return status==='Checked & Clear'||status==='Not Applicable'||status==='Sampled Out';
+}
+
 function awsGetCatStats(catName){
   var list=AWS_OBS_DATA.obs[catName]||[];
   var total=list.length, checked=0;
   for(var i=0;i<list.length;i++){
     var st=aws_state.obs[list[i].id];
-    if(st&&(st.status==='Checked & Clear'||st.status==='Checked with Observation')) checked++;
+    if(st&&_awsIsDone(st.status)) checked++;
   }
   return{total:total,checked:checked,pct:total>0?Math.round(checked/total*100):0};
 }
 
 function awsGetCatDetailStats(catName){
   var list=AWS_OBS_DATA.obs[catName]||[];
-  var total=list.length,obs=0,clear=0,inprog=0,na=0,pending=0;
+  var total=list.length,clear=0,inprog=0,na=0,so=0,pending=0;
   for(var i=0;i<list.length;i++){
     var st=aws_state.obs[list[i].id];
     var status=st?st.status:'Not Started';
-    if(status==='Checked with Observation') obs++;
-    else if(status==='Checked & Clear')     clear++;
-    else if(status==='In Progress')         inprog++;
-    else if(status==='Not Applicable')      na++;
+    if(status==='Checked & Clear')     clear++;
+    else if(status==='In Progress')    inprog++;
+    else if(status==='Not Applicable') na++;
+    else if(status==='Sampled Out')    so++;
     else pending++;
   }
-  var done=obs+clear;
-  return{total:total,obs:obs,clear:clear,inprog:inprog,na:na,pending:pending,pct:total>0?Math.round(done/total*100):0};
+  var done=clear+na+so; // all three mean work is complete for that item
+  return{total:total,clear:clear,inprog:inprog,na:na,so:so,pending:pending,pct:total>0?Math.round(done/total*100):0};
 }
 
 function awsGetTotalStats(){
@@ -15337,9 +16150,8 @@ function awsCardBg(pct){
 }
 
 function awsStatusClass(st){
-  if(st==='Checked & Clear')        return 's-clear';
-  if(st==='Checked with Observation') return 's-obs';
-  if(st==='In Progress')            return 's-inprog';
+  if(st==='Checked & Clear')  return 's-clear';
+  if(st==='In Progress')      return 's-inprog';
   if(st==='Not Applicable')         return 's-na';
   return '';
 }
@@ -15450,7 +16262,7 @@ function awsRenderCategories(){
     for(var j=0;j<list.length;j++){
       var obs=list[j];
       var st=awsGetObsState(obs.id);
-      var rowCls=st.status==='Checked with Observation'?' aws-row-obs':(st.checked?' aws-row-checked':'');
+      var rowCls=st.checked?' aws-row-checked':'';
       var cbChk=st.checked?' checked':'';
       html+='<tr class="aws-obs-row'+rowCls+'" id="aws_row_'+obs.id+'">';
       html+='<td style="text-align:center"><input type="checkbox" class="aws-obs-cb"'+cbChk+' onchange="awsSetObs(\''+obs.id+'\',\'checked\',this.checked)"></td>';
@@ -15509,12 +16321,12 @@ function awsSetObs(id,field,val){
   if(!aws_state.obs[id]) aws_state.obs[id]={checked:false,status:'Not Started',remark:''};
   aws_state.obs[id][field]=val;
   if(field==='status'){
-    if(val==='Checked & Clear'||val==='Checked with Observation') aws_state.obs[id].checked=true;
+    if(val==='Checked & Clear') aws_state.obs[id].checked=true;
     if(val==='Not Started'||val==='In Progress'||val==='Not Applicable') aws_state.obs[id].checked=false;
   }
   if(field==='checked'){
     if(val===true&&aws_state.obs[id].status==='Not Started') aws_state.obs[id].status='Checked & Clear';
-    if(val===false&&(aws_state.obs[id].status==='Checked & Clear'||aws_state.obs[id].status==='Checked with Observation')) aws_state.obs[id].status='Not Started';
+    if(val===false&&aws_state.obs[id].status==='Checked & Clear') aws_state.obs[id].status='Not Started';
   }
   awsSaveState();
   awsUpdateRowUI(id);
@@ -15528,7 +16340,7 @@ function awsUpdateRowUI(id){
   var st=aws_state.obs[id];if(!st) return;
   var row=document.getElementById('aws_row_'+id);
   if(row){
-    row.className='aws-obs-row'+(st.status==='Checked with Observation'?' aws-row-obs':(st.checked?' aws-row-checked':''));
+    row.className='aws-obs-row'+(st.checked?' aws-row-checked':'');
     var cb=row.querySelector('.aws-obs-cb');if(cb) cb.checked=st.checked;
     var sel=row.querySelector('.aws-status-sel');
     if(sel){sel.value=st.status;sel.className='aws-status-sel '+awsStatusClass(st.status);}
@@ -15576,10 +16388,180 @@ function awsShowRptTab(tab){
     if(tw) tw.style.display='';
     if(cw) cw.style.display='none';
   } else {
-    if(tt) tt.className='aws-report-tab';
-    if(tc) tc.className='aws-report-tab active';
-    if(tw) tw.style.display='none';
-    if(cw) cw.style.display='';
+    // Hide other full-page panels first
+    var awsP=document.getElementById('aws-panel'); if(awsP) awsP.style.display='none';
+    var awsTabBtn=document.getElementById('aws-tab-btn'); if(awsTabBtn) awsTabBtn.textContent='\u{1F4CB} Work Status';
+    panel.style.display='block';
+    panel.classList.add('panel-fadein');
+    setTimeout(function(){ panel.classList.remove('panel-fadein'); },300);
+    main.style.display='none';
+    if(btn) btn.textContent='\u{1F4C4} Close Draft Summary';
+    _setPanelBack('Draft Summary');
+    setRptBtnsDisabled(true);
+    var raBtn2=document.getElementById('ra-tab-btn'); if(raBtn2) raBtn2.disabled=true;
+    var awsBtn2=document.getElementById('aws-tab-btn'); if(awsBtn2) awsBtn2.disabled=true;
+    renderDraftPanel();
+  }
+}
+
+function renderDraftPanel(){
+  var content=document.getElementById('dp-content');
+  if(!content) return;
+
+  var cats=AWS_OBS_DATA.cats;
+  var grouped={};
+  var total=0, newCount=0, repCount=0;
+  var typeColor={New:'#2070b8',Repeated:'#d06020'};
+  var sensColor={High:'#c0392b','M to H':'#e67e22','L to M':'#2980b9',Low:'#27ae60'};
+
+  // Collect DB observations
+  for(var ci=0;ci<cats.length;ci++){
+    var cat=cats[ci];
+    var list=AWS_OBS_DATA.obs[cat]||[];
+    for(var oi=0;oi<list.length;oi++){
+      var o=list[oi];
+      if(!selIds[o.id]) continue;
+      if(!grouped[cat]) grouped[cat]=[];
+      var oType=obsTypeMap[o.id]||o.type||'New';
+      var entry={
+        obs:o, type:oType,
+        sens:sensitivityMap[o.id]||'',
+        coso:cosoMap[o.id]||'',
+        awsSt:(aws_state.obs[o.id]&&aws_state.obs[o.id].status)||'Not Started',
+        obsText:(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:(o.observation||''),
+        recText:(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:(o.recommendation||''),
+        larr:lastRefMap[o.id]||'',
+        bsNote:obsNotesMap[o.id]||''
+      };
+      grouped[cat].push(entry);
+      total++; if(oType==='Repeated') repCount++; else newCount++;
+    }
+  }
+
+  // Custom observations
+  var customRows=[];
+  for(var k=0;k<customs.length;k++){
+    var co=customs[k];
+    if(!selIds[co.id]) continue;
+    var coType=obsTypeMap[co.id]||co.type||'New';
+    customRows.push({
+      obs:co, type:coType,
+      sens:sensitivityMap[co.id]||'',
+      coso:cosoMap[co.id]||'',
+      awsSt:(aws_state.obs[co.id]&&aws_state.obs[co.id].status)||'—',
+      obsText:(obsEdits[co.id]&&obsEdits[co.id].observation!=null)?obsEdits[co.id].observation:(co.observation||''),
+      recText:(obsEdits[co.id]&&obsEdits[co.id].recommendation!=null)?obsEdits[co.id].recommendation:(co.recommendation||''),
+      larr:lastRefMap[co.id]||'',
+      bsNote:obsNotesMap[co.id]||''
+    });
+    total++; if(coType==='Repeated') repCount++; else newCount++;
+  }
+
+  // Update header bar counts
+  var brname=document.getElementById('brname'); var rno=document.getElementById('rno');
+  var dpName=document.getElementById('dp-bb-name'); var dpRno=document.getElementById('dp-bb-rno');
+  var dpTotal=document.getElementById('dp-bb-total'); var dpNew=document.getElementById('dp-bb-new'); var dpRep=document.getElementById('dp-bb-rep');
+  if(dpName) dpName.textContent=(brname&&brname.value.trim())||'(Branch not set)';
+  if(dpRno)  dpRno.textContent=(rno&&rno.value.trim())||'(Report No. not set)';
+  if(dpTotal) dpTotal.textContent=total;
+  if(dpNew)   dpNew.textContent=newCount;
+  if(dpRep)   dpRep.textContent=repCount;
+
+  if(total===0){
+    content.innerHTML='<div style="text-align:center;padding:48px 0;color:#888;font-size:13px">&#128203; No observations have been added to the draft report yet.<br><span style="font-size:12px;margin-top:6px;display:block">Select observations from the Build tab observation list.</span></div>';
+    return;
+  }
+
+  function _wsBadge(st){
+    var bg=st==='Checked & Clear'?'#d4edda':st==='In Progress'?'#ffe8cc':st==='Sampled Out'?'#eef0ff':st==='Not Applicable'?'#f3f3f3':'#ececec';
+    var fg=st==='Checked & Clear'?'#155724':st==='In Progress'?'#a04000':st==='Sampled Out'?'#3a3a9a':'#555';
+    return '<span style="background:'+bg+';color:'+fg+';border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap">'+awsEsc(st)+'</span>';
+  }
+
+  function _tableHead(hdrColor){
+    return '<table><thead><tr style="background:'+hdrColor+'">'
+      +'<th style="padding:7px 10px;text-align:left;width:72px">ID</th>'
+      +'<th style="padding:7px 10px;text-align:left">Observation Title <span style="font-size:10px;font-weight:400;opacity:.7">(click to open &amp; edit)</span></th>'
+      +'<th style="padding:7px 10px;text-align:center;width:72px">Type</th>'
+      +'<th style="padding:7px 10px;text-align:center;width:64px">Sensitivity</th>'
+      +'<th style="padding:7px 10px;text-align:center;width:52px">COSO</th>'
+      +'<th style="padding:7px 10px;text-align:center;width:130px">Work Status</th>'
+      +'<th style="padding:7px 10px;text-align:center;width:76px"></th>'
+      +'</tr></thead><tbody>';
+  }
+
+  function _obsRow(r, isCustom){
+    var id=r.obs.id;
+    var tc=typeColor[r.type]||'#555';
+    var sc=sensColor[r.sens]||'#aaa';
+    var h='<tr>';
+    h+='<td style="padding:7px 10px;color:#888;font-size:11px">'+(isCustom?'Custom':awsEsc(id))+'</td>';
+    h+='<td style="padding:7px 10px"><span class="dp-title-link" onclick="dpNavToObs(\''+id+'\')">'+awsEsc(r.obs.title)+'</span></td>';
+    h+='<td style="padding:7px 10px;text-align:center"><span style="background:'+tc+';color:#fff;border-radius:8px;padding:1px 8px;font-size:10px;font-weight:700">'+awsEsc(r.type)+'</span></td>';
+    h+='<td style="padding:7px 10px;text-align:center">'+(r.sens?'<span style="background:'+sc+';color:#fff;border-radius:8px;padding:1px 8px;font-size:10px;font-weight:700">'+awsEsc(r.sens)+'</span>':'<span style="color:#ccc">—</span>')+'</td>';
+    h+='<td style="padding:7px 10px;text-align:center">'+(r.coso?'<span style="background:#1a3a5c;color:#fff;border-radius:8px;padding:1px 8px;font-size:10px;font-weight:700">'+awsEsc(r.coso)+'</span>':'<span style="color:#ccc">—</span>')+'</td>';
+    h+='<td style="padding:7px 10px;text-align:center">'+_wsBadge(r.awsSt)+'</td>';
+    h+='<td style="padding:7px 10px;text-align:center"><button id="dp-ddbtn-'+id+'" onclick="dpToggleDetail(\''+id+'\')" style="font-size:11px;padding:2px 10px;background:#eaf2fb;color:#1a3a5c;border:1px solid #b0c8e8;border-radius:5px;cursor:pointer;font-family:inherit;font-weight:700;white-space:nowrap">&#9660; Details</button></td>';
+    h+='</tr>';
+    // Expandable detail row
+    h+='<tr id="dp-dd-'+id+'" class="dp-detail-row" style="display:none">';
+    h+='<td colspan="7"><div class="dp-detail-inner">';
+    h+='<div style="display:flex;flex-direction:column;gap:8px;max-width:900px">';
+    if(r.obsText){
+      h+='<div><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#1a3a5c;margin-bottom:3px">&#128270; Observation</div>'
+        +'<div style="background:#fff;border:1px solid #dde3ec;border-radius:5px;padding:8px 10px;line-height:1.6;white-space:pre-wrap;font-size:12px">'+awsEsc(r.obsText)+'</div></div>';
+    }
+    if(r.bsNote){
+      h+='<div><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#6a5a00;margin-bottom:3px">&#128203; Branch-Specific Notes / Tables</div>'
+        +'<div style="background:#fffef5;border:1px solid #e0d080;border-radius:5px;padding:8px 10px;line-height:1.6;white-space:pre-wrap;font-size:12px">'+awsEsc(r.bsNote)+'</div></div>';
+    }
+    if(r.recText){
+      h+='<div><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#1a6030;margin-bottom:3px">&#128204; Recommendation</div>'
+        +'<div style="background:#fff;border:1px solid #dde3ec;border-radius:5px;padding:8px 10px;line-height:1.6;white-space:pre-wrap;font-size:12px">'+awsEsc(r.recText)+'</div></div>';
+    }
+    if(r.type==='Repeated'&&r.larr){
+      h+='<div><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#8a3000;margin-bottom:3px">&#128196; Last Audit Report Reference (LARR)</div>'
+        +'<div style="background:#fff8f2;border:1px solid #f0c090;border-radius:5px;padding:6px 10px;font-size:12px">'+awsEsc(r.larr)+'</div></div>';
+    }
+    h+='<div style="margin-top:4px"><button onclick="dpNavToObs(\''+id+'\')" style="font-size:12px;padding:5px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600">&#9998; Open &amp; Edit in Build View</button></div>';
+    h+='</div></div></td></tr>';
+    return h;
+  }
+
+  var h='';
+
+  // DB observations grouped by category
+  for(var ci2=0;ci2<cats.length;ci2++){
+    var cat2=cats[ci2];
+    var rows=grouped[cat2];
+    if(!rows||!rows.length) continue;
+    var catId='dp-cat-'+ci2;
+    h+='<div class="dp-cat-block">';
+    h+='<div class="dp-cat-hdr" onclick="dpToggleCat(\''+catId+'\')">';
+    h+='<span>'+awsEsc(cat2)+'</span>';
+    h+='<div style="display:flex;align-items:center;gap:8px">';
+    h+='<span style="background:rgba(255,255,255,.2);border-radius:8px;padding:1px 10px;font-size:11px">'+rows.length+' obs.</span>';
+    h+='<span class="dp-toggle" style="font-size:13px">&#9660;</span>';
+    h+='</div></div>';
+    h+='<div class="dp-cat-body" id="'+catId+'">';
+    h+=_tableHead('#eaf0f8');
+    for(var ri=0;ri<rows.length;ri++) h+=_obsRow(rows[ri],false);
+    h+='</tbody></table></div></div>';
+  }
+
+  // Custom observations
+  if(customRows.length){
+    h+='<div class="dp-cat-block" style="border-color:#c8b8f0">';
+    h+='<div class="dp-cat-hdr" style="background:#5b3fa0" onclick="dpToggleCat(\'dp-cat-custom\')">';
+    h+='<span>&#10024; Custom Observations</span>';
+    h+='<div style="display:flex;align-items:center;gap:8px">';
+    h+='<span style="background:rgba(255,255,255,.2);border-radius:8px;padding:1px 10px;font-size:11px">'+customRows.length+' obs.</span>';
+    h+='<span class="dp-toggle" style="font-size:13px">&#9660;</span>';
+    h+='</div></div>';
+    h+='<div class="dp-cat-body" id="dp-cat-custom">';
+    h+=_tableHead('#f0eaff');
+    for(var cri=0;cri<customRows.length;cri++) h+=_obsRow(customRows[cri],true);
+    h+='</tbody></table></div></div>';
   }
 }
 
@@ -15602,7 +16584,7 @@ function awsInit(){
     brInp.value=aws_state.branch||'';
     brInp.oninput=function(){aws_state.branch=this.value;awsSaveState();};
   }
-  // Auto-sync from selIds: observations in the report → "Checked with Observation"
+  // Auto-sync from selIds: observations in the report → "In Progress"
   awsSyncFromReport();
   awsRenderAll();
 }
@@ -15624,14 +16606,19 @@ function awsSyncFromReport(){
     var cur=aws_state.obs[obsId];
     var curStatus=cur?cur.status:'Not Started';
     if(inReport[obsId]){
-      // In report: if untouched (Not Started) → set "Checked with Observation"
+      // In report: if untouched (Not Started) → set "In Progress"
       if(!cur||curStatus==='Not Started'){
-        aws_state.obs[obsId]={checked:true,status:'Checked with Observation',remark:cur&&cur.remark?cur.remark:''};
+        aws_state.obs[obsId]={checked:false,status:'In Progress',remark:cur&&cur.remark?cur.remark:''};
+        changed=true;
+      }
+      // Migrate legacy "Checked with Observation" → "In Progress"
+      if(curStatus==='Checked with Observation'){
+        aws_state.obs[obsId]={checked:false,status:'In Progress',remark:cur&&cur.remark?cur.remark:''};
         changed=true;
       }
     } else {
-      // Not in report: if was auto-set to "Checked with Observation" → reset to Not Started
-      if(curStatus==='Checked with Observation'){
+      // Not in report: if was auto-set (In Progress or legacy Checked with Observation) → reset to Not Started
+      if(curStatus==='In Progress'||curStatus==='Checked with Observation'){
         aws_state.obs[obsId]={checked:false,status:'Not Started',remark:cur&&cur.remark?cur.remark:''};
         changed=true;
       }
@@ -16859,8 +17846,8 @@ function _applyRepeatSelections(){
   }
   var modal=document.getElementById('rd-modal');
   if(modal) modal.remove();
-  doSearch();
-  if(typeof renderRpt==='function') renderRpt(); // refresh draft so LARR box appears immediately
+  applyFilter(); // refresh left panel so Repeated badge + LARR input appear immediately
+  renderRpt();   // refresh right editing panel so LARR field shows in draft report
   autoSaveNow();
   if(applied) ra_toast(applied+' observation(s) marked as Repeated with LARR auto-filled.');
   else ra_toast('No observations marked — all were unticked.');
@@ -17439,6 +18426,142 @@ function generateReviewerHtml(role){
   rv+='<div class="stat"><div class="num" id="stat-amended">0</div><div class="lbl">Amended</div></div>';
   rv+='</div>\n';
 
+  // ── Custom Observation Approval Section ──────────────────────────────────
+  var customObsForApproval=[];
+  if(role==='ro'){
+    // RO sees all selected custom observations
+    for(var _cai=0;_cai<customs.length;_cai++){
+      if(selIds[customs[_cai].id]) customObsForApproval.push(customs[_cai]);
+    }
+  } else {
+    // HO sees only RO-approved custom observations
+    for(var _hcai=0;_hcai<customs.length;_hcai++){
+      var _hco=customs[_hcai];
+      if(selIds[_hco.id]&&roCustomApprovals[_hco.id]&&roCustomApprovals[_hco.id].decision==='approved') customObsForApproval.push(_hco);
+    }
+  }
+  if(customObsForApproval.length){
+    rv+='<div style="background:#fff;border-radius:8px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.10);overflow:hidden;border:2px solid #1a6030">';
+    rv+='<div style="background:linear-gradient(90deg,#1a6030,#2a8050);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px">';
+    rv+='<span style="font-size:18px">&#128196;</span>';
+    rv+='<div><div style="font-size:14px;font-weight:800">Custom Observation Approval</div>';
+    rv+='<div style="font-size:11px;opacity:.75;margin-top:2px">Review each custom observation and approve, suggest changes, or reject for databank inclusion.</div></div>';
+    rv+='<div style="margin-left:auto;background:rgba(255,255,255,.2);border-radius:6px;padding:4px 12px;text-align:center">';
+    rv+='<div style="font-size:18px;font-weight:800">'+customObsForApproval.length+'</div>';
+    rv+='<div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px">Pending</div>';
+    rv+='</div></div>';
+    for(var _cap=0;_cap<customObsForApproval.length;_cap++){
+      var _co=customObsForApproval[_cap];
+      var _coOt=(obsEdits[_co.id]&&obsEdits[_co.id].observation!=null)?obsEdits[_co.id].observation:_co.observation||'';
+      var _coRt=(obsEdits[_co.id]&&obsEdits[_co.id].recommendation!=null)?obsEdits[_co.id].recommendation:_co.recommendation||'';
+      rv+='<div style="padding:14px 16px;border-bottom:1px solid #e0ece8" id="cap-card-'+esc(_co.id)+'">';
+      rv+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+      rv+='<span style="background:#1a6030;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">Custom</span>';
+      rv+='<span style="font-size:13px;font-weight:700;color:#1e2d40;flex:1">'+esc(_co.title)+'</span>';
+      rv+='<span style="font-size:10px;color:#888;background:#f0f0f0;border-radius:4px;padding:2px 7px">'+esc(_co.category||'Others')+'</span>';
+      rv+='</div>';
+      rv+='<div style="font-size:9.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Observation</div>';
+      rv+='<div style="font-size:12.5px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:8px 10px;margin-bottom:8px;white-space:pre-wrap">'+esc(_coOt)+'</div>';
+      rv+='<div style="font-size:9.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Recommendation</div>';
+      rv+='<div style="font-size:12.5px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:8px 10px;margin-bottom:10px;white-space:pre-wrap">'+esc(_coRt)+'</div>';
+      rv+='<div style="font-size:10px;font-weight:700;color:#1a3a5c;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Decision</div>';
+      rv+='<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">';
+      rv+='<button onclick="setCapDec(\''+esc(_co.id)+'\',\'approved\')" id="capbtn-appr-'+esc(_co.id)+'" style="flex:1;padding:8px;border:2px solid #27ae60;border-radius:6px;background:#fff;color:#27ae60;font-weight:700;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">&#10003; Approve</button>';
+      rv+='<button onclick="setCapDec(\''+esc(_co.id)+'\',\'changes\')" id="capbtn-chng-'+esc(_co.id)+'" style="flex:1;padding:8px;border:2px solid #e67e22;border-radius:6px;background:#fff;color:#e67e22;font-weight:700;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">&#9999; Suggest Changes</button>';
+      rv+='<button onclick="setCapDec(\''+esc(_co.id)+'\',\'rejected\')" id="capbtn-rejt-'+esc(_co.id)+'" style="flex:1;padding:8px;border:2px solid #c0392b;border-radius:6px;background:#fff;color:#c0392b;font-weight:700;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">&#10007; Reject</button>';
+      rv+='</div>';
+      rv+='<input type="hidden" id="capdec-'+esc(_co.id)+'" data-obsid="'+esc(_co.id)+'" value="">';
+      rv+='<textarea id="cap-cmt-'+esc(_co.id)+'" style="width:100%;padding:7px 9px;border:1px solid #dde2ea;border-radius:4px;font-family:Inter,sans-serif;font-size:12px;color:#2a3a50;resize:vertical;min-height:50px;box-sizing:border-box;display:none" placeholder="Comment (required for Suggest Changes or Reject)..."></textarea>';
+      rv+='</div>';
+    }
+    rv+='</div>\n';
+    // JS for custom approval buttons in reviewer file
+    rv+='<script>\n';
+    rv+='function setCapDec(id,dec){\n';
+    rv+='  document.getElementById("capdec-"+id).value=dec;\n';
+    rv+='  var cmt=document.getElementById("cap-cmt-"+id);\n';
+    rv+='  if(cmt) cmt.style.display=(dec==="changes"||dec==="rejected")?"block":"none";\n';
+    rv+='  var card=document.getElementById("cap-card-"+id);\n';
+    rv+='  if(card) card.style.background=dec==="approved"?"#f0fff4":dec==="changes"?"#fff8f0":"#fff5f5";\n';
+    rv+='  var ba=document.getElementById("capbtn-appr-"+id);\n';
+    rv+='  var bc=document.getElementById("capbtn-chng-"+id);\n';
+    rv+='  var br=document.getElementById("capbtn-rejt-"+id);\n';
+    rv+='  if(ba) ba.style.background=dec==="approved"?"#27ae60":"#fff"; if(ba) ba.style.color=dec==="approved"?"#fff":"#27ae60";\n';
+    rv+='  if(bc) bc.style.background=dec==="changes"?"#e67e22":"#fff"; if(bc) bc.style.color=dec==="changes"?"#fff":"#e67e22";\n';
+    rv+='  if(br) br.style.background=dec==="rejected"?"#c0392b":"#fff"; if(br) br.style.color=dec==="rejected"?"#fff":"#c0392b";\n';
+    rv+='}\n';
+    rv+='<\/script>\n';
+  }
+  // ── Corrections Review Section (only present on corrected re-submissions) ─
+  if(_corrections){
+    var _crFlagged=Object.keys(_corrections.flags||{}).filter(function(id){return _corrections.flags[id];});
+    var _crCount=_crFlagged.length;
+    rv+='<script type="application/json" id="bss-corrections">'+_correctionsJson+'<\/script>\n';
+    rv+='<div class="cr-section" id="cr-section">\n';
+    rv+='<div class="cr-hdr">';
+    rv+='<div><div class="cr-hdr-title">&#128203; Corrections Review — '+esc(_corrections.fromRole)+' Manager</div>';
+    rv+='<div class="cr-hdr-sub">Review each correction below. Approve or request further changes before forwarding.</div></div>';
+    rv+='<div style="background:rgba(255,255,255,.15);border-radius:6px;padding:5px 12px;text-align:center;white-space:nowrap">';
+    rv+='<div style="font-size:20px;font-weight:800" id="cr-count">0</div>';
+    rv+='<div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;opacity:.8">of '+_crCount+' reviewed</div>';
+    rv+='</div></div>\n';
+    if(_corrections.sendBackComment){
+      rv+='<div style="background:#fff8f0;border-bottom:1px solid #f0d0a0;padding:9px 16px;font-size:12px;color:#7a4000">';
+      rv+='<strong>&#128172; Overall Comment from '+esc(_corrections.fromRole)+' Manager:</strong> '+esc(_corrections.sendBackComment)+'</div>';
+    }
+    rv+='<div class="cr-progress">';
+    rv+='<div style="font-size:11px;font-weight:700;color:#1a3a5c;white-space:nowrap">Progress: <span id="cr-prog-lbl">0 / '+_crCount+'</span></div>';
+    rv+='<div class="cr-prog-bar-wrap"><div class="cr-prog-bar" id="cr-prog-bar"></div></div>';
+    rv+='<div style="font-size:11px;font-weight:700;color:#27ae60;white-space:nowrap" id="cr-all-ok" style="display:none"></div>';
+    rv+='</div>\n';
+    rv+='<div style="overflow-x:auto"><table class="cr-table">';
+    rv+='<thead><tr><th style="width:32px">#</th><th>Observation</th><th>'+esc(_corrections.fromRole)+' Comment</th><th>Correction Made</th><th style="width:200px">Wording Change</th><th style="width:120px">Decision</th></tr></thead><tbody id="cr-tbody">';
+    _crFlagged.forEach(function(id,idx){
+      var matchedObs=null;
+      for(var ai=0;ai<allObs.length;ai++){if(allObs[ai].id===id){matchedObs=allObs[ai];break;}}
+      var obsTitle=matchedObs?matchedObs.title:id;
+      var supComment=(_corrections.comments&&_corrections.comments[id])||'';
+      var audNote=(_corrections.auditorNotes&&_corrections.auditorNotes[id])||'';
+      var wc=_corrections.wordingSnap&&_corrections.wordingSnap[id];
+      rv+='<tr id="cr-row-'+esc(id)+'">';
+      rv+='<td style="font-weight:700;color:#1a3a5c;text-align:center">'+(idx+1)+'</td>';
+      rv+='<td style="font-weight:600;color:#1e2d40">'+esc(obsTitle)+'</td>';
+      rv+='<td>'+(supComment?'<div class="cr-sup-cmt">'+esc(supComment)+'</div>':'<span style="color:#aaa;font-style:italic">No comment</span>')+'</td>';
+      rv+='<td>'+(audNote?'<div class="cr-aud-note">'+esc(audNote)+'</div>':'<span style="color:#aaa;font-style:italic">No note provided</span>')+'</td>';
+      // Wording diff column
+      rv+='<td>';
+      if(wc){
+        if(wc.obsOrig!=null&&wc.obsEdit!=null&&wc.obsOrig!==wc.obsEdit){
+          rv+='<div style="font-size:9.5px;font-weight:700;color:#1a3a5c;margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px">Observation</div>';
+          rv+='<div class="cr-diff-wrap"><div class="cr-diff-orig"><div class="cr-diff-lbl">Before</div>'+esc(wc.obsOrig)+'</div><div class="cr-diff-edit"><div class="cr-diff-lbl">After</div>'+esc(wc.obsEdit)+'</div></div>';
+        }
+        if(wc.recOrig!=null&&wc.recEdit!=null&&wc.recOrig!==wc.recEdit){
+          rv+='<div style="font-size:9.5px;font-weight:700;color:#1a3a5c;margin:6px 0 3px;text-transform:uppercase;letter-spacing:.4px">Recommendation</div>';
+          rv+='<div class="cr-diff-wrap"><div class="cr-diff-orig"><div class="cr-diff-lbl">Before</div>'+esc(wc.recOrig)+'</div><div class="cr-diff-edit"><div class="cr-diff-lbl">After</div>'+esc(wc.recEdit)+'</div></div>';
+        }
+        if((wc.obsOrig===wc.obsEdit||wc.obsOrig==null)&&(wc.recOrig===wc.recEdit||wc.recOrig==null)){
+          rv+='<span style="color:#888;font-style:italic;font-size:11px">No text change detected</span>';
+        }
+      } else {
+        rv+='<span style="color:#aaa;font-style:italic;font-size:11px">—</span>';
+      }
+      rv+='</td>';
+      // Decision column
+      rv+='<td>';
+      rv+='<div id="cr-status-'+esc(id)+'" style="margin-bottom:5px"></div>';
+      rv+='<button class="cr-btn-approve" onclick="_crDecide(\''+esc(id)+'\',true)">&#10003; Approved</button>';
+      rv+='<button class="cr-btn-more" onclick="_crDecide(\''+esc(id)+'\',false)">&#8617; Needs More Work</button>';
+      rv+='</td>';
+      rv+='</tr>';
+    });
+    rv+='</tbody></table></div>';
+    rv+='<div class="cr-footer">';
+    rv+='<div id="cr-footer-msg" style="flex:1;font-size:12px;color:#555">Review all '+_crCount+' item'+(+_crCount!==1?'s':'')+' above before proceeding.</div>';
+    rv+='<div id="cr-footer-btns"></div>';
+    rv+='</div>';
+    rv+='</div>\n'; // cr-section
+  }
+
   // ── Observation cards — split into Repeated / New sections ───────────
   // Separate and sort to match the finalized report structure
   var repObs=allObs.filter(function(o){return (o.type||'New').toLowerCase()==='repeated';});
@@ -17474,7 +18597,12 @@ function generateReviewerHtml(role){
     rv+='<div class="obs-card'+(tc==='repeated'?' repeated':'')+'" id="card-'+esc(o.id)+'">';
     rv+='<div class="obs-hdr"><span class="obs-num">'+esc(entry.label)+'</span>';
     rv+='<span class="obs-title">'+esc(o.title)+'</span>';
-    rv+='<span class="obs-badge" style="'+badgeSt+'">'+esc(o.type||'New')+'</span></div>';
+    rv+='<span class="obs-badge" style="'+badgeSt+'">'+esc(o.type||'New')+'</span>';
+    var rvSens=sensitivityMap[o.id]||'';
+    if(rvSens){var rvSc=rvSens==='High'?'background:#fde8e8;color:#9b1a1a;border:1px solid #f0a0a0':rvSens==='M to H'?'background:#fff0e0;color:#b04400;border:1px solid #f0b070':rvSens==='L to M'?'background:#fffbe0;color:#806000;border:1px solid #e0c030':'background:#e8f8e8;color:#1a6020;border:1px solid #80c880';rv+='<span class="obs-badge" style="'+rvSc+'">'+esc(rvSens)+'</span>';}
+    var rvCoso=cosoMap[o.id]||'';
+    if(rvCoso){rv+='<span class="obs-badge" style="background:#e8f0ff;color:#1a3080;border:1px solid #90a8e8">COSO: '+esc(rvCoso)+'</span>';}
+    rv+='</div>';
     if(tc==='repeated'&&larrRef){
       rv+='<div style="padding:4px 14px;background:#fff8f0;font-size:10.5px;color:#b04800;border-bottom:1px solid #f0d8c0">';
       rv+='<strong>&#8635; LARR:</strong> '+esc(larrRef)+'</div>';
@@ -17516,10 +18644,50 @@ function generateReviewerHtml(role){
     rv+='<div class="sec-lbl">Observation</div><div class="sec-txt">'+esc(o.observation)+'</div>';
     rv+='<div class="sec-lbl">Recommendation</div><div class="sec-txt">'+esc(o.recommendation)+'</div>';
     var rvBsNotes=obsNotesMap[o.id]||'';
-    if(rvBsNotes) rv+='<div style="margin:8px 0;padding:8px 10px;background:#fffdf0;border:1px solid #e0d080;border-radius:6px"><div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#6a5a00;margin-bottom:4px">&#128203; Branch-Specific Notes / Tables <span style="font-size:9px;font-weight:400;color:#999;text-transform:none">(informational — not part of wording change workflow)</span></div><div style="font-size:12.5px;line-height:1.6;color:#2a3a00;white-space:pre-wrap">'+esc(rvBsNotes)+'</div></div>';
-    if(o.response){
+    rv+='<div class="sec-lbl">Observation</div><div style="font-size:12.5px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:8px 10px;word-break:break-word">'+_renderText(o.observation,{fontSize:'12.5px',color:'#2a3a50',lineHeight:'1.6'})+(rvBsNotes?_renderText(rvBsNotes,{fontSize:'12.5px',color:'#2a3a50',lineHeight:'1.6'}):'')+'</div>';
+    rv+='<div class="sec-lbl">Recommendation</div><div style="font-size:12.5px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:8px 10px;word-break:break-word">'+_renderText(o.recommendation,{fontSize:'12.5px',color:'#2a3a50',lineHeight:'1.6'})+'</div>';
+    if(o.annex) rv+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">&#128203; Annexure Ref:</strong> <a href="#'+_anxId(o.annex)+'" style="color:#1a3a5c;font-weight:700;text-decoration:underline;cursor:pointer" title="Click to view annexure below">'+esc(o.annex)+'</a></div>';
+    // Auditee responses — show split BH/RO responses if available, else combined
+    var rvBhResp=respBHMap[o.id]!=null?respBHMap[o.id]:null;
+    var rvRoResp=respROMap[o.id]!=null?respROMap[o.id]:null;
+    if(rvBhResp!==null){
+      rv+='<div class="sec-lbl" style="color:#1a5c3a">Auditee Response &ndash; BH</div>';
+      rv+='<div style="font-size:12.5px;line-height:1.6;color:#2a3a50;background:#fffef0;border-left:3px solid #d4b400;border-radius:4px;padding:8px 10px;word-break:break-word">'+_renderText(rvBhResp,{fontSize:'12.5px',color:'#2a3a50',lineHeight:'1.6'})+'</div>';
+    }
+    if(rvRoResp!==null){
+      rv+='<div class="sec-lbl" style="color:#5b3fa0">Auditee Response &ndash; RO/HO</div>';
+      rv+='<div style="font-size:12.5px;line-height:1.6;color:#3a2a70;background:#f8f5ff;border-left:3px solid #9b6fd0;border-radius:4px;padding:8px 10px;word-break:break-word">'+_renderText(rvRoResp,{fontSize:'12.5px',color:'#3a2a70',lineHeight:'1.6'})+'</div>';
+    }
+    if(rvBhResp===null&&rvRoResp===null&&o.response){
       rv+='<div class="sec-lbl">Auditee Response</div>';
       rv+='<div class="sec-txt" style="background:#fffef0;border-left:3px solid #d4b400">'+esc(o.response)+'</div>';
+    }
+    // Section head responses
+    var rvSectRO=respSectROMap[o.id]||null;
+    var rvSectHO=respSectHOMap[o.id]||null;
+    if(rvSectRO){
+      rv+='<div class="sec-lbl" style="color:#1a5c3a">RO Section Response</div>';
+      rv+='<div style="font-size:12.5px;line-height:1.6;color:#1a3a2a;background:#f0fff8;border-left:3px solid #3a9a6a;border-radius:4px;padding:8px 10px;word-break:break-word">'+_renderText(rvSectRO,{fontSize:'12.5px',color:'#1a3a2a',lineHeight:'1.6'})+'</div>';
+    }
+    if(rvSectHO){
+      rv+='<div class="sec-lbl" style="color:#1a3a5c">HO Section Response</div>';
+      rv+='<div style="font-size:12.5px;line-height:1.6;color:#1a2a5a;background:#f0f4ff;border-left:3px solid #4a6ab0;border-radius:4px;padding:8px 10px;word-break:break-word">'+_renderText(rvSectHO,{fontSize:'12.5px',color:'#1a2a5a',lineHeight:'1.6'})+'</div>';
+    }
+    // Auditor assessment, audit view, action taken
+    var rvAStatus=assessMap[o.id]||'';
+    var rvAv=avMap[o.id]||'';
+    var rvAct=actMap[o.id]||'';
+    if(rvAStatus){
+      var rvALabel=rvAStatus==='agreed'?'Agreed by Auditee':rvAStatus==='resolved'?'Resolved':'Not Agreed by Auditee';
+      rv+='<div style="margin-top:8px;padding:6px 10px;background:#eef4ff;border:1px solid #4a7fc1;border-radius:4px;font-size:11px;font-weight:700;color:#1a3a5c">Auditor Assessment: '+esc(rvALabel)+'</div>';
+    }
+    if(rvAv){
+      rv+='<div class="sec-lbl">Audit View</div>';
+      rv+='<div style="font-size:12.5px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-left:3px solid #1a3a5c;border-radius:4px;padding:8px 10px;word-break:break-word">'+_renderText(rvAv,{fontSize:'12.5px',color:'#2a3a50',lineHeight:'1.6'})+'</div>';
+    }
+    if(rvAct){
+      rv+='<div class="sec-lbl">Action Taken</div>';
+      rv+='<div style="font-size:12.5px;line-height:1.6;color:#2a3a50;background:#f0fff8;border-left:3px solid #1a7a4a;border-radius:4px;padding:8px 10px;word-break:break-word">'+_renderText(rvAct,{fontSize:'12.5px',color:'#2a3a50',lineHeight:'1.6'})+'</div>';
     }
 
     // Amend response
@@ -17546,18 +18714,143 @@ function generateReviewerHtml(role){
   rv+='<div style="margin-bottom:90px">';
   rv+='<textarea id="sendback-comment" class="sb-cmt" placeholder="Overall comment for send-back (required when sending back)..."></textarea>';
   rv+='</div>\n';
+
+  // ── Annexures Section ────────────────────────────────────────────────────
+  // Render annexures from session data (text + embedded files) so the reviewer
+  // can view all supporting evidence without needing any other file.
+  syncAnnexTextFromDom();
+  // Include every annexure that is referenced by at least one selected observation
+  // (even if it has no content yet) so the anchor links in observation cards always
+  // find their target element on the page.
+  var _refAnnexLabels={};
+  for(var _rax=0;_rax<allObs.length;_rax++){
+    if(allObs[_rax].annex){
+      var _axParts=allObs[_rax].annex.split(',');
+      for(var _axp=0;_axp<_axParts.length;_axp++){
+        var _axTrim=_axParts[_axp].trim();
+        if(_axTrim) _refAnnexLabels[_axTrim]=true;
+      }
+    }
+  }
+  var _pdfIdx=0;      // counter for unique PDF/file element IDs
+  var _pdfScripts=''; // JS lines pushed during annexure rendering; injected into <script> block
+  var _revAnnexes = (sess.annexures||[]).filter(function(a){
+    var lbl=(a.label||'').trim();
+    return _refAnnexLabels[lbl] || (a.files&&a.files.length) || (a.text&&a.text.trim());
+  });
+  if(_revAnnexes.length){
+    rv+='<div id="anx-section" style="background:#fff;border-radius:8px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden;border:2px solid #1a3a5c">';
+    rv+='<div style="background:linear-gradient(90deg,#1a3a5c,#2a5080);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px">';
+    rv+='<span style="font-size:18px">&#128196;</span>';
+    rv+='<div style="font-size:14px;font-weight:800">Annexures</div>';
+    rv+='<div style="font-size:11px;opacity:.75;margin-left:4px">('+_revAnnexes.length+' attached)</div>';
+    rv+='</div>';
+    rv+='<div style="padding:14px 16px">';
+    for(var _ai=0;_ai<_revAnnexes.length;_ai++){
+      var _ax=_revAnnexes[_ai];
+      var _axLbl=_ax.label||('Annexure-'+(_ai+1));
+      var _axAnchorId=_anxId(_axLbl);
+      rv+='<div id="'+_axAnchorId+'" style="margin-bottom:22px;padding-bottom:16px;scroll-margin-top:16px;'+ (_ai<_revAnnexes.length-1?'border-bottom:1px solid #dde2ea;':'') +'">';
+      rv+='<div style="font-size:13px;font-weight:800;color:#1a3a5c;margin-bottom:6px">'+esc(_axLbl);
+      if(_ax.title) rv+=' &mdash; '+esc(_ax.title);
+      rv+='</div>';
+      // Text content
+      if(_ax.text&&_ax.text.trim()){
+        // Convert pipe-table lines to HTML, plain lines to paragraphs
+        var _axLines=_ax.text.split('\n');
+        var _axHtml='';
+        var _inTbl=false;
+        for(var _li=0;_li<_axLines.length;_li++){
+          var _ln=_axLines[_li];
+          if(_ln.indexOf('|')>=0){
+            if(!_inTbl){ _axHtml+='<table style="border-collapse:collapse;width:100%;font-size:11.5px;margin-bottom:8px">'; _inTbl=true; }
+            if(/^\s*\|[-| :]+\|\s*$/.test(_ln)) continue; // separator row
+            var _cells=_ln.split('|').map(function(c){return c.trim();}).filter(function(c,ci,arr){return ci>0&&ci<arr.length-1;});
+            _axHtml+='<tr>';
+            for(var _ci2=0;_ci2<_cells.length;_ci2++) _axHtml+='<td style="border:1px solid #dde2ea;padding:4px 8px">'+esc(_cells[_ci2])+'</td>';
+            _axHtml+='</tr>';
+          } else {
+            if(_inTbl){ _axHtml+='</table>'; _inTbl=false; }
+            if(_ln.trim()) _axHtml+='<p style="font-size:12.5px;line-height:1.6;color:#2a3a50;margin-bottom:5px;white-space:pre-wrap">'+esc(_ln)+'</p>';
+          }
+        }
+        if(_inTbl) _axHtml+='</table>';
+        rv+=_axHtml;
+      }
+      // Files
+      if(_ax.files&&_ax.files.length){
+        for(var _fi=0;_fi<_ax.files.length;_fi++){
+          var _f=_ax.files[_fi];
+          if(!_f.dataUrl){
+            rv+='<div style="font-size:12px;color:#b05000;font-style:italic;margin-bottom:6px">&#9888; '+esc(_f.name)+' — not available (re-attach needed)</div>';
+            continue;
+          }
+          var _isImg=_f.type&&_f.type.indexOf('image/')===0;
+          var _isPdf=_f.type&&_f.type==='application/pdf';
+          rv+='<div style="margin-bottom:10px">';
+          if(_isImg){
+            rv+='<div style="font-size:11px;color:#6a7888;margin-bottom:4px">'+esc(_f.name)+'</div>';
+            rv+='<img src="'+_f.dataUrl+'" style="max-width:100%;border:1px solid #dde2ea;border-radius:4px;display:block">';
+          } else if(_isPdf){
+            // Chrome blocks data: URIs in <embed> and blocks data: URI downloads on file:// pages.
+            // Store data in a JS variable; on load, convert to blob: URL for iframe + download link.
+            var _pdfId='rvpdf-'+(_pdfIdx++);
+            var _safeDataUrl=_f.dataUrl.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            _pdfScripts+='_rvPdfs.push({id:\''+_pdfId+'\',name:'+JSON.stringify(_f.name)+',data:\''+_safeDataUrl+'\'});\n';
+            rv+='<div style="font-size:11px;color:#6a7888;margin-bottom:4px">'+esc(_f.name)+'</div>';
+            rv+='<iframe id="'+_pdfId+'" src="about:blank" style="width:100%;height:480px;border:1px solid #dde2ea;border-radius:4px"></iframe>';
+            rv+='<div style="margin-top:4px"><a id="'+_pdfId+'-dl" href="#" style="font-size:12px;color:#1a3a5c;font-weight:600">&#8595; Download PDF</a></div>';
+          } else {
+            // Other files — convert to blob: URL on load for cross-origin/file:// compatibility
+            var _fileId='rvfile-'+(_pdfIdx++);
+            var _safeDataUrl2=_f.dataUrl.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            _pdfScripts+='_rvPdfs.push({id:\''+_fileId+'\',name:'+JSON.stringify(_f.name)+',data:\''+_safeDataUrl2+'\'});\n';
+            rv+='<a id="'+_fileId+'-dl" href="#" style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12.5px;font-weight:600;color:#1a3a5c;text-decoration:none">&#128229; '+esc(_f.name)+'</a>';
+          }
+          rv+='</div>';
+        }
+      }
+      rv+='</div>'; // end annexure item
+    }
+    rv+='</div></div>\n'; // end padding + anx-section
+  }
+
+  var _crLocked=(_corrections&&_corrections.flags&&Object.keys(_corrections.flags).some(function(id){return _corrections.flags[id];}));
   rv+='<div class="action-bar"><div class="action-btns">';
   if(role==='ro'){
     rv+='<button class="btn-sb" onclick="showSBComment();doAction(\'send_back\')">&#8617; Send Back to Auditor</button>';
     rv+='<button class="btn-fwd" onclick="doAction(\'forward_ho\')">&#8594; Forward to HO &#10003;</button>';
   } else {
     rv+='<button class="btn-sb" onclick="showSBComment();doAction(\'send_back_to_ro\')">&#8617; Send Back to RO</button>';
-    rv+='<button class="btn-issue" onclick="doAction(\'issue\')">&#10003; Issue Report</button>';
+    rv+='<button class="btn-issue" id="btn-fwd-main"'+(_crLocked?' disabled title="Complete Corrections Review above before issuing" style="opacity:.45;cursor:not-allowed"':'')+' onclick="doAction(\'issue\')">&#10003; Issue Report</button>';
+    rv+='<button class="btn-fwd" id="btn-fwd-db" style="display:none;background:#c07000" onclick="doAction(\'forward_db\')">&#128190; Forward for Databank Update</button>';
   }
   rv+='</div></div>\n</div>\n'; // action-bar, wrap
 
   // ── Inline JS ─────────────────────────────────────────────────────────
   rv+='<script>\n';
+  // PDF / file blob: URL conversion — Chrome blocks data: URIs in <embed> and
+  // blocks data: URI downloads from file:// pages. Convert to blob: URLs on load.
+  rv+='var _rvPdfs=[];\n';
+  rv+=_pdfScripts; // per-file push lines collected during annexure rendering
+  rv+='(function(){\n';
+  rv+='  function _dataToBlob(dataUrl){\n';
+  rv+='    var arr=dataUrl.split(","),mime=arr[0].match(/:(.*?);/)[1];\n';
+  rv+='    var bstr=atob(arr[1]),n=bstr.length,u8=new Uint8Array(n);\n';
+  rv+='    for(var i=0;i<n;i++) u8[i]=bstr.charCodeAt(i);\n';
+  rv+='    return new Blob([u8],{type:mime});\n';
+  rv+='  }\n';
+  rv+='  for(var _pi=0;_pi<_rvPdfs.length;_pi++){\n';
+  rv+='    try{\n';
+  rv+='      var _pe=_rvPdfs[_pi];\n';
+  rv+='      var _burl=URL.createObjectURL(_dataToBlob(_pe.data));\n';
+  rv+='      var _frm=document.getElementById(_pe.id);\n';
+  rv+='      if(_frm) _frm.src=_burl;\n'; // iframe for PDF
+  rv+='      var _dl=document.getElementById(_pe.id+"-dl");\n';
+  rv+='      if(_dl){ _dl.href=_burl; _dl.download=_pe.name; }\n';
+  rv+='    }catch(e){}\n';
+  rv+='  }\n';
+  rv+='})();\n';
   rv+='var _evidenceStore={};\n';
   rv+='function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}\n';
   rv+='function onFlag(id,cb){\n';
@@ -17605,7 +18898,9 @@ function generateReviewerHtml(role){
   rv+='  });\n';
   rv+='  var name=(document.getElementById("reviewer-name")||{}).value||"";\n';
   rv+='  var sbCmt=(document.getElementById("sendback-comment")||{}).value||"";\n';
-  rv+='  return {action:action,reviewerName:name,reviewDate:new Date().toISOString().slice(0,10),flags:flags,comments:comments,wordingDecisions:wordingDec,amendments:amendments,sendBackComment:sbCmt};\n';
+  rv+='  var customApprovals={};\n';
+  rv+='  document.querySelectorAll("input[id^=capdec-]").forEach(function(inp){ var id=inp.getAttribute("data-obsid"); var dec=inp.value; if(dec){ var cmtEl=document.getElementById("cap-cmt-"+id); customApprovals[id]={decision:dec,comment:cmtEl?cmtEl.value.trim():""}; } });\n';
+  rv+='  return {action:action,reviewerName:name,reviewDate:new Date().toISOString().slice(0,10),flags:flags,comments:comments,wordingDecisions:wordingDec,amendments:amendments,sendBackComment:sbCmt,customApprovals:customApprovals};\n';
   rv+='}\n';
   rv+='function doAction(action){\n';
   rv+='  var name=(document.getElementById("reviewer-name")||{}).value||"";\n';
@@ -17615,18 +18910,67 @@ function generateReviewerHtml(role){
   rv+='    sb.style.display="block";\n';
   rv+='    if(!sb.value.trim()){ sb.scrollIntoView({behavior:"smooth"}); sb.focus(); alert("Please enter an overall send-back comment before submitting."); return; }\n';
   rv+='  }\n';
+  rv+='  // For HO Issue action: block if pending amendments exist\n';
+  rv+='  if(action==="issue"){\n';
+  rv+='    var _sess=null; try{ var _sEl=document.getElementById("bss-session"); if(_sEl) _sess=JSON.parse(_sEl.textContent); }catch(e){}\n';
+  rv+='    var _wc=(_sess&&_sess.wordingChanges)||{};\n';
+  rv+='    var _roAcc=(_sess&&_sess.roAccepted)||{};\n';
+  rv+='    var _roCust=(_sess&&_sess.roCustomApprovals)||{};\n';
+  rv+='    var _hasPendingAmend=false;\n';
+  rv+='    // Check wording changes: both RO and HO accepted obs or rec\n';
+  rv+='    var _wcIds=Object.keys(_wc);\n';
+  rv+='    for(var _wi=0;_wi<_wcIds.length;_wi++){\n';
+  rv+='      var _wid=_wcIds[_wi]; var _wcEntry=_wc[_wid];\n';
+  rv+='      if(!_wcEntry) continue;\n';
+  rv+='      var _roAccObs=_roAcc[_wid]&&_roAcc[_wid].obs===true;\n';
+  rv+='      var _roAccRec=_roAcc[_wid]&&_roAcc[_wid].rec===true;\n';
+  rv+='      var _hoObsEl=document.getElementById("wcdv-obs-"+_wid);\n';
+  rv+='      var _hoRecEl=document.getElementById("wcdv-rec-"+_wid);\n';
+  rv+='      var _hoAccObs=_hoObsEl&&_hoObsEl.value==="accept";\n';
+  rv+='      var _hoAccRec=_hoRecEl&&_hoRecEl.value==="accept";\n';
+  rv+='      if((_wcEntry.obsEdit!=null&&_roAccObs&&_hoAccObs)||(_wcEntry.recEdit!=null&&_roAccRec&&_hoAccRec)){\n';
+  rv+='        _hasPendingAmend=true; break;\n';
+  rv+='      }\n';
+  rv+='    }\n';
+  rv+='    // Check custom obs approvals: both RO and HO approved\n';
+  rv+='    if(!_hasPendingAmend){\n';
+  rv+='      var _custApprIds=Object.keys(_roCust);\n';
+  rv+='      for(var _ci=0;_ci<_custApprIds.length;_ci++){\n';
+  rv+='        var _cid=_custApprIds[_ci];\n';
+  rv+='        if(_roCust[_cid]&&_roCust[_cid].decision==="approved"){\n';
+  rv+='          var _hoCapEl=document.getElementById("capdec-"+_cid);\n';
+  rv+='          if(_hoCapEl&&_hoCapEl.value==="approved"){ _hasPendingAmend=true; break; }\n';
+  rv+='        }\n';
+  rv+='      }\n';
+  rv+='    }\n';
+  rv+='    if(_hasPendingAmend){\n';
+  rv+='      var _issBtn=document.getElementById("btn-fwd-main");\n';
+  rv+='      var _fwdBtn=document.getElementById("btn-fwd-db");\n';
+  rv+='      if(_issBtn){ _issBtn.style.display="none"; }\n';
+  rv+='      if(_fwdBtn){ _fwdBtn.style.display="inline-block"; }\n';
+  rv+='      var _warn=document.getElementById("amend-block-warn");\n';
+  rv+='      if(!_warn){\n';
+  rv+='        _warn=document.createElement("div"); _warn.id="amend-block-warn";\n';
+  rv+='        _warn.style.cssText="background:#fff3cd;border:2px solid #f0a500;border-radius:6px;padding:10px 14px;margin-top:8px;font-size:12px;color:#7a4800;font-weight:600";\n';
+  rv+='        _warn.innerHTML="&#9888; Pending databank amendments exist (wording changes or new observations accepted by both RO &amp; HO). Please use <strong>Forward for Databank Update</strong> — the Administrator must bake these into the app before final issuance.";\n';
+  rv+='        var _ab=document.querySelector(".action-bar"); if(_ab) _ab.appendChild(_warn);\n';
+  rv+='      }\n';
+  rv+='      return;\n';
+  rv+='    }\n';
+  rv+='  }\n';
   rv+='  var dec=collectDecisions(action);\n';
   rv+='  var dj=JSON.stringify(dec).replace(/<\\/script>/gi,"<\\\\/script>");\n';
   rv+='  var html="<!DOCTYPE html>\\n"+document.documentElement.outerHTML;\n';
   rv+='  html=html.replace(/<script type="application\\/json" id="bss-decisions">[\\s\\S]*?<\\/script>/,\'<script type="application/json" id="bss-decisions">\'+dj+\'<\\/script>\');\n';
-  rv+='  var suffix=action==="send_back"?"_SendBack":action==="forward_ho"?"_ForHO":action==="send_back_to_ro"?"_SentBackRO":"_Issued";\n';
+  rv+='  var suffix=action==="send_back"?"_SendBack":action==="forward_ho"?"_ForHO":action==="send_back_to_ro"?"_SentBackRO":action==="forward_db"?"_ForDB":"_Issued";\n';
   rv+='  var sess=JSON.parse(document.getElementById("bss-session").textContent);\n';
   rv+='  var br=(sess.brname||"").replace(/[^a-zA-Z0-9]/g,"_").slice(0,18);\n';
   rv+='  var fname="BSS_Review_"+(sess.reviewRole||"RO").toUpperCase()+suffix+(br?"_"+br:"")+".html";\n';
   rv+='  var blob=new Blob([html],{type:"text/html"});\n';
   rv+='  var url=URL.createObjectURL(blob);\n';
   rv+='  var a=document.createElement("a"); a.href=url; a.download=fname; a.click(); URL.revokeObjectURL(url);\n';
-  rv+='  setTimeout(function(){ alert("\\u2705 Review submitted!\\nFile downloaded: "+fname+"\\n\\nSend this HTML file back to the auditor (for send-back) or forward as instructed."); },300);\n';
+  rv+='  var _alertMsg=action==="forward_db"?"\\u2705 Forwarded for Databank Update!\\nFile downloaded: "+fname+"\\n\\nSend this file to the Administrator to apply amendments.":"\\u2705 Review submitted!\\nFile downloaded: "+fname+"\\n\\nSend this HTML file back to the auditor (for send-back) or forward as instructed.";\n';
+  rv+='  setTimeout(function(){ alert(_alertMsg); },300);\n';
   rv+='}\n';
   // On page load: if bss-decisions contains a send-back, display all RO/HO comments visibly
   rv+='window.addEventListener("load",function(){\n';
@@ -17750,6 +19094,7 @@ function loadReviewerHtml(evt, role){
       roFlags   =dec.flags||{};
       roComments=dec.comments||{};
       roAccepted=dec.wordingDecisions||{};
+      roCustomApprovals=dec.customApprovals||{};
       // Apply wording decisions
       Object.keys(roAccepted).forEach(function(id){
         if(wordingChanges[id]) wordingChanges[id].roDecision=roAccepted[id];
@@ -17768,12 +19113,15 @@ function loadReviewerHtml(evt, role){
       hoFlags   =dec.flags||{};
       hoComments=dec.comments||{};
       hoAccepted=dec.wordingDecisions||{};
+      hoCustomApprovals=dec.customApprovals||{};
       Object.keys(hoAccepted).forEach(function(id){
         if(wordingChanges[id]) wordingChanges[id].hoDecision=hoAccepted[id];
       });
       var ham=dec.amendments||{};
       Object.keys(ham).forEach(function(id){ if(ham[id]&&ham[id].amended) respAmendments[id]=ham[id]; });
       AT_log({type:'review_loaded',role:'HO',reviewer:dec.reviewerName||'',action:action,date:dec.reviewDate||''});
+      _detectPendingAmendments();
+      _updatePendingDatabankBadge();
       if(action==='send_back_to_ro'){
         showToast('⚠ Report sent back by HO to RO.\nHO: '+(dec.reviewerName||''), 5000);
         _showReviewSendBackModal(dec,'HO');
@@ -17880,37 +19228,33 @@ function _showReviewSendBackModal(dec, fromRole){
 }
 
 function _cgGoTo(id){
-  // Always reset filters so applyFilter populates #rlist with all DB observations
-  var qEl=document.getElementById('qinp');
-  var catEl=document.getElementById('scat');
-  if(qEl) qEl.value='';
-  if(catEl) catEl.value='All Categories';
-  if(typeof applyFilter==='function') applyFilter();
-
+  // Scroll to the observation CARD in the right-panel draft report (id="oc-{id}").
+  // Do NOT touch the left-panel search / applyFilter — that would make the checkbox
+  // clickable and risk the auditor accidentally unchecking (removing) the observation.
   setTimeout(function(){
-    var el=document.getElementById('ri-'+id);
-    if(el){
-      el.scrollIntoView({behavior:'smooth',block:'center'});
-      el.style.transition='box-shadow .2s';
-      el.style.boxShadow='0 0 0 3px #f0c030';
-      setTimeout(function(){ el.style.boxShadow=''; },1800);
+    var card=document.getElementById('oc-'+id);
+    if(card){
+      card.scrollIntoView({behavior:'smooth',block:'start'});
+      // Brief highlight so the auditor can see which card was jumped to
+      card.style.transition='outline .1s';
+      card.style.outline='3px solid #f0c030';
+      card.style.borderRadius='6px';
+      setTimeout(function(){ card.style.outline=''; card.style.borderRadius=''; },2000);
       return;
     }
-    // Fallback: custom observation or report preview card
+    // Fallback: data-obsid attribute (custom obs or other card variants)
     var found=false;
     var rpcont=document.getElementById('rpcont');
     if(rpcont){
-      var all=rpcont.querySelectorAll('[data-obsid]');
-      for(var i=0;i<all.length;i++){
-        if(all[i].getAttribute('data-obsid')===id){ all[i].scrollIntoView({behavior:'smooth',block:'center'}); found=true; break; }
+      var nodes=rpcont.querySelectorAll('[data-obsid]');
+      for(var i=0;i<nodes.length;i++){
+        if(nodes[i].getAttribute('data-obsid')===id){
+          nodes[i].scrollIntoView({behavior:'smooth',block:'start'});
+          found=true; break;
+        }
       }
     }
-    if(!found){
-      // Try any element whose id contains the observation id
-      var generic=document.querySelector('[id*="'+id+'"]');
-      if(generic){ generic.scrollIntoView({behavior:'smooth',block:'center'}); found=true; }
-    }
-    if(!found) showToast('Observation not found — ensure it is selected in the report.', 3000);
+    if(!found) showToast('Observation card not found in draft report — make sure it is selected.', 3000);
   }, 80);
 }
 
