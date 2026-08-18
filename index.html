@@ -9473,20 +9473,22 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
     <div id="aws-rpt-table-wrap">
       <table id="aws-rpt-table">
         <thead><tr>
-          <th>Category</th><th>Total</th><th>Checked w/ Obs.</th><th>Checked &amp; Clear</th>
-          <th>In Progress</th><th>Not Applicable</th><th>Sampled Out</th><th>Pending</th><th>% Done</th>
+          <th>Category</th><th title="Active population — excludes Sampled Out &amp; N/A">Active Total</th>
+          <th>Checked &amp; Clear</th><th>In Progress</th><th>Pending</th>
+          <th style="color:#999;font-style:italic" title="Excluded from population">N/A &#8251;</th>
+          <th style="color:#999;font-style:italic" title="Excluded from population">Sampled Out &#8251;</th>
+          <th>% Done</th>
         </tr></thead>
         <tbody id="aws-rpt-tbody"></tbody>
       </table>
     </div>
     <div id="aws-rpt-chart">
       <div class="aws-chart-legend">
-        <div class="aws-legend-item"><div class="aws-legend-dot" style="background:#ffc107"></div>Checked w/ Observation</div>
         <div class="aws-legend-item"><div class="aws-legend-dot" style="background:#3cb371"></div>Checked &amp; Clear</div>
         <div class="aws-legend-item"><div class="aws-legend-dot" style="background:#f0a040"></div>In Progress</div>
-        <div class="aws-legend-item"><div class="aws-legend-dot" style="background:#aaa"></div>Not Applicable</div>
-        <div class="aws-legend-item"><div class="aws-legend-dot" style="background:#7070cc"></div>Sampled Out</div>
         <div class="aws-legend-item"><div class="aws-legend-dot" style="background:#e8edf3;border:1px solid #ccc"></div>Pending</div>
+        <div class="aws-legend-item" style="opacity:.5"><div class="aws-legend-dot" style="background:#aaa"></div>N/A (excluded)</div>
+        <div class="aws-legend-item" style="opacity:.5"><div class="aws-legend-dot" style="background:#7070cc"></div>Sampled Out (excluded)</div>
       </div>
       <div id="aws-chart-rows"></div>
     </div>
@@ -20232,28 +20234,34 @@ function _awsIsDone(status){
 }
 
 function awsGetCatStats(catName){
+  // Active population excludes Sampled Out and N/A — these are not real workload
   var list=AWS_OBS_DATA.obs[catName]||[];
-  var total=list.length, checked=0;
+  var total=0, checked=0;
   for(var i=0;i<list.length;i++){
     var st=aws_state.obs[list[i].id];
+    var status=st?st.status:'Not Started';
+    if(status==='Sampled Out'||status==='Not Applicable') continue; // excluded from population
+    total++;
     if(st&&_awsIsDone(st.status)) checked++;
   }
   return{total:total,checked:checked,pct:total>0?Math.round(checked/total*100):0};
 }
 
 function awsGetCatDetailStats(catName){
+  // total = active observations only (excludes SO & NA from denominator)
   var list=AWS_OBS_DATA.obs[catName]||[];
-  var total=list.length,clear=0,inprog=0,na=0,so=0,pending=0;
+  var total=0,clear=0,inprog=0,na=0,so=0,pending=0;
   for(var i=0;i<list.length;i++){
     var st=aws_state.obs[list[i].id];
     var status=st?st.status:'Not Started';
-    if(status==='Checked & Clear')     clear++;
-    else if(status==='In Progress')    inprog++;
-    else if(status==='Not Applicable') na++;
-    else if(status==='Sampled Out')    so++;
-    else pending++;
+    if(status==='Not Applicable') { na++; continue; }  // counted separately, not in total
+    if(status==='Sampled Out')    { so++; continue; }  // counted separately, not in total
+    total++;
+    if(status==='Checked & Clear')  clear++;
+    else if(status==='In Progress') inprog++;
+    else                            pending++;
   }
-  var done=clear+na+so; // all three mean work is complete for that item
+  var done=clear; // only Checked & Clear counts as done in active population
   return{total:total,clear:clear,inprog:inprog,na:na,so:so,pending:pending,pct:total>0?Math.round(done/total*100):0};
 }
 
@@ -20330,37 +20338,47 @@ function awsRenderReport(){
   var chartRows=document.getElementById('aws-chart-rows');
   if(!tbody||!chartRows) return;
   var cats=AWS_OBS_DATA.cats;
-  var totT=0,totO=0,totC=0,totP=0,totN=0,totSO=0,totPend=0;
+  // totT = active population only (SO & NA excluded from denominator)
+  var totT=0,totC=0,totP=0,totN=0,totSO=0,totPend=0;
   var tHtml='',cHtml='';
   for(var i=0;i<cats.length;i++){
     var cat=cats[i];
     var s=awsGetCatDetailStats(cat);
-    totT+=s.total;totO+=s.obs;totC+=s.clear;totP+=s.inprog;totN+=s.na;totSO+=s.so;totPend+=s.pending;
-    tHtml+='<tr><td>'+awsEsc(cat)+'</td><td>'+s.total+'</td>';
-    tHtml+='<td style="color:#856404;font-weight:700">'+s.obs+'</td>';
+    totT+=s.total;totC+=s.clear;totP+=s.inprog;totN+=s.na;totSO+=s.so;totPend+=s.pending;
+    // Active total shown in column; SO+NA shown in their own columns but greyed in footer note
+    tHtml+='<tr><td>'+awsEsc(cat)+'</td>';
+    tHtml+='<td title="Active population (excludes Sampled Out & N/A)">'+s.total+'</td>';
     tHtml+='<td class="aws-td-clear">'+s.clear+'</td><td class="aws-td-prog">'+s.inprog+'</td>';
-    tHtml+='<td class="aws-td-na">'+s.na+'</td><td class="aws-td-so">'+s.so+'</td><td class="aws-td-pend">'+s.pending+'</td>';
+    tHtml+='<td class="aws-td-pend">'+s.pending+'</td>';
+    tHtml+='<td class="aws-td-na" style="color:#888;font-style:italic">'+s.na+'</td>';
+    tHtml+='<td class="aws-td-so" style="color:#888;font-style:italic">'+s.so+'</td>';
     tHtml+='<td><span class="aws-pct-pill '+awsPillClass(s.pct)+'">'+s.pct+'%</span></td></tr>';
-    var oW=s.total>0?(s.obs/s.total*100).toFixed(1):0;
+    // Bar chart based on active total only; SO & NA shown as muted segments appended after
     var cW=s.total>0?(s.clear/s.total*100).toFixed(1):0;
     var pW=s.total>0?(s.inprog/s.total*100).toFixed(1):0;
-    var nW=s.total>0?(s.na/s.total*100).toFixed(1):0;
-    var soW=s.total>0?(s.so/s.total*100).toFixed(1):0;
     var pdW=s.total>0?(s.pending/s.total*100).toFixed(1):0;
+    var allActive=s.total+s.na+s.so;
+    var nW=allActive>0?(s.na/allActive*100).toFixed(1):0;
+    var soW=allActive>0?(s.so/allActive*100).toFixed(1):0;
     var lbl=cat.length>26?cat.substring(0,24)+'...':cat;
     cHtml+='<div class="aws-chart-row">';
     cHtml+='<div class="aws-chart-label" title="'+awsEsc(cat)+'">'+awsEsc(lbl)+'</div>';
     cHtml+='<div class="aws-chart-bar-wrap">';
-    cHtml+='<div class="aws-bar-seg" style="background:#ffc107;width:'+oW+'%" title="Checked w/ Obs: '+s.obs+'"></div>';
     cHtml+='<div class="aws-bar-seg aws-bar-clear" style="width:'+cW+'%" title="Checked & Clear: '+s.clear+'"></div>';
     cHtml+='<div class="aws-bar-seg aws-bar-prog"  style="width:'+pW+'%" title="In Progress: '+s.inprog+'"></div>';
-    cHtml+='<div class="aws-bar-seg aws-bar-na"    style="width:'+nW+'%" title="Not Applicable: '+s.na+'"></div>';
-    cHtml+='<div class="aws-bar-seg aws-bar-so"    style="width:'+soW+'%" title="Sampled Out: '+s.so+'"></div>';
     cHtml+='<div class="aws-bar-seg aws-bar-pend"  style="width:'+pdW+'%" title="Pending: '+s.pending+'"></div>';
+    cHtml+='<div class="aws-bar-seg aws-bar-na"    style="width:'+nW+'%;opacity:.4" title="N/A (excluded): '+s.na+'"></div>';
+    cHtml+='<div class="aws-bar-seg aws-bar-so"    style="width:'+soW+'%;opacity:.4" title="Sampled Out (excluded): '+s.so+'"></div>';
     cHtml+='</div><div class="aws-chart-pct">'+s.pct+'%</div></div>';
   }
-  var totPct=totT>0?Math.round((totO+totC)/totT*100):0;
-  tHtml+='<tr><td>TOTAL</td><td>'+totT+'</td><td style="color:#856404;font-weight:700">'+totO+'</td><td class="aws-td-clear">'+totC+'</td><td class="aws-td-prog">'+totP+'</td><td class="aws-td-na">'+totN+'</td><td class="aws-td-so">'+totSO+'</td><td class="aws-td-pend">'+totPend+'</td><td><span class="aws-pct-pill '+awsPillClass(totPct)+'">'+totPct+'%</span></td></tr>';
+  var totPct=totT>0?Math.round(totC/totT*100):0;
+  tHtml+='<tr style="font-weight:700"><td>TOTAL</td>';
+  tHtml+='<td title="Active population only">'+totT+'</td>';
+  tHtml+='<td class="aws-td-clear">'+totC+'</td><td class="aws-td-prog">'+totP+'</td>';
+  tHtml+='<td class="aws-td-pend">'+totPend+'</td>';
+  tHtml+='<td class="aws-td-na" style="color:#888;font-style:italic">'+totN+'</td>';
+  tHtml+='<td class="aws-td-so" style="color:#888;font-style:italic">'+totSO+'</td>';
+  tHtml+='<td><span class="aws-pct-pill '+awsPillClass(totPct)+'">'+totPct+'%</span></td></tr>';
   tbody.innerHTML=tHtml;
   chartRows.innerHTML=cHtml;
 }
@@ -20384,36 +20402,42 @@ function awsRenderCategories(){
     html+='</div>';
     html+='<div class="aws-cat-body'+collapsed+'" id="aws_cat_body_'+i+'">';
     html+='<table class="aws-obs-table"><thead><tr><th style="width:36px">Done</th><th style="width:72px">ID</th><th>Observation</th><th style="width:120px">Risk Link</th><th style="width:170px">Status</th><th style="width:36px">&#128221;</th></tr></thead><tbody>';
-    // Sort: unchecked / in-progress first, checked (done) observations last
-    var sortedList=list.slice().sort(function(a,b){
+
+    // Split into active and excluded (SO / NA) lists
+    var activeList=[], excludedList=[];
+    for(var j=0;j<list.length;j++){
+      var _st0=awsGetObsState(list[j].id);
+      if(_st0.status==='Sampled Out'||_st0.status==='Not Applicable') excludedList.push(list[j]);
+      else activeList.push(list[j]);
+    }
+    // Sort active: unchecked / in-progress first, checked last
+    activeList.sort(function(a,b){
       var sa=aws_state.obs[a.id], sb=aws_state.obs[b.id];
-      var doneA=(sa&&sa.checked)?1:0, doneB=(sb&&sb.checked)?1:0;
-      return doneA-doneB; // 0 before 1 → unchecked first
+      return ((sa&&sa.checked)?1:0)-((sb&&sb.checked)?1:0);
     });
-    for(var j=0;j<sortedList.length;j++){
-      var obs=sortedList[j];
+
+    function _awsObsRow(obs, greyed){
       var st=awsGetObsState(obs.id);
-      var rowCls=st.checked?' aws-row-checked':'';
+      var rowCls=greyed?' aws-row-excluded':(st.checked?' aws-row-checked':'');
       var cbChk=st.checked?' checked':'';
-      html+='<tr class="aws-obs-row'+rowCls+'" id="aws_row_'+obs.id+'">';
-      html+='<td style="text-align:center"><input type="checkbox" class="aws-obs-cb"'+cbChk+' onchange="awsSetObs(\''+obs.id+'\',\'checked\',this.checked)"></td>';
-      html+='<td style="font-size:11px;color:#888">'+awsEsc(obs.id)+'</td>';
-      html+='<td>'+awsEsc(obs.title)+'</td>';
-      // Risk badge cell
+      var rowStyle=greyed?' style="opacity:.45;background:#f6f6f8"':'';
+      var r='<tr class="aws-obs-row'+rowCls+'" id="aws_row_'+obs.id+'"'+rowStyle+'>';
+      r+='<td style="text-align:center"><input type="checkbox" class="aws-obs-cb"'+cbChk+' onchange="awsSetObs(\''+obs.id+'\',\'checked\',this.checked)"'+(greyed?' title="Excluded from population"':'')+'></td>';
+      r+='<td style="font-size:11px;color:#888">'+awsEsc(obs.id)+'</td>';
+      r+='<td style="'+(greyed?'color:#999;font-style:italic':'')+'">'+awsEsc(obs.title)+'</td>';
       var srrId=_obsSrrCache[obs.id]||null;
       var srrDef=srrId?SRR_DEF[srrId]:null;
       if(srrDef){
-        html+='<td style="text-align:center"><div class="aws-risk-wrap">'
-          +'<span class="aws-risk-badge" style="background:'+srrDef.col+'">'+srrId+'</span>'
+        r+='<td style="text-align:center"><div class="aws-risk-wrap">'
+          +'<span class="aws-risk-badge" style="background:'+srrDef.col+(greyed?';opacity:.5':'')+'">'+(greyed?'<s>':'')+srrId+(greyed?'</s>':'')+'</span>'
           +'<div class="aws-risk-tip">'
           +'<div class="tip-srr">'+srrId+'</div>'
           +'<div class="tip-name">'+awsEsc(srrDef.name)+'</div>'
           +'<div class="tip-rr">&#9656; '+awsEsc(srrDef.rr)+' &mdash; '+awsEsc(srrDef.rrName)+'</div>'
           +'<div class="tip-ctrl">&#10003; Control: <strong>'+awsEsc(srrDef.caName)+'</strong></div>'
-          +'</div>'
-          +'</div></td>';
+          +'</div></div></td>';
       } else {
-        html+='<td style="text-align:center;color:#ccc;font-size:11px">&mdash;</td>';
+        r+='<td style="text-align:center;color:#ccc;font-size:11px">&mdash;</td>';
       }
       var selH='<select class="aws-status-sel '+awsStatusClass(st.status)+'" onchange="awsSetObs(\''+obs.id+'\',\'status\',this.value)">';
       for(var k=0;k<AWS_STATUS_OPTS.length;k++){
@@ -20421,14 +20445,23 @@ function awsRenderCategories(){
         selH+='<option value="'+AWS_STATUS_OPTS[k]+'"'+sel+'>'+AWS_STATUS_OPTS[k]+'</option>';
       }
       selH+='</select>';
-      html+='<td>'+selH+'</td>';
+      r+='<td>'+selH+'</td>';
       var hasR=st.remark&&st.remark.length>0;
-      html+='<td style="text-align:center"><button class="aws-remark-btn'+(hasR?' active':'')+'" id="aws_rbtn_'+obs.id+'" onclick="awsToggleRemark(\''+obs.id+'\')">&#128221;</button></td>';
-      html+='</tr>';
+      r+='<td style="text-align:center"><button class="aws-remark-btn'+(hasR?' active':'')+'" id="aws_rbtn_'+obs.id+'" onclick="awsToggleRemark(\''+obs.id+'\')">&#128221;</button></td>';
+      r+='</tr>';
       var rdsp=hasR?'':' style="display:none"';
-      html+='<tr class="aws-remark-row" id="aws_rrow_'+obs.id+'"'+rdsp+'>';
-      html+='<td colspan="6"><input type="text" class="aws-remark-input" placeholder="Remark..." value="'+awsEsc(st.remark||'')+'" oninput="awsSetObs(\''+obs.id+'\',\'remark\',this.value)" id="aws_ri_'+obs.id+'"></td></tr>';
+      r+='<tr class="aws-remark-row" id="aws_rrow_'+obs.id+'"'+rdsp+'>';
+      r+='<td colspan="6"><input type="text" class="aws-remark-input" placeholder="Remark..." value="'+awsEsc(st.remark||'')+'" oninput="awsSetObs(\''+obs.id+'\',\'remark\',this.value)" id="aws_ri_'+obs.id+'"></td></tr>';
+      return r;
     }
+
+    for(var ja=0;ja<activeList.length;ja++) html+=_awsObsRow(activeList[ja], false);
+
+    if(excludedList.length){
+      html+='<tr><td colspan="6" style="padding:6px 8px;background:#f0f0f4;border-top:2px dashed #ccc;font-size:10.5px;font-weight:700;color:#999;letter-spacing:.4px;text-transform:uppercase">&#8251; Excluded from population — Sampled Out / N/A ('+excludedList.length+')</td></tr>';
+      for(var je=0;je<excludedList.length;je++) html+=_awsObsRow(excludedList[je], true);
+    }
+
     html+='</tbody></table></div></div>';
   }
   wrap.innerHTML=html;
