@@ -9875,10 +9875,16 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       <input type="text" id="brfwk" placeholder="e.g. COSO Internal Control – Integrated Framework" >
     </div>
 
-    <div class="fr"><label>Prepared By</label>
+    <div class="fr"><label>Prepared By &mdash; Name</label>
+      <div class="crow">
+        <select id="spbn"></select>
+        <button class="gbtn" title="Manage Preparer Names" onclick="openM('prepbyname')">&#9881;</button>
+      </div>
+    </div>
+    <div class="fr"><label>Prepared By &mdash; Designation</label>
       <div class="crow">
         <select id="spb"></select>
-        <button class="gbtn" title="Manage Auditor Names" onclick="openM('prepby')">&#9881;</button>
+        <button class="gbtn" title="Manage Designations" onclick="openM('prepby')">&#9881;</button>
       </div>
     </div>
   </div>
@@ -10325,7 +10331,8 @@ function ss(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 // ============================================================
 // INITIAL DATA  (populated from data bank)
 // ============================================================
-var DEF_PB=['Senior Officer','Asst. Manager','Deputy Manager'];
+var DEF_PBN=[''];  // Preparer names (managed list)
+var DEF_PB=['Senior Officer','Asst. Manager','Deputy Manager'];  // Preparer designations
 var DEF_TY=["All Types","New","Repeated"]; // "All Types" kept as default value only
 var DEF_CA=['All Categories'].concat(["Branch Imprest, Payments & Accounts","Cash and Bank","Recruitment, Payroll & Employee Record","Student Record","Fixed Assets","Library","Science Laboratory","Safety & Security","Wellbeing Programme","Others"]);
 
@@ -10351,6 +10358,7 @@ function catOrderByDef(catsObj){
 // ============================================================
 // APP STATE
 // ============================================================
+var PREPBY_NAME = sg('bss_pbn', DEF_PBN);
 var PREPBY   = sg('bss_pb', DEF_PB);
 var TYPES    = sg('bss_ty', DEF_TY);
 var CATS     = sg('bss_ca', DEF_CA);
@@ -10421,6 +10429,7 @@ window.onload = function() {
   buildObsSrrCache();
   if(_hoAuthed) _hoActivateBtns();
   _updateExportBadge();
+  buildSel('spbn', PREPBY_NAME);
   buildSel('spb', PREPBY);
   buildSel('scat', CATS);
   buildCatSel();
@@ -11984,6 +11993,7 @@ function getHdrVals(){
     rno       : getEffectiveRno(rnoBase, stage),
     rnoBase   : rnoBase,
     rptStage  : stage,
+    pbn       : document.getElementById('spbn').value,
     pb        : document.getElementById('spb').value,
     dt        : document.getElementById('rdt').value,
     per       : fmtRange(document.getElementById('rper_from').value, document.getElementById('rper_to').value)
@@ -12689,7 +12699,7 @@ function autoFillIntroSections(){
   var period  = H.per      || '[Audit Period]';
   var visit   = H.brvisit  || '[Visit Dates]';
   var rno     = H.rnoBase  || '[Report No.]';
-  var pb      = H.pb       || '[Auditor Name]';
+  var pb      = (H.pbn&&H.pb) ? H.pbn+' ('+H.pb+')' : (H.pbn||H.pb||'[Auditor Name]');
   var prevRpt = H.brprev   || '[Previous Report Date]';
 
   var tmpl = (DB.intro_sections || {});
@@ -12841,7 +12851,7 @@ function renderRpt(){
   var brcode=H.brcode, brname=H.brname, brregion=H.brregion, brcity=H.brcity,
       brhead=H.brhead, braddress=H.braddress, brautype=H.brautype,
       brvisit=H.brvisit, brprev=H.brprev, brfwk=H.brfwk,
-      rno=H.rno, pb=H.pb, dt=H.dt, per=H.per;
+      rno=H.rno, pb=(H.pbn&&H.pb)?H.pbn+' ('+H.pb+')':(H.pbn||H.pb||''), dt=H.dt, per=H.per;
 
   var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
@@ -13477,7 +13487,7 @@ function remObs(id){
 // ============================================================
 function openM(type){
   curM=type;
-  var titles={branch:'Manage Branches',prepby:'Manage Auditor Names',type:'Manage Observation Types',cat:'Manage Categories'};
+  var titles={branch:'Manage Branches',prepbyname:'Manage Preparer Names',prepby:'Manage Preparer Designations',type:'Manage Observation Types',cat:'Manage Categories'};
   document.getElementById('mtit').textContent=titles[type]||'Manage';
   document.getElementById('movl').className='show';
   var b=document.getElementById('mbdy');
@@ -13536,9 +13546,10 @@ function addBr(){
   buildBrSel(); openM('branch'); toast('Branch added.');
 }
 
-function getArr(k){return k==='prepby'?PREPBY:k==='type'?TYPES:CATS;}
+function getArr(k){return k==='prepbyname'?PREPBY_NAME:k==='prepby'?PREPBY:k==='type'?TYPES:CATS;}
 function saveArr(k,a){
-  if(k==='prepby'){PREPBY=a;ss('bss_pb',a);buildSel('spb',a);}
+  if(k==='prepbyname'){PREPBY_NAME=a;ss('bss_pbn',a);buildSel('spbn',a);}
+  else if(k==='prepby'){PREPBY=a;ss('bss_pb',a);buildSel('spb',a);}
   else if(k==='type'){TYPES=a;ss('bss_ty',a);buildSel('styp',a);}
   else{CATS=a;ss('bss_ca',a);buildSel('scat',a);buildCatSel();}
 }
@@ -16234,7 +16245,7 @@ function downloadSoftCopy(){
   // Embed raw field values so they can be restored when loading back
   var meta={
     brcode:H.brcode, brname:H.brname, brregion:H.brregion, brautype:H.brautype,
-    rno:H.rno, pb:H.pb, brfwk:H.brfwk,
+    rno:H.rno, pbn:H.pbn, pb:H.pb, brfwk:H.brfwk,
     rdt:document.getElementById('rdt').value,
     rper_from:document.getElementById('rper_from').value,
     rper_to:document.getElementById('rper_to').value,
@@ -16278,7 +16289,8 @@ function downloadSoftCopy(){
   softHtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;margin-top:13px;text-align:left;font-size:12px">\n';
   if(H.rno) softHtml+='<div><strong style="color:#1a3a5c;display:inline-block;min-width:96px">Report No.:</strong> '+esc(H.rno)+'</div>';
   if(H.dt)  softHtml+='<div><strong style="color:#1a3a5c;display:inline-block;min-width:96px">Date:</strong> '+esc(fmtDt(H.dt))+'</div>';
-  if(H.pb)  softHtml+='<div><strong style="color:#1a3a5c;display:inline-block;min-width:96px">Prepared By:</strong> '+esc(H.pb)+'</div>';
+  var _softPb=(H.pbn&&H.pb)?H.pbn+' ('+H.pb+')':(H.pbn||H.pb||'');
+  if(_softPb) softHtml+='<div><strong style="color:#1a3a5c;display:inline-block;min-width:96px">Prepared By:</strong> '+esc(_softPb)+'</div>';
   if(H.per) softHtml+='<div><strong style="color:#1a3a5c;display:inline-block;min-width:96px">Audit Period:</strong> '+esc(H.per)+'</div>';
   softHtml+='</div></div>\n';
   softHtml+=misHtml;
@@ -17289,6 +17301,12 @@ function applyRespLoad(){
         setVal('rper_from',m.rper_from); setVal('rper_to',m.rper_to);
         setVal('brvisit_from',m.brvisit_from); setVal('brvisit_to',m.brvisit_to);
         setVal('brprev',m.brprev);
+        var spbn=document.getElementById('spbn');
+        if(spbn&&m.pbn){
+          var fnd2=false;
+          for(var q=0;q<spbn.options.length;q++){if(spbn.options[q].value===m.pbn){spbn.value=m.pbn;fnd2=true;break;}}
+          if(!fnd2){var obn=document.createElement('option');obn.value=m.pbn;obn.textContent=m.pbn;spbn.appendChild(obn);spbn.value=m.pbn;}
+        }
         var spb=document.getElementById('spb');
         if(spb&&m.pb){
           var found=false;
@@ -18219,7 +18237,8 @@ function finalizeReport(){
   finalHtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;margin-top:13px;text-align:left;font-size:12px">';
   if(H.rno) finalHtml+='<div><strong style="color:#1a3a5c;min-width:96px;display:inline-block">Report No.:</strong> '+esc(H.rno)+'</div>';
   if(H.dt)  finalHtml+='<div><strong style="color:#1a3a5c;min-width:96px;display:inline-block">Date:</strong> '+esc(fmtDt(H.dt))+'</div>';
-  if(H.pb)  finalHtml+='<div><strong style="color:#1a3a5c;min-width:96px;display:inline-block">Prepared By:</strong> '+esc(H.pb)+'</div>';
+  var _finPb=(H.pbn&&H.pb)?H.pbn+' ('+H.pb+')':(H.pbn||H.pb||'');
+  if(_finPb) finalHtml+='<div><strong style="color:#1a3a5c;min-width:96px;display:inline-block">Prepared By:</strong> '+esc(_finPb)+'</div>';
   if(H.per) finalHtml+='<div><strong style="color:#1a3a5c;min-width:96px;display:inline-block">Audit Period:</strong> '+esc(H.per)+'</div>';
   if(_issFmt) finalHtml+='<div style="grid-column:1/-1;margin-top:4px;padding-top:6px;border-top:1px solid #dde2ea"><strong style="color:#1a3a5c;min-width:96px;display:inline-block">Issued by:</strong> Head Office Systems &amp; Audit &nbsp;|&nbsp; <strong>Date:</strong> '+_issFmt+'</div>';
   finalHtml+='</div></div>\n';
@@ -19260,7 +19279,7 @@ function generateIssuedReport(forROCopy){
     +(H.brhead?'<div class="meta-item"><div class="label">Head of School</div><div class="value">'+e(H.brhead)+'</div></div>':'')
     +(H.brautype?'<div class="meta-item"><div class="label">Audit Type</div><div class="value">'+e(H.brautype)+'</div></div>':'')
     +(H.dt?'<div class="meta-item"><div class="label">Report Date</div><div class="value">'+e(fmtDt(H.dt))+'</div></div>':'')
-    +(H.pb?'<div class="meta-item"><div class="label">Prepared By</div><div class="value">'+e(H.pb)+'</div></div>':'')
+    +((H.pbn||H.pb)?'<div class="meta-item"><div class="label">Prepared By</div><div class="value">'+e((H.pbn&&H.pb)?H.pbn+' ('+H.pb+')':(H.pbn||H.pb))+'</div></div>':'')
     +'</div>'
     +'</div>\n'
 
@@ -22995,7 +23014,8 @@ function generateReviewerHtml(role){
   rv+='<div class="hdr">';
   rv+='<div style="font-size:10px;font-weight:700;letter-spacing:2px;color:#c9962a;text-transform:uppercase;margin-bottom:4px">Beaconhouse Group &nbsp;|&nbsp; Systems &amp; Audit</div>';
   rv+='<h1>'+stageLabel+': '+esc(branch)+'<\/h1>';
-  rv+='<div class="sub">Report: '+esc(H.rno||'N/A')+(H.pb?' &nbsp;|&nbsp; By: '+esc(H.pb):'')+'&nbsp;|&nbsp; Generated: '+dt+'</div>';
+  var _raPb=(H.pbn&&H.pb)?H.pbn+' ('+H.pb+')':(H.pbn||H.pb||'');
+  rv+='<div class="sub">Report: '+esc(H.rno||'N/A')+(_raPb?' &nbsp;|&nbsp; By: '+esc(_raPb):'')+'&nbsp;|&nbsp; Generated: '+dt+'</div>';
   rv+='</div>\n';
 
   // ── Instructions ──────────────────────────────────────────────────────
