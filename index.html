@@ -25788,38 +25788,114 @@ function ra_buildComplexityMatrix(){
   ra_loadComplexityMap();
   var wrap=document.getElementById('ra-complexity-body');
   if(!wrap) return;
-  var branches=[];
-  if(typeof BSS_BRANCHES!=='undefined'&&BSS_BRANCHES.length) branches=BSS_BRANCHES;
-  else if(RA_BRANCHES.length) branches=RA_BRANCHES;
-  if(!branches.length){ wrap.innerHTML='<div style="padding:16px;font-size:12px;color:#9a9aaa;text-align:center">No branch list loaded yet. Open a branch report first.</div>'; return; }
-  var filter=(document.getElementById('ra-cx-search')||{}).value||'';
-  var fl=filter.toLowerCase();
-  var filtered=filter?branches.filter(function(b){ return (b.name||'').toLowerCase().indexOf(fl)!==-1||(b.code||'').toLowerCase().indexOf(fl)!==-1; }):branches;
-  var sorted=filtered.slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
-  var h='<table style="width:100%;border-collapse:collapse;font-size:12px">'
-    +'<thead><tr style="background:#1a3a5c;color:#fff;position:sticky;top:0;z-index:1">'
-    +'<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Branch</th>'
-    +'<th style="padding:7px 10px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap">Score (0–100)</th>'
-    +'<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Level</th>'
+  // Show summary of already-saved scores
+  var keys=Object.keys(_raComplexityMap);
+  if(!keys.length){
+    wrap.innerHTML='<div style="font-size:11.5px;color:#9a9aaa;text-align:center;padding:20px 0">No scores saved yet.<br>Use the form above to enter a branch score.</div>';
+    return;
+  }
+  var sorted=keys.slice().sort(function(a,b){return a.localeCompare(b);});
+  var h='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#5a6a80;margin-bottom:8px">Saved Scores</div>';
+  h+='<table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<thead><tr style="background:#1a3a5c;color:#fff">'
+    +'<th style="padding:6px 8px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.4px">Branch</th>'
+    +'<th style="padding:6px 8px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.4px;white-space:nowrap">Score</th>'
+    +'<th style="padding:6px 8px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.4px">Level</th>'
+    +'<th style="padding:6px 8px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.4px">Edit</th>'
     +'</tr></thead><tbody>';
   for(var i=0;i<sorted.length;i++){
-    var br=sorted[i]; var nm=br.name||''; var cd=br.code||'';
-    var stored=ra_getComplexityScore(nm);
+    var nm=sorted[i]; var sc=_raComplexityMap[nm];
     var rowBg=i%2===0?'#fff':'#f8fafc';
-    var sc=stored!=null?stored:'';
-    var lvlHtml=stored!=null?ra_cxLevel(stored):'<span style="font-size:10px;color:#c0c0c0;font-style:italic">not set</span>';
     h+='<tr style="background:'+rowBg+';border-bottom:1px solid #eaeff6">'
-      +'<td style="padding:6px 10px"><div style="font-size:12px;font-weight:700;color:#1a3a5c">'+ra_esc(nm)+'</div>'
-      +(cd?'<div style="font-size:10px;color:#8a9aaa">'+ra_esc(cd)+'</div>':'')+'</td>'
-      +'<td style="padding:6px 10px;text-align:center">'
-        +'<input type="number" min="0" max="100" value="'+ra_esc(String(sc))+'" data-branch="'+ra_esc(nm)+'" onchange="ra_cxInputChange(this)" oninput="ra_cxInputChange(this)"'
-        +' style="width:64px;padding:4px 6px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:12px;font-weight:700;text-align:center;color:#1a3a5c">'
+      +'<td style="padding:5px 8px;font-weight:600;color:#1a3a5c;font-size:11.5px">'+ra_esc(nm)+'</td>'
+      +'<td style="padding:5px 8px;text-align:center;font-weight:700;color:#1a3a5c">'+sc+'</td>'
+      +'<td style="padding:5px 8px">'+ra_cxLevel(sc)+'</td>'
+      +'<td style="padding:5px 8px;text-align:center">'
+        +'<button onclick="ra_cxEditRow(\''+ra_esc(nm)+'\')" style="font-size:10px;padding:2px 8px;border:1px solid #c8d8ec;border-radius:3px;background:#fff;color:#1a3a5c;cursor:pointer;font-weight:600">&#9998; Edit</button>'
       +'</td>'
-      +'<td style="padding:6px 10px" id="ra-cx-lvl-'+ra_esc(cd||nm.replace(/\s/g,'_'))+'">'+lvlHtml+'</td>'
       +'</tr>';
   }
   h+='</tbody></table>';
   wrap.innerHTML=h;
+}
+
+// Lookup branch by code or name as user types
+function ra_cxLookup(field){
+  var codeEl=document.getElementById('ra-cx-inp-code');
+  var nameEl=document.getElementById('ra-cx-inp-name');
+  var scoreEl=document.getElementById('ra-cx-inp-score');
+  if(!codeEl||!nameEl||!scoreEl) return;
+  var val=(field==='code'?codeEl.value:nameEl.value).toLowerCase().trim();
+  if(!val) return;
+  var branches=[];
+  if(typeof BSS_BRANCHES!=='undefined'&&BSS_BRANCHES.length) branches=BSS_BRANCHES;
+  else if(typeof RA_BRANCHES!=='undefined'&&RA_BRANCHES.length) branches=RA_BRANCHES;
+  var found=null;
+  for(var i=0;i<branches.length;i++){
+    if(field==='code'&&(branches[i].code||'').toLowerCase()===val){ found=branches[i]; break; }
+    if(field==='name'&&(branches[i].name||'').toLowerCase().indexOf(val)===0){ found=branches[i]; break; }
+  }
+  if(found){
+    if(field==='code') nameEl.value=found.name||'';
+    else codeEl.value=found.code||'';
+    var stored=ra_getComplexityScore(found.name||'');
+    if(stored!=null) scoreEl.value=stored;
+    ra_cxFormScoreChange();
+  }
+}
+
+// Update level badge as score is typed
+function ra_cxFormScoreChange(){
+  var scoreEl=document.getElementById('ra-cx-inp-score');
+  var lvlEl=document.getElementById('ra-cx-form-lvl');
+  if(!scoreEl||!lvlEl) return;
+  var v=scoreEl.value.trim();
+  lvlEl.innerHTML=v!==''&&!isNaN(parseInt(v))?ra_cxLevel(Math.max(0,Math.min(100,parseInt(v)))):'';
+}
+
+// Save from form
+function ra_cxFormSave(){
+  var nameEl=document.getElementById('ra-cx-inp-name');
+  var codeEl=document.getElementById('ra-cx-inp-code');
+  var scoreEl=document.getElementById('ra-cx-inp-score');
+  if(!nameEl||!scoreEl) return;
+  var nm=(nameEl.value||'').trim();
+  var sc=scoreEl.value.trim();
+  if(!nm){ ra_toast('Please enter a Branch Name.'); return; }
+  if(sc===''||isNaN(parseInt(sc))){ ra_toast('Please enter a score (0–100).'); return; }
+  var n=Math.max(0,Math.min(100,parseInt(sc)));
+  _raComplexityMap[nm]=n; scoreEl.value=n;
+  ra_saveComplexityMap();
+  ra_cxFormScoreChange();
+  ra_buildComplexityMatrix();
+  ra_toast('Score saved for '+nm+': '+n);
+}
+
+// Clear the form fields
+function ra_cxFormClear(){
+  var f=['ra-cx-inp-code','ra-cx-inp-name','ra-cx-inp-score'];
+  for(var i=0;i<f.length;i++){ var el=document.getElementById(f[i]); if(el) el.value=''; }
+  var lvl=document.getElementById('ra-cx-form-lvl'); if(lvl) lvl.innerHTML='';
+}
+
+// Pre-fill form from a saved row for editing
+function ra_cxEditRow(nm){
+  var codeEl=document.getElementById('ra-cx-inp-code');
+  var nameEl=document.getElementById('ra-cx-inp-name');
+  var scoreEl=document.getElementById('ra-cx-inp-score');
+  if(!nameEl||!scoreEl) return;
+  if(nameEl) nameEl.value=nm;
+  // Try to find code
+  var branches=[];
+  if(typeof BSS_BRANCHES!=='undefined'&&BSS_BRANCHES.length) branches=BSS_BRANCHES;
+  else if(typeof RA_BRANCHES!=='undefined'&&RA_BRANCHES.length) branches=RA_BRANCHES;
+  if(codeEl){ codeEl.value=''; for(var i=0;i<branches.length;i++){ if(branches[i].name===nm){codeEl.value=branches[i].code||'';break;} } }
+  var stored=ra_getComplexityScore(nm);
+  if(scoreEl) scoreEl.value=stored!=null?stored:'';
+  ra_cxFormScoreChange();
+  // Scroll to top of the panel so user sees the form
+  var sec=document.getElementById('ra-scx-section');
+  if(sec) sec.scrollTop=0;
 }
 
 function ra_cxLevel(score){
@@ -27656,16 +27732,45 @@ function ra_methodologyHtml(){
       </div><!-- end ra-s23-section -->
       <!-- ── Complexity Matrix Section ─────────────────────────── -->
       <div id="ra-scx-section" style="display:none;flex-direction:column;height:100%">
-        <div style="padding:12px 14px;background:#f5f8fd;border-bottom:1px solid #dde4ee;flex-shrink:0">
-          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#1a3a5c;margin-bottom:6px">&#9881; Branch Complexity Matrix</div>
-          <div style="font-size:11px;color:#5a6a80;line-height:1.6;margin-bottom:10px">Enter the pre-calculated complexity score (0–100) for each branch. Stage 1 reads this automatically — no manual entry needed at planning time.</div>
-          <input type="text" id="ra-cx-search" placeholder="&#128269; Search branch…" oninput="ra_buildComplexityMatrix()" style="width:100%;padding:6px 8px;border:1px solid #c8d8ec;border-radius:4px;font-family:inherit;font-size:12px;box-sizing:border-box;margin-bottom:8px">
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button onclick="ra_cxClearAll()" style="padding:4px 10px;font-size:11px;border-radius:4px;border:1px solid #f0a0a0;background:#fff8f8;color:#c03030;cursor:pointer;font-weight:600">&#10005; Clear All</button>
-            <span style="font-size:10px;color:#8a9aaa;align-self:center">Changes save automatically</span>
+        <div style="padding:14px 16px;background:#f5f8fd;border-bottom:1px solid #dde4ee;flex-shrink:0">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#1a3a5c;margin-bottom:4px">&#9881; Branch Complexity Score</div>
+          <div style="font-size:11px;color:#5a6a80;line-height:1.6;margin-bottom:14px">Enter the Branch Code or Name to look up the branch, then set or update its complexity score (0–100). Scores save automatically and are used in Stage 1 planning.</div>
+
+          <!-- Branch Code field -->
+          <div style="margin-bottom:10px">
+            <label style="display:block;font-size:10.5px;font-weight:700;color:#1a3a5c;margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px">Branch Code</label>
+            <input type="text" id="ra-cx-inp-code" placeholder="e.g. 240" oninput="ra_cxLookup('code')"
+              style="width:100%;padding:7px 9px;border:1px solid #c8d8ec;border-radius:5px;font-family:inherit;font-size:12.5px;font-weight:600;color:#1a3a5c;box-sizing:border-box">
+          </div>
+
+          <!-- Branch Name field -->
+          <div style="margin-bottom:10px">
+            <label style="display:block;font-size:10.5px;font-weight:700;color:#1a3a5c;margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px">Branch Name</label>
+            <input type="text" id="ra-cx-inp-name" placeholder="e.g. LMA 11-FCC Gulberg" oninput="ra_cxLookup('name')"
+              style="width:100%;padding:7px 9px;border:1px solid #c8d8ec;border-radius:5px;font-family:inherit;font-size:12.5px;color:#1a3a5c;box-sizing:border-box">
+          </div>
+
+          <!-- Complexity Score field -->
+          <div style="margin-bottom:12px">
+            <label style="display:block;font-size:10.5px;font-weight:700;color:#1a3a5c;margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px">Complexity Score (0 – 100)</label>
+            <input type="number" id="ra-cx-inp-score" min="0" max="100" placeholder="e.g. 65" oninput="ra_cxFormScoreChange()"
+              style="width:100%;padding:7px 9px;border:1px solid #c8d8ec;border-radius:5px;font-family:inherit;font-size:13px;font-weight:700;color:#1a3a5c;box-sizing:border-box">
+          </div>
+
+          <!-- Level badge + save feedback -->
+          <div id="ra-cx-form-lvl" style="margin-bottom:12px;min-height:24px"></div>
+
+          <!-- Action buttons -->
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button onclick="ra_cxFormSave()" style="flex:1;padding:7px 10px;font-size:12px;font-weight:700;border-radius:5px;border:none;background:#1a3a5c;color:#fff;cursor:pointer">&#10003; Save Score</button>
+            <button onclick="ra_cxFormClear()" style="padding:7px 10px;font-size:12px;font-weight:600;border-radius:5px;border:1px solid #c8d8ec;background:#fff;color:#5a6a80;cursor:pointer">&#10005; Clear Form</button>
+          </div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid #dde4ee;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <span style="font-size:10px;color:#8a9aaa;flex:1">All saved scores are stored permanently and used automatically in Stage 1.</span>
+            <button onclick="ra_cxClearAll()" style="padding:3px 9px;font-size:10.5px;border-radius:4px;border:1px solid #f0a0a0;background:#fff8f8;color:#c03030;cursor:pointer;font-weight:600">&#10005; Clear All Scores</button>
           </div>
         </div>
-        <div id="ra-complexity-body" style="flex:1;overflow-y:auto"></div>
+        <div id="ra-complexity-body" style="flex:1;overflow-y:auto;padding:12px 16px"></div>
       </div><!-- end ra-scx-section -->
     </div><!-- end ra-LP -->
 
