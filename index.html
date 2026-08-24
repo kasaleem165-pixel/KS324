@@ -16788,6 +16788,17 @@ function renderAnnexList(){
         var soT=(obsTypeMap[so.id]||so.type||'New').toLowerCase();
         if(soT==='repeated') repObs.push(so); else newObs.push(so);
       }
+      function _numLblSort(a,b){
+        var la=(rptLabels[a.id]||'999').split('.').map(Number);
+        var lb=(rptLabels[b.id]||'999').split('.').map(Number);
+        for(var _i=0;_i<Math.max(la.length,lb.length);_i++){
+          var diff=(la[_i]||0)-(lb[_i]||0);
+          if(diff!==0) return diff;
+        }
+        return 0;
+      }
+      repObs.sort(_numLblSort);
+      newObs.sort(_numLblSort);
       function renderObsGroup(arr, sectionLabel, badgeCol){
         if(!arr.length) return;
         h+='<div style="font-size:9.5px;font-weight:700;color:#fff;background:'+badgeCol+';padding:2px 8px;border-radius:3px;margin:6px 0 4px;display:inline-block;letter-spacing:.5px">'+sectionLabel+'</div>';
