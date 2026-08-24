@@ -25819,29 +25819,49 @@ function ra_buildComplexityMatrix(){
   wrap.innerHTML=h;
 }
 
-// Lookup branch by code or name as user types
+// Populate datalists for Complexity form — called once after page load
+function ra_cxInitDataLists(){
+  var dlCode=document.getElementById('ra-cx-dl-code');
+  var dlName=document.getElementById('ra-cx-dl-name');
+  if(!dlCode||!dlName) return;
+  var branches=[];
+  if(typeof BSS_BRANCHES!=='undefined'&&BSS_BRANCHES.length) branches=BSS_BRANCHES;
+  else if(typeof RA_BRANCHES!=='undefined'&&RA_BRANCHES.length) branches=RA_BRANCHES;
+  var codeH='', nameH='';
+  for(var i=0;i<branches.length;i++){
+    var b=branches[i];
+    // Code datalist: value=code, label shows name so user sees both
+    codeH+='<option value="'+ra_esc(b.code||'')+'">'+ra_esc(b.name||'')+'</option>';
+    // Name datalist: value=name
+    nameH+='<option value="'+ra_esc(b.name||'')+'"></option>';
+  }
+  dlCode.innerHTML=codeH;
+  dlName.innerHTML=nameH;
+}
+
+// Lookup branch by code or name — exact match triggers auto-fill (same as brAutoFill)
 function ra_cxLookup(field){
   var codeEl=document.getElementById('ra-cx-inp-code');
   var nameEl=document.getElementById('ra-cx-inp-name');
   var scoreEl=document.getElementById('ra-cx-inp-score');
   if(!codeEl||!nameEl||!scoreEl) return;
-  var val=(field==='code'?codeEl.value:nameEl.value).toLowerCase().trim();
+  var val=(field==='code'?codeEl.value:nameEl.value).trim();
   if(!val) return;
   var branches=[];
   if(typeof BSS_BRANCHES!=='undefined'&&BSS_BRANCHES.length) branches=BSS_BRANCHES;
   else if(typeof RA_BRANCHES!=='undefined'&&RA_BRANCHES.length) branches=RA_BRANCHES;
   var found=null;
   for(var i=0;i<branches.length;i++){
-    if(field==='code'&&(branches[i].code||'').toLowerCase()===val){ found=branches[i]; break; }
-    if(field==='name'&&(branches[i].name||'').toLowerCase().indexOf(val)===0){ found=branches[i]; break; }
+    if(field==='code'&&branches[i].code===val){ found=branches[i]; break; }
+    if(field==='name'&&branches[i].name===val){ found=branches[i]; break; }
   }
-  if(found){
-    if(field==='code') nameEl.value=found.name||'';
-    else codeEl.value=found.code||'';
-    var stored=ra_getComplexityScore(found.name||'');
-    if(stored!=null) scoreEl.value=stored;
-    ra_cxFormScoreChange();
-  }
+  if(!found) return; // keep typing — no exact match yet
+  if(field==='code'&&nameEl.value!==found.name) nameEl.value=found.name||'';
+  if(field==='name'&&codeEl.value!==found.code) codeEl.value=found.code||'';
+  var stored=ra_getComplexityScore(found.name||'');
+  if(stored!=null&&scoreEl.value===''){ scoreEl.value=stored; ra_cxFormScoreChange(); }
+  else if(stored==null){ /* leave score blank for new entry */ }
+  ra_cxFormScoreChange();
 }
 
 // Update level badge as score is typed
@@ -25950,7 +25970,7 @@ function ra_switchStage(stage){
   showS1?tabOn(t1):tabOff(t1);
   showS23?tabOn(t2):tabOff(t2);
   showCX?tabOn(t3):tabOff(t3);
-  if(showCX){ ra_loadComplexityMap(); ra_buildComplexityMatrix(); }
+  if(showCX){ ra_loadComplexityMap(); ra_cxInitDataLists(); ra_buildComplexityMatrix(); }
 }
 
 function ra_runAnalysis(){
@@ -27739,15 +27759,17 @@ function ra_methodologyHtml(){
           <!-- Branch Code field -->
           <div style="margin-bottom:10px">
             <label style="display:block;font-size:10.5px;font-weight:700;color:#1a3a5c;margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px">Branch Code</label>
-            <input type="text" id="ra-cx-inp-code" placeholder="e.g. 240" oninput="ra_cxLookup('code')"
+            <input type="text" id="ra-cx-inp-code" placeholder="e.g. 240" list="ra-cx-dl-code" autocomplete="off" oninput="ra_cxLookup('code')"
               style="width:100%;padding:7px 9px;border:1px solid #c8d8ec;border-radius:5px;font-family:inherit;font-size:12.5px;font-weight:600;color:#1a3a5c;box-sizing:border-box">
+            <datalist id="ra-cx-dl-code"></datalist>
           </div>
 
           <!-- Branch Name field -->
           <div style="margin-bottom:10px">
             <label style="display:block;font-size:10.5px;font-weight:700;color:#1a3a5c;margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px">Branch Name</label>
-            <input type="text" id="ra-cx-inp-name" placeholder="e.g. LMA 11-FCC Gulberg" oninput="ra_cxLookup('name')"
+            <input type="text" id="ra-cx-inp-name" placeholder="e.g. LMA 11-FCC Gulberg" list="ra-cx-dl-name" autocomplete="off" oninput="ra_cxLookup('name')"
               style="width:100%;padding:7px 9px;border:1px solid #c8d8ec;border-radius:5px;font-family:inherit;font-size:12.5px;color:#1a3a5c;box-sizing:border-box">
+            <datalist id="ra-cx-dl-name"></datalist>
           </div>
 
           <!-- Complexity Score field -->
