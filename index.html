@@ -10670,6 +10670,139 @@ function _saveFileAsLegacy(blob, name){
   setTimeout(function(){URL.revokeObjectURL(url);},2000);
 }
 
+// ── ZIP helper (pure JS, no library) ──────────────────────────
+// Wraps a single file in a minimal valid ZIP so Gmail won't block it.
+// Usage: saveFileAsZip(htmlBlob, 'ReportName.html')
+function saveFileAsZip(blob, htmlFilename){
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var data = new Uint8Array(e.target.result);
+    var zipBytes = _buildZip(data, htmlFilename);
+    var zipBlob = new Blob([zipBytes], {type:'application/zip'});
+    var zipName = htmlFilename.replace(/\.html?$/i,'') + '.zip';
+    _saveFileAsLegacy(zipBlob, zipName);
+  };
+  reader.readAsArrayBuffer(blob);
+}
+
+function _buildZip(fileBytes, filename){
+  // Minimal ZIP: no compression (store), single file
+  var nameBytes = _strToBytes(filename);
+  var crc = _crc32(fileBytes);
+  var sz = fileBytes.length;
+  var now = new Date();
+  var dosDate = ((now.getFullYear()-1980)<<9)|((now.getMonth()+1)<<5)|now.getDate();
+  var dosTime = (now.getHours()<<11)|(now.getMinutes()<<5)|(now.getSeconds()>>1);
+
+  // Local file header
+  var lfh = _u8([
+    0x50,0x4B,0x03,0x04,         // signature
+    0x14,0x00,                   // version needed
+    0x00,0x00,                   // flags
+    0x00,0x00,                   // compression: store
+    _lo(dosTime),_hi(dosTime),   // mod time
+    _lo(dosDate),_hi(dosDate),   // mod date
+    _lo32(crc),_b2(crc),_b3(crc),_hi32(crc), // crc-32
+    _lo32(sz),_b2(sz),_b3(sz),_hi32(sz),      // compressed size
+    _lo32(sz),_b2(sz),_b3(sz),_hi32(sz),      // uncompressed size
+    _lo(nameBytes.length),_hi(nameBytes.length), // filename length
+    0x00,0x00                    // extra field length
+  ]);
+  var localOffset = 0;
+  var localEntry = _concat([lfh, nameBytes, fileBytes]);
+
+  // Central directory header
+  var cdh = _u8([
+    0x50,0x4B,0x01,0x02,         // signature
+    0x3F,0x00,                   // version made by
+    0x14,0x00,                   // version needed
+    0x00,0x00,                   // flags
+    0x00,0x00,                   // compression: store
+    _lo(dosTime),_hi(dosTime),
+    _lo(dosDate),_hi(dosDate),
+    _lo32(crc),_b2(crc),_b3(crc),_hi32(crc),
+    _lo32(sz),_b2(sz),_b3(sz),_hi32(sz),
+    _lo32(sz),_b2(sz),_b3(sz),_hi32(sz),
+    _lo(nameBytes.length),_hi(nameBytes.length),
+    0x00,0x00,                   // extra length
+    0x00,0x00,                   // comment length
+    0x00,0x00,                   // disk start
+    0x00,0x00,                   // internal attr
+    0x00,0x00,0x00,0x00,         // external attr
+    0x00,0x00,0x00,0x00          // local header offset
+  ]);
+  var cdEntry = _concat([cdh, nameBytes]);
+  var cdOffset = localEntry.length;
+  var cdSize   = cdEntry.length;
+
+  // End of central directory
+  var eocd = _u8([
+    0x50,0x4B,0x05,0x06,
+    0x00,0x00,                   // disk number
+    0x00,0x00,                   // disk with cd
+    0x01,0x00,                   // entries this disk
+    0x01,0x00,                   // total entries
+    _lo32(cdSize),_b2(cdSize),_b3(cdSize),_hi32(cdSize),
+    _lo32(cdOffset),_b2(cdOffset),_b3(cdOffset),_hi32(cdOffset),
+    0x00,0x00                    // comment length
+  ]);
+
+  return _concat([localEntry, cdEntry, eocd]);
+}
+
+// ZIP byte helpers
+function _strToBytes(s){ var a=[]; for(var i=0;i<s.length;i++) a.push(s.charCodeAt(i)&0xff); return new Uint8Array(a); }
+function _u8(arr){ return new Uint8Array(arr); }
+function _concat(parts){
+  var len=0; for(var i=0;i<parts.length;i++) len+=parts[i].length;
+  var out=new Uint8Array(len); var off=0;
+  for(var i=0;i<parts.length;i++){out.set(parts[i],off);off+=parts[i].length;}
+  return out;
+}
+function _lo(n){return n&0xff;} function _hi(n){return (n>>8)&0xff;}
+function _lo32(n){return n&0xff;} function _b2(n){return (n>>8)&0xff;}
+function _b3(n){return (n>>16)&0xff;} function _hi32(n){return (n>>>24)&0xff;}
+// ── Download choice popup — HTML or ZIP ───────────────────────
+// Shows a small modal letting the user pick HTML (normal) or ZIP (for Gmail).
+function _showDownloadChoice(blob, fname, label){
+  // Remove any existing
+  var old=document.getElementById('_dlChoiceOv'); if(old) old.remove();
+  var ov=document.createElement('div');
+  ov.id='_dlChoiceOv';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center';
+  var zipName=fname.replace(/\.html?$/i,'')+'.zip';
+  ov.innerHTML='<div style="background:#fff;border-radius:10px;padding:24px 28px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.28);font-family:Inter,Arial,sans-serif">'
+    +'<div style="font-size:14px;font-weight:800;color:#1a3a5c;margin-bottom:6px">&#128190; Download '+esc(label)+'</div>'
+    +'<div style="font-size:11.5px;color:#5a6a80;line-height:1.6;margin-bottom:18px">'
+    +'Choose the format. If you are sending via <strong>Gmail</strong>, use <strong>Download as ZIP</strong> — Gmail blocks HTML files. The recipient simply extracts the ZIP and opens the HTML file inside.'
+    +'</div>'
+    +'<div style="display:flex;flex-direction:column;gap:10px">'
+    +'<button id="_dlHtmlBtn" style="padding:10px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;text-align:left">'
+    +'&#128196; Download as HTML &nbsp;<span style="font-size:10.5px;font-weight:400;opacity:.8">— '+esc(fname)+'</span>'
+    +'</button>'
+    +'<button id="_dlZipBtn" style="padding:10px 14px;background:#1a6030;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;text-align:left">'
+    +'&#128230; Download as ZIP &nbsp;<span style="font-size:10.5px;font-weight:400;opacity:.8">— '+esc(zipName)+' &nbsp;(use for Gmail)</span>'
+    +'</button>'
+    +'<button id="_dlCancelBtn" style="padding:7px 14px;background:#f0f3f8;color:#5a6a80;border:1px solid #c8d8ec;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer">'
+    +'Cancel'
+    +'</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  document.getElementById('_dlHtmlBtn').onclick=function(){ ov.remove(); saveFileAs(blob,fname); };
+  document.getElementById('_dlZipBtn').onclick=function(){ ov.remove(); saveFileAsZip(blob,fname); };
+  document.getElementById('_dlCancelBtn').onclick=function(){ ov.remove(); };
+  ov.addEventListener('click',function(e){ if(e.target===ov) ov.remove(); });
+}
+
+function _crc32(buf){
+  var t=new Int32Array(256);
+  for(var i=0;i<256;i++){var c=i;for(var j=0;j<8;j++)c=c&1?(0xEDB88320^(c>>>1)):(c>>>1);t[i]=c;}
+  var c=-1;
+  for(var i=0;i<buf.length;i++) c=t[(c^buf[i])&0xff]^(c>>>8);
+  return (c^-1)>>>0;
+}
+
 // ============================================================
 // DROPDOWN BUILDERS
 // ============================================================
@@ -19772,8 +19905,9 @@ function generateIssuedReport(forROCopy){
     +'</body>\n</html>';
 
   if(forROCopy||isReview){ return html; }
-  saveFileAs(new Blob([html],{type:'text/html'}), fname);
-  toast('Issued report saved as '+fname);
+  var _issuedBlob=new Blob([html],{type:'text/html'});
+  var _issuedFname=fname;
+  _showDownloadChoice(_issuedBlob, _issuedFname, 'Issued Report');
 }
 
 // ── Global helpers for pre-flight navigation (must be global for onclick strings) ──
@@ -23688,10 +23822,7 @@ function generateReviewerHtml(role){
 
   var fname='BSS_Review_'+role.toUpperCase()+'_'+branch.replace(/[^a-zA-Z0-9]/g,'_').slice(0,20)+'_'+dt+'.html';
   var blob=new Blob([rv],{type:'text/html'});
-  var url=URL.createObjectURL(blob);
-  var a=document.createElement('a'); a.href=url; a.download=fname; a.click();
-  URL.revokeObjectURL(url);
-  showToast('Reviewer HTML generated: '+fname+'\nSend this file directly to the '+(role==='ro'?'RO Audit Supervisor':'HO Audit Supervisor')+'. No separate viewer app needed.', 3500);
+  _showDownloadChoice(blob, fname, (role==='ro'?'RO':'HO')+' Reviewer File');
 }
 
 function triggerLoadSectResponse(role){
