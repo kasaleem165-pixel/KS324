@@ -11194,25 +11194,31 @@ function _tableNodeToMarkdown(tbl){
   }
 
   // Remove completely empty rows (e.g. rowspan phantom rows)
+  // Note: grid rows may be sparse arrays — use explicit index loops, NOT .filter()/.some()
+  // because those methods skip empty slots and miscount.
   var allRows=[];
   var maxCols=0;
   for(var i=0;i<grid.length;i++){
     var row=grid[i]||[];
     if(row.length>maxCols) maxCols=row.length;
-    if(row.some(function(c){return (c||'').trim()!=='';})) allRows.push(row);
+    // Normalize to a dense array (fill sparse slots with '')
+    var denseRow=[];
+    for(var _d=0;_d<row.length;_d++) denseRow[_d]=(row[_d]||'');
+    var hasContent=false;
+    for(var _d=0;_d<denseRow.length;_d++){if(denseRow[_d].trim()){hasContent=true;break;}}
+    if(hasContent) allRows.push(denseRow);
   }
   if(!allRows.length||!maxCols) return '';
 
   // Detect if row 0 is a header or a spanning title row
   // A "title row" has only 1 non-empty cell that spans all cols — render as bold text line above table
   var out='';
-  var dataRows=[];
-  var headerIdx=0;
 
   // Separate any leading single-cell title rows from the real header
   var i=0;
   while(i<allRows.length){
-    var nonEmpty=allRows[i].filter(function(c){return (c||'').trim()!=='';});
+    var nonEmpty=[];
+    for(var _d=0;_d<allRows[i].length;_d++){if((allRows[i][_d]||'').trim()) nonEmpty.push(allRows[i][_d]);}
     if(nonEmpty.length===1 && allRows[i].length>1){
       // Single-cell spanning row — render as a bold label above table
       out+='**'+nonEmpty[0]+'**\n';
@@ -11229,23 +11235,33 @@ function _tableNodeToMarkdown(tbl){
   while(header.length<maxCols) header.push('');
   while(i<allRows.length){
     var nextRow=allRows[i];
-    var emptyCount=nextRow.filter(function(c){return (c||'').trim()==='';}).length;
-    var filledCount=nextRow.length-emptyCount;
-    if(emptyCount>filledCount&&filledCount>0){
-      // Sub-header row — merge non-empty cells into header
+    // Count empty/filled using explicit index loop
+    var emptyCount=0,filledCount=0;
+    for(var _d=0;_d<maxCols;_d++){
+      if((nextRow[_d]||'').trim()==='') emptyCount++; else filledCount++;
+    }
+    // A sub-header row must: (a) be mostly empty AND (b) fill at least one EMPTY slot in header
+    // If only non-empty cells land on already-filled header cols it's a section title, not a sub-header
+    var fillsHeaderGap=false;
+    for(var _d=0;_d<maxCols;_d++){
+      if((nextRow[_d]||'').trim()!==''&&!(header[_d]||'').trim()){fillsHeaderGap=true;break;}
+    }
+    if(emptyCount>filledCount&&filledCount>0&&fillsHeaderGap){
+      // Sub-header row — merge sub-labels into header using the PRE-modification header for parent lookup
+      var origHeader=header.slice();
       for(var col=0;col<maxCols;col++){
         var sub=(nextRow[col]||'').trim();
         if(!sub) continue;
-        if((header[col]||'').trim()){
-          // Both filled — combine
-          header[col]=header[col]+' '+sub;
+        if((origHeader[col]||'').trim()){
+          // Col already has a parent label — append sub-label (e.g. "Variance"+"Amount")
+          header[col]=(origHeader[col]||'').trim()+' '+sub;
         } else {
-          // Find parent spanning cell to the left
+          // Empty slot — find parent span label to the LEFT in the ORIGINAL header
           var parent=col;
-          while(parent>0&&!(header[parent]||'').trim()) parent--;
-          if((header[parent]||'').trim()&&parent!==col){
-            header[col]=(header[parent]||'').trim()+' '+sub;
-            header[parent]=''; // clear the parent placeholder
+          while(parent>0&&!(origHeader[parent]||'').trim()) parent--;
+          if((origHeader[parent]||'').trim()&&parent!==col){
+            // e.g. "Variance %", keep parent "Variance Amount" untouched
+            header[col]=(origHeader[parent]||'').trim()+' '+sub;
           } else {
             header[col]=sub;
           }
@@ -11260,7 +11276,8 @@ function _tableNodeToMarkdown(tbl){
   // Remaining rows — detect mid-table section headers (single non-empty cell)
   var bodyRows=[];
   while(i<allRows.length){
-    var nonEmpty2=allRows[i].filter(function(c){return (c||'').trim()!=='';});
+    var nonEmpty2=[];
+    for(var _d=0;_d<allRows[i].length;_d++){if((allRows[i][_d]||'').trim()) nonEmpty2.push(allRows[i][_d]);}
     if(nonEmpty2.length===1){
       bodyRows.push({section:nonEmpty2[0]});
     } else {
