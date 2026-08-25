@@ -11352,7 +11352,7 @@ function _stripWordMarkup(text){
   return text;
 }
 
-// Renders plain text, converting markdown pipe tables to HTML <table> elements.
+// Renders plain text, converting markdown pipe tables and TSV tables to HTML <table> elements.
 // Non-table lines are wrapped in a pre-wrap div. Handles mixed content.
 function _renderText(text, opts){
   if(!text) return '';
@@ -11366,12 +11366,51 @@ function _renderText(text, opts){
   var lines=text.split('\n');
   var out='';
   var i=0;
+
+  // Helper: render a 2D array of rows as an HTML table (first row = header)
+  function _rowsToTable(rows){
+    var maxCols=0;
+    for(var ri=0;ri<rows.length;ri++) if(rows[ri].length>maxCols) maxCols=rows[ri].length;
+    if(!maxCols) return '';
+    var h='<div style="overflow-x:auto;margin:6px 0 8px">';
+    h+='<table style="border-collapse:collapse;width:auto;min-width:100%;font-size:'+fs+';color:'+col+';border:2px solid #1a3a5c">';
+    h+='<thead><tr>';
+    for(var ci=0;ci<maxCols;ci++)
+      h+='<th style="background:#1a3a5c;color:#fff;padding:6px 10px;text-align:center;font-weight:700;border:1px solid #fff;white-space:nowrap">'+esc((rows[0][ci]||'').trim())+'</th>';
+    h+='</tr></thead><tbody>';
+    for(var ri=1;ri<rows.length;ri++){
+      h+='<tr style="background:'+(ri%2===0?'#f0f4f9':'#fff')+'">';
+      for(var ci2=0;ci2<maxCols;ci2++)
+        h+='<td style="padding:5px 10px;border:1px solid #1a3a5c;vertical-align:top;line-height:1.5;white-space:nowrap">'+esc((rows[ri][ci2]||'').trim())+'</td>';
+      h+='</tr>';
+    }
+    h+='</tbody></table></div>';
+    return h;
+  }
+
+  // Helper: does a line look like part of a TSV table?
+  // True if the line contains at least one tab AND at least one non-whitespace character
+  function _isTsvLine(ln){
+    return ln.indexOf('\t')!==-1 && ln.trim()!=='';
+  }
+
+  // Helper: is a TSV block actually a table (2+ rows with consistent tabs)?
+  // A single tab-line that's just surrounding text is not a table.
+  function _isTsvBlock(block){
+    // Need at least 2 lines with tabs, OR 1 line with 2+ tabs (real tabular data)
+    var tabLines=0; var multiTabLines=0;
+    for(var bi=0;bi<block.length;bi++){
+      if(_isTsvLine(block[bi])) tabLines++;
+      if((block[bi].match(/\t/g)||[]).length>=2) multiTabLines++;
+    }
+    return tabLines>=2 || multiTabLines>=1;
+  }
+
   while(i<lines.length){
     if(lines[i].trim().charAt(0)==='|'){
-      // Collect consecutive pipe-table lines
+      // ── Pipe-markdown table ──────────────────────────────────────────────
       var tbl=[];
       while(i<lines.length && lines[i].trim().charAt(0)==='|'){tbl.push(lines[i]);i++;}
-      // Parse rows, skip separator line (only -|: chars)
       var rows=[];
       for(var ti=0;ti<tbl.length;ti++){
         var ln=tbl[ti].trim();
@@ -11381,25 +11420,38 @@ function _renderText(text, opts){
         if(cells.length&&cells[cells.length-1].trim()==='') cells.pop();
         if(cells.length) rows.push(cells.map(function(c){return c.trim();}));
       }
-      if(rows.length){
-        out+='<div style="overflow-x:auto;margin:6px 0 8px">';
-        out+='<table style="border-collapse:collapse;width:auto;min-width:100%;font-size:'+fs+';color:'+col+';border:2px solid #1a3a5c">';
-        out+='<thead><tr>';
-        for(var ci=0;ci<rows[0].length;ci++)
-          out+='<th style="background:#1a3a5c;color:#fff;padding:6px 10px;text-align:center;font-weight:700;border:1px solid #fff;white-space:nowrap">'+esc(rows[0][ci])+'</th>';
-        out+='</tr></thead><tbody>';
-        for(var ri=1;ri<rows.length;ri++){
-          out+='<tr style="background:'+(ri%2===0?'#f0f4f9':'#fff')+'">';
-          for(var rci=0;rci<rows[ri].length;rci++)
-            out+='<td style="padding:5px 10px;border:1px solid #1a3a5c;vertical-align:top;line-height:1.5;white-space:nowrap">'+esc(rows[ri][rci])+'</td>';
-          out+='</tr>';
+      if(rows.length) out+=_rowsToTable(rows);
+
+    } else if(_isTsvLine(lines[i])){
+      // ── TSV (tab-separated) table ────────────────────────────────────────
+      // Collect all lines that contain a tab (they form one table block)
+      var tsvBlock=[];
+      while(i<lines.length && _isTsvLine(lines[i])){tsvBlock.push(lines[i]);i++;}
+      if(_isTsvBlock(tsvBlock)){
+        // Parse: split on tabs, pad rows to max column count
+        var rows=[];
+        var maxCols=0;
+        for(var ti=0;ti<tsvBlock.length;ti++){
+          var cells=tsvBlock[ti].split('\t');
+          if(cells.length>maxCols) maxCols=cells.length;
+          rows.push(cells);
         }
-        out+='</tbody></table></div>';
+        // Pad each row to maxCols
+        for(var ri=0;ri<rows.length;ri++){
+          while(rows[ri].length<maxCols) rows[ri].push('');
+        }
+        out+=_rowsToTable(rows);
+      } else {
+        // Not clearly tabular — render as plain text
+        var block=tsvBlock.join('\n');
+        if(block.trim())
+          out+='<div style="font-size:'+fs+';line-height:'+lh+';color:'+col+';white-space:pre-wrap;margin-bottom:'+mb+'">'+esc(block)+'</div>';
       }
+
     } else {
-      // Collect consecutive non-table lines into a text block
+      // ── Plain text block ─────────────────────────────────────────────────
       var block='';
-      while(i<lines.length && lines[i].trim().charAt(0)!=='|'){
+      while(i<lines.length && lines[i].trim().charAt(0)!=='|' && !_isTsvLine(lines[i])){
         block+=(block?'\n':'')+lines[i]; i++;
       }
       if(block.trim())
