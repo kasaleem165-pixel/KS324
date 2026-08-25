@@ -11240,13 +11240,14 @@ function _tableNodeToMarkdown(tbl){
     for(var _d=0;_d<maxCols;_d++){
       if((nextRow[_d]||'').trim()==='') emptyCount++; else filledCount++;
     }
-    // A sub-header row must: (a) be mostly empty AND (b) fill at least one EMPTY slot in header
-    // If only non-empty cells land on already-filled header cols it's a section title, not a sub-header
+    // A sub-header row must fill at least one EMPTY slot in the current header (colspan placeholder).
+    // Section title rows only land on already-filled header cols, so fillsHeaderGap stays false.
+    // We do NOT require emptyCount>filledCount — that breaks when colspan covers >50% of cols.
     var fillsHeaderGap=false;
     for(var _d=0;_d<maxCols;_d++){
       if((nextRow[_d]||'').trim()!==''&&!(header[_d]||'').trim()){fillsHeaderGap=true;break;}
     }
-    if(emptyCount>filledCount&&filledCount>0&&fillsHeaderGap){
+    if(fillsHeaderGap&&filledCount>0){
       // Sub-header row — merge sub-labels into header using the PRE-modification header for parent lookup
       var origHeader=header.slice();
       for(var col=0;col<maxCols;col++){
