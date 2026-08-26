@@ -9569,6 +9569,8 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <div class="tb-dd-sep"></div>
         <button class="tb-dd-item" id="admin-pending-btn" onclick="showPendingDatabankModal();tbDDClose()"><span class="di">&#128196;</span> Pending Databank Additions <span id="admin-pending-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
         <button class="tb-dd-item" id="admin-amend-btn" onclick="showPendingAmendmentsModal();tbDDClose()"><span class="di">&#9999;</span> Pending Databank Amendments <span id="admin-amend-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
+        <div class="tb-dd-sep"></div>
+        <button class="tb-dd-item" onclick="generateProtectedCopy();tbDDClose()"><span class="di">&#128274;</span> Generate Protected Copy</button>
       </div>
     </div>
 
@@ -10631,6 +10633,86 @@ function showWelcomeBack(branchName, savedAt, wasAuto){
     // Reuse the existing New Report flow so the auditor picks first-time vs returning
     doNewReport();
   });
+}
+
+// ============================================================
+// GENERATE PROTECTED COPY — encodes all JS via UTF-8→XOR→base64
+// so the code cannot be read or copied easily.
+// Uses DOM-based script extraction (not regex) to correctly handle
+// <\/script> occurrences inside string literals.
+// ============================================================
+function generateProtectedCopy(){
+  var KEY='BSS_BRAINS_PROT_2026_KS324_v1';
+  var kl=KEY.length, CHUNK=4096;
+
+  // UTF-8 → XOR with key (offset-aware) → base64, stored as |-separated chunks
+  function _enc(code){
+    var bytes=new TextEncoder().encode(code);
+    var parts=[], off=0;
+    while(off<bytes.length){
+      var sl=bytes.slice(off,off+CHUNK);
+      var xr=new Uint8Array(sl.length);
+      for(var i=0;i<sl.length;i++) xr[i]=sl[i]^KEY.charCodeAt((off+i)%kl);
+      var bin='', ai=0;
+      while(ai<xr.length){var sub=xr.subarray(ai,ai+32768);bin+=String.fromCharCode.apply(null,sub);ai+=32768;}
+      parts.push(btoa(bin));
+      off+=CHUNK;
+    }
+    return parts.join('|');
+  }
+
+  // Decoder — tiny readable script embedded in <head> of the protected file
+  var decoderSrc='(function(){'
+    +'var K="'+KEY+'",kl='+kl+';'
+    +'window._bpd=function(s){'
+    +'var parts=s.split("|"),bytes=[],off=0;'
+    +'for(var p=0;p<parts.length;p++){'
+    +'var raw=atob(parts[p]);'
+    +'for(var j=0;j<raw.length;j++)bytes.push(raw.charCodeAt(j)^K.charCodeAt((off+j)%kl));'
+    +'off+=raw.length;}'
+    +'return new TextDecoder().decode(new Uint8Array(bytes));'
+    +'};'
+    +'})();';
+
+  // ── Step 1: collect all executable scripts from the DOM ───────────────
+  var toEncode=[];
+  for(var si=0;si<document.scripts.length;si++){
+    var s=document.scripts[si];
+    var t=s.type||'';
+    if(t&&t!=='text/javascript') continue;
+    var code=s.text||'';
+    if(!code.trim()) continue;
+    toEncode.push({code:code, encoded:_enc(code)});
+  }
+
+  // ── Steps 2-4: build the protected HTML from raw source ───────────────
+  function _buildAndSave(rawHtml){
+    var html=rawHtml;
+    var searchEnd=html.length;
+    for(var ti=toEncode.length-1;ti>=0;ti--){
+      var code=toEncode[ti].code;
+      var encoded=toEncode[ti].encoded;
+      var pos=html.lastIndexOf(code,searchEnd);
+      if(pos===-1) pos=html.indexOf(code);
+      if(pos===-1) continue;
+      var evalExpr='eval(window._bpd("'+encoded+'"))';
+      html=html.slice(0,pos)+evalExpr+html.slice(pos+code.length);
+      searchEnd=pos-1;
+    }
+    html=html.replace(/(<head[^>]*>)/i,'$1\n<script>'+decoderSrc+'<\/script>');
+    var yr=new Date().getFullYear();
+    html='<!-- BRAINS — Beaconhouse Systems & Audit — Protected Copy — (c) '+yr
+      +' — Unauthorized copying or redistribution is prohibited -->\n'+html;
+    var blob=new Blob([html],{type:'text/html'});
+    saveFileAs(blob,'BRAINS_protected.html');
+    toast('&#128274; Protected copy generated — distribute BRAINS_protected.html to auditors.');
+  }
+
+  // Fetch the raw source so script text matches exactly (outerHTML may differ)
+  fetch(location.href)
+    .then(function(r){ return r.text(); })
+    .then(function(raw){ _buildAndSave(raw); })
+    .catch(function(){ _buildAndSave(document.documentElement.outerHTML); });
 }
 
 // ============================================================
