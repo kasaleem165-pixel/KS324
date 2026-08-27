@@ -867,12 +867,30 @@ function _applyRoleUI(){
 }
 
 function brainsLogout(){
-  if(!confirm('Log out? You will be returned to the login screen.')) return;
+  if(!confirm('Log out? Your current report data will remain intact.')) return;
+  // Clear session flags — no page reload so report data stays in memory
   try{
     sessionStorage.removeItem('sa_auth_2026');
     sessionStorage.removeItem('sa_current_user');
   }catch(e){}
-  location.reload();
+  window._hoAuthed  = false;
+  window._viewerMode= false;
+  // Close any open dropdowns
+  try{ tbDDClose(); }catch(e){}
+  // Re-lock the HO-only buttons that _hoActivateBtns() had unlocked
+  try{
+    var chpw=document.getElementById('chpw-btn');
+    if(chpw){ chpw.disabled=true; chpw.style.opacity='.45'; chpw.style.filter='grayscale(1)'; chpw.style.cursor='not-allowed'; chpw.style.background=''; chpw.style.borderColor=''; chpw.innerHTML='<span class="di">&#128274;</span> Change Password'; }
+  }catch(e){}
+  // Show the password screen
+  var ps=document.getElementById('pw-screen');
+  if(ps){
+    ps.style.display='flex';
+    var pi=document.getElementById('pw-input');
+    if(pi){ pi.value=''; pi.focus(); }
+    var pe=document.getElementById('pw-err');
+    if(pe) pe.textContent='';
+  }
 }
 
 function showChangePwModal(){
