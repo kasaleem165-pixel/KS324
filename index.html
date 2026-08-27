@@ -30446,15 +30446,19 @@ function _brainsDoUnlock(){
     })
     .then(function(decrypted){
       var src=new TextDecoder().decode(decrypted);
+      var _n=new Date();
+      var _p=function(x){return x<10?'0'+x:String(x);};
+      var _fn='BRAINS_source_'+_p(_n.getDate())+'-'+_p(_n.getMonth()+1)+'-'+_n.getFullYear()
+              +'_'+_p(_n.getHours())+_p(_n.getMinutes())+'.html';
       var blob=new Blob([src],{type:'text/html'});
       var url=URL.createObjectURL(blob);
       var a=document.createElement('a');
-      a.href=url; a.download='BRAINS_source.html';
+      a.href=url; a.download=_fn;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(function(){URL.revokeObjectURL(url);},4000);
       inp.value='';
       st.style.color='#4caf50';
-      st.textContent='✓ Source downloaded as BRAINS_source.html — open it in Claude Code to edit.';
+      st.textContent='✓ Source downloaded as '+_fn+' — upload this file to Claude Code to edit.';
     })
     .catch(function(err){
       st.style.color='#e07050';
