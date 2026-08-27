@@ -10770,39 +10770,10 @@ function generateProtectedCopy(){
       },null,2);
       var keyBlob=new Blob([keyJson],{type:'application/json'});
 
-      // Step G: download protected HTML via Save-As picker, then auto-download key file.
-      // Both pickers cannot share one user-gesture token, so the key file uses the
-      // legacy <a download> path which fires immediately after the HTML write completes.
+      // Step G: show a modal with two Save buttons — each button click is its own
+      // user gesture, allowing showSaveFilePicker for both files independently.
       var htmlBlob=new Blob([html],{type:'text/html'});
-      if(window.showSaveFilePicker){
-        var ext='html';
-        window.showSaveFilePicker({
-          suggestedName:_fnHtml,
-          types:[{description:'HTML Document',accept:{'text/html':['.html','.htm']}}]
-        }).then(function(handle){
-          return handle.createWritable();
-        }).then(function(writable){
-          return writable.write(htmlBlob).then(function(){ writable.close(); });
-        }).then(function(){
-          // HTML saved — now auto-download key file (no second picker needed)
-          _saveFileAsLegacy(keyBlob,_fnKey);
-          toast('&#128274; Protected HTML saved via dialog. Key file auto-downloaded to your Downloads folder as <b>'+_fnKey+'</b> — move it to a safe location.');
-        }).catch(function(e){
-          if(e&&e.name==='AbortError'){
-            toast('&#9888; Save cancelled — no files were created.');
-            return;
-          }
-          // Picker unavailable in this context — fall back to auto-download for both
-          _saveFileAsLegacy(htmlBlob,_fnHtml);
-          setTimeout(function(){ _saveFileAsLegacy(keyBlob,_fnKey); },400);
-          toast('&#128274; Both files auto-downloaded: <b>'+_fnHtml+'</b> + <b>'+_fnKey+'</b>');
-        });
-      } else {
-        // No File System Access API — auto-download both
-        _saveFileAsLegacy(htmlBlob,_fnHtml);
-        setTimeout(function(){ _saveFileAsLegacy(keyBlob,_fnKey); },400);
-        toast('&#128274; Both files downloaded: <b>'+_fnHtml+'</b> + <b>'+_fnKey+'</b> — check your Downloads folder.');
-      }
+      _brainsShowSaveModal(htmlBlob,_fnHtml,keyBlob,_fnKey);
     })
     .catch(function(err){
       toast('&#9888; Protection failed: '+err.message);
@@ -10814,6 +10785,87 @@ function generateProtectedCopy(){
     .then(function(r){ return r.text(); })
     .then(function(raw){ _buildAndSave(raw); })
     .catch(function(){ _buildAndSave(document.documentElement.outerHTML); });
+}
+
+// ============================================================
+// PROTECTED COPY SAVE MODAL
+// Shows two Save buttons so each gets its own user gesture → showSaveFilePicker
+// ============================================================
+function _brainsShowSaveModal(htmlBlob,fnHtml,keyBlob,fnKey){
+  var existing=document.getElementById('_bpsm');
+  if(existing) existing.remove();
+
+  function _pick(blob,fname,mimeType,extList,desc,onDone){
+    if(window.showSaveFilePicker){
+      var accept={};
+      accept[mimeType]=extList;
+      window.showSaveFilePicker({suggestedName:fname,types:[{description:desc,accept:accept}]})
+        .then(function(h){ return h.createWritable(); })
+        .then(function(w){ return w.write(blob).then(function(){ w.close(); }); })
+        .then(onDone)
+        .catch(function(e){ if(e&&e.name!=='AbortError'){ _saveFileAsLegacy(blob,fname); onDone(); } });
+    } else {
+      _saveFileAsLegacy(blob,fname);
+      onDone();
+    }
+  }
+
+  var htmlSaved=false, keySaved=false;
+
+  function _updateStatus(){
+    var s=document.getElementById('_bpsm-status');
+    if(!s) return;
+    if(htmlSaved&&keySaved){
+      s.innerHTML='<span style="color:#1e8449;font-weight:700">&#10003; Both files saved successfully.</span>';
+      setTimeout(function(){ var m=document.getElementById('_bpsm'); if(m) m.remove(); },1800);
+    } else if(htmlSaved){
+      s.innerHTML='<span style="color:#1e8449">&#10003; Protected HTML saved.</span> &nbsp; Now save the Master Key file &darr;';
+      document.getElementById('_bpsm-kbtn').style.background='#1a3a5c';
+      document.getElementById('_bpsm-kbtn').style.color='#fff';
+    } else if(keySaved){
+      s.innerHTML='<span style="color:#1e8449">&#10003; Master Key saved.</span> &nbsp; Now save the Protected HTML file &darr;';
+      document.getElementById('_bpsm-hbtn').style.background='#1a3a5c';
+      document.getElementById('_bpsm-hbtn').style.color='#fff';
+    }
+  }
+
+  var ov=document.createElement('div');
+  ov.id='_bpsm';
+  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font-family:Inter,Arial,sans-serif';
+  ov.innerHTML=
+    '<div style="background:#fff;border-radius:10px;padding:28px 32px;max-width:480px;width:92%;box-shadow:0 8px 40px rgba(0,0,0,.35)">'+
+    '<div style="font-size:16px;font-weight:800;color:#1a3a5c;margin-bottom:4px">&#128274; Save Protected Files</div>'+
+    '<div style="font-size:12px;color:#666;margin-bottom:18px">Click each button to choose where to save the file. Both files must be saved.</div>'+
+    '<div style="display:flex;flex-direction:column;gap:10px">'+
+      '<button id="_bpsm-hbtn" style="padding:11px 18px;background:#c9962a;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;text-align:left">'+
+        '&#128196; Save Protected HTML &nbsp;<small style="font-weight:400;font-size:11px">(for auditors / field use)</small><br>'+
+        '<span style="font-size:10px;font-weight:400;opacity:.85">'+fnHtml+'</span>'+
+      '</button>'+
+      '<button id="_bpsm-kbtn" style="padding:11px 18px;background:#c9962a;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;text-align:left">'+
+        '&#128273; Save Master Key &nbsp;<small style="font-weight:400;font-size:11px">(keep secret — admin only)</small><br>'+
+        '<span style="font-size:10px;font-weight:400;opacity:.85">'+fnKey+'</span>'+
+      '</button>'+
+    '</div>'+
+    '<div id="_bpsm-status" style="font-size:12px;color:#888;margin-top:14px;min-height:18px"></div>'+
+    '<div style="margin-top:14px;text-align:right">'+
+      '<button id="_bpsm-close" style="padding:7px 20px;background:#eee;color:#555;border:none;border-radius:6px;font-size:12px;cursor:pointer">Close</button>'+
+    '</div>'+
+    '</div>';
+  document.body.appendChild(ov);
+
+  document.getElementById('_bpsm-hbtn').onclick=function(){
+    _pick(htmlBlob,fnHtml,'text/html',['.html','.htm'],'HTML Document',function(){
+      htmlSaved=true; _updateStatus();
+    });
+  };
+  document.getElementById('_bpsm-kbtn').onclick=function(){
+    _pick(keyBlob,fnKey,'application/json',['.json'],'JSON File',function(){
+      keySaved=true; _updateStatus();
+    });
+  };
+  document.getElementById('_bpsm-close').onclick=function(){
+    document.getElementById('_bpsm').remove();
+  };
 }
 
 // ============================================================
