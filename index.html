@@ -815,7 +815,15 @@ function _viewerBlocked(){
 // Called after login and on page startup if already authenticated.
 function _applyRoleUI(){
   var r = _userRole();
-  if(r === 'administrator' || r === 'viewer') return; // Both see all tabs
+  if(r === 'administrator') return; // Full access — all buttons visible
+
+  // Viewer sees all tabs but must NOT see the protected-copy / decode buttons
+  if(r === 'viewer'){
+    ['gen-prot-btn','decode-src-btn'].forEach(function(id){
+      var el=document.getElementById(id); if(el) el.style.display='none';
+    });
+    return;
+  }
 
   function hide(id){ var el=document.getElementById(id); if(el) el.style.display='none'; }
 
@@ -9569,9 +9577,6 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <div class="tb-dd-sep"></div>
         <button class="tb-dd-item" id="admin-pending-btn" onclick="showPendingDatabankModal();tbDDClose()"><span class="di">&#128196;</span> Pending Databank Additions <span id="admin-pending-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
         <button class="tb-dd-item" id="admin-amend-btn" onclick="showPendingAmendmentsModal();tbDDClose()"><span class="di">&#9999;</span> Pending Databank Amendments <span id="admin-amend-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
-        <div class="tb-dd-sep"></div>
-        <button class="tb-dd-item" onclick="generateProtectedCopy();tbDDClose()"><span class="di">&#128274;</span> Generate Protected Copy</button>
-        <button class="tb-dd-item" onclick="_brainsShowUnlock();tbDDClose()"><span class="di">&#128275;</span> Decode Source (Admin)</button>
       </div>
     </div>
 
@@ -9608,7 +9613,9 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       <div class="tb-dd-menu">
         <button class="tb-dd-item locked" id="chpw-btn" onclick="showChangePwModal();tbDDClose()" disabled><span class="di">&#128274;</span> Change Password</button>
         <div class="tb-dd-sep"></div>
-        <div class="tb-dd-sep"></div>
+        <button class="tb-dd-item admin-only-btn" id="gen-prot-btn" onclick="generateProtectedCopy();tbDDClose()"><span class="di">&#128274;</span> Generate Protected Copy</button>
+        <button class="tb-dd-item admin-only-btn" id="decode-src-btn" onclick="_brainsShowUnlock();tbDDClose()"><span class="di">&#128275;</span> Decode Source (Admin)</button>
+        <div class="tb-dd-sep admin-only-btn"></div>
         <button class="tb-dd-item" onclick="showClearSessionModal();tbDDClose()"><span class="di">&#128465;</span> Clear Session</button>
         <button class="tb-dd-item" onclick="updbExportApp();tbDDClose()"><span class="di">&#128229;</span> Export Updated App</button>
       </div>
