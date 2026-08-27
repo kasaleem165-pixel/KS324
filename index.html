@@ -9571,6 +9571,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <button class="tb-dd-item" id="admin-amend-btn" onclick="showPendingAmendmentsModal();tbDDClose()"><span class="di">&#9999;</span> Pending Databank Amendments <span id="admin-amend-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
         <div class="tb-dd-sep"></div>
         <button class="tb-dd-item" onclick="generateProtectedCopy();tbDDClose()"><span class="di">&#128274;</span> Generate Protected Copy</button>
+        <button class="tb-dd-item" onclick="_brainsShowUnlock();tbDDClose()"><span class="di">&#128275;</span> Decode Source (Admin)</button>
       </div>
     </div>
 
@@ -30345,67 +30346,84 @@ function rcmCloseDetail(){
   <div style="font-size:9.5px;color:rgba(201,150,42,.7);letter-spacing:.3px">Developed by <strong style="color:#c9962a">Kamran Saleem</strong> &nbsp;&bull;&nbsp; Senior Manager Systems &amp; Audit</div>
 </div>
 
-<!-- ══ BRAINS ADMIN SOURCE UNLOCK ══════════════════════════════════════════
-     Hidden modal — Ctrl+Shift+U on a Protected Copy → load master key file
-     → decrypts and downloads the original editable source. Only visible in
-     Protected Copies that have a vault blob embedded at generation time.
-     ════════════════════════════════════════════════════════════════════════ -->
-<div id="brains-unlock-overlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(7,14,30,.88);backdrop-filter:blur(8px);align-items:center;justify-content:center;font-family:Inter,Arial,sans-serif">
-  <div style="background:#0f1e35;border:1px solid rgba(201,150,42,.5);border-radius:10px;padding:36px 40px;max-width:420px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.7)">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-      <span style="font-size:22px">&#128274;</span>
-      <span style="font-size:17px;font-weight:700;color:#c9962a">BRAINS Source Unlock</span>
-    </div>
-    <p style="font-size:12.5px;color:#8fa8c8;margin:0 0 20px">Load the <strong style="color:#c8d8ee">BRAINS_master_key.json</strong> file to decrypt and recover the original editable source.</p>
-    <label style="display:block;font-size:11px;font-weight:700;color:#6a8aaa;text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">Master Key File</label>
-    <input type="file" id="brains-key-input" accept=".json" style="display:block;width:100%;box-sizing:border-box;background:#162035;border:1px solid #2a3f5f;color:#c8d8ee;border-radius:5px;padding:7px 10px;font-size:12px;margin-bottom:18px">
-    <div style="display:flex;gap:10px;justify-content:flex-end">
-      <button onclick="document.getElementById('brains-unlock-overlay').style.display='none'" style="padding:8px 20px;border-radius:5px;border:1px solid #2a3f5f;background:transparent;color:#8fa8c8;font-size:12px;cursor:pointer">Cancel</button>
-      <button onclick="_brainsUnlockSrc()" style="padding:8px 24px;border-radius:5px;border:none;background:#c9962a;color:#0a1525;font-size:12px;font-weight:700;cursor:pointer">&#128275; Decrypt &amp; Download Source</button>
-    </div>
-    <div id="brains-unlock-status" style="margin-top:12px;font-size:11.5px;color:#e07050;min-height:18px"></div>
-  </div>
-</div>
-
 <script>
-// Ctrl+Shift+U → open admin source unlock (only meaningful on Protected Copies)
-document.addEventListener('keydown',function(e){
-  if(e.ctrlKey&&e.shiftKey&&(e.key==='U'||e.key==='u')){
-    e.preventDefault();
-    var ov=document.getElementById('brains-unlock-overlay');
-    if(ov){
-      ov.style.display=(ov.style.display==='none'?'flex':'none');
-      document.getElementById('brains-unlock-status').textContent='';
-    }
+// ── BRAINS ADMIN SOURCE UNLOCK ─────────────────────────────────────────────
+// Accessible ONLY via the admin toolbar "Decode Source" button.
+// Modal is built dynamically — nothing visible in page HTML to auditors.
+// Requires BRAINS_master_key.json (AES-256-GCM key) held by administrator.
+// ─────────────────────────────────────────────────────────────────────────────
+function _brainsShowUnlock(){
+  // Build modal on first call; reuse on subsequent calls
+  if(!document.getElementById('_buo')){
+    var ov=document.createElement('div');
+    ov.id='_buo';
+    ov.style.cssText='display:none;position:fixed;inset:0;z-index:99999;background:rgba(7,14,30,.88);'
+      +'backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);'
+      +'align-items:center;justify-content:center;font-family:Inter,Arial,sans-serif';
+    ov.innerHTML=''
+      +'<div style="background:#0f1e35;border:1px solid rgba(201,150,42,.5);border-radius:10px;'
+      +'padding:36px 40px;max-width:460px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.7)">'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'
+      +'<span style="font-size:22px">&#128275;</span>'
+      +'<span style="font-size:17px;font-weight:700;color:#c9962a">Decode BRAINS Source</span>'
+      +'</div>'
+      +'<p style="font-size:12.5px;color:#8fa8c8;margin:0 0 6px">Load <strong style="color:#c8d8ee">BRAINS_master_key.json</strong> to decrypt '
+      +'and download the original editable source.</p>'
+      +'<p style="font-size:11px;color:#5a7a9a;margin:0 0 20px">After downloading, open the file in '
+      +'<strong style="color:#7a9aba">Claude Code</strong> as your working copy, make changes, '
+      +'then use <em>Generate Protected Copy</em> again to produce a new protected version.</p>'
+      +'<label style="display:block;font-size:11px;font-weight:700;color:#6a8aaa;'
+      +'text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">Master Key File</label>'
+      +'<input type="file" id="_bki" accept=".json" style="display:block;width:100%;box-sizing:border-box;'
+      +'background:#162035;border:1px solid #2a3f5f;color:#c8d8ee;border-radius:5px;'
+      +'padding:7px 10px;font-size:12px;margin-bottom:18px">'
+      +'<div style="display:flex;gap:10px;justify-content:flex-end">'
+      +'<button onclick="document.getElementById(\'_buo\').style.display=\'none\'" '
+      +'style="padding:8px 20px;border-radius:5px;border:1px solid #2a3f5f;background:transparent;'
+      +'color:#8fa8c8;font-size:12px;cursor:pointer">Cancel</button>'
+      +'<button onclick="_brainsDoUnlock()" '
+      +'style="padding:8px 24px;border-radius:5px;border:none;background:#c9962a;color:#0a1525;'
+      +'font-size:12px;font-weight:700;cursor:pointer">&#128275; Decrypt &amp; Download Source</button>'
+      +'</div>'
+      +'<div id="_bst" style="margin-top:12px;font-size:11.5px;color:#e07050;min-height:18px"></div>'
+      +'</div>';
+    document.body.appendChild(ov);
   }
-});
+  document.getElementById('_bst').textContent='';
+  document.getElementById('_bki').value='';
+  document.getElementById('_buo').style.display='flex';
+}
 
-function _brainsUnlockSrc(){
-  var st=document.getElementById('brains-unlock-status');
-  var inp=document.getElementById('brains-key-input');
-  if(!inp.files||!inp.files[0]){st.textContent='Please select the master key file.';return;}
+function _brainsDoUnlock(){
+  var st=document.getElementById('_bst');
+  var inp=document.getElementById('_bki');
+  if(!inp||!inp.files||!inp.files[0]){st.style.color='#e07050';st.textContent='Please select the master key file.';return;}
   st.style.color='#8fa8c8'; st.textContent='Reading key file…';
   var fr=new FileReader();
   fr.onload=function(ev){
     var kd;
     try{ kd=JSON.parse(ev.target.result); }
     catch(e){ st.style.color='#e07050'; st.textContent='Invalid key file (not valid JSON).'; return; }
-    if(!kd||!kd.k||!kd.iv){ st.style.color='#e07050'; st.textContent='Key file is missing required fields.'; return; }
+    if(!kd||!kd.k||!kd.iv){ st.style.color='#e07050'; st.textContent='Key file is missing required fields (k, iv).'; return; }
     var vaultEl=document.getElementById('brains-vault-blob');
-    if(!vaultEl){ st.style.color='#e07050'; st.textContent='No vault found in this file. Only Protected Copies contain a vault.'; return; }
-    var vd;
-    try{ vd=JSON.parse(vaultEl.textContent||vaultEl.text); }
-    catch(e){ st.style.color='#e07050'; st.textContent='Vault data is corrupt.'; return; }
-    st.textContent='Importing key…';
-    function _b64ToBytes(b64){
-      var bin=atob(b64),out=new Uint8Array(bin.length);
-      for(var i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i);
-      return out;
+    if(!vaultEl){
+      st.style.color='#e07050';
+      st.textContent='No encrypted vault found. This file has no vault — open a Protected Copy instead.';
+      return;
     }
-    var kBytes=_b64ToBytes(kd.k), ivBytes=_b64ToBytes(kd.iv), encBytes=_b64ToBytes(vd.e);
+    var vd;
+    try{ vd=JSON.parse(vaultEl.textContent||vaultEl.text||''); }
+    catch(e){ st.style.color='#e07050'; st.textContent='Vault data is corrupt or unreadable.'; return; }
+    st.textContent='Importing AES key…';
+    function _b64u(b64){
+      var bin=atob(b64),u=new Uint8Array(bin.length);
+      for(var i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+      return u;
+    }
+    var kBytes=_b64u(kd.k), ivBytes=_b64u(kd.iv), encBytes=_b64u(vd.e);
     crypto.subtle.importKey('raw',kBytes,{name:'AES-GCM'},false,['decrypt'])
     .then(function(aesKey){
-      st.textContent='Decrypting source…';
+      st.textContent='Decrypting source — please wait…';
       return crypto.subtle.decrypt({name:'AES-GCM',iv:ivBytes},aesKey,encBytes);
     })
     .then(function(decrypted){
@@ -30415,14 +30433,14 @@ function _brainsUnlockSrc(){
       var a=document.createElement('a');
       a.href=url; a.download='BRAINS_source.html';
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(function(){URL.revokeObjectURL(url);},3000);
+      setTimeout(function(){URL.revokeObjectURL(url);},4000);
+      inp.value='';
       st.style.color='#4caf50';
-      st.textContent='&#10003; Source decrypted and downloaded as BRAINS_source.html';
-      document.getElementById('brains-key-input').value='';
+      st.textContent='✓ Source downloaded as BRAINS_source.html — open it in Claude Code to edit.';
     })
     .catch(function(err){
       st.style.color='#e07050';
-      st.textContent='Decryption failed — wrong key file or corrupt vault. ('+err.message+')';
+      st.textContent='Decryption failed — wrong key file? ('+err.message+')';
     });
   };
   fr.readAsText(inp.files[0]);
