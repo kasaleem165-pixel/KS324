@@ -10732,28 +10732,39 @@ function generateProtectedCopy(){
         +'<\/script>';
       html=html.replace(/(<head[^>]*>)/i,'$1\n<script>'+decoderSrc+'<\/script>\n'+vaultTag);
 
-      // Step D: copyright banner
-      var yr=new Date().getFullYear();
+      // Step D: build date-time stamp for filenames (YYYY-MM-DD_HHMM)
+      var _now=new Date();
+      var _pad=function(n){return n<10?'0'+n:String(n);};
+      var _ds=_now.getFullYear()+'-'+_pad(_now.getMonth()+1)+'-'+_pad(_now.getDate());
+      var _ts=_ds+'_'+_pad(_now.getHours())+_pad(_now.getMinutes());
+      var _fnHtml='BRAINS_protected_'+_ts+'.html';
+      var _fnKey ='BRAINS_master_key_'+_ts+'.json';
+
+      // Step E: copyright banner (includes timestamp)
+      var yr=_now.getFullYear();
       html='<!-- BRAINS — Beaconhouse Systems & Audit — Protected Copy — (c) '+yr
+        +' — Generated: '+_now.toLocaleString()
         +' — Unauthorized copying or redistribution is prohibited -->\n'+html;
 
-      // Step E: download protected HTML
+      // Step F: download protected HTML (save dialog lets admin pick location & name)
       var htmlBlob=new Blob([html],{type:'text/html'});
-      saveFileAs(htmlBlob,'BRAINS_protected.html');
+      saveFileAs(htmlBlob,_fnHtml);
 
-      // Step F: download master key file (separate download, slight delay)
+      // Step G: download master key file (save dialog, slight delay so both don't collide)
       var keyJson=JSON.stringify({
         v:1,
         product:'BRAINS',
         org:'Beaconhouse Systems & Audit',
-        generated:new Date().toISOString().slice(0,10),
-        note:'KEEP SECRET. Required by administrator to recover BRAINS source for editing. Do NOT share.',
+        generated:_now.toISOString(),
+        generated_local:_now.toLocaleString(),
+        paired_file:_fnHtml,
+        note:'KEEP SECRET. Pairs with '+_fnHtml+'. Required by administrator to recover BRAINS source for editing. Do NOT share.',
         k:keyB64,
         iv:ivB64
       },null,2);
       setTimeout(function(){
-        saveFileAs(new Blob([keyJson],{type:'application/json'}),'BRAINS_master_key.json');
-        toast('&#128274; Two files downloaded: BRAINS_protected.html (for auditors) + BRAINS_master_key.json (keep safe — needed to edit source).');
+        saveFileAs(new Blob([keyJson],{type:'application/json'}),_fnKey);
+        toast('&#128274; Saved: <b>'+_fnHtml+'</b> (auditors) + <b>'+_fnKey+'</b> (keep safe). Both files carry today\'s date — check file properties for the exact time.');
       },600);
     })
     .catch(function(err){
