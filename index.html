@@ -10756,11 +10756,7 @@ function generateProtectedCopy(){
         +' — Generated: '+_now.toLocaleString()
         +' — Unauthorized copying or redistribution is prohibited -->\n'+html;
 
-      // Step F: download protected HTML (save dialog lets admin pick location & name)
-      var htmlBlob=new Blob([html],{type:'text/html'});
-      saveFileAs(htmlBlob,_fnHtml);
-
-      // Step G: download master key file (save dialog, slight delay so both don't collide)
+      // Step F: build key JSON first (needed in both save paths)
       var keyJson=JSON.stringify({
         v:1,
         product:'BRAINS',
@@ -10772,10 +10768,41 @@ function generateProtectedCopy(){
         k:keyB64,
         iv:ivB64
       },null,2);
-      setTimeout(function(){
-        saveFileAs(new Blob([keyJson],{type:'application/json'}),_fnKey);
-        toast('&#128274; Saved: <b>'+_fnHtml+'</b> (auditors) + <b>'+_fnKey+'</b> (keep safe). Both files carry today\'s date — check file properties for the exact time.');
-      },600);
+      var keyBlob=new Blob([keyJson],{type:'application/json'});
+
+      // Step G: download protected HTML via Save-As picker, then auto-download key file.
+      // Both pickers cannot share one user-gesture token, so the key file uses the
+      // legacy <a download> path which fires immediately after the HTML write completes.
+      var htmlBlob=new Blob([html],{type:'text/html'});
+      if(window.showSaveFilePicker){
+        var ext='html';
+        window.showSaveFilePicker({
+          suggestedName:_fnHtml,
+          types:[{description:'HTML Document',accept:{'text/html':['.html','.htm']}}]
+        }).then(function(handle){
+          return handle.createWritable();
+        }).then(function(writable){
+          return writable.write(htmlBlob).then(function(){ writable.close(); });
+        }).then(function(){
+          // HTML saved — now auto-download key file (no second picker needed)
+          _saveFileAsLegacy(keyBlob,_fnKey);
+          toast('&#128274; Protected HTML saved via dialog. Key file auto-downloaded to your Downloads folder as <b>'+_fnKey+'</b> — move it to a safe location.');
+        }).catch(function(e){
+          if(e&&e.name==='AbortError'){
+            toast('&#9888; Save cancelled — no files were created.');
+            return;
+          }
+          // Picker unavailable in this context — fall back to auto-download for both
+          _saveFileAsLegacy(htmlBlob,_fnHtml);
+          setTimeout(function(){ _saveFileAsLegacy(keyBlob,_fnKey); },400);
+          toast('&#128274; Both files auto-downloaded: <b>'+_fnHtml+'</b> + <b>'+_fnKey+'</b>');
+        });
+      } else {
+        // No File System Access API — auto-download both
+        _saveFileAsLegacy(htmlBlob,_fnHtml);
+        setTimeout(function(){ _saveFileAsLegacy(keyBlob,_fnKey); },400);
+        toast('&#128274; Both files downloaded: <b>'+_fnHtml+'</b> + <b>'+_fnKey+'</b> — check your Downloads folder.');
+      }
     })
     .catch(function(err){
       toast('&#9888; Protection failed: '+err.message);
