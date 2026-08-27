@@ -647,7 +647,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
       window._viewerMode=true; // blocks destructive admin actions
     }
     // Apply role-based UI restrictions on page reload (all non-admin roles)
-    if(cu&&(cu.role==='ro_supervisor'||cu.role==='ho_supervisor'||cu.role==='auditor')){
+    if(cu&&(cu.role==='ro_supervisor'||cu.role==='ho_supervisor'||cu.role==='auditor'||cu.role==='viewer')){
       setTimeout(_applyRoleUI, 0);
     }
   }}catch(e){}
@@ -706,6 +706,7 @@ function pwCheck(){
     window._viewerMode=true; // blocks destructive admin actions
     try{_hoActivateBtns();}catch(e){}
     document.getElementById('pw-screen').style.display='none';
+    setTimeout(_applyRoleUI, 0);
     return;
   }
 
@@ -863,6 +864,15 @@ function _applyRoleUI(){
     // HO hides: Issue Report (admin-only), Send to RO, Load RO Review, sep1, Send to HO, sep2
     ['rev-send-ro','rev-load-ro','rev-sep-1','rev-send-ho','rev-sep-2','rev-issue'].forEach(hide);
   }
+}
+
+function brainsLogout(){
+  if(!confirm('Log out? You will be returned to the login screen.')) return;
+  try{
+    sessionStorage.removeItem('sa_auth_2026');
+    sessionStorage.removeItem('sa_current_user');
+  }catch(e){}
+  location.reload();
 }
 
 function showChangePwModal(){
@@ -9623,6 +9633,12 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <button class="tb-dd-item" onclick="updbExportApp();tbDDClose()"><span class="di">&#128229;</span> Export Updated App</button>
       </div>
     </div>
+
+    <!-- Logout button — always visible to all roles -->
+    <button id="logout-btn" onclick="brainsLogout()" title="Log out and return to login screen"
+      style="margin-left:4px;padding:5px 11px;background:rgba(192,57,43,.18);color:#f1948a;border:1px solid rgba(192,57,43,.4);border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,Arial,sans-serif;white-space:nowrap;flex-shrink:0;letter-spacing:.3px">
+      &#x23FB; Logout
+    </button>
 
     <input type="file" id="srr-proposals-input" accept=".json" style="display:none" onchange="srrLoadProposalsFile(event)">
     <input type="file" id="ro-review-fileinp" accept=".html" style="display:none" onchange="loadReviewerHtml(event,'ro')">
