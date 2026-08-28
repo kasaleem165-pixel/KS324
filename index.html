@@ -14594,10 +14594,16 @@ function doNewReport(){
 var _updbCandidates = []; // observations pending approval
 
 // Administrator password — built from char codes to avoid any source-encoding issues
+// Must match the default in pwCheck(). Also checks localStorage for a changed password.
 var _HO_PW = (function(){
-  return [72,79,64,83,38,65,50,48,50,54].map(function(c){return String.fromCharCode(c);}).join('');
+  return [78,105,109,100,64,83,38,65,50,48,50,54].map(function(c){return String.fromCharCode(c);}).join('');
 })();
-function _hoCheckPw(v){ return typeof v==='string' && v===_HO_PW; }
+function _hoCheckPw(v){
+  if(typeof v!=='string') return false;
+  // Check localStorage-overridden password first (set via Change Password modal)
+  var stored=''; try{stored=localStorage.getItem('sa_pw_ho')||'';}catch(e){}
+  return v===(stored||_HO_PW);
+}
 if(typeof _hoAuthed==='undefined') var _hoAuthed = false; // set to true by pwCheck on admin/viewer login
 
 function showHOAuthModal(callback, showFieldOption){
