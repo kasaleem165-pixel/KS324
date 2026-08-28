@@ -12621,7 +12621,9 @@ function captureSession() {
               files:(a.files||[]).map(function(f){return {name:f.name,type:f.type,dataUrl:f.dataUrl};})};
     }),
     srrFiles: srr_files.map(function(f){return {name:f.name,type:f.type,dataUrl:f.dataUrl};}),
-    srrKwProposals: (window._srrKwProposals||[]).slice()
+    srrKwProposals: (window._srrKwProposals||[]).slice(),
+    obsAmendments: (function(){ try{ return JSON.parse(localStorage.getItem(DB_AMEND_KEY)||'{}'); }catch(e){ return {}; } })(),
+    obsExtensions: (function(){ try{ return JSON.parse(localStorage.getItem(DB_EXT_KEY)||'[]'); }catch(e){ return []; } })()
   };
 }
 
@@ -12694,6 +12696,9 @@ function restoreSession(sess) {
             files:(a.files||[]).map(function(f){return {name:f.name,type:f.type,dataUrl:f.dataUrl};})};
   });
   resequenceAnnexLabels(); // ensure labels are in correct format after restore
+  // Restore observation amendments (text edits) and custom/extended observations
+  try{ localStorage.setItem(DB_AMEND_KEY, JSON.stringify(sess.obsAmendments||{})); }catch(e){}
+  try{ localStorage.setItem(DB_EXT_KEY,   JSON.stringify(sess.obsExtensions||[])); }catch(e){}
   srr_files = (sess.srrFiles||[]).map(function(f){return {name:f.name,type:f.type,dataUrl:f.dataUrl};});
   srrRenderFilesBar();
   if(Array.isArray(sess.srrKwProposals)){ window._srrKwProposals=sess.srrKwProposals.slice(); _srrUpdateSubmitBtn(); }
