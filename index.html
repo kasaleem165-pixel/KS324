@@ -636,7 +636,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
 <script>
 // Password screen is always shown on load — no session bypass.
 // Auth is established only by entering a valid password in pwCheck().
-var APP_BUILD = '27-Aug-2026';
+var APP_BUILD = '31-Aug-2026';
 function pwCheck(){
   var v = document.getElementById('pw-input').value;
 
@@ -23324,8 +23324,12 @@ function ra_parseXlsxFile(arrayBuffer,callback){
 function ra_parseReport(text,sess,docxSens){
   var result={}; var catNames=Object.keys(RA_DB_CATS);
   for(var i=0;i<catNames.length;i++) result[catNames[i]]={obs:0,repeated:0,new:0,sensTotals:{}};
+  result._obsIdSet=null; // populated when session data is available — used for specific obs ID matching
   if(sess){
     var om=sess.obsTypeMap||{}; var si=sess.selIds||{}; var sm=sess.sensitivityMap||{}; var ids=Object.keys(si);
+    // Build flat obs ID set for specific repeat matching
+    result._obsIdSet={};
+    for(var oi=0;oi<ids.length;oi++) result._obsIdSet[ids[oi]]=true;
     var rep=0,nw=0;
     for(var j=0;j<ids.length;j++){ if((om[ids[j]]||'New').toLowerCase()==='repeated') rep++; else nw++; }
     var total=rep+nw;
@@ -23406,19 +23410,52 @@ function ra_getScoreMode(){
   return el ? el.value : 'mode4';
 }
 
-function ra_scoreCategory(catName,rpt1,rpt2){
+function ra_scoreCategory(catName,rpt1,rpt2,allParsed,currentCatMap,hasCurrentAudit){
   var mode=ra_getScoreMode();
   var d1=rpt1[catName]||{obs:0,repeated:0}; var d2=rpt2?(rpt2[catName]||{obs:0,repeated:0}):null;
   var db=RA_DB_CATS[catName]; var tot=0;
-  for(var c in rpt1) tot+=rpt1[c].obs||0; if(tot<1) tot=1;
+  for(var c in rpt1){ if(c.charAt(0)!=='_') tot+=rpt1[c].obs||0; } if(tot<1) tot=1;
 
   var dilD=RA_DIL_WT[catName];
   var dilScore = dilD ? dilD.areaWtScore : (db.areaWt||0.10)*100;
 
   // Frequency
   var freq=(d1.obs/tot)*30;
-  // Repeat rate
-  var rec=0; if(d1.obs>0) rec=(d1.repeated/d1.obs)*25; if(d2&&d2.obs>0&&d1.obs>0) rec=Math.min(25,rec+8);
+
+  // ── Repeat rate — NEW multi-report specific-obs matching ──────────────────
+  // Rule: an obs is a repeat only if it is CONFIRMED in the current audit AND
+  // present in Rank 1 (most recent previous report). Older reports escalate the
+  // weight. If no current audit obs or no ID sets available, falls back to old
+  // formula (legacy mode).
+  var rec=0;
+  var rank1=allParsed&&allParsed.length>0?allParsed[0]:rpt1;
+  var currentIds=currentCatMap?currentCatMap[catName]||[]:[];
+  var rank1HasIds=rank1&&rank1._obsIdSet;
+
+  if(hasCurrentAudit&&currentIds.length>0&&rank1HasIds){
+    // NEW: specific observation ID matching
+    var weightSum=0;
+    for(var ri=0;ri<currentIds.length;ri++){
+      var oid=currentIds[ri];
+      // Gate: must be in Rank 1
+      if(!rank1._obsIdSet[oid]) continue; // was fixed after last audit — zero
+      // Check Rank 2 and Rank 3
+      var inR2=allParsed&&allParsed.length>1&&allParsed[1]._obsIdSet&&allParsed[1]._obsIdSet[oid];
+      var inR3=allParsed&&allParsed.length>2&&allParsed[2]._obsIdSet&&allParsed[2]._obsIdSet[oid];
+      var w;
+      if(inR2&&inR3)      w=1.00; // Critical — in current + 3 reports
+      else if(inR2)       w=0.80; // High — in current + 2 reports
+      else                w=0.60; // Medium — in current + Rank 1 only
+      weightSum+=w;
+    }
+    // Normalise: max weight if all obs were Critical = currentIds.length × 1.00
+    var maxW=currentIds.length*1.00;
+    rec=maxW>0?Math.min(25,(weightSum/maxW)*25):0;
+  } else {
+    // LEGACY fallback: no current audit obs or text-only previous reports
+    if(d1.obs>0) rec=(d1.repeated/d1.obs)*25;
+    if(d2&&d2.obs>0&&d1.obs>0) rec=Math.min(25,rec+8);
+  }
   // Sensitivity
   var rawSens=0,hasSens=false;
   if(d1.obs>0&&d1.sensTotals){
@@ -23445,7 +23482,12 @@ function ra_scoreCategory(catName,rpt1,rpt2){
     // Mode 2 — Branch History + Databank (no Diligent)
     // Freq(35)+Repeat(30)+Sens(20)+DB(15) = 100
     var freq2=(d1.obs/tot)*35;
-    var rec2=0; if(d1.obs>0) rec2=(d1.repeated/d1.obs)*30; if(d2&&d2.obs>0&&d1.obs>0) rec2=Math.min(30,rec2+8);
+    var rec2=0;
+    if(hasCurrentAudit&&currentIds.length>0&&rank1HasIds){
+      var wSum2=0;
+      for(var ri2=0;ri2<currentIds.length;ri2++){var oi2=currentIds[ri2];if(!rank1._obsIdSet[oi2])continue;var ir2=allParsed&&allParsed.length>1&&allParsed[1]._obsIdSet&&allParsed[1]._obsIdSet[oi2];var ir3=allParsed&&allParsed.length>2&&allParsed[2]._obsIdSet&&allParsed[2]._obsIdSet[oi2];wSum2+=(ir2&&ir3)?1.00:ir2?0.80:0.60;}
+      var mW2=currentIds.length*1.00; rec2=mW2>0?Math.min(30,(wSum2/mW2)*30):0;
+    } else { if(d1.obs>0) rec2=(d1.repeated/d1.obs)*30; if(d2&&d2.obs>0&&d1.obs>0) rec2=Math.min(30,rec2+8); }
     var sens2=hasSens ? rawSens*20 : (db.areaWt||0.10)*20;
     var dbs2=Math.min(15,(db.count/108)*db.weight*15/5);
     total=freq2+rec2+sens2+dbs2;
@@ -23454,7 +23496,12 @@ function ra_scoreCategory(catName,rpt1,rpt2){
     // Mode 3 — Diligent + Specific Branch Only (no databank baseline)
     // Freq(32)+Repeat(27)+Diligent(28)+Sens(13) = 100
     var freq3=(d1.obs/tot)*32;
-    var rec3=0; if(d1.obs>0) rec3=(d1.repeated/d1.obs)*27; if(d2&&d2.obs>0&&d1.obs>0) rec3=Math.min(27,rec3+8);
+    var rec3=0;
+    if(hasCurrentAudit&&currentIds.length>0&&rank1HasIds){
+      var wSum3=0;
+      for(var ri3=0;ri3<currentIds.length;ri3++){var oi3=currentIds[ri3];if(!rank1._obsIdSet[oi3])continue;var ir2b=allParsed&&allParsed.length>1&&allParsed[1]._obsIdSet&&allParsed[1]._obsIdSet[oi3];var ir3b=allParsed&&allParsed.length>2&&allParsed[2]._obsIdSet&&allParsed[2]._obsIdSet[oi3];wSum3+=(ir2b&&ir3b)?1.00:ir2b?0.80:0.60;}
+      var mW3=currentIds.length*1.00; rec3=mW3>0?Math.min(27,(wSum3/mW3)*27):0;
+    } else { if(d1.obs>0) rec3=(d1.repeated/d1.obs)*27; if(d2&&d2.obs>0&&d1.obs>0) rec3=Math.min(27,rec3+8); }
     var dil3=dilD ? (dilD.avgImpact*0.6+dilD.avgLikelihood*0.4)/5*28 : (db.areaWt||0.10)*28*4;
     var sens3=hasSens ? rawSens*13 : (db.areaWt||0.10)*13;
     total=freq3+rec3+dil3+sens3;
@@ -26542,6 +26589,27 @@ function ra_switchStage(stage){
   if(showCX){ ra_loadComplexityMap(); ra_cxInitDataLists(); ra_buildComplexityMatrix(); }
 }
 
+// Build a map of RA-category-key → [obsIds] for the CURRENT audit's selected observations.
+// Used by the new repeat scoring to confirm which obs are still occurring this audit.
+function ra_buildCurrentCatMap(){
+  var catMap={};
+  if(!selIds||!DB||!DB.observations) return catMap;
+  var selectedIds=Object.keys(selIds);
+  // Build a fast obsId→obs lookup from databank + customs
+  var idToObs={};
+  for(var di=0;di<DB.observations.length;di++) idToObs[DB.observations[di].id]=DB.observations[di];
+  for(var ci=0;ci<(customs||[]).length;ci++) idToObs[customs[ci].id]=customs[ci];
+  for(var si2=0;si2<selectedIds.length;si2++){
+    var oid=selectedIds[si2];
+    var obs=idToObs[oid]; if(!obs) continue;
+    var raCat=ra_mapCatToKey(obs.category||obs.area||'');
+    if(!raCat) continue;
+    if(!catMap[raCat]) catMap[raCat]=[];
+    catMap[raCat].push(oid);
+  }
+  return catMap;
+}
+
 function ra_runAnalysis(){
   var brEl=document.getElementById('ra-sel_branch'); var branchName=brEl?brEl.value.trim():'Unknown Branch'; if(!branchName) branchName='Unknown Branch';
   var ptEl=document.getElementById('ra-paste_text'); var pasteText=ptEl?ptEl.value.trim():'';
@@ -26559,15 +26627,22 @@ function ra_runAnalysis(){
   var allSources=[];
   for(var li=0;li<ra_loadedReports.length;li++) allSources.push({text:ra_loadedReports[li].text,sess:ra_loadedReports[li].sess,date:ra_loadedReports[li].date,docxSens:ra_loadedReports[li].docxSens||null});
   if(pasteText) allSources.push({text:pasteText,sess:null,date:'',docxSens:null});
+  // Sort sources newest-first so allParsed[0]=Rank1(most recent), allParsed[1]=Rank2, etc.
+  allSources.sort(function(a,b){ var da=a.date||'',db2=b.date||''; return da<db2?1:da>db2?-1:0; });
   var parsedList=[];
   for(var pi=0;pi<allSources.length;pi++) parsedList.push(ra_parseReport(allSources[pi].text,allSources[pi].sess,allSources[pi].docxSens));
-  var rpt1,rpt2=null,d1='',d2='';
-  if(parsedList.length===1){ rpt1=parsedList[0]; d1=allSources[0].date||''; }
-  else { rpt1=parsedList[parsedList.length-1]; rpt2=parsedList[0]; d1=allSources[allSources.length-1].date||''; d2=allSources[0].date||''; }
+  // allParsed[0] = Rank 1 (most recent previous report), allParsed[1] = Rank 2, etc.
+  var allParsed=parsedList; // sorted newest-first above
+  var rpt1=allParsed[0], rpt2=allParsed.length>1?allParsed[allParsed.length-1]:null;
+  var d1=allSources[0]?allSources[0].date||'':'';
+  var d2=allSources.length>1?allSources[allSources.length-1].date||'':'';
+  // Build current audit category map for specific obs ID repeat matching
+  var currentCatMap=ra_buildCurrentCatMap();
+  var hasCurrentAudit=Object.keys(currentCatMap).length>0;
   var catNames=Object.keys(RA_DB_CATS); var scores=[];
   var mode5=ra_getScoreMode()==='mode5';
   for(var si=0;si<catNames.length;si++){
-    var sc=ra_scoreCategory(catNames[si],rpt1,rpt2);
+    var sc=ra_scoreCategory(catNames[si],rpt1,rpt2,allParsed,currentCatMap,hasCurrentAudit);
     var _d1=rpt1[catNames[si]]||{obs:0,repeated:0,sensTotals:{}};
     scores.push({cat:catNames[si],score:sc,level:ra_scoreToLevel(sc),d1:_d1,d2:rpt2?rpt2[catNames[si]]:null,fromReport:(_d1.obs>0)});
   }
@@ -27691,11 +27766,12 @@ function ra_methodologyHtml(){
     +'<div style="display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:start;background:#fff8f0;border-radius:7px;padding:10px 14px;border-left:4px solid #e67e22">'
     +'<div style="font-size:18px;text-align:center">&#128260;</div>'
     +'<div><div style="font-weight:800;color:#b04400;font-size:12px">2 — Were the Same Issues Repeated? (Repeat Rate)</div>'
-    +'<div style="font-size:11.5px;color:#4a5a70;line-height:1.6;margin-top:3px">If the same problem was found in the previous visit AND the current one, it means nothing was fixed. Repeated issues get a higher score here. If the situation is getting worse over time, an extra bonus of 8 points is added.</div>'
+    +'<div style="font-size:11.5px;color:#4a5a70;line-height:1.6;margin-top:3px">Each observation selected in the <strong>current audit</strong> is matched by its specific ID against previous audit reports. An observation only counts as a repeat if it also appears in the <strong>most recent previous report</strong> (Rank 1) — if it is absent from Rank 1, it is assumed fixed and scores zero. Observations confirmed across more reports carry greater weight: <strong>Medium</strong> (current + Rank 1 only) = 0.60, <strong>High</strong> (+ Rank 2) = 0.80, <strong>Critical</strong> (+ Rank 3) = 1.00. The weighted average is scaled to 25 points.</div>'
     +'<div style="margin-top:7px;background:#7a3000;border-radius:5px;padding:7px 12px;font-family:monospace;font-size:11px;color:#ffd0a0;line-height:1.8">'
-    +'<span style="color:#ffa040;font-weight:700">Score</span> = (Repeated observations &divide; Total observations in this area) &times; 25'
-    +'<div style="color:#d09060;font-size:10.5px;margin-top:2px">+ 8 bonus pts if a second previous report is also uploaded &amp; issues are worsening (capped at 25)</div>'
-    +'<div style="color:#c08050;font-size:10.5px;margin-top:2px">Example: 6 repeats out of 12 Finance obs &rarr; (6&divide;12)&times;25 = 12.5 &rarr; with trend bonus: min(25, 12.5+8) = <strong style="color:#fff">20.5 pts</strong></div>'
+    +'<span style="color:#ffa040;font-weight:700">Score</span> = (&Sigma; Weight per repeated obs &divide; Max possible weight) &times; 25'
+    +'<div style="color:#d09060;font-size:10.5px;margin-top:2px">Weight: Medium (2 reports) = 0.60 &nbsp;|&nbsp; High (3 reports) = 0.80 &nbsp;|&nbsp; Critical (4 reports) = 1.00</div>'
+    +'<div style="color:#c08050;font-size:10.5px;margin-top:2px">Example: 3 obs in Finance — 1 Critical (1.00) + 1 High (0.80) + 1 Medium (0.60) &rarr; (2.40&divide;3.00)&times;25 = <strong style="color:#fff">20.0 pts</strong></div>'
+    +'<div style="color:#d09060;font-size:10.5px;margin-top:2px">Fallback (no current audit obs or text-only files): legacy formula (repeated obs &divide; total obs) &times; 25</div>'
     +'</div></div>'
     +'<div style="text-align:center;font-weight:900;font-size:14px;color:#c9962a;white-space:nowrap">25 pts</div>'
     +'</div>'
