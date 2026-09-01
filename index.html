@@ -639,7 +639,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
 <script>
 // Password screen is always shown on load — no session bypass.
 // Auth is established only by entering a valid password in pwCheck().
-var APP_BUILD = '01-Sep-2026b';
+var APP_BUILD = '01-Sep-2026c';
 function pwCheck(){
   var v = document.getElementById('pw-input').value;
 
@@ -16594,8 +16594,18 @@ function downloadDraft(individual){
         'if(lbl)lbl.textContent="&#10003; Draft restored from auto-save";'+
       '}catch(e){}'+
     '}'+
+    'function _roRestoreEmbedded(){'+
+      'try{'+
+        'var el=document.getElementById("bhs-resp-data");'+
+        'if(!el)return;'+
+        'var data=JSON.parse(el.textContent||el.innerHTML);'+
+        'var tas=document.querySelectorAll("textarea[name],input[name]");'+
+        'for(var i=0;i<tas.length;i++){if(tas[i].name&&data[tas[i].name]!=null)tas[i].value=data[tas[i].name];}'+
+      '}catch(e){}'+
+    '}'+
     'window.addEventListener("load",function(){'+
-      '_roRestoreAuto();'+
+      '_roRestoreEmbedded();'+ // load embedded saved responses first (works on any machine)
+      '_roRestoreAuto();'+      // localStorage draft overwrites if on the same machine (more recent)
       'var tas=document.querySelectorAll("textarea[name]");'+
       'for(var i=0;i<tas.length;i++){'+
         'tas[i].addEventListener("input",function(){_roUnsaved=true;clearTimeout(tas._rot);tas._rot=setTimeout(_roAutoSave,2000);});'+
