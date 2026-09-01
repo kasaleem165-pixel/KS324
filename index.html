@@ -647,7 +647,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
   var pi=document.getElementById('pw-input');
   if(pi){ pi.value=''; }
 })();
-var APP_BUILD = '01-Sep-2026e';
+var APP_BUILD = '01-Sep-2026f';
 function pwCheck(){
   var v = document.getElementById('pw-input').value;
 
@@ -17143,7 +17143,27 @@ function downloadSoftCopy(){
   softHtml+='    +"Generated: "+(new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}));\n';
   softHtml+='  clone.appendChild(ftr);\n';
   // Draft: return full live page (scripts + action bar + pre-filled values preserved)
-  softHtml+='  if(isDraft){ return document.documentElement.outerHTML; }\n';
+  // IMPORTANT: inject bhs-resp-data into the draft so Auditee 2 sees pre-filled responses.
+  // bhs-resp-data does NOT exist as a DOM element in the live soft-copy page (it is only
+  // referenced as a string literal inside buildHtml source code), so we inject it by
+  // splitting on </head> — a tag that cannot appear inside JS source strings.
+  // Also inject a window.onload bootstrap because the original IIFE already ran once.
+  softHtml+='  if(isDraft){\n';
+  softHtml+='    var rawHtml=document.documentElement.outerHTML;\n';
+  softHtml+='    // 1. Inject/update bhs-resp-data before </head> (split on tag, not regex on whole doc)\n';
+  softHtml+='    var headClose=rawHtml.indexOf("<\\/head>");\n';
+  softHtml+='    var injTag=\'<script id="bhs-resp-data" type="application/json">\'+json+\'<\\/script>\';\n';
+  softHtml+='    var updatedHtml= headClose!==-1\n';
+  softHtml+='      ? rawHtml.slice(0,headClose)+injTag+"<\\/head>"+rawHtml.slice(headClose+7)\n';
+  softHtml+='      : rawHtml+injTag;\n';
+  softHtml+='    // 2. Append bootstrap script before </body> so autoLoad fires when Auditee 2 opens file\n';
+  softHtml+='    var bodyClose=updatedHtml.lastIndexOf("<\\/body>");\n';
+  softHtml+='    var bootstrap=\'<script>window.addEventListener("load",function(){if(typeof autoLoad==="function"){autoLoad();if(typeof updateProgress==="function")updateProgress();}});<\\/script>\';\n';
+  softHtml+='    updatedHtml= bodyClose!==-1\n';
+  softHtml+='      ? updatedHtml.slice(0,bodyClose)+bootstrap+"<\\/body>"+updatedHtml.slice(bodyClose+7)\n';
+  softHtml+='      : updatedHtml+bootstrap;\n';
+  softHtml+='    return updatedHtml;\n';
+  softHtml+='  }\n';
   // Outer page styles
   softHtml+='  var ocss="*{box-sizing:border-box}body{font-family:Inter,Arial,sans-serif;font-size:13px;color:#1e2d40;background:#f3f5f8;padding:20px}#wrap{max-width:860px;margin:0 auto}#rp{background:#fff;border-radius:6px;padding:28px 32px;box-shadow:0 2px 8px rgba(0,0,0,.1)}@media print{body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}}";\n';
   // Return the full HTML — embedded JSON preserved for import; formatted body for human reading
