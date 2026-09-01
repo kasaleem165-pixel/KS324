@@ -639,7 +639,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
 <script>
 // Password screen is always shown on load — no session bypass.
 // Auth is established only by entering a valid password in pwCheck().
-var APP_BUILD = '01-Sep-2026';
+var APP_BUILD = '01-Sep-2026b';
 function pwCheck(){
   var v = document.getElementById('pw-input').value;
 
@@ -651,6 +651,7 @@ function pwCheck(){
     window._hoAuthed=true;
     try{_hoActivateBtns();}catch(e){}
     document.getElementById('pw-screen').style.display='none';
+    _startRestore();
     return;
   }
 
@@ -661,6 +662,7 @@ function pwCheck(){
     try{sessionStorage.setItem('sa_auth_2026','1'); sessionStorage.setItem('sa_current_user', JSON.stringify({role:'ho_supervisor'}));}catch(e){}
     document.getElementById('pw-screen').style.display='none';
     setTimeout(_applyRoleUI, 0);
+    _startRestore();
     return;
   }
 
@@ -671,6 +673,7 @@ function pwCheck(){
     try{sessionStorage.setItem('sa_auth_2026','1'); sessionStorage.setItem('sa_current_user', JSON.stringify({role:'ro_supervisor'}));}catch(e){}
     document.getElementById('pw-screen').style.display='none';
     setTimeout(_applyRoleUI, 0);
+    _startRestore();
     return;
   }
 
@@ -681,6 +684,7 @@ function pwCheck(){
     try{sessionStorage.setItem('sa_auth_2026','1'); sessionStorage.setItem('sa_current_user', JSON.stringify({role:'auditor'}));}catch(e){}
     document.getElementById('pw-screen').style.display='none';
     setTimeout(_applyRoleUI, 0);
+    _startRestore();
     return;
   }
 
@@ -694,6 +698,7 @@ function pwCheck(){
     try{_hoActivateBtns();}catch(e){}
     document.getElementById('pw-screen').style.display='none';
     setTimeout(_applyRoleUI, 0);
+    _startRestore();
     return;
   }
 
@@ -10486,46 +10491,9 @@ window.onload = function() {
       }
     }
   }
-  // Auto-restore: prefer auto-save if newer than latest manual version
-  // Uses IndexedDB (async) with localStorage fallback
-  function _doAutoRestore(sessions, autoSaved){
-    var manualLatest = null;
-    if(sessions && sessions.length){
-      sessions.sort(function(a,b){return (b.ver||0)-(a.ver||0);});
-      manualLatest = sessions[0];
-    }
-    var useAuto = false;
-    if(autoSaved && autoSaved._autoSavedAt){
-      useAuto = !manualLatest || (autoSaved._autoSavedAt > (manualLatest.ts||''));
-    }
-    var sourceSession = useAuto ? autoSaved : manualLatest;
-    if(sourceSession){
-      var hasWork = (sourceSession.selCount > 0) ||
-                    (sourceSession.formData && sourceSession.formData.brname);
-      if(hasWork){
-        _brInfoHasData = true;
-        restoreSession(sourceSession);
-        var brn = (sourceSession.formData && sourceSession.formData.brname) || 'your last session';
-        var savedAt = useAuto ? sourceSession._autoSavedAt : sourceSession.ts;
-        showWelcomeBack(brn, savedAt ? fmtTs(savedAt) : '', useAuto);
-      }
-    }
-    updateStageBadge();
-    if(_brInfoHasData) lockBrInfo();
-    showPrompt();
-  }
-
-  function _startRestore(){
-    idbGet(VH_KEY, [], function(sessions){
-      idbGet(AS_KEY, null, function(autoSaved){
-        _doAutoRestore(sessions, autoSaved);
-        _raReportsRestore();
-      });
-    });
-  }
-
-  if(_idbReady){ _startRestore(); }
-  else { _idbQueue.push(_startRestore); }
+  // Session restore is intentionally NOT called here.
+  // It runs only after the user successfully logs in via pwCheck() below,
+  // so saved data is never loaded before authentication.
 
   // Warn before closing if any data exists
   window.addEventListener('beforeunload', function(e){
@@ -10560,6 +10528,56 @@ window.onload = function() {
 };
 
 function pad(n){return n<10?'0'+n:n;}
+
+// ── Post-login session restore ────────────────────────────────────────────
+// Called once from pwCheck() after the user successfully authenticates.
+// Reads IndexedDB for the most recent saved/auto-saved session and, if found,
+// restores it and shows the Welcome Back prompt. Never runs before login.
+function _doAutoRestore(sessions, autoSaved){
+  var manualLatest = null;
+  if(sessions && sessions.length){
+    sessions.sort(function(a,b){return (b.ver||0)-(a.ver||0);});
+    manualLatest = sessions[0];
+  }
+  var useAuto = false;
+  if(autoSaved && autoSaved._autoSavedAt){
+    useAuto = !manualLatest || (autoSaved._autoSavedAt > (manualLatest.ts||''));
+  }
+  var sourceSession = useAuto ? autoSaved : manualLatest;
+  if(sourceSession){
+    var hasWork = (sourceSession.selCount > 0) ||
+                  (sourceSession.formData && sourceSession.formData.brname);
+    if(hasWork){
+      _brInfoHasData = true;
+      restoreSession(sourceSession);
+      var brn = (sourceSession.formData && sourceSession.formData.brname) || 'your last session';
+      var savedAt2 = useAuto ? sourceSession._autoSavedAt : sourceSession.ts;
+      showWelcomeBack(brn, savedAt2 ? fmtTs(savedAt2) : '', useAuto);
+    }
+  }
+  updateStageBadge();
+  if(_brInfoHasData) lockBrInfo();
+  showPrompt();
+}
+function _startRestore(){
+  if(_idbReady){
+    idbGet(VH_KEY, [], function(sessions){
+      idbGet(AS_KEY, null, function(autoSaved){
+        _doAutoRestore(sessions, autoSaved);
+        _raReportsRestore();
+      });
+    });
+  } else {
+    _idbQueue.push(function(){
+      idbGet(VH_KEY, [], function(sessions){
+        idbGet(AS_KEY, null, function(autoSaved){
+          _doAutoRestore(sessions, autoSaved);
+          _raReportsRestore();
+        });
+      });
+    });
+  }
+}
 
 function showWelcomeBack(branchName, savedAt, wasAuto){
   // Remove any stale banner/modal first
