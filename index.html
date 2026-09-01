@@ -625,7 +625,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
     <div style="font-family:'Merriweather',serif;font-size:42px;font-weight:700;letter-spacing:10px;color:#1a3a5c;text-shadow:0 2px 8px rgba(26,58,92,.15);line-height:1;margin-bottom:6px">BRAINS</div>
     <div style="font-size:10px;font-weight:600;color:#c9962a;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:24px">Branch Risk Audit Investigation &amp; Supervision</div>
     <div style="font-size:13px;font-weight:600;color:#1a3a5c;margin-bottom:8px">Enter Password to Continue</div>
-    <input id="pw-input" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')pwCheck()"
+    <input id="pw-input" type="password" placeholder="Password" autocomplete="new-password" onkeydown="if(event.key==='Enter')pwCheck()"
       style="width:100%;padding:10px 14px;border:2px solid #c8d8ec;border-radius:6px;font-size:14px;font-family:Inter,Arial,sans-serif;outline:none;box-sizing:border-box;margin-bottom:10px">
     <div id="pw-err" style="font-size:12px;color:#c0392b;min-height:18px;margin-bottom:8px"></div>
     <button onclick="pwCheck()" style="width:100%;padding:11px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;font-family:Inter,Arial,sans-serif">Access System</button>
@@ -639,7 +639,15 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
 <script>
 // Password screen is always shown on load — no session bypass.
 // Auth is established only by entering a valid password in pwCheck().
-var APP_BUILD = '01-Sep-2026c';
+// Clear any stale session auth so a page refresh always shows the password screen.
+(function(){
+  try{ sessionStorage.removeItem('sa_auth_2026'); sessionStorage.removeItem('sa_current_user'); }catch(e){}
+  var ps=document.getElementById('pw-screen');
+  if(ps){ ps.style.display='flex'; }
+  var pi=document.getElementById('pw-input');
+  if(pi){ pi.value=''; }
+})();
+var APP_BUILD = '01-Sep-2026d';
 function pwCheck(){
   var v = document.getElementById('pw-input').value;
 
