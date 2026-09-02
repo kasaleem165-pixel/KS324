@@ -647,7 +647,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
   var pi=document.getElementById('pw-input');
   if(pi){ pi.value=''; }
 })();
-var APP_BUILD = '01-Sep-2026f';
+var APP_BUILD = '02-Sep-2026a';
 function pwCheck(){
   var v = document.getElementById('pw-input').value;
 
@@ -16868,14 +16868,17 @@ function downloadSoftCopy(){
   softHtml+='<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">\n';
   softHtml+='<style>\n';
   softHtml+='*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}\n';
-  softHtml+='body{font-family:Inter,sans-serif;font-size:13.5px;color:#1e2d40;background:#f3f5f8;padding:20px}\n';
-  softHtml+='#wrap{max-width:860px;margin:0 auto}\n';
+  softHtml+='body{font-family:Inter,sans-serif;font-size:13.5px;color:#1e2d40;background:#f3f5f8;padding:20px;transition:background .4s}\n';
+  softHtml+='#wrap{max-width:860px;margin:0 auto;position:relative;z-index:1}\n';
   softHtml+='#notice{background:#fff3cd;border:1px solid #f0c040;border-radius:6px;padding:12px 16px;margin-bottom:20px;font-size:13px;line-height:1.6}\n';
   softHtml+='#notice strong{color:#7a5000}\n';
   softHtml+='#rp{background:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(26,58,92,.1);padding:30px 34px}\n';
   softHtml+='textarea{font-family:Inter,sans-serif}\n';
-  softHtml+='#draftbtn{display:block;width:100%;margin-top:10px;padding:13px;background:#b04400;color:#fff;border:none;border-radius:6px;font-family:Inter,sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px}\n';
-  softHtml+='#draftbtn:hover{background:#d05000}\n';
+  // State banner at top of live page
+  softHtml+='#statebanner{text-align:center;font-size:13px;font-weight:700;padding:9px 16px;border-radius:6px;margin-bottom:14px;letter-spacing:.3px;transition:background .4s,color .4s}\n';
+  // Draft button styling
+  softHtml+='#draftbtn{display:block;width:100%;margin-top:10px;padding:13px;background:#7a4f00;color:#fff;border:none;border-radius:6px;font-family:Inter,sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:background .3s}\n';
+  softHtml+='#draftbtn:hover{background:#a06800}\n';
   softHtml+='#savebtn{display:block;width:100%;margin-top:10px;padding:13px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-family:Inter,sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px}\n';
   softHtml+='#savebtn:hover{background:#2a5080}\n';
   softHtml+='.row2btn{display:flex;gap:10px;margin-top:10px}\n';
@@ -16884,7 +16887,10 @@ function downloadSoftCopy(){
   softHtml+='#progressfill{height:100%;background:#2a8a40;border-radius:4px;transition:width .3s}\n';
   softHtml+='#progresslbl{font-size:11px;color:#4a6080;margin-top:4px;text-align:right}\n';
   softHtml+='#autosavelbl{font-size:11px;margin-top:6px;text-align:center;min-height:16px;color:#2a8a40}\n';
-  softHtml+='@media print{#notice,#actionbar{display:none!important}body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}}\n';
+  // Watermark layer (behind content, fixed position)
+  softHtml+='#wmlayer{position:fixed;inset:0;pointer-events:none;z-index:0;display:flex;align-items:center;justify-content:center;overflow:hidden}\n';
+  softHtml+='#wmtext{transform:rotate(-35deg);font-size:110px;font-weight:900;letter-spacing:16px;font-family:Arial,sans-serif;white-space:nowrap;user-select:none;transition:color .4s,opacity .4s}\n';
+  softHtml+='@media print{#notice,#actionbar,#wmlayer{display:none!important}body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}}\n';
   syncAnnexTextFromDom();
   var softObsIds=all.map(function(o){return o.id;});
   var annexParts=buildAnnexHtml(true,{},softObsIds);
@@ -16907,12 +16913,15 @@ function downloadSoftCopy(){
   softHtml+=obsSection;
   softHtml+=annexParts.body;
   softHtml+='</div>\n'; // end #rp
+  // Watermark layer (behind everything, fixed)
+  softHtml+='<div id="wmlayer"><div id="wmtext"></div></div>\n';
   // Progress bar and action buttons
   softHtml+='<div id="actionbar">\n';
+  softHtml+='<div id="statebanner"></div>\n';
   softHtml+='<div id="progressbar"><div id="progressfill" style="width:0%"></div></div>\n';
   softHtml+='<div id="progresslbl">0 of 0 responses completed</div>\n';
   softHtml+='<div id="autosavelbl"></div>\n';
-  softHtml+='<button id="draftbtn" onclick="saveDraft()">&#9888; Save Draft (Incomplete &#8212; NOT FOR FORWARDING)</button>\n';
+  softHtml+='<button id="draftbtn" onclick="saveDraft()">&#9654; Save Partial &amp; Forward to Next Auditee</button>\n';
   softHtml+='<button id="savebtn" onclick="saveResponses()">&#10003; Submit Final Responses</button>\n';
   softHtml+='</div>\n'; // end #actionbar
   softHtml+='</div>\n'; // end #wrap
@@ -17077,7 +17086,7 @@ function downloadSoftCopy(){
   // Count alphabetic characters and minimum — must be global so checkComplete() can see them
   softHtml+='function countAlpha(s){var n=0;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);if((c>=65&&c<=90)||(c>=97&&c<=122))n++;}return n;}\n';
   softHtml+='var MIN_ALPHA=10;\n';
-  // Progress bar
+  // Progress bar + live state indicator (watermark, banner, body bg, button label)
   softHtml+='function updateProgress(){\n';
   softHtml+='  var tas=document.querySelectorAll("textarea[name^=\\"resp_\\"]"),total=tas.length,done=0;\n';
   softHtml+='  for(var i=0;i<tas.length;i++){if(countAlpha(tas[i].value)>=MIN_ALPHA)done++;}\n';
@@ -17085,8 +17094,44 @@ function downloadSoftCopy(){
   softHtml+='  var fill=document.getElementById("progressfill"),lbl=document.getElementById("progresslbl");\n';
   softHtml+='  if(fill)fill.style.width=pct+"%";\n';
   softHtml+='  if(lbl)lbl.textContent=done+" of "+total+" responses completed";\n';
-  // Show/hide inline hint for each textarea
-  softHtml+='  for(var j=0;j<tas.length;j++){var hint=document.getElementById("rh_"+tas[j].name);if(!hint)continue;var al=countAlpha(tas[j].value);if(tas[j].value.trim()&&al<MIN_ALPHA){hint.textContent="\\u26a0\\ufe0f Response must contain at least "+MIN_ALPHA+" letters ("+al+" so far).";hint.style.display="block";}else{hint.style.display="none";}}\n';
+  // Determine live state
+  softHtml+='  var liveState= done===0 ? "draft" : (done<total ? "partial" : "complete");\n';
+  // Update watermark
+  softHtml+='  var wm=document.getElementById("wmtext");\n';
+  softHtml+='  if(wm){\n';
+  softHtml+='    wm.textContent= liveState==="draft"?"DRAFT":liveState==="partial"?"PARTIAL":"";\n';
+  softHtml+='    wm.style.color= liveState==="draft"?"rgba(180,20,20,0.09)":"rgba(180,110,0,0.09)";\n';
+  softHtml+='  }\n';
+  // Update body background tint
+  softHtml+='  document.body.style.background= liveState==="complete"?"#f3f5f8":liveState==="partial"?"#fffcf0":"#fff8f8";\n';
+  // Update state banner
+  softHtml+='  var sb=document.getElementById("statebanner");\n';
+  softHtml+='  if(sb){\n';
+  softHtml+='    if(liveState==="draft"){\n';
+  softHtml+='      sb.style.background="#7a1010";sb.style.color="#fff";\n';
+  softHtml+='      sb.innerHTML="&#9888; DRAFT &mdash; No responses filled yet";\n';
+  softHtml+='    } else if(liveState==="partial"){\n';
+  softHtml+='      sb.style.background="#7a4f00";sb.style.color="#fff";\n';
+  softHtml+='      sb.innerHTML="&#9654; PARTIAL &mdash; "+done+" of "+total+" responses filled &mdash; you may forward to next auditee";\n';
+  softHtml+='    } else {\n';
+  softHtml+='      sb.style.background="#1a6030";sb.style.color="#fff";\n';
+  softHtml+='      sb.innerHTML="&#10003; ALL RESPONSES COMPLETE &mdash; Click <em>Submit Final Responses</em> to generate the final file";\n';
+  softHtml+='    }\n';
+  softHtml+='  }\n';
+  // Update draft button label to reflect state
+  softHtml+='  var db=document.getElementById("draftbtn");\n';
+  softHtml+='  if(db){\n';
+  softHtml+='    db.innerHTML= liveState==="draft"\n';
+  softHtml+='      ? "&#9888; Save Draft (no responses yet)"\n';
+  softHtml+='      : "&#9654; Save Partial &amp; Forward to Next Auditee ("+done+"/"+total+" done)";\n';
+  softHtml+='  }\n';
+  // Show/hide inline hint for each textarea + colour border by state
+  softHtml+='  for(var j=0;j<tas.length;j++){\n';
+  softHtml+='    var hint=document.getElementById("rh_"+tas[j].name);\n';
+  softHtml+='    var al=countAlpha(tas[j].value);\n';
+  softHtml+='    if(hint){if(tas[j].value.trim()&&al<MIN_ALPHA){hint.textContent="\\u26a0\\ufe0f At least "+MIN_ALPHA+" letters required ("+al+" so far).";hint.style.display="block";}else{hint.style.display="none";}}\n';
+  softHtml+='    tas[j].style.borderColor= tas[j].value.trim()&&al>=MIN_ALPHA ? "#27ae60" : (tas[j].value.trim()&&al<MIN_ALPHA ? "#e67e22" : "#c0392b");\n';
+  softHtml+='  }\n';
   softHtml+='}\n';
   // Check all resp fields complete and long enough
   softHtml+='function checkComplete(){\n';
@@ -17095,17 +17140,51 @@ function downloadSoftCopy(){
   softHtml+='  return{blank:blank,short:short};\n';
   softHtml+='}\n';
   // Build response HTML — full formatted document with embedded JSON for import
+  // state: 'draft' = zero responses, 'partial' = some responses, 'final' = all complete
   softHtml+='function buildHtml(data,isDraft){\n';
   softHtml+='  var json=JSON.stringify(data).replace(/<\\/script>/gi,"<\\\\/script>");\n';
   softHtml+='  var tas=document.querySelectorAll("textarea[name^=\\"resp_\\"]"),total=tas.length,done=0;\n';
-  softHtml+='  for(var i=0;i<tas.length;i++){if(tas[i].value.trim())done++;}\n';
-  softHtml+='  var banner=isDraft?"<div style=\\"background:#c0392b;color:#fff;text-align:center;font-family:Arial,sans-serif;font-size:15px;font-weight:700;padding:12px 20px;letter-spacing:.5px\\">&#9888; DRAFT &mdash; NOT FOR FORWARDING &mdash; "+done+" of "+total+" responses completed</div>":"";\n';
+  softHtml+='  for(var i=0;i<tas.length;i++){if(countAlpha(tas[i].value)>=MIN_ALPHA)done++;}\n';
+  // Determine state: draft=0 responses, partial=some, final=all (only reached via saveResponses)
+  softHtml+='  var state= !isDraft ? "final" : (done===0 ? "draft" : "partial");\n';
+  // Top status banner
+  softHtml+='  var bannerBg= state==="final"  ? "#1a6030"\n';
+  softHtml+='              : state==="partial" ? "#7a4f00"\n';
+  softHtml+='              :                    "#7a1010";\n';
+  softHtml+='  var bannerIcon= state==="final"  ? "&#10003; "\n';
+  softHtml+='                : state==="partial" ? "&#9654; "\n';
+  softHtml+='                :                    "&#9888; ";\n';
+  softHtml+='  var bannerLabel= state==="final"  ? "FINAL SUBMISSION"\n';
+  softHtml+='                 : state==="partial" ? "PARTIAL &mdash; RESPONSES IN PROGRESS"\n';
+  softHtml+='                 :                    "DRAFT &mdash; NO RESPONSES YET";\n';
+  softHtml+='  var banner=\'<div style="background:\'+bannerBg+\';color:#fff;text-align:center;font-family:Arial,sans-serif;font-size:14px;font-weight:700;padding:11px 20px;letter-spacing:.5px">\'+bannerIcon+bannerLabel+\' &mdash; \'+done+\' of \'+total+\' completed</div>\';\n';
+  // Watermark SVG: only for draft and partial states
+  softHtml+='  var wmText= state==="partial" ? "PARTIAL" : (state==="draft" ? "DRAFT" : "");\n';
+  softHtml+='  var wmColor= state==="partial" ? "rgba(180,110,0,0.10)" : "rgba(180,20,20,0.09)";\n';
+  softHtml+='  var watermark= wmText\n';
+  softHtml+='    ? \'<div style="position:fixed;inset:0;pointer-events:none;z-index:0;display:flex;align-items:center;justify-content:center;overflow:hidden">\'\n';
+  softHtml+='      +\'<div style="transform:rotate(-35deg);font-size:120px;font-weight:900;letter-spacing:20px;color:\'+wmColor+\';font-family:Arial,sans-serif;white-space:nowrap;user-select:none">\'+wmText+\'</div></div>\'\n';
+  softHtml+='    : "";\n';
+  // Page background tint
+  softHtml+='  var bodyBg= state==="final"  ? "#f3f5f8"\n';
+  softHtml+='            : state==="partial" ? "#fffcf0"\n';
+  softHtml+='            :                    "#fff8f8";\n';
   // Clone #rp (contains only report content — action bar and notice are outside it)
   softHtml+='  var clone=document.getElementById("rp").cloneNode(true);\n';
   softHtml+='  if(isDraft){\n';
-  // Draft: keep textareas interactive, just pre-fill with saved values
+  // Draft/partial: keep textareas interactive, just pre-fill with saved values
+  // Highlight blank textareas with a red/amber dashed border so they stand out
   softHtml+='    var clTas=clone.querySelectorAll("textarea[name^=\\"resp_\\"]");\n';
-  softHtml+='    for(var ti=0;ti<clTas.length;ti++){clTas[ti].value=data[clTas[ti].name]||"";}\n';
+  softHtml+='    for(var ti=0;ti<clTas.length;ti++){\n';
+  softHtml+='      clTas[ti].value=data[clTas[ti].name]||"";\n';
+  softHtml+='      if(!clTas[ti].value.trim()){\n';
+  softHtml+='        clTas[ti].style.border="2px dashed #c0392b";\n';
+  softHtml+='        clTas[ti].style.background="#fff8f8";\n';
+  softHtml+='      } else {\n';
+  softHtml+='        clTas[ti].style.border="2px solid #27ae60";\n';
+  softHtml+='        clTas[ti].style.background="#f8fff8";\n';
+  softHtml+='      }\n';
+  softHtml+='    }\n';
   softHtml+='    var clInps=clone.querySelectorAll("input[name^=\\"eta_\\"]");\n';
   softHtml+='    for(var ii=0;ii<clInps.length;ii++){clInps[ii].value=data[clInps[ii].name]||"";}\n';
   softHtml+='  }else{\n';
@@ -17130,11 +17209,12 @@ function downloadSoftCopy(){
   // Submission stamp prepended at top of clone
   softHtml+='  var stamp=document.createElement("div");\n';
   softHtml+='  stamp.style.cssText="text-align:center;background:#1a3a5c;color:#fff;padding:12px 20px;border-radius:4px;margin-bottom:20px";\n';
+  softHtml+='  var stampSub= state==="final"  ? \'<div style="font-size:11px;color:#a8ffb8;margin-top:4px">&#10003; FINAL SUBMISSION &mdash; \'+done+\' of \'+total+\' responses completed</div>\'\n';
+  softHtml+='              : state==="partial" ? \'<div style="font-size:11px;color:#ffd080;margin-top:4px">&#9654; PARTIAL &mdash; \'+done+\' of \'+total+\' responses filled &mdash; forward to next auditee</div>\'\n';
+  softHtml+='              :                    \'<div style="font-size:11px;color:#ffb0b0;margin-top:4px">&#9888; DRAFT &mdash; No responses filled yet</div>\';\n';
   softHtml+='  stamp.innerHTML=\'<div style="font-size:9px;letter-spacing:2px;color:#c9c070;text-transform:uppercase;margin-bottom:4px">Beaconhouse Group &nbsp;|&nbsp; Systems &amp; Audit</div>\'\n';
   softHtml+='    +\'<div style="font-size:17px;font-weight:700;letter-spacing:.5px">AUDITEE RESPONSE DOCUMENT</div>\'\n';
-  softHtml+='    +(isDraft\n';
-  softHtml+='      ?\'<div style="font-size:11px;color:#ffc0c0;margin-top:4px">DRAFT &mdash; NOT FOR FORWARDING</div>\'\n';
-  softHtml+='      :\'<div style="font-size:11px;color:#a8ffb8;margin-top:4px">&#10003; FINAL SUBMISSION &mdash; \'+done+\' of \'+total+\' responses completed</div>\');\n';
+  softHtml+='    +stampSub;\n';
   softHtml+='  clone.insertBefore(stamp,clone.firstChild);\n';
   // Footer appended at bottom
   softHtml+='  var ftr=document.createElement("div");\n';
@@ -17142,21 +17222,15 @@ function downloadSoftCopy(){
   softHtml+='  ftr.innerHTML="Beaconhouse Group &mdash; Systems &amp; Audit Department &mdash; Auditee Response Record<br>"\n';
   softHtml+='    +"Generated: "+(new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}));\n';
   softHtml+='  clone.appendChild(ftr);\n';
-  // Draft: return full live page (scripts + action bar + pre-filled values preserved)
-  // IMPORTANT: inject bhs-resp-data into the draft so Auditee 2 sees pre-filled responses.
-  // bhs-resp-data does NOT exist as a DOM element in the live soft-copy page (it is only
-  // referenced as a string literal inside buildHtml source code), so we inject it by
-  // splitting on </head> — a tag that cannot appear inside JS source strings.
-  // Also inject a window.onload bootstrap because the original IIFE already ran once.
+  // Draft/partial: return full live page (interactive textareas preserved for next auditee)
+  // IMPORTANT: inject bhs-resp-data and bootstrap before closing tags.
   softHtml+='  if(isDraft){\n';
   softHtml+='    var rawHtml=document.documentElement.outerHTML;\n';
-  softHtml+='    // 1. Inject/update bhs-resp-data before </head> (split on tag, not regex on whole doc)\n';
   softHtml+='    var headClose=rawHtml.indexOf("<\\/head>");\n';
   softHtml+='    var injTag=\'<script id="bhs-resp-data" type="application/json">\'+json+\'<\\/script>\';\n';
   softHtml+='    var updatedHtml= headClose!==-1\n';
   softHtml+='      ? rawHtml.slice(0,headClose)+injTag+"<\\/head>"+rawHtml.slice(headClose+7)\n';
   softHtml+='      : rawHtml+injTag;\n';
-  softHtml+='    // 2. Append bootstrap script before </body> so autoLoad fires when Auditee 2 opens file\n';
   softHtml+='    var bodyClose=updatedHtml.lastIndexOf("<\\/body>");\n';
   softHtml+='    var bootstrap=\'<script>window.addEventListener("load",function(){if(typeof autoLoad==="function"){autoLoad();if(typeof updateProgress==="function")updateProgress();}});<\\/script>\';\n';
   softHtml+='    updatedHtml= bodyClose!==-1\n';
@@ -17164,17 +17238,19 @@ function downloadSoftCopy(){
   softHtml+='      : updatedHtml+bootstrap;\n';
   softHtml+='    return updatedHtml;\n';
   softHtml+='  }\n';
-  // Outer page styles
-  softHtml+='  var ocss="*{box-sizing:border-box}body{font-family:Inter,Arial,sans-serif;font-size:13px;color:#1e2d40;background:#f3f5f8;padding:20px}#wrap{max-width:860px;margin:0 auto}#rp{background:#fff;border-radius:6px;padding:28px 32px;box-shadow:0 2px 8px rgba(0,0,0,.1)}@media print{body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}}";\n';
-  // Return the full HTML — embedded JSON preserved for import; formatted body for human reading
-  softHtml+='  return "<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>"+(isDraft?"[DRAFT] ":"")+"Auditee Response<\\/title>"\n';
+  // Final: static read-only page with watermark support and tinted background
+  softHtml+='  var ocss="*{box-sizing:border-box}body{font-family:Inter,Arial,sans-serif;font-size:13px;color:#1e2d40;background:"+bodyBg+";padding:20px}#wrap{max-width:860px;margin:0 auto;position:relative;z-index:1}#rp{background:#fff;border-radius:6px;padding:28px 32px;box-shadow:0 2px 8px rgba(0,0,0,.1)}@media print{body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}.wm-layer{display:none}}";\n';
+  softHtml+='  return "<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>Auditee Response<\\/title>"\n';
   softHtml+='    +\'<script id="bhs-resp-data" type="application/json">\'+json+\'<\\/script>\'\n';
-  softHtml+='    +"<style>"+ocss+"<\\/style><\\/head><body>"+banner+\'<div id="wrap"><div id="rp">\'+clone.innerHTML+\'<\\/div><\\/div><\\/body><\\/html>\';\n';
+  softHtml+='    +"<style>"+ocss+"<\\/style><\\/head><body>"+watermark+banner+\'<div id="wrap"><div id="rp">\'+clone.innerHTML+\'<\\/div><\\/div><\\/body><\\/html>\';\n';
   softHtml+='}\n';
-  // Save Draft
+  // Save Draft/Partial — filename reflects state
   softHtml+='function saveDraft(){\n';
+  softHtml+='  var tas=document.querySelectorAll("textarea[name^=\\"resp_\\"]"),total=tas.length,done=0;\n';
+  softHtml+='  for(var i=0;i<tas.length;i++){if(countAlpha(tas[i].value)>=MIN_ALPHA)done++;}\n';
+  softHtml+='  var prefix=done===0?"DRAFT":("PARTIAL_"+done+"of"+total);\n';
   softHtml+='  var blob=new Blob([buildHtml(collectData(),true)],{type:"text/html"});\n';
-  softHtml+='  saveFileAs(blob,"DRAFT_"+document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+".html");\n';
+  softHtml+='  saveFileAs(blob,prefix+"_"+document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+".html");\n';
   softHtml+='}\n';
   // Submit Final
   softHtml+='function saveResponses(){\n';
