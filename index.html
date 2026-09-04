@@ -421,9 +421,10 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 .tb-dd-item .di{font-size:14px;width:20px;text-align:center;flex-shrink:0;opacity:.85}
 .tb-dd-item.locked{opacity:.4;cursor:not-allowed}
 .tb-dd-item.locked:hover{background:transparent;color:#cddaea}
-.tb-item-body{display:flex;flex-direction:column;align-items:flex-start;white-space:normal;min-width:0}
-.tb-dd-desc{display:block;font-size:10px;font-weight:400;color:rgba(180,200,220,.65);margin-top:1px;line-height:1.3;white-space:normal}
-.tb-dd-item:hover .tb-dd-desc{color:rgba(255,255,255,.6)}
+.tb-dd-item[data-tip]{position:relative}
+.tb-dd-item[data-tip]::after{content:attr(data-tip);position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);background:#0d1f35;color:#d8e8f8;font-size:11.5px;font-weight:400;line-height:1.5;padding:8px 12px;border-radius:6px;border:1px solid #2e4a6a;white-space:normal;width:230px;box-shadow:0 4px 18px rgba(0,0,0,.5);z-index:99999;pointer-events:none;opacity:0;transition:opacity .15s ease}
+.tb-dd-item[data-tip]:hover::after{opacity:1}
+.dd-right .tb-dd-item[data-tip]::after{left:auto;right:calc(100% + 8px)}
 .tb-dd-sep{height:1px;background:rgba(255,255,255,.1);margin:4px 8px}
 .tb-dd-group-label{padding:5px 13px 3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#c9962a;opacity:.9}
 .tb-dd-sub{padding-left:28px;font-size:12px;color:#b8cce0}
@@ -9561,39 +9562,39 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
     <div class="tb-dd" id="dd-file">
       <button class="tb-dd-tab" onclick="tbDDToggle('dd-file')">File <span class="arr">&#9660;</span></button>
       <div class="tb-dd-menu">
-        <button id="file-new" class="tb-dd-item rpt-btn" onclick="doNewReport();tbDDClose()"><span class="di">&#43;</span><span class="tb-item-body">New Report<span class="tb-dd-desc">Start a fresh audit report for a new branch visit</span></span></button>
-        <button id="file-load" class="tb-dd-item rpt-btn" onclick="triggerLoadReport();tbDDClose()"><span class="di">&#128228;</span><span class="tb-item-body">Load Report<span class="tb-dd-desc">Open a previously saved report file (.html or .json)</span></span></button>
-        <button id="file-versions" class="tb-dd-item rpt-btn" onclick="showVersionHistory();tbDDClose()"><span class="di">&#128190;</span><span class="tb-item-body">Save / Versions<span class="tb-dd-desc">Save the current report and browse version history</span></span></button>
+        <button id="file-new" class="tb-dd-item rpt-btn" onclick="doNewReport();tbDDClose()" data-tip="Start a fresh audit report for a new branch visit"><span class="di">&#43;</span> New Report</button>
+        <button id="file-load" class="tb-dd-item rpt-btn" onclick="triggerLoadReport();tbDDClose()" data-tip="Open a previously saved report file (.html or .json)"><span class="di">&#128228;</span> Load Report</button>
+        <button id="file-versions" class="tb-dd-item rpt-btn" onclick="showVersionHistory();tbDDClose()" data-tip="Save the current report and browse version history"><span class="di">&#128190;</span> Save / Versions</button>
         <div id="file-sep" class="tb-dd-sep"></div>
-        <button id="file-clear" class="tb-dd-item rpt-btn" onclick="doClear();tbDDClose()"><span class="di">&#10005;</span><span class="tb-item-body">Clear Draft<span class="tb-dd-desc">Erase all current work and start from scratch</span></span></button>
+        <button id="file-clear" class="tb-dd-item rpt-btn" onclick="doClear();tbDDClose()" data-tip="Erase all current work and start from scratch"><span class="di">&#10005;</span> Clear Draft</button>
       </div>
     </div>
 
     <div class="tb-dd" id="dd-build">
       <button class="tb-dd-tab" onclick="tbDDToggle('dd-build')">Build <span class="arr">&#9660;</span></button>
       <div class="tb-dd-menu">
-        <button class="tb-dd-item" id="aws-tab-btn" onclick="toggleAWSPanel();tbDDClose()"><span class="di">&#128203;</span><span class="tb-item-body">Work Status<span class="tb-dd-desc">Track completion status of each observation (Not Started / In Progress / Done)</span></span></button>
-        <button class="tb-dd-item" id="ra-tab-btn"  onclick="toggleRAPanel();tbDDClose()"><span class="di">&#128202;</span><span class="tb-item-body">Risk Assessment<span class="tb-dd-desc">View and assign risk ratings (High / Medium / Low) across audit areas</span></span></button>
-        <button class="tb-dd-item" id="draft-tab-btn" onclick="toggleDraftPanel();tbDDClose()"><span class="di">&#128196;</span><span class="tb-item-body">Draft Summary<span class="tb-dd-desc">Preview a structured summary of all findings drafted so far</span></span></button>
+        <button class="tb-dd-item" id="aws-tab-btn" onclick="toggleAWSPanel();tbDDClose()" data-tip="Track completion status of each observation (Not Started / In Progress / Done)"><span class="di">&#128203;</span> Work Status</button>
+        <button class="tb-dd-item" id="ra-tab-btn"  onclick="toggleRAPanel();tbDDClose()" data-tip="View and assign risk ratings (High / Medium / Low) across audit areas"><span class="di">&#128202;</span> Risk Assessment</button>
+        <button class="tb-dd-item" id="draft-tab-btn" onclick="toggleDraftPanel();tbDDClose()" data-tip="Preview a structured summary of all findings drafted so far"><span class="di">&#128196;</span> Draft Summary</button>
       </div>
     </div>
 
     <div class="tb-dd" id="dd-dist">
       <button class="tb-dd-tab" onclick="tbDDToggle('dd-dist')">Distribute <span class="arr">&#9660;</span></button>
       <div class="tb-dd-menu">
-        <button class="tb-dd-item rpt-btn" onclick="downloadSoftCopy();tbDDClose()"><span class="di">&#128233;</span><span class="tb-item-body">Auditee Copy<span class="tb-dd-desc">Generate a response file to send to the branch auditee for their comments</span></span></button>
-        <button class="tb-dd-item rpt-btn" onclick="triggerLoad();tbDDClose()"><span class="di">&#128194;</span><span class="tb-item-body">Load Auditee Response<span class="tb-dd-desc">Import the filled response file returned by the auditee</span></span></button>
+        <button class="tb-dd-item rpt-btn" onclick="downloadSoftCopy();tbDDClose()" data-tip="Generate a response file to send to the branch auditee for their comments"><span class="di">&#128233;</span> Auditee Copy</button>
+        <button class="tb-dd-item rpt-btn" onclick="triggerLoad();tbDDClose()" data-tip="Import the filled response file returned by the auditee"><span class="di">&#128194;</span> Load Auditee Response</button>
         <div class="tb-dd-sep"></div>
-        <button class="tb-dd-item rpt-btn" onclick="showFollowUpModal();tbDDClose()"><span class="di">&#128260;</span><span class="tb-item-body">Follow-up Response Request<span class="tb-dd-desc">Generate a follow-up query file for unresolved or incomplete matters</span></span></button>
-        <button class="tb-dd-item rpt-btn" onclick="document.getElementById('followup-fileinp').click();tbDDClose()"><span class="di">&#128194;</span><span class="tb-item-body">Load Follow-up Response<span class="tb-dd-desc">Import the auditee's reply to the follow-up query</span></span></button>
+        <button class="tb-dd-item rpt-btn" onclick="showFollowUpModal();tbDDClose()" data-tip="Generate a follow-up query file for unresolved or incomplete matters"><span class="di">&#128260;</span> Follow-up Response Request</button>
+        <button class="tb-dd-item rpt-btn" onclick="document.getElementById('followup-fileinp').click();tbDDClose()" data-tip="Import the auditee's reply to the follow-up query"><span class="di">&#128194;</span> Load Follow-up Response</button>
         <div class="tb-dd-sep"></div>
-        <button class="tb-dd-item rpt-btn" onclick="showDraftModal('ro');tbDDClose()"><span class="di">&#128196;</span><span class="tb-item-body">Refer to RO<span class="tb-dd-desc">Send selected observations to the Regional Office for their response</span></span></button>
-        <button id="dist-refer-ho" class="tb-dd-item rpt-btn" onclick="showDraftModal('ho');tbDDClose()"><span class="di">&#128196;</span><span class="tb-item-body">Refer to HO<span class="tb-dd-desc">Send selected observations to Head Office for their response</span></span></button>
+        <button class="tb-dd-item rpt-btn" onclick="showDraftModal('ro');tbDDClose()" data-tip="Send selected observations to the Regional Office for their response"><span class="di">&#128196;</span> Refer to RO</button>
+        <button id="dist-refer-ho" class="tb-dd-item rpt-btn" onclick="showDraftModal('ho');tbDDClose()" data-tip="Send selected observations to Head Office for their response"><span class="di">&#128196;</span> Refer to HO</button>
         <div class="tb-dd-sep"></div>
-        <button class="tb-dd-item rpt-btn" onclick="triggerLoadSectResponse('ro');tbDDClose()"><span class="di">&#128194;</span><span class="tb-item-body">Load RO Response<span class="tb-dd-desc">Import the response file received from the Regional Office</span></span></button>
-        <button id="dist-load-ho" class="tb-dd-item rpt-btn" onclick="triggerLoadSectResponse('ho');tbDDClose()"><span class="di">&#128194;</span><span class="tb-item-body">Load HO Response<span class="tb-dd-desc">Import the response file received from Head Office</span></span></button>
+        <button class="tb-dd-item rpt-btn" onclick="triggerLoadSectResponse('ro');tbDDClose()" data-tip="Import the response file received from the Regional Office"><span class="di">&#128194;</span> Load RO Response</button>
+        <button id="dist-load-ho" class="tb-dd-item rpt-btn" onclick="triggerLoadSectResponse('ho');tbDDClose()" data-tip="Import the response file received from Head Office"><span class="di">&#128194;</span> Load HO Response</button>
         <div class="tb-dd-sep"></div>
-        <button class="tb-dd-item rpt-btn" onclick="showSaveDialog();tbDDClose()"><span class="di">&#9989;</span><span class="tb-item-body">Validate &amp; Save Report<span class="tb-dd-desc">Check completeness of all fields and save the finalised report</span></span></button>
+        <button class="tb-dd-item rpt-btn" onclick="showSaveDialog();tbDDClose()" data-tip="Check completeness of all fields and save the finalised report"><span class="di">&#9989;</span> Validate &amp; Save Report</button>
       </div>
     </div>
 
@@ -9601,33 +9602,33 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       <button class="tb-dd-tab" onclick="tbDDToggle('dd-review')">Review <span class="arr">&#9660;</span></button>
       <div class="tb-dd-menu">
 
-        <button id="rev-send-ro" class="tb-dd-item rpt-btn" onclick="generateReviewerHtml('ro');tbDDClose()"><span class="di">&#128228;</span><span class="tb-item-body">Send to RO Audit Supervisor<span class="tb-dd-desc">Export the report for RO supervisor review and sign-off</span></span></button>
-        <button id="rev-load-ro" class="tb-dd-item rpt-btn" onclick="triggerLoadReviewerHtml('ro');tbDDClose()"><span class="di">&#128194;</span><span class="tb-item-body">Load RO Supervisor Review<span class="tb-dd-desc">Import the reviewed and annotated file returned by the RO supervisor</span></span></button>
+        <button id="rev-send-ro" class="tb-dd-item rpt-btn" onclick="generateReviewerHtml('ro');tbDDClose()" data-tip="Export the report for RO supervisor review and sign-off"><span class="di">&#128228;</span> Send to RO Audit Supervisor</button>
+        <button id="rev-load-ro" class="tb-dd-item rpt-btn" onclick="triggerLoadReviewerHtml('ro');tbDDClose()" data-tip="Import the reviewed and annotated file returned by the RO supervisor"><span class="di">&#128194;</span> Load RO Supervisor Review</button>
         <div id="rev-sep-1" class="tb-dd-sep"></div>
-        <button id="rev-send-ho" class="tb-dd-item rpt-btn" onclick="generateReviewerHtml('ho');tbDDClose()"><span class="di">&#128228;</span><span class="tb-item-body">Send to HO Audit Supervisor<span class="tb-dd-desc">Export the report for HO supervisor review and sign-off</span></span></button>
-        <button id="rev-load-ho" class="tb-dd-item rpt-btn" onclick="if(_canIssue()){triggerLoadReviewerHtml('ho');tbDDClose();}else{tbDDClose();showHOAuthModal(function(){triggerLoadReviewerHtml('ho');});}"><span class="di">&#128194;</span><span class="tb-item-body">Load HO Supervisor Review<span class="tb-dd-desc">Import the reviewed and annotated file returned by the HO supervisor</span></span></button>
+        <button id="rev-send-ho" class="tb-dd-item rpt-btn" onclick="generateReviewerHtml('ho');tbDDClose()" data-tip="Export the report for HO supervisor review and sign-off"><span class="di">&#128228;</span> Send to HO Audit Supervisor</button>
+        <button id="rev-load-ho" class="tb-dd-item rpt-btn" onclick="if(_canIssue()){triggerLoadReviewerHtml('ho');tbDDClose();}else{tbDDClose();showHOAuthModal(function(){triggerLoadReviewerHtml('ho');});}" data-tip="Import the reviewed and annotated file returned by the HO supervisor"><span class="di">&#128194;</span> Load HO Supervisor Review</button>
         <div id="rev-sep-2" class="tb-dd-sep"></div>
-        <button id="rev-issue" class="tb-dd-item rpt-btn" onclick="if(_canIssue()){generateIssuedReport();tbDDClose();}else{tbDDClose();showHOAuthModal(function(){generateIssuedReport();});}"><span class="di">&#10003;</span><span class="tb-item-body">Issue Report<span class="tb-dd-desc">Finalise and officially issue the completed audit report</span></span></button>
+        <button id="rev-issue" class="tb-dd-item rpt-btn" onclick="if(_canIssue()){generateIssuedReport();tbDDClose();}else{tbDDClose();showHOAuthModal(function(){generateIssuedReport();});}" data-tip="Finalise and officially issue the completed audit report"><span class="di">&#10003;</span> Issue Report</button>
         <div class="tb-dd-sep"></div>
-        <button class="tb-dd-item" id="admin-pending-btn" onclick="showPendingDatabankModal();tbDDClose()"><span class="di">&#128196;</span><span class="tb-item-body">Pending Databank Additions <span id="admin-pending-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span><span class="tb-dd-desc">Review and approve new observations proposed by auditors for the databank</span></span></button>
-        <button class="tb-dd-item" id="admin-amend-btn" onclick="showPendingAmendmentsModal();tbDDClose()"><span class="di">&#9999;</span><span class="tb-item-body">Pending Databank Amendments <span id="admin-amend-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span><span class="tb-dd-desc">Review and approve edits or corrections to existing databank observations</span></span></button>
+        <button class="tb-dd-item" id="admin-pending-btn" onclick="showPendingDatabankModal();tbDDClose()" data-tip="Review and approve new observations proposed by auditors for the databank"><span class="di">&#128196;</span> Pending Databank Additions <span id="admin-pending-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
+        <button class="tb-dd-item" id="admin-amend-btn" onclick="showPendingAmendmentsModal();tbDDClose()" data-tip="Review and approve edits or corrections to existing databank observations"><span class="di">&#9999;</span> Pending Databank Amendments <span id="admin-amend-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
       </div>
     </div>
 
     <div class="tb-dd" id="dd-tools">
       <button class="tb-dd-tab" onclick="tbDDToggle('dd-tools')">Tools <span class="arr">&#9660;</span></button>
       <div class="tb-dd-menu">
-        <button class="tb-dd-item" id="srr-tab-btn" onclick="toggleSRRPanel();tbDDClose()"><span class="di">&#128279;</span><span class="tb-item-body">Risk Mapping Editor<span class="tb-dd-desc">Map each observation to its risk category and sub-risk reference (SRR)</span></span></button>
-        <button class="tb-dd-item" onclick="srrImportProposalsClick();tbDDClose()"><span class="di">&#128229;</span><span class="tb-item-body">Import SRR Keyword Proposals <span id="srr-prop-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span><span class="tb-dd-desc">Load keyword mapping proposals submitted by auditors for your review</span></span></button>
-        <button class="tb-dd-item" id="dbm-tab-btn" onclick="toggleDBMPanel();tbDDClose()"><span class="di">&#128196;</span><span class="tb-item-body">Observation Filter &amp; Overrides<span class="tb-dd-desc">Suppress, restore, or override which observations appear in this report</span></span></button>
-        <button class="tb-dd-item" id="rcm-tab-btn" onclick="toggleRCMPanel();tbDDClose()"><span class="di">&#128220;</span><span class="tb-item-body">Risk &amp; Controls Reference<span class="tb-dd-desc">Browse the reference library of risks and internal control descriptions</span></span></button>
+        <button class="tb-dd-item" id="srr-tab-btn" onclick="toggleSRRPanel();tbDDClose()" data-tip="Map each observation to its risk category and sub-risk reference (SRR)"><span class="di">&#128279;</span> Risk Mapping Editor</button>
+        <button class="tb-dd-item" onclick="srrImportProposalsClick();tbDDClose()" data-tip="Load keyword mapping proposals submitted by auditors for your review"><span class="di">&#128229;</span> Import SRR Keyword Proposals <span id="srr-prop-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
+        <button class="tb-dd-item" id="dbm-tab-btn" onclick="toggleDBMPanel();tbDDClose()" data-tip="Suppress, restore, or override which observations appear in this report"><span class="di">&#128196;</span> Observation Filter &amp; Overrides</button>
+        <button class="tb-dd-item" id="rcm-tab-btn" onclick="toggleRCMPanel();tbDDClose()" data-tip="Browse the reference library of risks and internal control descriptions"><span class="di">&#128220;</span> Risk &amp; Controls Reference</button>
         <div class="tb-dd-sep"></div>
-        <button class="tb-dd-item rpt-btn" onclick="showWordToReportModal();tbDDClose()"><span class="di">&#128196;</span><span class="tb-item-body">Word &#8594; Report<span class="tb-dd-desc">Convert a Word document audit report into the BRAINS format</span></span></button>
-        <button class="tb-dd-item locked" id="cmp-btn"  onclick="showCompareModal();tbDDClose()"><span class="di">&#128274;</span><span class="tb-item-body">Compare Report<span class="tb-dd-desc">Compare two report versions side by side (coming soon)</span></span></button>
-        <button class="tb-dd-item locked" id="demo-btn" onclick="showDemoAuth();tbDDClose()"><span class="di">&#128274;</span><span class="tb-item-body">Demo Mode<span class="tb-dd-desc">Run the app with sample data for training and demonstration purposes</span></span></button>
+        <button class="tb-dd-item rpt-btn" onclick="showWordToReportModal();tbDDClose()" data-tip="Convert a Word document audit report into the BRAINS format"><span class="di">&#128196;</span> Word &#8594; Report</button>
+        <button class="tb-dd-item locked" id="cmp-btn"  onclick="showCompareModal();tbDDClose()" data-tip="Compare two report versions side by side (coming soon)"><span class="di">&#128274;</span> Compare Report</button>
+        <button class="tb-dd-item locked" id="demo-btn" onclick="showDemoAuth();tbDDClose()" data-tip="Run the app with sample data for training and demonstration purposes"><span class="di">&#128274;</span> Demo Mode</button>
         <div class="tb-dd-sep"></div>
         <div class="tb-dd-group-label">&#128230; Databank Management</div>
-        <button class="tb-dd-item tb-dd-sub" id="updb-btn" onclick="showUpdateDbModal();tbDDClose()"><span class="di">&#128203;</span><span class="tb-item-body">Duplicate Observations<span class="tb-dd-desc">Review and approve observations flagged as potential duplicates in the databank</span></span></button>
+        <button class="tb-dd-item tb-dd-sub" id="updb-btn" onclick="showUpdateDbModal();tbDDClose()" data-tip="Review and approve observations flagged as potential duplicates in the databank"><span class="di">&#128203;</span> Duplicate Observations</button>
 
       </div>
     </div>
@@ -9645,13 +9646,13 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
     <div class="tb-dd dd-right" id="dd-admin">
       <button class="tb-dd-tab" onclick="if(window._hoAuthed){tbDDToggle('dd-admin');}else{showHOAuthModal(function(){tbDDToggle('dd-admin');});}">Admin <span id="admin-export-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px;vertical-align:middle">Export Pending</span> <span class="arr">&#9660;</span></button>
       <div class="tb-dd-menu">
-        <button class="tb-dd-item locked" id="chpw-btn" onclick="showChangePwModal();tbDDClose()" disabled><span class="di">&#128274;</span><span class="tb-item-body">Change Password<span class="tb-dd-desc">Update the login credentials for this app (coming soon)</span></span></button>
+        <button class="tb-dd-item locked" id="chpw-btn" onclick="showChangePwModal();tbDDClose()" disabled data-tip="Update the login credentials for this app (coming soon)"><span class="di">&#128274;</span> Change Password</button>
         <div class="tb-dd-sep"></div>
-        <button class="tb-dd-item admin-only-btn" id="gen-prot-btn" onclick="generateProtectedCopy();tbDDClose()"><span class="di">&#128274;</span><span class="tb-item-body">Generate Protected Copy<span class="tb-dd-desc">Create a password-protected version of the app for secure distribution</span></span></button>
-        <button class="tb-dd-item admin-only-btn" id="decode-src-btn" onclick="_brainsShowUnlock();tbDDClose()"><span class="di">&#128275;</span><span class="tb-item-body">Decode Source (Admin)<span class="tb-dd-desc">Unlock and view the encoded source code of the app (Administrator only)</span></span></button>
+        <button class="tb-dd-item admin-only-btn" id="gen-prot-btn" onclick="generateProtectedCopy();tbDDClose()" data-tip="Create a password-protected version of the app for secure distribution"><span class="di">&#128274;</span> Generate Protected Copy</button>
+        <button class="tb-dd-item admin-only-btn" id="decode-src-btn" onclick="_brainsShowUnlock();tbDDClose()" data-tip="Unlock and view the encoded source code of the app (Administrator only)"><span class="di">&#128275;</span> Decode Source (Admin)</button>
         <div class="tb-dd-sep admin-only-btn"></div>
-        <button class="tb-dd-item" onclick="showClearSessionModal();tbDDClose()"><span class="di">&#128465;</span><span class="tb-item-body">Clear Session<span class="tb-dd-desc">Remove all current session data from this browser (cannot be undone)</span></span></button>
-        <button class="tb-dd-item" onclick="updbExportApp();tbDDClose()"><span class="di">&#128229;</span><span class="tb-item-body">Export Updated App<span class="tb-dd-desc">Bake approved databank changes into a new distributable app file</span></span></button>
+        <button class="tb-dd-item" onclick="showClearSessionModal();tbDDClose()" data-tip="Remove all current session data from this browser (cannot be undone)"><span class="di">&#128465;</span> Clear Session</button>
+        <button class="tb-dd-item" onclick="updbExportApp();tbDDClose()" data-tip="Bake approved databank changes into a new distributable app file"><span class="di">&#128229;</span> Export Updated App</button>
       </div>
     </div>
 
