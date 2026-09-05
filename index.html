@@ -16788,6 +16788,16 @@ function renderAnnexList(){
         var soT=(obsTypeMap[so.id]||so.type||'New').toLowerCase();
         if(soT==='repeated') repObs.push(so); else newObs.push(so);
       }
+      // Sort each group by their report label so the list is in sequential number order
+      function _lblSort(a2,b2){
+        var la=rptLabels[a2.id]||'',lb=rptLabels[b2.id]||'';
+        var pa=la.split('.').map(Number),pb=lb.split('.').map(Number);
+        for(var _i=0;_i<Math.max(pa.length,pb.length);_i++){
+          var diff=(pa[_i]||0)-(pb[_i]||0); if(diff) return diff;
+        }
+        return 0;
+      }
+      repObs.sort(_lblSort); newObs.sort(_lblSort);
       function renderObsGroup(arr, sectionLabel, badgeCol){
         if(!arr.length) return;
         h+='<div style="font-size:9.5px;font-weight:700;color:#fff;background:'+badgeCol+';padding:2px 8px;border-radius:3px;margin:6px 0 4px;display:inline-block;letter-spacing:.5px">'+sectionLabel+'</div>';
