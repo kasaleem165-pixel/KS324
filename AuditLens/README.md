@@ -18,6 +18,20 @@ CREATE AUDIT → ADD DOCUMENTS → EXTRACT DATA → RUN CHECKS → REVIEW EXCEPT
 
 AuditLens needs no installation.
 
+### Easiest way: one file
+
+**`AuditLens.html`** is the entire application — every stylesheet and script bundled into a
+single file, the same way BRAINS and Animal Sales Pro ship. Just download it and double-click
+it to open in your browser. No folder, no server, nothing else to copy. It was verified to
+work this way (including data surviving a page reload) before being added here.
+
+Regenerate it after editing any source file in `css/`/`js/`/`data/` with:
+```bash
+node build/bundle.js . AuditLens.html
+```
+
+### Developer / multi-file way
+
 1. Copy the `AuditLens/` folder anywhere.
 2. **Serve it over HTTP** (recommended) rather than opening `index.html` directly with
    `file://` — some browsers restrict IndexedDB / `fetch()` on blob URLs under `file://`.
