@@ -19337,8 +19337,15 @@ function generateIssuedReport(forROCopy){
       +'</div></div></div>';
     // Populate verbatim modal data
     var mBody='';
-    if(ot) mBody+='<div class="modal-badge mb-find">Finding</div><div class="modal-section ms-find">'+e(ot)+'</div>';
+    var mbBsNotes=obsNotesMap[o.id]||'';
+    if(ot) mBody+='<div class="modal-badge mb-find">Finding</div><div class="modal-section ms-find">'+e(ot)+(mbBsNotes?'<div style="margin-top:6px;padding:6px 8px;background:#fffdf0;border:1px solid #e0d080;border-radius:4px;font-size:.85rem;color:#4a4000">'+e(mbBsNotes)+'</div>':'')+'</div>';
     if(rt) mBody+='<div class="modal-badge mb-rec">Recommendation</div><div class="modal-section ms-rec">'+e(rt)+'</div>';
+    var mbLarr=lastRefMap[o.id]||'';
+    if(mbLarr) mBody+='<div class="modal-badge" style="background:#fff3e8;color:#8a3000;border:1px solid #f0b080">&#128196; LARR</div><div class="modal-section" style="color:#5a2000;font-weight:600">'+e(mbLarr)+'</div>';
+    var mbAx=annexMap[o.id]||o._annex||'';
+    if(mbAx) mBody+='<div class="modal-badge" style="background:#e8f0fa;color:#1a3a5c;border:1px solid #b0c8e8">Annexure Data</div><div class="modal-section" style="color:#1a3a5c;font-weight:700">'+e(mbAx)+'</div>';
+    var mbLnkAnx=getLinkedAnnexures(o.id);
+    if(mbLnkAnx.length){var mbLnkLbls=mbLnkAnx.map(function(a){return a.label||'?';}).join(', ');mBody+='<div class="modal-badge" style="background:#e8f0fa;color:#1a3a5c;border:1px solid #b0c8e8">Annexure Ref</div><div class="modal-section" style="color:#1a3a5c;font-weight:600">'+e(mbLnkLbls)+'</div>';}
     if(resp.bh!==null&&resp.bh!=='') mBody+='<div class="modal-badge mb-resp">Auditee Response (HOS)</div><div class="modal-section ms-resp">'+e(resp.bh)+'</div>';
     if(resp.ro!==null&&resp.ro!=='') mBody+='<div class="modal-badge mb-roresp">RO Response</div><div class="modal-section ms-resp">'+e(resp.ro)+'</div>';
     if(resp.bh===null&&resp.ro===null&&resp.gen) mBody+='<div class="modal-badge mb-resp">Auditee Response</div><div class="modal-section ms-resp">'+e(resp.gen)+'</div>';
@@ -19385,8 +19392,15 @@ function generateIssuedReport(forROCopy){
     h+='<span class="tag">Referred to: '+e(ref)+'</span>';
     var effType=obsTypeMap[o.id]||o.type||'New'; h+='<span class="tag">'+e(effType)+'</span>';
     h+='</div>';
-    if(ot) h+='<div class="box-label">Finding</div><div class="finding-box">'+_renderText(ot,{fontSize:'.87rem',lineHeight:'1.6',color:'#2a3a50'})+'</div>';
+    var issBsNotes=obsNotesMap[o.id]||'';
+    if(ot) h+='<div class="box-label">Finding</div><div class="finding-box">'+_renderText(ot,{fontSize:'.87rem',lineHeight:'1.6',color:'#2a3a50'})+(issBsNotes?_renderText(issBsNotes,{fontSize:'.87rem',lineHeight:'1.6',color:'#2a3a50'}):'')+'</div>';
     if(rt){h+='<div class="accordion"><div class="acc-toggle" onclick="toggleAcc(this)"><span>&#9989; Recommendation</span><span class="acc-arrow">&#9660;</span></div><div class="acc-body open">'+_renderText(rt,{fontSize:'.87rem',lineHeight:'1.6',color:'#2a3a50'})+'</div></div>';}
+    var issLarr=lastRefMap[o.id]||'';
+    if(issLarr) h+='<div style="margin:.5rem 0;padding:5px 9px;background:#fff8f2;border:1px solid #f0c090;border-radius:5px;font-size:.8rem"><strong style="font-size:.68rem;font-weight:700;color:#8a3000;text-transform:uppercase;letter-spacing:.5px">&#128196; LARR:</strong> <span style="color:#5a2000;font-weight:600;margin-left:5px">'+e(issLarr)+'</span></div>';
+    var issAx=annexMap[o.id]||o._annex||'';
+    if(issAx) h+='<div style="display:flex;align-items:center;gap:6px;margin:.5rem 0;padding:6px 0;border-top:1px solid #eee;font-size:.8rem"><strong style="font-size:.68rem;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> <span style="color:#1a3a5c;font-weight:700;margin-left:4px">'+e(issAx)+'</span></div>';
+    var issLnkAnx=getLinkedAnnexures(o.id);
+    if(issLnkAnx.length){var issLnkLbls=issLnkAnx.map(function(a){return a.label||'?';}).join(', ');h+='<div style="display:flex;align-items:center;gap:6px;margin:.5rem 0;padding:6px 0;border-top:1px solid #eee;font-size:.8rem"><strong style="font-size:.68rem;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Ref:</strong> <span style="color:#1a3a5c;font-weight:600;margin-left:4px">'+e(issLnkLbls)+'</span></div>';}
     var respHtml='';
     if(resp.bh!==null&&resp.bh!=='') respHtml+='<div><strong style="font-size:.75rem;color:#2980b9">HOS:</strong> '+e(resp.bh)+'</div>';
     if(resp.ro!==null&&resp.ro!=='') respHtml+='<div><strong style="font-size:.75rem;color:#2980b9">RO/HO:</strong> '+e(resp.ro)+'</div>';
@@ -19519,8 +19533,15 @@ function generateIssuedReport(forROCopy){
     h+='</div>';
     // Store verbatim data for shared modal
     var mBody='';
-    if(ot) mBody+='<div class="modal-badge mb-find">Finding</div><div class="modal-section ms-find">'+e(ot)+'</div>';
+    var mbBsNotes2=obsNotesMap[o.id]||'';
+    if(ot) mBody+='<div class="modal-badge mb-find">Finding</div><div class="modal-section ms-find">'+e(ot)+(mbBsNotes2?'<div style="margin-top:6px;padding:6px 8px;background:#fffdf0;border:1px solid #e0d080;border-radius:4px;font-size:.85rem;color:#4a4000">'+e(mbBsNotes2)+'</div>':'')+'</div>';
     if(rt) mBody+='<div class="modal-badge mb-rec">Recommendation</div><div class="modal-section ms-rec">'+e(rt)+'</div>';
+    var mbLarr2=lastRefMap[o.id]||'';
+    if(mbLarr2) mBody+='<div class="modal-badge" style="background:#fff3e8;color:#8a3000;border:1px solid #f0b080">&#128196; LARR</div><div class="modal-section" style="color:#5a2000;font-weight:600">'+e(mbLarr2)+'</div>';
+    var mbAx2=annexMap[o.id]||o._annex||'';
+    if(mbAx2) mBody+='<div class="modal-badge" style="background:#e8f0fa;color:#1a3a5c;border:1px solid #b0c8e8">Annexure Data</div><div class="modal-section" style="color:#1a3a5c;font-weight:700">'+e(mbAx2)+'</div>';
+    var mbLnkAnx2=getLinkedAnnexures(o.id);
+    if(mbLnkAnx2.length){var mbLnkLbls2=mbLnkAnx2.map(function(a){return a.label||'?';}).join(', ');mBody+='<div class="modal-badge" style="background:#e8f0fa;color:#1a3a5c;border:1px solid #b0c8e8">Annexure Ref</div><div class="modal-section" style="color:#1a3a5c;font-weight:600">'+e(mbLnkLbls2)+'</div>';}
     if(resp.bh!==null&&resp.bh!=='') mBody+='<div class="modal-badge mb-resp">Auditee Response (HOS)</div><div class="modal-section ms-resp">'+e(resp.bh)+'</div>';
     if(resp.ro!==null&&resp.ro!=='') mBody+='<div class="modal-badge mb-roresp">RO Response</div><div class="modal-section ms-resp">'+e(resp.ro)+'</div>';
     if(resp.bh===null&&resp.ro===null&&resp.gen) mBody+='<div class="modal-badge mb-resp">Auditee Response</div><div class="modal-section ms-resp">'+e(resp.gen)+'</div>';
