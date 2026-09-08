@@ -18764,8 +18764,13 @@ function finalizeReport(){
     h+='</div><div style="padding:11px 13px">';
     var finBsNotes=obsNotesMap[o.id]||'';
     if(obsText){h+=sl('Observation')+st(obsText);if(finBsNotes)h+=st(finBsNotes);}
+    var finInstCount=instCountMap[o.id]||'';
+    var finInstAmt=instAmountMap[o.id]||'';
+    if(finInstCount||finInstAmt){h+='<div style="display:flex;gap:16px;margin:0 0 10px;padding:7px 10px;background:#f0f7e8;border:1px solid #b8d8a0;border-radius:6px;font-size:12px">';if(finInstCount)h+='<span><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Instances:</strong> <span style="color:#2a3a50;font-weight:600;margin-left:4px">'+esc(finInstCount+'')+'</span></span>';if(finInstAmt)h+='<span><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Financial Impact (Rs.):</strong> <span style="color:#8a1000;font-weight:700;margin-left:4px">'+esc(Number(finInstAmt).toLocaleString())+'</span></span>';h+='</div>';}
     if(recText) h+=sl('Recommendation')+st(recText);
     if(ax)               h+='<div style="display:flex;align-items:center;gap:7px;margin:8px 0;padding:7px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Data:</strong> <a href="#'+_anxId(ax)+'" style="color:#1a3a5c;font-weight:700;text-decoration:underline;cursor:pointer" title="Click to view annexure below">'+esc(ax)+'</a></div>';
+    var finLnkAnx=getLinkedAnnexures(o.id);
+    if(finLnkAnx.length){var finLnkLbls=finLnkAnx.map(function(a){return a.label||'?';}).join(', ');h+='<div style="display:flex;align-items:center;gap:7px;margin:0 0 8px;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Ref:</strong> <span style="color:#1a3a5c;font-weight:600">'+esc(finLnkLbls)+'</span></div>';}
     var bhFin=respBHMap[o.id]!=null?respBHMap[o.id]:null;
     var roFin=respROMap[o.id]!=null?respROMap[o.id]:null;
     if(bhFin!==null) h+=sl('Auditee Response – HOS')+st(bhFin);
