@@ -16587,7 +16587,7 @@ function downloadDraft(individual){
     if(!numD&&!total) h+='<p style="color:#888;text-align:center">No observations in selected categories.</p>';
     syncAnnexTextFromDom();
     var draftObsIds=allObs.filter(function(o){return (cats.indexOf(o.category||'Others')>=0);}).map(function(o){return o.id;});
-    var annexParts=buildAnnexHtml(true,{},draftObsIds);
+    var annexParts=buildAnnexHtml(true,getObsReportLabels(),draftObsIds);
     h+=annexParts.body;
     h+='</div>';
     return {html:h, annexHead:annexParts.head, annexData:annexParts.data};
@@ -16918,7 +16918,7 @@ function downloadSoftCopy(){
   softHtml+='@media print{#notice,#actionbar,#wmlayer{display:none!important}body{background:#fff;padding:0}#rp{box-shadow:none;padding:0}}\n';
   syncAnnexTextFromDom();
   var softObsIds=all.map(function(o){return o.id;});
-  var annexParts=buildAnnexHtml(true,{},softObsIds);
+  var annexParts=buildAnnexHtml(true,getObsReportLabels(),softObsIds);
   softHtml+='</style>\n'+annexParts.head+'\n</head>\n<body>\n<div id="wrap">\n';
   softHtml+='<div id="notice"><strong>&#9432; Instructions for Auditee:</strong> Please read each observation carefully and enter your response in the yellow-highlighted <em>Auditee Response</em> field (required). Also fill in the <em>Estimated Time to Resolve</em> field. <strong>Your work is saved automatically</strong> in this browser — you can close this file and reopen it anytime to continue. To work on a different device, use <strong>&#128190; Save Progress</strong> to back up your work and <strong>&#128194; Load Progress</strong> to restore it. When all responses are complete, click <strong>&#10003; Submit Final Responses</strong> to download the completed file for return to the auditor.</div>\n';
   softHtml+='<div id="rp">\n';
@@ -18971,7 +18971,7 @@ function finalizeReport(){
 
   var today=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
   syncAnnexTextFromDom();
-  var finalAnnexParts=buildAnnexHtml(true);
+  var finalAnnexParts=buildAnnexHtml(true,getObsReportLabels());
   var finalHtml='<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n';
   finalHtml+='<title>FOR ISSUANCE – Audit Report'+(H.brcode?' '+H.brcode:'')+(H.brname?' '+H.brname:'')+'</title>\n';
   finalHtml+='<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">\n';
