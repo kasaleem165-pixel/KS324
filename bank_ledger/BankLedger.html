@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bank Ledger &amp; Memorandum Accounts</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#222;font-size:15px}
+
+nav{background:#1a3a5c;display:flex;align-items:center;flex-wrap:wrap;padding:0 12px}
+.brand{color:#fff;font-weight:700;font-size:1rem;padding:13px 14px 13px 0;white-space:nowrap}
+nav button{background:none;border:none;color:#b8d0e8;padding:13px 11px;cursor:pointer;font-size:.85rem;font-family:inherit}
+nav button:hover,nav button.active{color:#fff;background:rgba(255,255,255,.12)}
+
+.page{display:none;max-width:1240px;margin:22px auto;padding:0 14px}
+.page.active{display:block}
+
+.card{background:#fff;border-radius:10px;box-shadow:0 1px 5px rgba(0,0,0,.09);padding:20px 22px;margin-bottom:18px}
+.card-title{font-size:1rem;font-weight:700;color:#1a3a5c;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:#fff;border-radius:10px;box-shadow:0 1px 5px rgba(0,0,0,.09);padding:14px 16px;text-align:center;cursor:pointer;transition:box-shadow .15s,transform .1s}
+.stat:hover{box-shadow:0 4px 14px rgba(0,0,0,.14);transform:translateY(-2px)}
+.stat .n{font-size:1.4rem;font-weight:700;color:#1a3a5c}
+.stat .l{font-size:.75rem;color:#777;margin-top:3px}
+.stat.g .n{color:#059669}.stat.r .n{color:#dc2626}.stat.a .n{color:#d97706}
+
+th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+th.sortable:hover{background:#e2e8f0}
+th.sort-asc::after{content:' ▲';font-size:.7rem;color:#1a3a5c}
+th.sort-desc::after{content:' ▼';font-size:.7rem;color:#1a3a5c}
+tr.clickable-row{cursor:pointer}
+tr.clickable-row:hover td{background:#f0f7ff}
+
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.79rem}
+th{background:#f1f5f9;padding:5px 7px;text-align:left;color:#555;font-weight:600;border-bottom:2px solid #e2e8f0;white-space:nowrap}
+td{padding:5px 7px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+tr:hover td{background:#fafbfd}
+.empty{text-align:center;color:#aaa;padding:26px;font-style:italic}
+.right{text-align:right}
+.mono{font-family:Consolas,Menlo,monospace}
+
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:.74rem;font-weight:600;white-space:nowrap}
+.badge.in{background:#d1fae5;color:#065f46}
+.badge.out{background:#fee2e2;color:#991b1b}
+.badge.dr{background:#dbeafe;color:#1e40af}
+.badge.cr{background:#fef3c7;color:#92400e}
+.badge.dup{background:#fee2e2;color:#991b1b}
+.badge.memo{background:#ede9fe;color:#5b21b6}
+.badge.none{background:#f1f5f9;color:#888}
+
+.btn{display:inline-block;padding:7px 16px;border-radius:6px;font-size:.86rem;cursor:pointer;border:none;font-family:inherit}
+.btn-primary{background:#1a3a5c;color:#fff}.btn-primary:hover{background:#143050}
+.btn-success{background:#059669;color:#fff}.btn-success:hover{background:#047857}
+.btn-danger{background:#dc2626;color:#fff}.btn-danger:hover{background:#b91c1c}
+.btn-light{background:#e2e8f0;color:#444}.btn-light:hover{background:#cbd5e1}
+.btn-sm{padding:3px 10px;font-size:.78rem}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.linklike{background:none;border:none;color:#1a3a5c;text-decoration:underline;cursor:pointer;font-size:.78rem;padding:0;font-family:inherit}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg.full{grid-column:1/-1}
+label{font-size:.81rem;color:#444;font-weight:500}
+input,select,textarea{padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:.88rem;font-family:inherit;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid #1a3a5c;border-color:#1a3a5c}
+.hint{font-size:.72rem;color:#888;margin-top:2px}
+.selrow{display:flex;gap:6px;align-items:center}
+.selrow select{flex:1}
+
+.flash{padding:8px 12px;border-radius:6px;font-size:.85rem;margin-bottom:10px}
+.flash.ok{background:#d1fae5;color:#065f46}
+.flash.err{background:#fee2e2;color:#991b1b}
+
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:100;overflow-y:auto}
+.overlay.open{display:flex;align-items:flex-start;justify-content:center;padding:24px 14px}
+.modal{background:#fff;border-radius:12px;width:100%;max-width:760px;padding:26px;position:relative}
+.modal-close{position:absolute;top:12px;right:14px;background:none;border:none;font-size:1.35rem;cursor:pointer;color:#888}
+
+.tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid #e2e8f0;flex-wrap:wrap}
+.tabs button{background:none;border:none;padding:9px 14px;cursor:pointer;font-size:.83rem;color:#666;font-family:inherit;border-bottom:2px solid transparent;margin-bottom:-2px}
+.tabs button.active{color:#1a3a5c;border-bottom-color:#1a3a5c;font-weight:600}
+
+.dropzone{border:2px dashed #94a8c2;border-radius:10px;padding:34px 20px;text-align:center;cursor:pointer;background:#f8fafc;transition:.15s}
+.dropzone:hover,.dropzone.drag{background:#eef4fb;border-color:#1a3a5c}
+.dropzone .dz-icon{font-size:2rem;margin-bottom:8px}
+.dropzone .dz-txt{color:#555;font-size:.88rem}
+.dropzone .dz-sub{color:#999;font-size:.75rem;margin-top:4px}
+.chk{width:auto!important;accent-color:#1a3a5c}
+details.raw{margin-top:10px;font-size:.78rem;color:#666}
+details.raw summary{cursor:pointer;color:#1a3a5c;font-weight:600}
+details.raw pre{white-space:pre-wrap;background:#f8fafc;padding:10px;border-radius:6px;margin-top:6px;max-height:220px;overflow-y:auto}
+
+@media print{
+  nav,.no-print{display:none!important}
+  .page{max-width:100%;margin:0;padding:0}
+  .card{box-shadow:none;border:1px solid #ddd}
+}
+@media (max-width:640px){
+  .form-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand">🏦 Bank Ledger &amp; Memo Accounts</div>
+  <button id="nav-dashboard" class="active" onclick="show('dashboard')">Dashboard</button>
+  <button id="nav-banks" onclick="show('banks')">Banks</button>
+  <button id="nav-memo" onclick="show('memo')">Memo Accounts</button>
+  <button id="nav-entries" onclick="show('entries')">Main Entry</button>
+  <button id="nav-import" onclick="show('import')">Import Statement</button>
+  <button id="nav-reports" onclick="show('reports')">Reports</button>
+  <button id="nav-settings" onclick="show('settings')">Settings</button>
+</nav>
+
+<!-- ═══════════════ DASHBOARD ═══════════════ -->
+<div class="page active" id="page-dashboard">
+  <div id="dash-stats" class="stats"></div>
+  <div class="card">
+    <div class="card-title">Bank Balances</div>
+    <div class="tbl-wrap"><table id="dash-banks-tbl"></table></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Memorandum Accounts</div>
+    <div class="tbl-wrap"><table id="dash-memo-tbl"></table></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Recent Entries</div>
+    <div class="tbl-wrap"><table id="dash-recent-tbl"></table></div>
+  </div>
+</div>
+
+<!-- ═══════════════ BANKS ═══════════════ -->
+<div class="page" id="page-banks">
+  <div class="card">
+    <div class="card-title">Add Bank / Cash Account</div>
+    <div id="bank-flash"></div>
+    <div class="form-grid">
+      <div class="fg"><label>Account Name *</label><input id="bk-name" placeholder="e.g. HBL Current Account"></div>
+      <div class="fg"><label>Account Title</label><input id="bk-title" placeholder="Name on the account"></div>
+      <div class="fg"><label>Account Number</label><input id="bk-accno"></div>
+      <div class="fg"><label>Opening Balance</label><input id="bk-opening" type="number" step="0.01" value="0"></div>
+      <div class="fg"><label>Opening Date</label><input id="bk-opendate" type="date"></div>
+      <div class="fg full"><label>Notes</label><input id="bk-notes"></div>
+    </div>
+    <div style="margin-top:14px"><button class="btn btn-primary" onclick="addBank()">Add Bank Account</button></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Bank Accounts</div>
+    <div class="tbl-wrap"><table id="banks-tbl"></table></div>
+  </div>
+</div>
+
+<!-- ═══════════════ MEMO ACCOUNTS ═══════════════ -->
+<div class="page" id="page-memo">
+  <div class="card">
+    <div class="card-title">Create Memorandum Account</div>
+    <div id="memo-flash"></div>
+    <div class="hint" style="margin-bottom:10px">
+      A memorandum account is an internal sub-ledger — e.g. "Loan to Ali", "Advance Received – Zubair", "Petty Cash Custody".
+      Tag any Main Entry to one and it automatically posts into that account's own ledger too.
+    </div>
+    <div class="form-grid">
+      <div class="fg"><label>Account Name *</label><input id="mo-name" placeholder="e.g. Loan to Ali"></div>
+      <div class="fg">
+        <label>Nature *</label>
+        <select id="mo-nature">
+          <option value="dr">Debit-normal (Asset/Expense-like — Loan Given, Advance to Staff, Receivable)</option>
+          <option value="cr">Credit-normal (Liability/Income-like — Advance Received, Payable to Vendor)</option>
+        </select>
+      </div>
+      <div class="fg"><label>Opening Balance</label><input id="mo-opening" type="number" step="0.01" value="0">
+        <div class="hint">Enter as a natural balance for the nature chosen above.</div>
+      </div>
+      <div class="fg"><label>Notes</label><input id="mo-notes"></div>
+    </div>
+    <div style="margin-top:14px"><button class="btn btn-primary" onclick="addMemo()">Create Account</button></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Memorandum Accounts</div>
+    <div class="tbl-wrap"><table id="memo-tbl"></table></div>
+  </div>
+</div>
+
+<!-- ═══════════════ MAIN ENTRY ═══════════════ -->
+<div class="page" id="page-entries">
+  <div class="card">
+    <div class="card-title">Record Entry</div>
+    <div id="entry-flash"></div>
+    <div class="form-grid">
+      <div class="fg"><label>Date *</label><input id="en-date" type="date"></div>
+      <div class="fg">
+        <label>Bank Account</label>
+        <div class="selrow"><select id="en-bank"></select><button type="button" class="linklike" onclick="quickAddBank('en-bank')">＋New</button></div>
+        <div class="hint">Leave as "No Bank" only for a pure memorandum adjustment.</div>
+      </div>
+      <div class="fg"><label>Direction *</label>
+        <select id="en-direction">
+          <option value="in">Deposit (money in)</option>
+          <option value="out">Withdrawal (money out)</option>
+        </select>
+      </div>
+      <div class="fg"><label>Amount *</label><input id="en-amount" type="number" step="0.01"></div>
+      <div class="fg full"><label>Description *</label><input id="en-desc" placeholder="Narration / purpose"></div>
+      <div class="fg"><label>Reference / Cheque #</label><input id="en-ref"></div>
+      <div class="fg">
+        <label>Memorandum Account</label>
+        <div class="selrow"><select id="en-memo"></select><button type="button" class="linklike" onclick="quickAddMemo('en-memo')">＋New</button></div>
+      </div>
+      <div class="fg"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="en-reconciled" class="chk"> Reconciled against bank statement</label></div>
+    </div>
+    <div style="margin-top:14px"><button class="btn btn-primary" onclick="addEntry()">Record Entry</button></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <span>Main Entry Sheet <span class="hint" id="entries-count"></span></span>
+      <button class="btn btn-light btn-sm" onclick="exportEntriesCSV()">↓ Export to Excel</button>
+    </div>
+    <div class="form-grid" style="margin-bottom:14px">
+      <div class="fg"><label>Bank</label><select id="ef-bankfilter" onchange="renderEntries()"></select></div>
+      <div class="fg"><label>Memo Account</label><select id="ef-memofilter" onchange="renderEntries()"></select></div>
+      <div class="fg"><label>From</label><input id="ef-from" type="date" onchange="renderEntries()"></div>
+      <div class="fg"><label>To</label><input id="ef-to" type="date" onchange="renderEntries()"></div>
+      <div class="fg full"><label>Search description / reference</label><input id="ef-search" oninput="renderEntries()"></div>
+    </div>
+    <div class="tbl-wrap"><table id="entries-tbl"></table></div>
+  </div>
+</div>
+
+<!-- ═══════════════ IMPORT STATEMENT ═══════════════ -->
+<div class="page" id="page-import">
+  <div class="card">
+    <div class="card-title">Import Bank Statement</div>
+    <div id="import-libwarn"></div>
+    <div class="hint" style="margin-bottom:12px">
+      Upload a text-based PDF, a scanned/photographed statement (PDF or image — auto OCR), or a photo of a passbook page.
+      Every extracted row lands in a review queue below — nothing is posted to Main Entry until you check it and click "Post Selected".
+    </div>
+    <div class="form-grid" style="margin-bottom:14px">
+      <div class="fg"><label>Bank Account for this statement *</label><select id="im-bank"></select></div>
+    </div>
+    <div class="dropzone" id="import-dz" onclick="dzClick()"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="dzDrop(event)">
+      <div class="dz-icon">📄</div>
+      <div class="dz-txt">Click to choose a file, or drag &amp; drop it here</div>
+      <div class="dz-sub">PDF, PNG or JPG · <span id="import-filename"></span></div>
+    </div>
+    <input type="file" id="import-file" accept=".pdf,.png,.jpg,.jpeg" style="display:none" onchange="handleFileSelect(this.files[0])">
+    <div style="margin-top:12px">
+      <button class="btn btn-primary" id="import-parsebtn" disabled onclick="parseStatementFile()">Parse File</button>
+      <button class="btn btn-light" onclick="clearStaging()">Clear Pending Rows</button>
+    </div>
+    <div id="import-status" style="margin-top:12px"></div>
+    <details class="raw"><summary>Show extracted text (debug)</summary><pre id="import-raw"></pre></details>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <span>Review &amp; Post</span>
+      <button class="btn btn-success" onclick="postStaging()">Post Selected to Main Entry</button>
+    </div>
+    <div id="staging-wrap"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ REPORTS ═══════════════ -->
+<div class="page" id="page-reports">
+  <div class="card">
+    <div class="tabs">
+      <button id="rpttab-bank" class="active" onclick="reportTab('bank')">Bank Statement</button>
+      <button id="rpttab-memo" onclick="reportTab('memo')">Memo Account Ledger</button>
+      <button id="rpttab-overview" onclick="reportTab('overview')">Overview</button>
+    </div>
+
+    <div id="rpt-bank">
+      <div class="form-grid no-print" style="margin-bottom:12px">
+        <div class="fg"><label>Bank</label><select id="rb-bank" onchange="renderBankReport()"></select></div>
+        <div class="fg"><label>From</label><input id="rb-from" type="date" onchange="renderBankReport()"></div>
+        <div class="fg"><label>To</label><input id="rb-to" type="date" onchange="renderBankReport()"></div>
+        <div class="fg" style="justify-content:flex-end;flex-direction:row;gap:8px;align-items:flex-end">
+          <button class="btn btn-light btn-sm" onclick="exportBankReportCSV()">↓ Excel</button>
+          <button class="btn btn-light btn-sm" onclick="window.print()">Print</button>
+        </div>
+      </div>
+      <div class="tbl-wrap"><table id="rpt-bank-tbl"></table></div>
+    </div>
+
+    <div id="rpt-memo" style="display:none">
+      <div class="form-grid no-print" style="margin-bottom:12px">
+        <div class="fg"><label>Memo Account</label><select id="rm-memo" onchange="renderMemoReport()"></select></div>
+        <div class="fg"><label>From</label><input id="rm-from" type="date" onchange="renderMemoReport()"></div>
+        <div class="fg"><label>To</label><input id="rm-to" type="date" onchange="renderMemoReport()"></div>
+        <div class="fg" style="justify-content:flex-end;flex-direction:row;gap:8px;align-items:flex-end">
+          <button class="btn btn-light btn-sm" onclick="exportMemoReportCSV()">↓ Excel</button>
+          <button class="btn btn-light btn-sm" onclick="window.print()">Print</button>
+        </div>
+      </div>
+      <div class="tbl-wrap"><table id="rpt-memo-tbl"></table></div>
+    </div>
+
+    <div id="rpt-overview" style="display:none">
+      <div class="no-print" style="margin-bottom:12px;text-align:right">
+        <button class="btn btn-light btn-sm" onclick="exportOverviewCSV()">↓ Excel</button>
+        <button class="btn btn-light btn-sm" onclick="window.print()">Print</button>
+      </div>
+      <div id="rpt-overview-tbl"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ SETTINGS ═══════════════ -->
+<div class="page" id="page-settings">
+  <div class="card">
+    <div class="card-title">App Data</div>
+    <div id="settings-counts"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Backup &amp; Restore</div>
+    <p class="hint" style="margin-bottom:10px">All data is stored only in this browser's local storage. Back up regularly.</p>
+    <button class="btn btn-primary" onclick="backupDB()">↓ Download Backup (JSON)</button>
+    <label class="btn btn-light" style="margin-left:8px;cursor:pointer">
+      ↑ Restore from Backup
+      <input type="file" accept=".json" style="display:none" onchange="restoreDBFile(this.files[0])">
+    </label>
+  </div>
+  <div class="card">
+    <div class="card-title">Danger Zone</div>
+    <button class="btn btn-danger" onclick="clearAllData()">Delete All Data</button>
+  </div>
+</div>
+
+<!-- ═══════════════ OVERLAYS ═══════════════ -->
+<div class="overlay" id="editbank-overlay">
+  <div class="modal">
+    <button class="modal-close" onclick="closeBankEdit()">✕</button>
+    <div class="card-title">Edit Bank Account</div>
+    <input type="hidden" id="eb-id">
+    <div class="form-grid">
+      <div class="fg"><label>Account Name *</label><input id="eb-name"></div>
+      <div class="fg"><label>Account Title</label><input id="eb-title"></div>
+      <div class="fg"><label>Account Number</label><input id="eb-accno"></div>
+      <div class="fg"><label>Opening Balance</label><input id="eb-opening" type="number" step="0.01"></div>
+      <div class="fg"><label>Opening Date</label><input id="eb-opendate" type="date"></div>
+      <div class="fg full"><label>Notes</label><input id="eb-notes"></div>
+    </div>
+    <div style="margin-top:14px"><button class="btn btn-primary" onclick="saveBankEdit()">Save Changes</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="editmemo-overlay">
+  <div class="modal">
+    <button class="modal-close" onclick="closeMemoEdit()">✕</button>
+    <div class="card-title">Edit Memorandum Account</div>
+    <input type="hidden" id="em-id">
+    <div class="form-grid">
+      <div class="fg"><label>Account Name *</label><input id="em-name"></div>
+      <div class="fg"><label>Nature *</label>
+        <select id="em-nature"><option value="dr">Debit-normal</option><option value="cr">Credit-normal</option></select>
+      </div>
+      <div class="fg"><label>Opening Balance</label><input id="em-opening" type="number" step="0.01"></div>
+      <div class="fg"><label>Notes</label><input id="em-notes"></div>
+    </div>
+    <div style="margin-top:14px"><button class="btn btn-primary" onclick="saveMemoEdit()">Save Changes</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="editentry-overlay">
+  <div class="modal">
+    <button class="modal-close" onclick="closeEntryEdit()">✕</button>
+    <div class="card-title">Edit Entry</div>
+    <input type="hidden" id="ee-id">
+    <div class="form-grid">
+      <div class="fg"><label>Date *</label><input id="ee-date" type="date"></div>
+      <div class="fg"><label>Bank Account</label><select id="ee-bank"></select></div>
+      <div class="fg"><label>Direction *</label>
+        <select id="ee-direction"><option value="in">Deposit (money in)</option><option value="out">Withdrawal (money out)</option></select>
+      </div>
+      <div class="fg"><label>Amount *</label><input id="ee-amount" type="number" step="0.01"></div>
+      <div class="fg full"><label>Description *</label><input id="ee-desc"></div>
+      <div class="fg"><label>Reference / Cheque #</label><input id="ee-ref"></div>
+      <div class="fg"><label>Memorandum Account</label><select id="ee-memo"></select></div>
+      <div class="fg"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="ee-reconciled" class="chk"> Reconciled</label></div>
+    </div>
+    <div style="margin-top:14px"><button class="btn btn-primary" onclick="saveEntryEdit()">Save Changes</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="ledger-overlay">
+  <div class="modal">
+    <button class="modal-close" onclick="closeLedger()">✕</button>
+    <div class="card-title" id="ml-title">Ledger</div>
+    <div id="ml-body"></div>
+  </div>
+</div>
+
+<!-- pdf.js / tesseract.js — used only by the Import Statement page; the rest of the app is fully offline -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+
+<script>
+// ══════════════════════════ DB ══════════════════════════
+const DBKEY='BankLedgerDB';
+let DB={banks:[],memoAccounts:[],entries:[],staging:[],settings:{}};
+function save(){localStorage.setItem(DBKEY,JSON.stringify(DB));}
+function load(){
+  const raw=localStorage.getItem(DBKEY);
+  if(raw){ try{ DB=JSON.parse(raw); }catch(e){ console.error('DB parse failed',e); } }
+  DB.banks=DB.banks||[]; DB.memoAccounts=DB.memoAccounts||[]; DB.entries=DB.entries||[];
+  DB.staging=DB.staging||[]; DB.settings=DB.settings||{};
+  // one-time migrations go here, guarded by DB.settings._flagName, following the pattern used
+  // across this author's other apps (AnimalSales.html) — none needed yet.
+  save();
+}
+
+// ══════════════════════════ UTILITIES ══════════════════════════
+function uid(p){return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function today(){return new Date().toISOString().substring(0,10);}
+function Rs(n){return 'Rs.'+Number(n||0).toLocaleString('en-PK',{maximumFractionDigits:0});}
+function fmtN(n,d=0){return Number(n||0).toLocaleString('en-PK',{maximumFractionDigits:d});}
+function fmtD(d){if(!d)return '-';const dt=new Date(d+'T00:00:00');if(isNaN(dt))return d;const m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return String(dt.getDate()).padStart(2,'0')+'-'+m[dt.getMonth()]+'-'+dt.getFullYear();}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function flash(id,msg,type='ok'){const el=document.getElementById(id);if(!el)return;el.innerHTML=`<div class="flash ${type}">${msg}</div>`;setTimeout(()=>{if(el)el.innerHTML='';},3500);}
+function mName(id){const m=DB.memoAccounts.find(x=>x.id===id);return m?m.name:'';}
+function bName(id){const b=DB.banks.find(x=>x.id===id);return b?b.name:'';}
+
+function exportCSV(headers,rows,filename){
+  const BOM='﻿';
+  const escC=v=>{const s=String(v==null?'':v);return(s.includes(',')||s.includes('"')||s.includes('\n'))?'"'+s.replace(/"/g,'""')+'"':s;};
+  const csv=BOM+[headers,...rows].map(r=>r.map(escC).join(',')).join('\r\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download=filename+'_'+today()+'.csv';
+  a.click();
+}
+
+// ══════════════════════════ SORT ══════════════════════════
+const SORT={
+  banks:{col:'name',dir:'asc'},
+  memo:{col:'name',dir:'asc'},
+  entries:{col:'date',dir:'desc'}
+};
+function sortArr(arr,col,dir){return [...arr].sort((a,b)=>{let av=a[col]??'',bv=b[col]??'';if(typeof av==='number'&&typeof bv==='number')return dir==='asc'?av-bv:bv-av;return dir==='asc'?String(av).localeCompare(String(bv)):String(bv).localeCompare(String(av));});}
+function th(label,tbl,col){return `<th class="sortable${SORT[tbl].col===col?' sort-'+SORT[tbl].dir:''}" onclick="sortToggle('${tbl}','${col}')">${label}</th>`;}
+function sortToggle(tbl,col){
+  if(SORT[tbl].col===col){SORT[tbl].dir=SORT[tbl].dir==='asc'?'desc':'asc';}else{SORT[tbl].col=col;SORT[tbl].dir='asc';}
+  const fn={banks:renderBanks,memo:renderMemo,entries:renderEntries}[tbl];
+  if(fn)fn();
+}
+
+// ══════════════════════════ NAVIGATION ══════════════════════════
+let _prevPage='dashboard';
+function show(p){
+  const cur=document.querySelector('.page.active');
+  if(cur&&cur.id) _prevPage=cur.id.replace('page-','');
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  const navEl=document.getElementById('nav-'+p);
+  if(navEl) navEl.classList.add('active');
+  const fn={
+    dashboard:renderDashboard,
+    banks:()=>{renderBanks();populateBankSelects();},
+    memo:()=>{renderMemo();populateMemoSelects();},
+    entries:()=>{populateEntryFormSelects();renderEntries();},
+    import:()=>{populateImportSelects();renderStaging();checkLibs();},
+    reports:renderReportsInit,
+    settings:renderSettings
+  }[p];
+  if(fn)fn();
+}
+function goBack(){show(_prevPage==='dashboard'||!_prevPage?'dashboard':_prevPage);}
+
+// ══════════════════════════ BANKS ══════════════════════════
+function addBank(){
+  const name=document.getElementById('bk-name').value.trim();
+  if(!name){flash('bank-flash','Bank/Account name is required.','err');return;}
+  const bank={
+    id:uid('bnk'), name,
+    account_title:document.getElementById('bk-title').value.trim(),
+    account_no:document.getElementById('bk-accno').value.trim(),
+    opening_balance:parseFloat(document.getElementById('bk-opening').value)||0,
+    opening_date:document.getElementById('bk-opendate').value||today(),
+    notes:document.getElementById('bk-notes').value.trim()
+  };
+  DB.banks.push(bank); save();
+  ['bk-name','bk-title','bk-accno','bk-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('bk-opening').value=0;
+  document.getElementById('bk-opendate').value=today();
+  flash('bank-flash','Bank account added.'); renderBanks(); populateBankSelects();
+}
+function bankBalance(bankId){
+  const bank=DB.banks.find(b=>b.id===bankId); if(!bank) return 0;
+  let bal=bank.opening_balance||0;
+  DB.entries.filter(e=>e.bank_id===bankId).forEach(e=>{ bal += e.direction==='in'? e.amount : -e.amount; });
+  return bal;
+}
+function bankEntryCount(bankId){return DB.entries.filter(e=>e.bank_id===bankId).length;}
+function renderBanks(){
+  const tbl=document.getElementById('banks-tbl');
+  if(!DB.banks.length){tbl.innerHTML='<tr><td class="empty">No bank accounts yet. Add one above.</td></tr>';return;}
+  const list=sortArr(DB.banks.map(b=>({...b,_bal:bankBalance(b.id),_n:bankEntryCount(b.id)})),SORT.banks.col,SORT.banks.dir);
+  tbl.innerHTML=`<thead><tr>${th('Bank / Account','banks','name')}${th('Account Title','banks','account_title')}${th('Account No.','banks','account_no')}${th('Opening Balance','banks','opening_balance')}<th>Entries</th><th>Current Balance</th><th>Actions</th></tr></thead>
+  <tbody>${list.map(b=>`<tr>
+    <td><b>${esc(b.name)}</b>${b.notes?`<div class="hint">${esc(b.notes)}</div>`:''}</td>
+    <td>${esc(b.account_title)||'-'}</td>
+    <td class="mono">${esc(b.account_no)||'-'}</td>
+    <td class="right">${Rs(b.opening_balance)}</td>
+    <td class="right">${b._n}</td>
+    <td class="right"><b>${Rs(b._bal)}</b></td>
+    <td>
+      <button class="btn btn-light btn-sm" onclick="openBankEdit('${b.id}')">Edit</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteBank('${b.id}')">Delete</button>
+    </td>
+  </tr>`).join('')}</tbody>`;
+}
+function deleteBank(id){
+  const n=bankEntryCount(id);
+  if(n>0){ if(!confirm(`This bank has ${n} linked entr${n===1?'y':'ies'} in the Main Entry sheet. Deleting the bank will NOT delete those entries, but they will show as "Unknown Bank". Continue?`)) return; }
+  else if(!confirm('Delete this bank account?')) return;
+  DB.banks=DB.banks.filter(b=>b.id!==id); save(); renderBanks(); populateBankSelects(); renderDashboard();
+}
+function openBankEdit(id){
+  const b=DB.banks.find(x=>x.id===id); if(!b) return;
+  document.getElementById('eb-id').value=b.id;
+  document.getElementById('eb-name').value=b.name;
+  document.getElementById('eb-title').value=b.account_title||'';
+  document.getElementById('eb-accno').value=b.account_no||'';
+  document.getElementById('eb-opening').value=b.opening_balance||0;
+  document.getElementById('eb-opendate').value=b.opening_date||today();
+  document.getElementById('eb-notes').value=b.notes||'';
+  document.getElementById('editbank-overlay').classList.add('open');
+}
+function closeBankEdit(){document.getElementById('editbank-overlay').classList.remove('open');}
+function saveBankEdit(){
+  const id=document.getElementById('eb-id').value;
+  const b=DB.banks.find(x=>x.id===id); if(!b) return;
+  const name=document.getElementById('eb-name').value.trim();
+  if(!name){alert('Name is required.');return;}
+  if(!confirm('Save changes to this bank account?')) return;
+  b.name=name; b.account_title=document.getElementById('eb-title').value.trim();
+  b.account_no=document.getElementById('eb-accno').value.trim();
+  b.opening_balance=parseFloat(document.getElementById('eb-opening').value)||0;
+  b.opening_date=document.getElementById('eb-opendate').value||b.opening_date;
+  b.notes=document.getElementById('eb-notes').value.trim();
+  save(); closeBankEdit(); renderBanks(); populateBankSelects(); renderDashboard();
+  flash('bank-flash','Bank account updated.');
+}
+function populateBankSelects(){
+  const bankOpts=DB.banks.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
+  const cfg={'en-bank':'— No Bank (Memo Adjustment Only) —','im-bank':'— Select Bank —','rb-bank':'— Select Bank —','ee-bank':'— No Bank (Memo Adjustment Only) —'};
+  Object.keys(cfg).forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    const cur=el.value;
+    el.innerHTML=`<option value="">${cfg[id]}</option>`+bankOpts;
+    if(cur) el.value=cur;
+  });
+}
+function quickAddBank(selectId){
+  const n=prompt('New bank / account name:'); if(!n||!n.trim()) return;
+  const bank={id:uid('bnk'),name:n.trim(),account_title:'',account_no:'',opening_balance:0,opening_date:today(),notes:''};
+  DB.banks.push(bank); save(); populateBankSelects();
+  const el=document.getElementById(selectId); if(el) el.value=bank.id;
+  renderBanks();
+}
+
+// ══════════════════════════ MEMO ACCOUNTS ══════════════════════════
+function addMemo(){
+  const name=document.getElementById('mo-name').value.trim();
+  if(!name){flash('memo-flash','Account name is required.','err');return;}
+  if(DB.memoAccounts.some(m=>m.name.toLowerCase()===name.toLowerCase())){flash('memo-flash','A memorandum account with this name already exists.','err');return;}
+  const acc={id:uid('memo'),name,nature:document.getElementById('mo-nature').value,
+    opening_balance:parseFloat(document.getElementById('mo-opening').value)||0,
+    notes:document.getElementById('mo-notes').value.trim(), archived:false};
+  DB.memoAccounts.push(acc); save();
+  ['mo-name','mo-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('mo-opening').value=0;
+  flash('memo-flash','Memorandum account created.'); renderMemo(); populateMemoSelects();
+}
+function memoNatureDelta(entry){ return entry.direction==='out'? entry.amount : -entry.amount; } // debit-normal delta: withdrawal = +debit
+function memoBalance(memoId){
+  const acc=DB.memoAccounts.find(m=>m.id===memoId); if(!acc) return 0;
+  let bal=acc.opening_balance||0;
+  DB.entries.filter(e=>e.memo_account_id===memoId).forEach(e=>{
+    const d=memoNatureDelta(e);
+    bal += acc.nature==='dr'? d : -d;
+  });
+  return bal;
+}
+function memoEntryCount(memoId){return DB.entries.filter(e=>e.memo_account_id===memoId).length;}
+function renderMemo(){
+  const tbl=document.getElementById('memo-tbl');
+  const active=DB.memoAccounts.filter(m=>!m.archived);
+  if(!active.length){tbl.innerHTML='<tr><td class="empty">No memorandum accounts yet. Create one above — e.g. "Loan to Ali", "Advance Received – Zubair", "Petty Cash Custody".</td></tr>';return;}
+  const list=sortArr(active.map(m=>({...m,_bal:memoBalance(m.id),_n:memoEntryCount(m.id)})),SORT.memo.col,SORT.memo.dir);
+  tbl.innerHTML=`<thead><tr>${th('Account Name','memo','name')}${th('Nature','memo','nature')}${th('Opening Bal.','memo','opening_balance')}<th>Linked Entries</th><th>Current Balance</th><th>Actions</th></tr></thead>
+  <tbody>${list.map(m=>`<tr>
+    <td><b>${esc(m.name)}</b>${m.notes?`<div class="hint">${esc(m.notes)}</div>`:''}</td>
+    <td><span class="badge ${m.nature}">${m.nature==='dr'?'Debit-normal':'Credit-normal'}</span></td>
+    <td class="right">${Rs(m.opening_balance)}</td>
+    <td class="right"><button class="linklike" onclick="openMemoLedger('${m.id}')">${m._n}</button></td>
+    <td class="right"><b>${Rs(m._bal)}</b></td>
+    <td>
+      <button class="btn btn-light btn-sm" onclick="openMemoLedger('${m.id}')">Ledger</button>
+      <button class="btn btn-light btn-sm" onclick="openMemoEdit('${m.id}')">Edit</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteMemo('${m.id}')">Delete</button>
+    </td>
+  </tr>`).join('')}</tbody>`;
+}
+function deleteMemo(id){
+  const n=memoEntryCount(id);
+  if(n>0){ if(!confirm(`This account has ${n} linked entr${n===1?'y':'ies'}. Deleting it will unlink those entries (they stay in Main Entry with no memo tag). Continue?`)) return;
+    DB.entries.forEach(e=>{ if(e.memo_account_id===id) e.memo_account_id=null; });
+  } else if(!confirm('Delete this memorandum account?')) return;
+  DB.memoAccounts=DB.memoAccounts.filter(m=>m.id!==id); save(); renderMemo(); populateMemoSelects(); renderEntries(); renderDashboard();
+}
+function openMemoEdit(id){
+  const m=DB.memoAccounts.find(x=>x.id===id); if(!m) return;
+  document.getElementById('em-id').value=m.id;
+  document.getElementById('em-name').value=m.name;
+  document.getElementById('em-nature').value=m.nature;
+  document.getElementById('em-opening').value=m.opening_balance||0;
+  document.getElementById('em-notes').value=m.notes||'';
+  document.getElementById('editmemo-overlay').classList.add('open');
+}
+function closeMemoEdit(){document.getElementById('editmemo-overlay').classList.remove('open');}
+function saveMemoEdit(){
+  const id=document.getElementById('em-id').value;
+  const m=DB.memoAccounts.find(x=>x.id===id); if(!m) return;
+  const name=document.getElementById('em-name').value.trim();
+  if(!name){alert('Name is required.');return;}
+  if(!confirm('Save changes to this memorandum account?\n\nNote: changing the "Nature" flips how the running balance is calculated for ALL entries already linked to it.')) return;
+  m.name=name; m.nature=document.getElementById('em-nature').value;
+  m.opening_balance=parseFloat(document.getElementById('em-opening').value)||0;
+  m.notes=document.getElementById('em-notes').value.trim();
+  save(); closeMemoEdit(); renderMemo(); populateMemoSelects(); renderDashboard();
+  flash('memo-flash','Memorandum account updated.');
+}
+function populateMemoSelects(){
+  const opts=DB.memoAccounts.filter(m=>!m.archived).map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('');
+  const cfg={'en-memo':'— No Memo Account —','ee-memo':'— No Memo Account —','rm-memo':'— Select Account —'};
+  Object.keys(cfg).forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    const cur=el.value;
+    el.innerHTML=`<option value="">${cfg[id]}</option>`+opts;
+    if(cur) el.value=cur;
+  });
+}
+function quickAddMemo(selectId){
+  const n=prompt('New memorandum account name:'); if(!n||!n.trim()) return;
+  if(DB.memoAccounts.some(m=>m.name.toLowerCase()===n.trim().toLowerCase())){alert('An account with this name already exists.');return;}
+  const isDr=confirm('Click OK for Debit-normal (asset/expense-like — e.g. Loan Given, Advance to Staff).\nClick Cancel for Credit-normal (liability/income-like — e.g. Advance Received, Payable to Vendor).');
+  const acc={id:uid('memo'),name:n.trim(),nature:isDr?'dr':'cr',opening_balance:0,notes:'',archived:false};
+  DB.memoAccounts.push(acc); save(); populateMemoSelects();
+  const el=document.getElementById(selectId); if(el) el.value=acc.id;
+  renderMemo();
+}
+function openMemoLedger(id){
+  const m=DB.memoAccounts.find(x=>x.id===id); if(!m) return;
+  document.getElementById('ml-title').textContent='Ledger — '+m.name;
+  const list=[...DB.entries.filter(e=>e.memo_account_id===id)].sort((a,b)=>a.date===b.date?(a.created_at||0)-(b.created_at||0):a.date.localeCompare(b.date));
+  let bal=m.opening_balance||0;
+  let rows=`<tr><td colspan="5"><i>Opening Balance</i></td><td class="right"><b>${Rs(bal)}</b></td></tr>`;
+  if(!list.length){rows+=`<tr><td colspan="6" class="empty">No entries linked to this account yet.</td></tr>`;}
+  list.forEach(e=>{
+    const d=memoNatureDelta(e); bal += m.nature==='dr'? d : -d;
+    rows+=`<tr>
+      <td>${fmtD(e.date)}</td>
+      <td>${e.bank_id? esc(bName(e.bank_id)) : '<span class="hint">Memo Adj.</span>'}</td>
+      <td>${esc(e.description)}</td>
+      <td><span class="badge ${e.direction}">${e.direction==='in'?'Deposit':'Withdrawal'}</span></td>
+      <td class="right">${Rs(e.amount)}</td>
+      <td class="right"><b>${Rs(bal)}</b></td>
+    </tr>`;
+  });
+  document.getElementById('ml-body').innerHTML=`<div class="tbl-wrap"><table>
+    <thead><tr><th>Date</th><th>Bank</th><th>Description</th><th>Type</th><th class="right">Amount</th><th class="right">Balance</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>
+    <div class="hint" style="margin-top:10px">Nature: <b>${m.nature==='dr'?'Debit-normal':'Credit-normal'}</b> — withdrawals from the bank ${m.nature==='dr'?'increase':'decrease'} this account's balance, deposits ${m.nature==='dr'?'decrease':'increase'} it.</div>`;
+  document.getElementById('ledger-overlay').classList.add('open');
+}
+function closeLedger(){document.getElementById('ledger-overlay').classList.remove('open');}
+
+// ══════════════════════════ MAIN ENTRY ══════════════════════════
+function addEntry(){
+  const date=document.getElementById('en-date').value;
+  const amount=parseFloat(document.getElementById('en-amount').value);
+  const direction=document.getElementById('en-direction').value;
+  const desc=document.getElementById('en-desc').value.trim();
+  const bankId=document.getElementById('en-bank').value;
+  const memoId=document.getElementById('en-memo').value;
+  if(!date){flash('entry-flash','Date is required.','err');return;}
+  if(!amount||amount<=0){flash('entry-flash','Enter a valid amount.','err');return;}
+  if(!desc){flash('entry-flash','Description is required.','err');return;}
+  if(!bankId && !memoId){flash('entry-flash','Select a bank, or at least a memorandum account for a memo-only adjustment.','err');return;}
+  const entry={id:uid('ent'),date,bank_id:bankId||null,direction,amount,
+    description:desc, ref_no:document.getElementById('en-ref').value.trim(),
+    memo_account_id:memoId||null, reconciled:document.getElementById('en-reconciled').checked,
+    source:'manual', created_at:Date.now()};
+  DB.entries.push(entry); save();
+  ['en-amount','en-desc','en-ref'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('en-reconciled').checked=false;
+  document.getElementById('en-date').value=today();
+  flash('entry-flash','Entry recorded.'); renderEntries(); renderDashboard();
+}
+function entriesFiltered(){
+  const bankF=document.getElementById('ef-bankfilter')?.value||'';
+  const memoF=document.getElementById('ef-memofilter')?.value||'';
+  const from=document.getElementById('ef-from')?.value||'';
+  const to=document.getElementById('ef-to')?.value||'';
+  const q=(document.getElementById('ef-search')?.value||'').toLowerCase();
+  return DB.entries.filter(e=>{
+    if(bankF && (e.bank_id||'')!==bankF) return false;
+    if(memoF==='__none__'){ if(e.memo_account_id) return false; }
+    else if(memoF && (e.memo_account_id||'')!==memoF) return false;
+    if(from && e.date<from) return false;
+    if(to && e.date>to) return false;
+    if(q && !((e.description||'').toLowerCase().includes(q)||(e.ref_no||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+function renderEntries(){
+  const tbl=document.getElementById('entries-tbl');
+  const list0=entriesFiltered();
+  const singleBank=document.getElementById('ef-bankfilter')?.value||'';
+  const list=sortArr(list0,SORT.entries.col,SORT.entries.dir);
+  const cEl=document.getElementById('entries-count');
+  if(cEl) cEl.textContent='('+list.length+' entr'+(list.length===1?'y':'ies')+')';
+  if(!list.length){tbl.innerHTML='<tr><td class="empty">No entries match the current filter.</td></tr>';return;}
+  let runningMap={};
+  if(singleBank){
+    const bank=DB.banks.find(b=>b.id===singleBank);
+    let bal=bank?bank.opening_balance||0:0;
+    const chron=[...DB.entries.filter(e=>e.bank_id===singleBank)].sort((a,b)=>a.date===b.date?(a.created_at||0)-(b.created_at||0):a.date.localeCompare(b.date));
+    chron.forEach(e=>{ bal += e.direction==='in'?e.amount:-e.amount; runningMap[e.id]=bal; });
+  }
+  tbl.innerHTML=`<thead><tr>${th('Date','entries','date')}<th>Bank</th>${th('Description','entries','description')}<th>Ref/Cheque #</th><th>Memo Account</th><th>Deposit (In)</th><th>Withdrawal (Out)</th>${singleBank?'<th>Balance</th>':''}<th>Recon.</th><th>Actions</th></tr></thead>
+  <tbody>${list.map(e=>`<tr>
+    <td>${fmtD(e.date)}</td>
+    <td>${e.bank_id? esc(bName(e.bank_id)) : '<span class="hint">Memo Adj.</span>'}</td>
+    <td>${esc(e.description)}${e.source==='import'?' <span class="badge memo" title="Imported from bank statement">import</span>':''}</td>
+    <td class="mono">${esc(e.ref_no)||'-'}</td>
+    <td>${e.memo_account_id? `<span class="badge memo">${esc(mName(e.memo_account_id))}</span>` : '<span class="badge none">—</span>'}</td>
+    <td class="right">${e.direction==='in'?Rs(e.amount):''}</td>
+    <td class="right">${e.direction==='out'?Rs(e.amount):''}</td>
+    ${singleBank?`<td class="right"><b>${Rs(runningMap[e.id]||0)}</b></td>`:''}
+    <td>${e.reconciled?'✅':''}</td>
+    <td>
+      <button class="btn btn-light btn-sm" onclick="openEntryEdit('${e.id}')">Edit</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteEntry('${e.id}')">Del</button>
+    </td>
+  </tr>`).join('')}</tbody>`;
+}
+function deleteEntry(id){
+  if(!confirm('Delete this entry? This cannot be undone.')) return;
+  DB.entries=DB.entries.filter(e=>e.id!==id); save(); renderEntries(); renderDashboard();
+}
+function openEntryEdit(id){
+  const e=DB.entries.find(x=>x.id===id); if(!e) return;
+  populateBankSelects(); populateMemoSelects();
+  document.getElementById('ee-id').value=e.id;
+  document.getElementById('ee-date').value=e.date;
+  document.getElementById('ee-bank').value=e.bank_id||'';
+  document.getElementById('ee-direction').value=e.direction;
+  document.getElementById('ee-amount').value=e.amount;
+  document.getElementById('ee-desc').value=e.description;
+  document.getElementById('ee-ref').value=e.ref_no||'';
+  document.getElementById('ee-memo').value=e.memo_account_id||'';
+  document.getElementById('ee-reconciled').checked=!!e.reconciled;
+  document.getElementById('editentry-overlay').classList.add('open');
+}
+function closeEntryEdit(){document.getElementById('editentry-overlay').classList.remove('open');}
+function saveEntryEdit(){
+  const id=document.getElementById('ee-id').value;
+  const e=DB.entries.find(x=>x.id===id); if(!e) return;
+  const date=document.getElementById('ee-date').value;
+  const amount=parseFloat(document.getElementById('ee-amount').value);
+  const desc=document.getElementById('ee-desc').value.trim();
+  const bankId=document.getElementById('ee-bank').value;
+  const memoId=document.getElementById('ee-memo').value;
+  if(!date||!amount||amount<=0||!desc){alert('Date, amount and description are required.');return;}
+  if(!bankId && !memoId){alert('Select a bank, or at least a memorandum account.');return;}
+  if(!confirm('Save changes to this entry?')) return;
+  e.date=date; e.bank_id=bankId||null; e.direction=document.getElementById('ee-direction').value;
+  e.amount=amount; e.description=desc; e.ref_no=document.getElementById('ee-ref').value.trim();
+  e.memo_account_id=memoId||null; e.reconciled=document.getElementById('ee-reconciled').checked;
+  save(); closeEntryEdit(); renderEntries(); renderDashboard();
+  flash('entry-flash','Entry updated.');
+}
+function populateEntryFormSelects(){
+  populateBankSelects(); populateMemoSelects();
+  const bf=document.getElementById('ef-bankfilter'), mf=document.getElementById('ef-memofilter');
+  if(bf){ const cur=bf.value; bf.innerHTML='<option value="">All Banks</option>'+DB.banks.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join(''); bf.value=cur; }
+  if(mf){ const cur=mf.value; mf.innerHTML='<option value="">All Memo Accounts</option><option value="__none__">— No Memo Tag —</option>'+DB.memoAccounts.filter(m=>!m.archived).map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join(''); mf.value=cur; }
+  const d=document.getElementById('en-date'); if(d && !d.value) d.value=today();
+}
+function exportEntriesCSV(){
+  const list=sortArr(entriesFiltered(),SORT.entries.col,SORT.entries.dir);
+  const headers=['Date','Bank','Description','Ref/Cheque No','Memo Account','Deposit (In)','Withdrawal (Out)','Reconciled'];
+  const rows=list.map(e=>[fmtD(e.date), e.bank_id?bName(e.bank_id):'Memo Adj.', e.description, e.ref_no||'', e.memo_account_id?mName(e.memo_account_id):'', e.direction==='in'?e.amount.toFixed(0):'', e.direction==='out'?e.amount.toFixed(0):'', e.reconciled?'Yes':'No']);
+  exportCSV(headers,rows,'MainEntries');
+}
+
+// ══════════════════════════ IMPORT STATEMENT ══════════════════════════
+let _libStatus={pdf:false,ocr:false};
+function checkLibs(){
+  _libStatus.pdf = typeof pdfjsLib!=='undefined';
+  _libStatus.ocr = typeof Tesseract!=='undefined';
+  if(_libStatus.pdf && pdfjsLib.GlobalWorkerOptions){
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  const warn=document.getElementById('import-libwarn');
+  if(warn){
+    if(!_libStatus.pdf || !_libStatus.ocr){
+      warn.innerHTML=`<div class="flash err">${!_libStatus.pdf?'PDF reader library did not load. ':''}${!_libStatus.ocr?'OCR (image/scanned statement) library did not load. ':''}Check your internet connection — statement import needs it once per session; every other part of this app works fully offline.</div>`;
+    } else warn.innerHTML='';
+  }
+}
+function populateImportSelects(){ populateBankSelects(); }
+
+let _lastFile=null;
+function handleFileSelect(file){
+  _lastFile=file;
+  document.getElementById('import-filename').textContent=file? file.name : '';
+  document.getElementById('import-parsebtn').disabled=!file;
+}
+function dzClick(){document.getElementById('import-file').click();}
+function dzDrop(ev){
+  ev.preventDefault(); document.getElementById('import-dz').classList.remove('drag');
+  const f=ev.dataTransfer.files[0]; if(f) handleFileSelect(f);
+}
+
+async function parseStatementFile(){
+  if(!_lastFile) return;
+  const bankId=document.getElementById('im-bank').value;
+  if(!bankId){alert('Select which bank account this statement belongs to first.');return;}
+  const statusEl=document.getElementById('import-status');
+  statusEl.innerHTML='<div class="flash ok">Reading file…</div>';
+  try{
+    let text='';
+    const isImage=/^image\//.test(_lastFile.type) || /\.(png|jpe?g)$/i.test(_lastFile.name);
+    const isPdf = _lastFile.type==='application/pdf' || /\.pdf$/i.test(_lastFile.name);
+    if(isImage){
+      if(!_libStatus.ocr) throw new Error('OCR library not available (no internet?).');
+      text = await ocrImageFile(_lastFile, statusEl);
+    } else if(isPdf){
+      if(!_libStatus.pdf) throw new Error('PDF library not available (no internet?).');
+      text = await extractPdfText(_lastFile);
+      if(text.replace(/\s/g,'').length < 30){
+        statusEl.innerHTML='<div class="flash ok">No readable text layer found — this looks like a scanned statement. Running OCR instead (this can take a minute)…</div>';
+        if(!_libStatus.ocr) throw new Error('This PDF has no text layer and the OCR library is not available.');
+        text = await ocrPdfFile(_lastFile, statusEl);
+      }
+    } else {
+      throw new Error('Unsupported file type. Upload a PDF or an image (PNG/JPG) of the statement.');
+    }
+    document.getElementById('import-raw').textContent = text || '(no text extracted)';
+    const rows = parseStatementText(text);
+    if(!rows.length){
+      statusEl.innerHTML='<div class="flash err">Could not automatically detect any transaction rows. Open "Show extracted text" below to see what was read, and enter rows manually in Main Entry instead — statement layouts vary a lot and this parser is best-effort.</div>';
+      return;
+    }
+    rows.forEach(r=>{
+      const dupOf = findPossibleDuplicate(bankId, r);
+      const suggestedMemo = suggestMemoAccount(r.description);
+      DB.staging.push({id:uid('stg'), date:r.date, description:r.description, amount:r.amount,
+        direction:r.direction, bank_id:bankId, memo_account_id: suggestedMemo, raw:r.raw,
+        dup: !!dupOf, include:!dupOf});
+    });
+    save();
+    statusEl.innerHTML=`<div class="flash ok">Extracted ${rows.length} row(s). Review and edit below, then "Post Selected to Main Entry".</div>`;
+    renderStaging();
+  }catch(err){
+    console.error(err);
+    statusEl.innerHTML=`<div class="flash err">${esc(err.message||String(err))}</div>`;
+  }
+}
+
+async function extractPdfText(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+  let lines=[];
+  for(let i=1;i<=pdf.numPages;i++){
+    const page=await pdf.getPage(i);
+    const content=await page.getTextContent();
+    const buckets={};
+    content.items.forEach(it=>{
+      const y=Math.round(it.transform[5]/2)*2;
+      (buckets[y]=buckets[y]||[]).push({x:it.transform[4],s:it.str});
+    });
+    Object.keys(buckets).map(Number).sort((a,b)=>b-a).forEach(y=>{
+      lines.push(buckets[y].sort((a,b)=>a.x-b.x).map(o=>o.s).join(' '));
+    });
+  }
+  return lines.join('\n');
+}
+async function ocrImageFile(file, statusEl){
+  const {data:{text}} = await Tesseract.recognize(file,'eng',{logger:m=>{
+    if(m.status && statusEl) statusEl.innerHTML=`<div class="flash ok">OCR: ${esc(m.status)} ${m.progress?Math.round(m.progress*100)+'%':''}</div>`;
+  }});
+  return text;
+}
+async function ocrPdfFile(file, statusEl){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+  let full='';
+  for(let i=1;i<=pdf.numPages;i++){
+    if(statusEl) statusEl.innerHTML=`<div class="flash ok">OCR: rendering &amp; reading page ${i} of ${pdf.numPages}…</div>`;
+    const page=await pdf.getPage(i);
+    const viewport=page.getViewport({scale:2});
+    const canvas=document.createElement('canvas');
+    canvas.width=viewport.width; canvas.height=viewport.height;
+    await page.render({canvasContext:canvas.getContext('2d'), viewport}).promise;
+    const {data:{text}} = await Tesseract.recognize(canvas,'eng');
+    full += text + '\n';
+  }
+  return full;
+}
+
+function parseFlexibleDate(s){
+  s=s.trim();
+  let m;
+  if(m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/)) return `${m[1]}-${m[2]}-${m[3]}`;
+  if(m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/)){
+    let [,d,mo,y]=m; if(y.length===2) y='20'+y;
+    d=d.padStart(2,'0'); mo=mo.padStart(2,'0');
+    if(+mo>12 && +d<=12){ [d,mo]=[mo,d]; }
+    return `${y}-${mo}-${d}`;
+  }
+  const months={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  if(m=s.match(/^(\d{1,2})[\s\-]([A-Za-z]{3,9})[\s\-](\d{2,4})$/)){
+    let [,d,mon,y]=m; const mo=months[mon.slice(0,3).toLowerCase()]; if(!mo) return null;
+    if(y.length===2) y='20'+y;
+    return `${y}-${String(mo).padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+  return null;
+}
+function parseStatementText(text){
+  const lines=text.split(/\n/).map(l=>l.trim()).filter(Boolean);
+  const dateRe=/(\d{4}-\d{2}-\d{2})|(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})|(\d{1,2}[\s\-][A-Za-z]{3,9}[\s\-]\d{2,4})/;
+  const dateStripRe=/(\d{4}-\d{2}-\d{2})|(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})|(\d{1,2}[\s\-][A-Za-z]{3,9}[\s\-]\d{2,4})/gi;
+  // "confident" money patterns: thousands-grouped (incl. South-Asian 1,25,000 style) or a plain N.NN decimal
+  const confidentAmtRe=/\d{1,3}(?:,\d{2,3})+(?:\.\d{1,2})?|\d+\.\d{2}/g;
+  // loose fallback: any bare digit run — only used when a line has no confident amount at all
+  const looseAmtRe=/\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?/g;
+  // cheque/reference numbers ("Cheque 004521", "Ref# 88213") get mistaken for the amount — strip them before searching
+  const refStripRe=/\b(?:cheque|chq|ref(?:erence)?|instrument|txn|transaction)\.?\s*(?:no\.?)?\s*[:#]?\s*\d+/gi;
+  const rows=[];
+  lines.forEach(line=>{
+    const dm=line.match(dateRe); if(!dm) return;
+    const parsedDate=parseFlexibleDate(dm[0]); if(!parsedDate) return;
+    const rest=line.slice(dm.index+dm[0].length);
+    // search copy has ref numbers and any second date stripped out so they can't be mistaken for the amount;
+    // the description is still built from the original, unstripped `rest` below
+    const amtSearchText=rest.replace(refStripRe,' ').replace(dateStripRe,' ');
+    let amtMatches=[...amtSearchText.matchAll(confidentAmtRe)].map(x=>x[0]);
+    if(!amtMatches.length) amtMatches=[...amtSearchText.matchAll(looseAmtRe)].map(x=>x[0]).filter(a=>/\d/.test(a));
+    if(!amtMatches.length) return; // no plausible amount on this line — likely not a transaction row
+    const firstAmtPos=rest.indexOf(amtMatches[0]);
+    let desc=(firstAmtPos>0? rest.slice(0,firstAmtPos): rest).replace(/^[\s|,:;\-]+|[\s|,:;\-]+$/g,'').trim();
+    if(!desc) desc='(no description)';
+    const nums=amtMatches.map(a=>parseFloat(a.replace(/,/g,''))).filter(n=>!isNaN(n) && n>0);
+    if(!nums.length) return;
+    let direction = /\bcr\b|\bcredit\b|\bdeposit\b/i.test(line) ? 'in' : (/\bdr\b|\bdebit\b|\bwithdrawal\b/i.test(line) ? 'out' : null);
+    let amount;
+    if(nums.length>=3){
+      const [debit,credit]=nums;
+      if(debit>0 && credit>0){ amount=debit; direction=direction||'out'; }
+      else if(credit>0){ amount=credit; direction=direction||'in'; }
+      else { amount=debit; direction=direction||'out'; }
+    } else if(nums.length===2){
+      amount=nums[0];
+    } else {
+      amount=nums[0];
+    }
+    rows.push({date:parsedDate, description:desc, amount, direction: direction||'out', raw:line});
+  });
+  return rows;
+}
+function findPossibleDuplicate(bankId,row){
+  return DB.entries.find(e=> e.bank_id===bankId && e.date===row.date && Math.abs(e.amount-row.amount)<0.5 );
+}
+function suggestMemoAccount(desc){
+  const d=(desc||'').toLowerCase();
+  const hit=DB.memoAccounts.find(m=>!m.archived && d.includes(m.name.toLowerCase()));
+  return hit? hit.id : null;
+}
+
+function renderStaging(){
+  const wrap=document.getElementById('staging-wrap');
+  if(!DB.staging.length){ wrap.innerHTML='<div class="empty">No pending rows. Upload and parse a statement above.</div>'; return; }
+  const bankOpts=DB.banks.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
+  const memoOpts='<option value="">— none —</option>'+DB.memoAccounts.filter(m=>!m.archived).map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('');
+  wrap.innerHTML=`<div class="tbl-wrap"><table>
+    <thead><tr><th><input type="checkbox" class="chk" onclick="toggleAllStaging(this)" ${DB.staging.every(r=>r.include)?'checked':''}></th>
+    <th>Date</th><th>Description</th><th>Bank</th><th>Type</th><th class="right">Amount</th><th>Memo Account</th><th></th></tr></thead>
+    <tbody>${DB.staging.map(r=>`<tr>
+      <td><input type="checkbox" class="chk" ${r.include?'checked':''} onchange="stagingSet('${r.id}','include',this.checked)"></td>
+      <td><input type="date" value="${r.date}" onchange="stagingSet('${r.id}','date',this.value)"></td>
+      <td><input type="text" value="${esc(r.description)}" onchange="stagingSet('${r.id}','description',this.value)">${r.dup?' <span class="badge dup">possible duplicate</span>':''}</td>
+      <td><select onchange="stagingSet('${r.id}','bank_id',this.value)">${bankOpts.replace(`value="${r.bank_id}"`,`value="${r.bank_id}" selected`)}</select></td>
+      <td><select onchange="stagingSet('${r.id}','direction',this.value)">
+        <option value="in" ${r.direction==='in'?'selected':''}>Deposit (In)</option>
+        <option value="out" ${r.direction==='out'?'selected':''}>Withdrawal (Out)</option>
+      </select></td>
+      <td><input type="number" step="0.01" style="width:110px" value="${r.amount}" onchange="stagingSet('${r.id}','amount',parseFloat(this.value)||0)"></td>
+      <td><select onchange="stagingSet('${r.id}','memo_account_id',this.value)">${memoOpts.replace(`value="${r.memo_account_id}"`,`value="${r.memo_account_id}" selected`)}</select></td>
+      <td><button class="btn btn-light btn-sm" onclick="removeStaging('${r.id}')">✕</button></td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+function stagingSet(id,field,val){ const r=DB.staging.find(x=>x.id===id); if(!r) return; r[field]=val; save(); }
+function toggleAllStaging(cb){ DB.staging.forEach(r=>r.include=cb.checked); save(); renderStaging(); }
+function removeStaging(id){ DB.staging=DB.staging.filter(r=>r.id!==id); save(); renderStaging(); }
+function clearStaging(){ if(!DB.staging.length) return; if(!confirm('Clear all pending import rows? This does not affect already-posted entries.')) return; DB.staging=[]; save(); renderStaging(); }
+function postStaging(){
+  const toPost=DB.staging.filter(r=>r.include);
+  if(!toPost.length){alert('No rows selected to post.');return;}
+  const invalid=toPost.filter(r=>!r.date||!r.amount||r.amount<=0||!r.bank_id);
+  if(invalid.length){alert(`${invalid.length} selected row(s) are missing a date, amount, or bank. Fix or uncheck them first.`);return;}
+  if(!confirm(`Post ${toPost.length} entr${toPost.length===1?'y':'ies'} to the Main Entry sheet?`)) return;
+  toPost.forEach(r=>{
+    DB.entries.push({id:uid('ent'), date:r.date, bank_id:r.bank_id, direction:r.direction, amount:r.amount,
+      description:r.description, ref_no:'', memo_account_id:r.memo_account_id||null, reconciled:false,
+      source:'import', created_at:Date.now()});
+  });
+  const postedIds=new Set(toPost.map(r=>r.id));
+  DB.staging=DB.staging.filter(r=>!postedIds.has(r.id));
+  save();
+  document.getElementById('import-status').innerHTML=`<div class="flash ok">Posted ${toPost.length} entr${toPost.length===1?'y':'ies'} to Main Entry.</div>`;
+  renderStaging(); renderEntries(); renderDashboard();
+}
+
+// ══════════════════════════ REPORTS ══════════════════════════
+function reportTab(t){
+  ['bank','memo','overview'].forEach(x=>{
+    document.getElementById('rpt-'+x).style.display = x===t?'block':'none';
+    document.getElementById('rpttab-'+x).classList.toggle('active',x===t);
+  });
+  if(t==='overview') renderOverviewReport();
+}
+function renderReportsInit(){ populateBankSelects(); populateMemoSelects(); reportTab('bank'); }
+
+function renderBankReport(){
+  const bankId=document.getElementById('rb-bank').value;
+  if(!bankId){document.getElementById('rpt-bank-tbl').innerHTML='<tr><td class="empty">Select a bank account.</td></tr>';return;}
+  const from=document.getElementById('rb-from').value, to=document.getElementById('rb-to').value;
+  const bank=DB.banks.find(b=>b.id===bankId);
+  const chron=[...DB.entries.filter(e=>e.bank_id===bankId)].sort((a,b)=>a.date===b.date?(a.created_at||0)-(b.created_at||0):a.date.localeCompare(b.date));
+  let bal=bank.opening_balance||0;
+  let rows='', shownAny=false;
+  chron.forEach(e=>{
+    bal += e.direction==='in'?e.amount:-e.amount;
+    if((from && e.date<from) || (to && e.date>to)) return;
+    shownAny=true;
+    rows+=`<tr><td>${fmtD(e.date)}</td><td>${esc(e.description)}</td><td class="mono">${esc(e.ref_no)||'-'}</td>
+      <td>${e.memo_account_id?esc(mName(e.memo_account_id)):'-'}</td>
+      <td class="right">${e.direction==='in'?Rs(e.amount):''}</td>
+      <td class="right">${e.direction==='out'?Rs(e.amount):''}</td>
+      <td class="right"><b>${Rs(bal)}</b></td></tr>`;
+  });
+  document.getElementById('rpt-bank-tbl').innerHTML=`<thead><tr><th>Date</th><th>Description</th><th>Ref#</th><th>Memo Account</th><th class="right">Deposit</th><th class="right">Withdrawal</th><th class="right">Balance</th></tr></thead>
+  <tbody>${shownAny?rows:'<tr><td colspan="7" class="empty">No entries in this date range.</td></tr>'}</tbody>`;
+}
+function exportBankReportCSV(){
+  const bankId=document.getElementById('rb-bank').value; if(!bankId){alert('Select a bank first.');return;}
+  const bank=DB.banks.find(b=>b.id===bankId);
+  const from=document.getElementById('rb-from').value, to=document.getElementById('rb-to').value;
+  const chron=[...DB.entries.filter(e=>e.bank_id===bankId)].sort((a,b)=>a.date===b.date?(a.created_at||0)-(b.created_at||0):a.date.localeCompare(b.date));
+  let bal=bank.opening_balance||0; const rows=[];
+  chron.forEach(e=>{
+    bal += e.direction==='in'?e.amount:-e.amount;
+    if((from&&e.date<from)||(to&&e.date>to)) return;
+    rows.push([fmtD(e.date),e.description,e.ref_no||'',e.memo_account_id?mName(e.memo_account_id):'',e.direction==='in'?e.amount.toFixed(0):'',e.direction==='out'?e.amount.toFixed(0):'',bal.toFixed(0)]);
+  });
+  exportCSV(['Date','Description','Ref#','Memo Account','Deposit','Withdrawal','Balance'],rows,'BankStatement_'+bank.name.replace(/\s+/g,''));
+}
+function renderMemoReport(){
+  const id=document.getElementById('rm-memo').value;
+  if(!id){document.getElementById('rpt-memo-tbl').innerHTML='<tr><td class="empty">Select a memorandum account.</td></tr>';return;}
+  const from=document.getElementById('rm-from').value, to=document.getElementById('rm-to').value;
+  const acc=DB.memoAccounts.find(m=>m.id===id);
+  const chron=[...DB.entries.filter(e=>e.memo_account_id===id)].sort((a,b)=>a.date===b.date?(a.created_at||0)-(b.created_at||0):a.date.localeCompare(b.date));
+  let bal=acc.opening_balance||0; let rows='', any=false;
+  chron.forEach(e=>{
+    const d=memoNatureDelta(e); bal += acc.nature==='dr'?d:-d;
+    if((from&&e.date<from)||(to&&e.date>to)) return;
+    any=true;
+    rows+=`<tr><td>${fmtD(e.date)}</td><td>${e.bank_id?esc(bName(e.bank_id)):'Memo Adj.'}</td><td>${esc(e.description)}</td>
+      <td>${e.direction==='in'?'Deposit':'Withdrawal'}</td><td class="right">${Rs(e.amount)}</td><td class="right"><b>${Rs(bal)}</b></td></tr>`;
+  });
+  document.getElementById('rpt-memo-tbl').innerHTML=`<thead><tr><th>Date</th><th>Bank</th><th>Description</th><th>Type</th><th class="right">Amount</th><th class="right">Balance</th></tr></thead>
+  <tbody>${any?rows:'<tr><td colspan="6" class="empty">No entries in this date range.</td></tr>'}</tbody>`;
+}
+function exportMemoReportCSV(){
+  const id=document.getElementById('rm-memo').value; if(!id){alert('Select an account first.');return;}
+  const acc=DB.memoAccounts.find(m=>m.id===id);
+  const from=document.getElementById('rm-from').value, to=document.getElementById('rm-to').value;
+  const chron=[...DB.entries.filter(e=>e.memo_account_id===id)].sort((a,b)=>a.date===b.date?(a.created_at||0)-(b.created_at||0):a.date.localeCompare(b.date));
+  let bal=acc.opening_balance||0; const rows=[];
+  chron.forEach(e=>{
+    const d=memoNatureDelta(e); bal+=acc.nature==='dr'?d:-d;
+    if((from&&e.date<from)||(to&&e.date>to)) return;
+    rows.push([fmtD(e.date),e.bank_id?bName(e.bank_id):'Memo Adj.',e.description,e.direction==='in'?'Deposit':'Withdrawal',e.amount.toFixed(0),bal.toFixed(0)]);
+  });
+  exportCSV(['Date','Bank','Description','Type','Amount','Balance'],rows,'MemoLedger_'+acc.name.replace(/\s+/g,''));
+}
+function renderOverviewReport(){
+  const bt=DB.banks.reduce((s,b)=>s+bankBalance(b.id),0);
+  const bRows=DB.banks.map(b=>`<tr><td>${esc(b.name)}</td><td class="right">${Rs(bankBalance(b.id))}</td></tr>`).join('') || '<tr><td colspan="2" class="empty">No banks.</td></tr>';
+  const mRows=DB.memoAccounts.filter(m=>!m.archived).map(m=>`<tr><td>${esc(m.name)}</td><td><span class="badge ${m.nature}">${m.nature==='dr'?'Dr':'Cr'}</span></td><td class="right">${Rs(memoBalance(m.id))}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">No memo accounts.</td></tr>';
+  document.getElementById('rpt-overview-tbl').innerHTML=`
+    <div class="card-title" style="margin-top:0">Bank Balances</div>
+    <table><thead><tr><th>Bank</th><th class="right">Balance</th></tr></thead><tbody>${bRows}
+    <tr><td><b>Total Cash &amp; Bank</b></td><td class="right"><b>${Rs(bt)}</b></td></tr></tbody></table>
+    <div class="card-title" style="margin-top:18px">Memorandum Account Balances <span class="hint">(subsidiary tracking of amounts already inside the bank balances above — do not add to the bank total)</span></div>
+    <table><thead><tr><th>Account</th><th>Nature</th><th class="right">Balance</th></tr></thead><tbody>${mRows}</tbody></table>
+  `;
+}
+function exportOverviewCSV(){
+  const rows=[];
+  rows.push(['— BANK BALANCES —','','']);
+  DB.banks.forEach(b=>rows.push([b.name,'',bankBalance(b.id).toFixed(0)]));
+  rows.push(['Total Cash & Bank','',DB.banks.reduce((s,b)=>s+bankBalance(b.id),0).toFixed(0)]);
+  rows.push(['','','']);
+  rows.push(['— MEMORANDUM ACCOUNTS (subsidiary, not additive to bank total) —','','']);
+  DB.memoAccounts.filter(m=>!m.archived).forEach(m=>rows.push([m.name,m.nature==='dr'?'Debit-normal':'Credit-normal',memoBalance(m.id).toFixed(0)]));
+  exportCSV(['Account','Nature','Balance'],rows,'Overview');
+}
+
+// ══════════════════════════ DASHBOARD ══════════════════════════
+function renderDashboard(){
+  const totalBank=DB.banks.reduce((s,b)=>s+bankBalance(b.id),0);
+  document.getElementById('dash-stats').innerHTML=`
+    <div class="stat g" onclick="show('banks')"><div class="n">${Rs(totalBank)}</div><div class="l">Total Bank Balance</div></div>
+    <div class="stat" onclick="show('banks')"><div class="n">${DB.banks.length}</div><div class="l">Bank Accounts</div></div>
+    <div class="stat" onclick="show('memo')"><div class="n">${DB.memoAccounts.filter(m=>!m.archived).length}</div><div class="l">Memo Accounts</div></div>
+    <div class="stat" onclick="show('entries')"><div class="n">${DB.entries.length}</div><div class="l">Total Entries</div></div>
+    <div class="stat ${DB.staging.length?'a':''}" onclick="show('import')"><div class="n">${DB.staging.length}</div><div class="l">Pending Import Rows</div></div>
+  `;
+  const bTbl=document.getElementById('dash-banks-tbl');
+  bTbl.innerHTML = DB.banks.length? `<thead><tr><th>Bank</th><th class="right">Balance</th></tr></thead><tbody>${
+    DB.banks.map(b=>`<tr class="clickable-row" onclick="show('banks')"><td>${esc(b.name)}</td><td class="right"><b>${Rs(bankBalance(b.id))}</b></td></tr>`).join('')
+  }</tbody>` : '<tr><td class="empty">No bank accounts yet.</td></tr>';
+  const mTbl=document.getElementById('dash-memo-tbl');
+  const activeMemo=DB.memoAccounts.filter(m=>!m.archived);
+  mTbl.innerHTML = activeMemo.length? `<thead><tr><th>Account</th><th>Nature</th><th class="right">Balance</th></tr></thead><tbody>${
+    activeMemo.map(m=>`<tr class="clickable-row" onclick="openMemoLedger('${m.id}')"><td>${esc(m.name)}</td><td><span class="badge ${m.nature}">${m.nature==='dr'?'Dr':'Cr'}</span></td><td class="right"><b>${Rs(memoBalance(m.id))}</b></td></tr>`).join('')
+  }</tbody>` : '<tr><td class="empty">No memorandum accounts yet.</td></tr>';
+  const rTbl=document.getElementById('dash-recent-tbl');
+  const recent=[...DB.entries].sort((a,b)=>(b.created_at||0)-(a.created_at||0)).slice(0,10);
+  rTbl.innerHTML = recent.length? `<thead><tr><th>Date</th><th>Bank</th><th>Description</th><th>Memo</th><th class="right">In</th><th class="right">Out</th></tr></thead><tbody>${
+    recent.map(e=>`<tr><td>${fmtD(e.date)}</td><td>${e.bank_id?esc(bName(e.bank_id)):'Memo Adj.'}</td><td>${esc(e.description)}</td><td>${e.memo_account_id?esc(mName(e.memo_account_id)):'-'}</td><td class="right">${e.direction==='in'?Rs(e.amount):''}</td><td class="right">${e.direction==='out'?Rs(e.amount):''}</td></tr>`).join('')
+  }</tbody>` : '<tr><td class="empty">No entries recorded yet.</td></tr>';
+}
+
+// ══════════════════════════ SETTINGS ══════════════════════════
+function renderSettings(){
+  document.getElementById('settings-counts').innerHTML=`
+    <div class="stats">
+      <div class="stat"><div class="n">${DB.banks.length}</div><div class="l">Banks</div></div>
+      <div class="stat"><div class="n">${DB.memoAccounts.length}</div><div class="l">Memo Accounts</div></div>
+      <div class="stat"><div class="n">${DB.entries.length}</div><div class="l">Entries</div></div>
+      <div class="stat"><div class="n">${DB.staging.length}</div><div class="l">Pending Import Rows</div></div>
+    </div>`;
+}
+function backupDB(){
+  const data=JSON.stringify(DB,null,2);
+  const a=document.createElement('a');
+  a.href='data:application/json;charset=utf-8,'+encodeURIComponent(data);
+  a.download='BankLedger_Backup_'+today()+'.json';
+  a.click();
+}
+function restoreDBFile(file){
+  if(!file) return;
+  if(!confirm('Restoring a backup will REPLACE all current data in this app. Continue?')) return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const parsed=JSON.parse(reader.result);
+      if(!parsed || typeof parsed!=='object') throw new Error('Invalid backup file.');
+      DB={banks:parsed.banks||[],memoAccounts:parsed.memoAccounts||[],entries:parsed.entries||[],staging:parsed.staging||[],settings:parsed.settings||{}};
+      save();
+      alert('Backup restored successfully.');
+      location.reload();
+    }catch(e){ alert('Could not restore backup: '+e.message); }
+  };
+  reader.readAsText(file);
+}
+function clearAllData(){
+  const t=prompt('This will permanently delete ALL banks, memorandum accounts, entries and pending imports.\n\nType DELETE to confirm.');
+  if(t!=='DELETE') return;
+  localStorage.removeItem(DBKEY);
+  location.reload();
+}
+
+// ══════════════════════════ INIT ══════════════════════════
+window.addEventListener('DOMContentLoaded',()=>{
+  load();
+  populateBankSelects(); populateMemoSelects();
+  document.getElementById('en-date').value=today();
+  document.getElementById('bk-opendate').value=today();
+  renderDashboard();
+  setTimeout(checkLibs,600);
+});
+</script>
+</body>
+</html>
