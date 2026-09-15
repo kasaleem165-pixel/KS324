@@ -2943,13 +2943,14 @@ function _obsOrderRemove(id){
 function handleSel(id, checked, div) {
   if(checked){
     selIds[id]=true;
-    // Seed obsTypeMap from the DB/custom obs type if Detect Repeats hasn't set it yet.
-    // This ensures DB-tagged Repeated observations land in the correct obsOrder section.
+    // Seed obsTypeMap as 'New' if Detect Repeats hasn't already classified this obs.
+    // Do NOT read the databank type field here — that field is a general databank-level
+    // indicator and must NOT automatically classify observations as Repeated for a branch.
+    // Repeated classification is done exclusively via the Detect Repeats button, which
+    // compares against a previous report of the same branch. For a first-audit branch
+    // (no prior report), every observation must start as New regardless of databank type.
     if(!obsTypeMap[id]){
-      var _hsType='New';
-      for(var _hsi=0;_hsi<DB.observations.length;_hsi++){if(DB.observations[_hsi].id===id){_hsType=DB.observations[_hsi].type||'New';break;}}
-      if(_hsType==='New'){for(var _hsc=0;_hsc<customs.length;_hsc++){if(customs[_hsc].id===id){_hsType=customs[_hsc].type||'New';break;}}}
-      obsTypeMap[id]=_hsType;
+      obsTypeMap[id]='New';
     }
     _obsOrderAdd(id);
     // Default: lock Instances & Financial Impact as N/A for newly selected obs
