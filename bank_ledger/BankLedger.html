@@ -870,7 +870,7 @@ async function parseStatementFile(){
       const suggestedMemo = suggestMemoAccount(r.description);
       DB.staging.push({id:uid('stg'), date:r.date, description:r.description, amount:r.amount,
         direction:r.direction, bank_id:bankId, memo_account_id: suggestedMemo, raw:r.raw,
-        dup: !!dupOf, include:!dupOf});
+        dup: !!dupOf, dirUnsure: !r.dirConfident, include: !dupOf && r.dirConfident});
     });
     save();
     statusEl.innerHTML=`<div class="flash ok">Extracted ${rows.length} row(s). Review and edit below, then "Post Selected to Main Entry".</div>`;
@@ -950,8 +950,11 @@ function parseStatementText(text){
   const looseAmtRe=/\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?/g;
   // cheque/reference numbers ("Cheque 004521", "Ref# 88213") get mistaken for the amount — strip them before searching
   const refStripRe=/\b(?:cheque|chq|ref(?:erence)?|instrument|txn|transaction)\.?\s*(?:no\.?)?\s*[:#]?\s*\d+/gi;
+  // "Balance B/F", "Opening Balance", "Balance C/F" etc. are a running total, not a transaction — skip them outright
+  const balanceLineRe=/\b(?:opening|closing)\s*balance\b|\bbalance\s*(?:b\/f|c\/f|brought\s*forward|carried\s*forward)\b/i;
   const rows=[];
   lines.forEach(line=>{
+    if(balanceLineRe.test(line)) return;
     const dm=line.match(dateRe); if(!dm) return;
     const parsedDate=parseFlexibleDate(dm[0]); if(!parsedDate) return;
     const rest=line.slice(dm.index+dm[0].length);
@@ -967,18 +970,21 @@ function parseStatementText(text){
     const nums=amtMatches.map(a=>parseFloat(a.replace(/,/g,''))).filter(n=>!isNaN(n) && n>0);
     if(!nums.length) return;
     let direction = /\bcr\b|\bcredit\b|\bdeposit\b/i.test(line) ? 'in' : (/\bdr\b|\bdebit\b|\bwithdrawal\b/i.test(line) ? 'out' : null);
-    let amount;
+    // A statement laid out as separate Debit/Credit columns collapses to plain text with no column info once a
+    // row has only ONE amount (the normal case — most rows have either a debit OR a credit, never both). With
+    // 3+ numbers we can use position (debit, credit, balance) to infer direction; with fewer, and no explicit
+    // Dr/Cr wording on the line, direction is a genuine guess — flag it so it isn't silently trusted.
+    let amount, dirConfident = !!direction;
     if(nums.length>=3){
       const [debit,credit]=nums;
       if(debit>0 && credit>0){ amount=debit; direction=direction||'out'; }
       else if(credit>0){ amount=credit; direction=direction||'in'; }
       else { amount=debit; direction=direction||'out'; }
-    } else if(nums.length===2){
-      amount=nums[0];
+      dirConfident=true;
     } else {
       amount=nums[0];
     }
-    rows.push({date:parsedDate, description:desc, amount, direction: direction||'out', raw:line});
+    rows.push({date:parsedDate, description:desc, amount, direction: direction||'out', dirConfident, raw:line});
   });
   return rows;
 }
@@ -1004,10 +1010,10 @@ function renderStaging(){
       <td><input type="date" value="${r.date}" onchange="stagingSet('${r.id}','date',this.value)"></td>
       <td><input type="text" value="${esc(r.description)}" onchange="stagingSet('${r.id}','description',this.value)">${r.dup?' <span class="badge dup">possible duplicate</span>':''}</td>
       <td><select onchange="stagingSet('${r.id}','bank_id',this.value)">${bankOpts.replace(`value="${r.bank_id}"`,`value="${r.bank_id}" selected`)}</select></td>
-      <td><select onchange="stagingSet('${r.id}','direction',this.value)">
+      <td><select onchange="stagingSet('${r.id}','direction',this.value);stagingSet('${r.id}','dirUnsure',false)">
         <option value="in" ${r.direction==='in'?'selected':''}>Deposit (In)</option>
         <option value="out" ${r.direction==='out'?'selected':''}>Withdrawal (Out)</option>
-      </select></td>
+      </select>${r.dirUnsure?' <span class="badge dup" title="Statement had only one amount and no Dr/Cr wording on this line — direction is a guess, please confirm">check?</span>':''}</td>
       <td><input type="number" step="0.01" style="width:110px" value="${r.amount}" onchange="stagingSet('${r.id}','amount',parseFloat(this.value)||0)"></td>
       <td><select onchange="stagingSet('${r.id}','memo_account_id',this.value)">${memoOpts.replace(`value="${r.memo_account_id}"`,`value="${r.memo_account_id}" selected`)}</select></td>
       <td><button class="btn btn-light btn-sm" onclick="removeStaging('${r.id}')">✕</button></td>
