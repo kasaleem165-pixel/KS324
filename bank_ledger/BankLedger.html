@@ -221,7 +221,11 @@ details.raw pre{white-space:pre-wrap;background:#f8fafc;padding:10px;border-radi
       <button class="btn btn-light btn-sm" onclick="exportEntriesCSV()">↓ Export to Excel</button>
     </div>
     <div class="form-grid" style="margin-bottom:14px">
-      <div class="fg"><label>Bank</label><select id="ef-bankfilter" onchange="renderEntries()"></select></div>
+      <div class="fg"><label>Bank</label>
+        <div class="selrow"><select id="ef-bankfilter" onchange="renderEntries()"></select>
+          <button type="button" class="linklike" id="ef-editbalance" style="display:none" onclick="openBankEdit(document.getElementById('ef-bankfilter').value)">✎ Opening Bal.</button>
+        </div>
+      </div>
       <div class="fg"><label>Memo Account</label><select id="ef-memofilter" onchange="renderEntries()"></select></div>
       <div class="fg"><label>From</label><input id="ef-from" type="date" onchange="renderEntries()"></div>
       <div class="fg"><label>To</label><input id="ef-to" type="date" onchange="renderEntries()"></div>
@@ -731,16 +735,33 @@ function renderEntries(){
   const list=sortArr(list0,SORT.entries.col,SORT.entries.dir);
   const cEl=document.getElementById('entries-count');
   if(cEl) cEl.textContent='('+list.length+' entr'+(list.length===1?'y':'ies')+')';
-  if(!list.length){tbl.innerHTML='<tr><td class="empty">No entries match the current filter.</td></tr>';return;}
-  let runningMap={};
+  const editBalEl=document.getElementById('ef-editbalance');
+  if(editBalEl) editBalEl.style.display=singleBank?'inline':'none';
+
+  // header has 10 columns when a single bank is selected (incl. Balance), 9 otherwise
+  const headHtml=`<tr>${th('Date','entries','date')}<th>Bank</th>${th('Description','entries','description')}<th>Ref/Cheque #</th><th>Memo Account</th><th>Deposit (In)</th><th>Withdrawal (Out)</th>${singleBank?'<th>Balance</th>':''}<th>Recon.</th><th>Actions</th></tr>`;
+
+  let openingRowHtml='', runningMap={};
   if(singleBank){
     const bank=DB.banks.find(b=>b.id===singleBank);
-    let bal=bank?bank.opening_balance||0:0;
+    const openingBal=bank?bank.opening_balance||0:0;
+    let bal=openingBal;
     const chron=[...DB.entries.filter(e=>e.bank_id===singleBank)].sort((a,b)=>a.date===b.date?(a.created_at||0)-(b.created_at||0):a.date.localeCompare(b.date));
     chron.forEach(e=>{ bal += e.direction==='in'?e.amount:-e.amount; runningMap[e.id]=bal; });
+    // Date, Bank + colspan 5 (Description, Ref/Cheque#, Memo Account, Deposit, Withdrawal) + Balance + Recon. + Actions = 10 cols
+    openingRowHtml=`<tr><td>${fmtD(bank?bank.opening_date:'')}</td><td>${esc(bank?bank.name:'')}</td><td colspan="5"><i>Opening Balance</i></td><td class="right"><b>${Rs(openingBal)}</b></td><td></td><td></td></tr>`;
   }
-  tbl.innerHTML=`<thead><tr>${th('Date','entries','date')}<th>Bank</th>${th('Description','entries','description')}<th>Ref/Cheque #</th><th>Memo Account</th><th>Deposit (In)</th><th>Withdrawal (Out)</th>${singleBank?'<th>Balance</th>':''}<th>Recon.</th><th>Actions</th></tr></thead>
-  <tbody>${list.map(e=>`<tr>
+
+  if(!list.length){
+    // still show the opening balance for a single-bank filter even when no entries fall in range — an
+    // account with a starting balance and no transactions yet shouldn't just look empty
+    tbl.innerHTML = singleBank
+      ? `<thead>${headHtml}</thead><tbody>${openingRowHtml}<tr><td colspan="10" class="empty">No entries match the current filter.</td></tr></tbody>`
+      : '<tr><td class="empty">No entries match the current filter.</td></tr>';
+    return;
+  }
+  tbl.innerHTML=`<thead>${headHtml}</thead>
+  <tbody>${openingRowHtml}${list.map(e=>`<tr>
     <td>${fmtD(e.date)}</td>
     <td>${e.bank_id? esc(bName(e.bank_id)) : '<span class="hint">Memo Adj.</span>'}</td>
     <td>${esc(e.description)}${e.source==='import'?' <span class="badge memo" title="Imported from bank statement">import</span>':''}</td>
@@ -801,8 +822,14 @@ function populateEntryFormSelects(){
 }
 function exportEntriesCSV(){
   const list=sortArr(entriesFiltered(),SORT.entries.col,SORT.entries.dir);
+  const singleBank=document.getElementById('ef-bankfilter')?.value||'';
   const headers=['Date','Bank','Description','Ref/Cheque No','Memo Account','Deposit (In)','Withdrawal (Out)','Reconciled'];
-  const rows=list.map(e=>[fmtD(e.date), e.bank_id?bName(e.bank_id):'Memo Adj.', e.description, e.ref_no||'', e.memo_account_id?mName(e.memo_account_id):'', e.direction==='in'?e.amount.toFixed(0):'', e.direction==='out'?e.amount.toFixed(0):'', e.reconciled?'Yes':'No']);
+  const rows=[];
+  if(singleBank){
+    const bank=DB.banks.find(b=>b.id===singleBank);
+    if(bank) rows.push([fmtD(bank.opening_date),bank.name,'Opening Balance: Rs.'+(bank.opening_balance||0).toFixed(0),'','','','','']);
+  }
+  list.forEach(e=>rows.push([fmtD(e.date), e.bank_id?bName(e.bank_id):'Memo Adj.', e.description, e.ref_no||'', e.memo_account_id?mName(e.memo_account_id):'', e.direction==='in'?e.amount.toFixed(0):'', e.direction==='out'?e.amount.toFixed(0):'', e.reconciled?'Yes':'No']));
   exportCSV(headers,rows,'MainEntries');
 }
 
@@ -1069,15 +1096,17 @@ function renderBankReport(){
       <td class="right">${e.direction==='out'?Rs(e.amount):''}</td>
       <td class="right"><b>${Rs(bal)}</b></td></tr>`;
   });
+  const openingRow=`<tr><td>${fmtD(bank.opening_date)}</td><td colspan="4"><i>Opening Balance</i></td><td></td><td class="right"><b>${Rs(bank.opening_balance||0)}</b></td></tr>`;
   document.getElementById('rpt-bank-tbl').innerHTML=`<thead><tr><th>Date</th><th>Description</th><th>Ref#</th><th>Memo Account</th><th class="right">Deposit</th><th class="right">Withdrawal</th><th class="right">Balance</th></tr></thead>
-  <tbody>${shownAny?rows:'<tr><td colspan="7" class="empty">No entries in this date range.</td></tr>'}</tbody>`;
+  <tbody>${openingRow}${shownAny?rows:'<tr><td colspan="7" class="empty">No entries in this date range.</td></tr>'}</tbody>`;
 }
 function exportBankReportCSV(){
   const bankId=document.getElementById('rb-bank').value; if(!bankId){alert('Select a bank first.');return;}
   const bank=DB.banks.find(b=>b.id===bankId);
   const from=document.getElementById('rb-from').value, to=document.getElementById('rb-to').value;
   const chron=[...DB.entries.filter(e=>e.bank_id===bankId)].sort((a,b)=>a.date===b.date?(a.created_at||0)-(b.created_at||0):a.date.localeCompare(b.date));
-  let bal=bank.opening_balance||0; const rows=[];
+  let bal=bank.opening_balance||0;
+  const rows=[[fmtD(bank.opening_date),'Opening Balance','','','','',bal.toFixed(0)]];
   chron.forEach(e=>{
     bal += e.direction==='in'?e.amount:-e.amount;
     if((from&&e.date<from)||(to&&e.date>to)) return;
