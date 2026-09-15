@@ -9667,9 +9667,48 @@ function applyRespLoad(){
   responseLoaded=true;
   renderStepGuide();
   for(var j=0;j<loadedObs.length;j++) selIds[loadedObs[j]]=true;
+
+  // ── Orphan recovery ───────────────────────────────────────────────────────
+  // If an observation was deleted from the databank (via DBM changes) after the
+  // response form was sent to the auditee, its ID will be in loadedObs/selIds
+  // but absent from DB.observations and customs. renderRpt builds its list only
+  // from current DB records, so deleted observations become invisible. Fix: detect
+  // orphaned IDs, recover their title from the response HTML, and add a custom
+  // observation entry so they remain visible and auditable in the report.
+  var _dbIdx = {};
+  for(var _di=0;_di<DB.observations.length;_di++) _dbIdx[DB.observations[_di].id]=true;
+  for(var _ci=0;_ci<customs.length;_ci++) _dbIdx[customs[_ci].id]=true;
+  var _orphaned=[];
+  for(var _oi=0;_oi<loadedObs.length;_oi++){
+    var _lid=loadedObs[_oi];
+    if(!_dbIdx[_lid]){
+      // Recover title from the response HTML (obs-block id="obs-OBS_XXX" > .obs-title)
+      var _obsEl=doc?doc.getElementById('obs-'+_lid):null;
+      var _titleEl=_obsEl?_obsEl.querySelector('.obs-title'):null;
+      var _recovTitle=_titleEl?(_titleEl.textContent||'').trim():'';
+      // Recover category from first .tag element
+      var _tagEls=_obsEl?_obsEl.querySelectorAll('.obs-meta .tag'):[];
+      var _recovCat=_tagEls&&_tagEls.length?(_tagEls[0].textContent||'').trim():'';
+      customs.push({
+        id:_lid,
+        title:_recovTitle||_lid,
+        category:_recovCat||'',
+        type:'New',
+        observation:'',
+        recommendation:'',
+        _orphaned:true
+      });
+      _dbIdx[_lid]=true;
+      _orphaned.push(_lid);
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
   applyFilter();
   renderRpt();
-  toast('Loaded '+loadedObs.length+' response(s) — '+(isBH&&isRO?'HOS + RO/HO':isBH?'Head of School':'RO/HO')+'.');
+  var _msg='Loaded '+loadedObs.length+' response(s) — '+(isBH&&isRO?'HOS + RO/HO':isBH?'Head of School':'RO/HO')+'.';
+  if(_orphaned.length) _msg+=' Note: '+_orphaned.length+' observation(s) were not found in the current databank and have been restored from the response file.';
+  toast(_msg);
 }
 
 // ============================================================
