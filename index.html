@@ -5049,6 +5049,8 @@ function renderRpt(){
   ];
   for(var _ri=0;_ri<obsOrder.repeated.length;_ri++){ var _ro=obsById[obsOrder.repeated[_ri]]; if(_ro) sections[0].obs.push(_ro); }
   for(var _ni=0;_ni<obsOrder.new.length;_ni++){      var _no=obsById[obsOrder.new[_ni]];      if(_no) sections[1].obs.push(_no); }
+  // If no repeated observations, use plain "Observations" heading for the New section
+  if(!sections[0].obs.length){ sections[1].label='Observations'; }
 
   var h='';
   var curStage=H.rptStage||'draft_bh';
@@ -8029,6 +8031,8 @@ function downloadDraft(individual){
       var effT=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
       if(effT==='repeated') sections[0].obs.push(o); else sections[1].obs.push(o);
     }
+    // If no repeated observations, use plain "Observations" heading for the New section
+    if(!sections[0].obs.length){ sections[1].label='Observations'; }
 
     // ── Pre-assign observation numbers so summary tables can reference them ──
     var obsNums={};   // id -> number string like "1.1", "2.3"
@@ -8353,6 +8357,8 @@ function downloadSoftCopy(){
     var effTsc=(obsTypeMap[all[a].id]||all[a].type||'New').toLowerCase();
     if(effTsc==='repeated') scSections[0].obs.push(all[a]); else scSections[1].obs.push(all[a]);
   }
+  // If no repeated observations, use plain "Observations" heading for the New section
+  if(!scSections[0].obs.length){ scSections[1].label='Observations'; }
   function scCatGroups(obsList){var cats={};for(var i=0;i<obsList.length;i++){var c=obsList[i].category||'Others';if(!cats[c])cats[c]=[];cats[c].push(obsList[i]);}return{cats:cats,catOrder:catOrderByDef(cats)};}
 
   var fname='AuditReport'+(H.brcode?'_'+H.brcode:'')+(H.brname?'_'+H.brname.replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_'):'')+'_AuditeeResponse.html';
@@ -10344,6 +10350,8 @@ function finalizeReport(){
     var effTfin=(obsTypeMap[all[a].id]||all[a].type||'New').toLowerCase();
     if(effTfin==='repeated') finSections[0].obs.push(all[a]); else finSections[1].obs.push(all[a]);
   }
+  // If no repeated observations, use plain "Observations" heading for the New section
+  if(!finSections[0].obs.length){ finSections[1].label='Observations'; }
   function finCatGroups(ol){var cats={};for(var i=0;i<ol.length;i++){var c=ol[i].category||'Others';if(!cats[c])cats[c]=[];cats[c].push(ol[i]);}return{cats:cats,catOrder:catOrderByDef(cats)};}
   var sectHdFin='font-family:Merriweather,serif;font-size:14px;font-weight:700;color:#fff;background:#1a3a5c;padding:10px 16px;margin-bottom:16px;border-radius:4px;letter-spacing:.3px';
   var catHdFin='font-family:Merriweather,serif;font-size:12px;font-weight:700;color:#1a3a5c;background:#edf2f8;border-left:4px solid #1a3a5c;padding:7px 12px;margin-bottom:10px;border-radius:0 4px 4px 0;text-transform:uppercase;letter-spacing:.4px';
