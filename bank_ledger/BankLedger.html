@@ -179,6 +179,35 @@ details.raw pre{white-space:pre-wrap;background:#f8fafc;padding:10px;border-radi
     </div>
     <div style="margin-top:14px"><button class="btn btn-primary" onclick="addMemo()">Create Account</button></div>
   </div>
+
+  <div class="card">
+    <div class="card-title">Record Memo Entry</div>
+    <div id="memoentry-flash"></div>
+    <div class="hint" style="margin-bottom:10px">
+      Post an entry directly into a memorandum account — for things with no bank transaction of their own,
+      e.g. an accrual, a write-off, or correcting a past balance. This posts to the account's ledger only; it
+      never touches any bank balance. To record something that also moved money through a bank, use
+      <b>Main Entry</b> instead and tag it to the memo account there.
+    </div>
+    <div class="form-grid">
+      <div class="fg"><label>Memorandum Account *</label>
+        <div class="selrow"><select id="me-account" onchange="updateMemoEntryHint()"></select><button type="button" class="linklike" onclick="quickAddMemo('me-account')">＋New</button></div>
+      </div>
+      <div class="fg"><label>Date *</label><input id="me-date" type="date"></div>
+      <div class="fg"><label>Direction *</label>
+        <select id="me-direction" onchange="updateMemoEntryHint()">
+          <option value="in">Deposit (In)</option>
+          <option value="out">Withdrawal (Out)</option>
+        </select>
+      </div>
+      <div class="fg"><label>Amount *</label><input id="me-amount" type="number" step="0.01"></div>
+      <div class="fg full"><label>Description *</label><input id="me-desc" placeholder="Narration / purpose"></div>
+      <div class="fg"><label>Reference</label><input id="me-ref"></div>
+    </div>
+    <div class="hint" id="me-hint" style="margin-top:8px"></div>
+    <div style="margin-top:14px"><button class="btn btn-primary" onclick="addMemoEntry()">Record Entry</button></div>
+  </div>
+
   <div class="card">
     <div class="card-title">Memorandum Accounts</div>
     <div class="tbl-wrap"><table id="memo-tbl"></table></div>
@@ -470,7 +499,7 @@ function show(p){
   const fn={
     dashboard:renderDashboard,
     banks:()=>{renderBanks();populateBankSelects();},
-    memo:()=>{renderMemo();populateMemoSelects();},
+    memo:()=>{renderMemo();populateMemoSelects();const d=document.getElementById('me-date');if(d&&!d.value)d.value=today();updateMemoEntryHint();},
     entries:()=>{populateEntryFormSelects();renderEntries();},
     import:()=>{populateImportSelects();renderStaging();checkLibs();},
     reports:renderReportsInit,
@@ -647,7 +676,7 @@ function saveMemoEdit(){
 }
 function populateMemoSelects(){
   const opts=DB.memoAccounts.filter(m=>!m.archived).map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('');
-  const cfg={'en-memo':'— No Memo Account —','ee-memo':'— No Memo Account —','rm-memo':'— Select Account —'};
+  const cfg={'en-memo':'— No Memo Account —','ee-memo':'— No Memo Account —','rm-memo':'— Select Account —','me-account':'— Select Account —'};
   Object.keys(cfg).forEach(id=>{
     const el=document.getElementById(id); if(!el) return;
     const cur=el.value;
@@ -663,6 +692,7 @@ function quickAddMemo(selectId){
   DB.memoAccounts.push(acc); save(); populateMemoSelects();
   const el=document.getElementById(selectId); if(el) el.value=acc.id;
   renderMemo();
+  updateMemoEntryHint();
 }
 function openMemoLedger(id){
   const m=DB.memoAccounts.find(x=>x.id===id); if(!m) return;
@@ -685,10 +715,39 @@ function openMemoLedger(id){
   document.getElementById('ml-body').innerHTML=`<div class="tbl-wrap"><table>
     <thead><tr><th>Date</th><th>Bank</th><th>Description</th><th>Type</th><th class="right">Amount</th><th class="right">Balance</th></tr></thead>
     <tbody>${rows}</tbody></table></div>
-    <div class="hint" style="margin-top:10px">Nature: <b>${m.nature==='dr'?'Debit-normal':'Credit-normal'}</b> — withdrawals from the bank ${m.nature==='dr'?'increase':'decrease'} this account's balance, deposits ${m.nature==='dr'?'decrease':'increase'} it.</div>`;
+    <div class="hint" style="margin-top:10px">Nature: <b>${m.nature==='dr'?'Debit-normal':'Credit-normal'}</b> — "Withdrawal" entries ${m.nature==='dr'?'increase':'decrease'} this account's balance, "Deposit" entries ${m.nature==='dr'?'decrease':'increase'} it (whether or not the entry is tied to a bank).</div>`;
   document.getElementById('ledger-overlay').classList.add('open');
 }
 function closeLedger(){document.getElementById('ledger-overlay').classList.remove('open');}
+
+function updateMemoEntryHint(){
+  const el=document.getElementById('me-hint'); if(!el) return;
+  const acc=DB.memoAccounts.find(m=>m.id===document.getElementById('me-account').value);
+  if(!acc){ el.textContent=''; return; }
+  const direction=document.getElementById('me-direction').value;
+  const drDelta = direction==='out'? 1 : -1; // debit-normal delta sign, same convention as memoNatureDelta()
+  const goesUp = (acc.nature==='dr'? drDelta : -drDelta) > 0;
+  el.textContent = `This will ${goesUp?'increase':'decrease'} the balance of "${acc.name}" (currently ${Rs(memoBalance(acc.id))}).`;
+}
+function addMemoEntry(){
+  const memoId=document.getElementById('me-account').value;
+  const date=document.getElementById('me-date').value;
+  const amount=parseFloat(document.getElementById('me-amount').value);
+  const direction=document.getElementById('me-direction').value;
+  const desc=document.getElementById('me-desc').value.trim();
+  if(!memoId){flash('memoentry-flash','Select a memorandum account.','err');return;}
+  if(!date){flash('memoentry-flash','Date is required.','err');return;}
+  if(!amount||amount<=0){flash('memoentry-flash','Enter a valid amount.','err');return;}
+  if(!desc){flash('memoentry-flash','Description is required.','err');return;}
+  const entry={id:uid('ent'),date,bank_id:null,direction,amount,description:desc,
+    ref_no:document.getElementById('me-ref').value.trim(),
+    memo_account_id:memoId, reconciled:false, source:'manual', created_at:Date.now()};
+  DB.entries.push(entry); save();
+  ['me-amount','me-desc','me-ref'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('me-date').value=today();
+  flash('memoentry-flash','Entry recorded to memorandum account.');
+  renderMemo(); renderDashboard(); updateMemoEntryHint();
+}
 
 // ══════════════════════════ MAIN ENTRY ══════════════════════════
 function addEntry(){
@@ -1239,6 +1298,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   populateBankSelects(); populateMemoSelects();
   document.getElementById('en-date').value=today();
   document.getElementById('bk-opendate').value=today();
+  document.getElementById('me-date').value=today();
   renderDashboard();
   setTimeout(checkLibs,600);
 });
