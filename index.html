@@ -449,7 +449,7 @@ mark{background:#fff3a0;border-radius:2px;padding:0 1px}
 #ra-panel.ra-drawer-open{transform:translateX(0)}
 #ra-drawer-toggle{position:fixed;top:50%;right:0;transform:translateY(-50%);z-index:1201;background:#1a3a5c;color:#fff;border:none;border-radius:6px 0 0 6px;padding:10px 6px;cursor:pointer;writing-mode:vertical-rl;letter-spacing:1px;font-family:Inter,sans-serif;font-size:11px;font-weight:700;transition:right .3s ease,background .2s;display:none}
 #ra-drawer-toggle.visible{display:block}
-#ra-drawer-toggle.open{right:min(90%,1200px);background:#2a5a8c}
+#ra-drawer-toggle.open{background:#2a5a8c}
 #main.ra-drawer-open{margin-right:0;transition:margin-right .3s ease}
 @media(max-width:900px){#ra-panel{width:90%;min-width:0}#main.ra-drawer-open{margin-right:0}}
 .panel-fadein{animation:panelFadeIn .25s ease}
@@ -13724,12 +13724,18 @@ function toggleRAPanel(){
   if(open){
     panel.classList.remove('ra-drawer-open');
     main.classList.remove('ra-drawer-open');
-    if(toggle){ toggle.classList.remove('open'); toggle.innerHTML='&#128202; RA'; }
+    if(toggle){ toggle.classList.remove('open'); toggle.style.right='0'; toggle.innerHTML='&#128202; RA'; }
     _setPanelBack(null);
   } else {
     panel.classList.add('ra-drawer-open');
     main.classList.add('ra-drawer-open');
-    if(toggle){ toggle.classList.add('open'); toggle.innerHTML='&#10005; RA'; }
+    // Position the toggle at the panel's left edge (panel is min(90vw, 1200px) wide, anchored to right:0)
+    if(toggle){
+      var panelW=Math.min(window.innerWidth*0.9, 1200);
+      toggle.style.right=panelW+'px';
+      toggle.classList.add('open');
+      toggle.innerHTML='&#10005; RA';
+    }
     _setPanelBack(null); // no back button needed — main stays visible
     ra_initBranches();
     ra_initModeButtons();
