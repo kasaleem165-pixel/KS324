@@ -239,7 +239,6 @@ details.raw pre{white-space:pre-wrap;background:#f8fafc;padding:10px;border-radi
         <label>Memorandum Account</label>
         <div class="selrow"><select id="en-memo"></select><button type="button" class="linklike" onclick="quickAddMemo('en-memo')">＋New</button></div>
       </div>
-      <div class="fg"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="en-reconciled" class="chk"> Reconciled against bank statement</label></div>
     </div>
     <div style="margin-top:14px"><button class="btn btn-primary" onclick="addEntry()">Record Entry</button></div>
   </div>
@@ -418,7 +417,6 @@ details.raw pre{white-space:pre-wrap;background:#f8fafc;padding:10px;border-radi
       <div class="fg full"><label>Description *</label><input id="ee-desc"></div>
       <div class="fg"><label>Reference / Cheque #</label><input id="ee-ref"></div>
       <div class="fg"><label>Memorandum Account</label><select id="ee-memo"></select></div>
-      <div class="fg"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="ee-reconciled" class="chk"> Reconciled</label></div>
     </div>
     <div style="margin-top:14px"><button class="btn btn-primary" onclick="saveEntryEdit()">Save Changes</button></div>
   </div>
@@ -741,7 +739,7 @@ function addMemoEntry(){
   if(!desc){flash('memoentry-flash','Description is required.','err');return;}
   const entry={id:uid('ent'),date,bank_id:null,direction,amount,description:desc,
     ref_no:document.getElementById('me-ref').value.trim(),
-    memo_account_id:memoId, reconciled:false, source:'manual', created_at:Date.now()};
+    memo_account_id:memoId, source:'manual', created_at:Date.now()};
   DB.entries.push(entry); save();
   ['me-amount','me-desc','me-ref'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('me-date').value=today();
@@ -763,11 +761,9 @@ function addEntry(){
   if(!bankId && !memoId){flash('entry-flash','Select a bank, or at least a memorandum account for a memo-only adjustment.','err');return;}
   const entry={id:uid('ent'),date,bank_id:bankId||null,direction,amount,
     description:desc, ref_no:document.getElementById('en-ref').value.trim(),
-    memo_account_id:memoId||null, reconciled:document.getElementById('en-reconciled').checked,
-    source:'manual', created_at:Date.now()};
+    memo_account_id:memoId||null, source:'manual', created_at:Date.now()};
   DB.entries.push(entry); save();
   ['en-amount','en-desc','en-ref'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('en-reconciled').checked=false;
   document.getElementById('en-date').value=today();
   flash('entry-flash','Entry recorded.'); renderEntries(); renderDashboard();
 }
@@ -797,8 +793,8 @@ function renderEntries(){
   const editBalEl=document.getElementById('ef-editbalance');
   if(editBalEl) editBalEl.style.display=singleBank?'inline':'none';
 
-  // header has 10 columns when a single bank is selected (incl. Balance), 9 otherwise
-  const headHtml=`<tr>${th('Date','entries','date')}<th>Bank</th>${th('Description','entries','description')}<th>Ref/Cheque #</th><th>Memo Account</th><th>Deposit (In)</th><th>Withdrawal (Out)</th>${singleBank?'<th>Balance</th>':''}<th>Recon.</th><th>Actions</th></tr>`;
+  // header has 9 columns when a single bank is selected (incl. Balance), 8 otherwise
+  const headHtml=`<tr>${th('Date','entries','date')}<th>Bank</th>${th('Description','entries','description')}<th>Ref/Cheque #</th><th>Memo Account</th><th>Deposit (In)</th><th>Withdrawal (Out)</th>${singleBank?'<th>Balance</th>':''}<th>Actions</th></tr>`;
 
   let openingRowHtml='', runningMap={};
   if(singleBank){
@@ -807,15 +803,15 @@ function renderEntries(){
     let bal=openingBal;
     const chron=[...DB.entries.filter(e=>e.bank_id===singleBank)].sort((a,b)=>a.date===b.date?(a.created_at||0)-(b.created_at||0):a.date.localeCompare(b.date));
     chron.forEach(e=>{ bal += e.direction==='in'?e.amount:-e.amount; runningMap[e.id]=bal; });
-    // Date, Bank + colspan 5 (Description, Ref/Cheque#, Memo Account, Deposit, Withdrawal) + Balance + Recon. + Actions = 10 cols
-    openingRowHtml=`<tr><td>${fmtD(bank?bank.opening_date:'')}</td><td>${esc(bank?bank.name:'')}</td><td colspan="5"><i>Opening Balance</i></td><td class="right"><b>${Rs(openingBal)}</b></td><td></td><td></td></tr>`;
+    // Date, Bank + colspan 5 (Description, Ref/Cheque#, Memo Account, Deposit, Withdrawal) + Balance + Actions = 9 cols
+    openingRowHtml=`<tr><td>${fmtD(bank?bank.opening_date:'')}</td><td>${esc(bank?bank.name:'')}</td><td colspan="5"><i>Opening Balance</i></td><td class="right"><b>${Rs(openingBal)}</b></td><td></td></tr>`;
   }
 
   if(!list.length){
     // still show the opening balance for a single-bank filter even when no entries fall in range — an
     // account with a starting balance and no transactions yet shouldn't just look empty
     tbl.innerHTML = singleBank
-      ? `<thead>${headHtml}</thead><tbody>${openingRowHtml}<tr><td colspan="10" class="empty">No entries match the current filter.</td></tr></tbody>`
+      ? `<thead>${headHtml}</thead><tbody>${openingRowHtml}<tr><td colspan="9" class="empty">No entries match the current filter.</td></tr></tbody>`
       : '<tr><td class="empty">No entries match the current filter.</td></tr>';
     return;
   }
@@ -829,7 +825,6 @@ function renderEntries(){
     <td class="right">${e.direction==='in'?Rs(e.amount):''}</td>
     <td class="right">${e.direction==='out'?Rs(e.amount):''}</td>
     ${singleBank?`<td class="right"><b>${Rs(runningMap[e.id]||0)}</b></td>`:''}
-    <td>${e.reconciled?'✅':''}</td>
     <td>
       <button class="btn btn-light btn-sm" onclick="openEntryEdit('${e.id}')">Edit</button>
       <button class="btn btn-danger btn-sm" onclick="deleteEntry('${e.id}')">Del</button>
@@ -851,7 +846,6 @@ function openEntryEdit(id){
   document.getElementById('ee-desc').value=e.description;
   document.getElementById('ee-ref').value=e.ref_no||'';
   document.getElementById('ee-memo').value=e.memo_account_id||'';
-  document.getElementById('ee-reconciled').checked=!!e.reconciled;
   document.getElementById('editentry-overlay').classList.add('open');
 }
 function closeEntryEdit(){document.getElementById('editentry-overlay').classList.remove('open');}
@@ -868,7 +862,7 @@ function saveEntryEdit(){
   if(!confirm('Save changes to this entry?')) return;
   e.date=date; e.bank_id=bankId||null; e.direction=document.getElementById('ee-direction').value;
   e.amount=amount; e.description=desc; e.ref_no=document.getElementById('ee-ref').value.trim();
-  e.memo_account_id=memoId||null; e.reconciled=document.getElementById('ee-reconciled').checked;
+  e.memo_account_id=memoId||null;
   save(); closeEntryEdit(); renderEntries(); renderDashboard();
   flash('entry-flash','Entry updated.');
 }
@@ -882,13 +876,13 @@ function populateEntryFormSelects(){
 function exportEntriesCSV(){
   const list=sortArr(entriesFiltered(),SORT.entries.col,SORT.entries.dir);
   const singleBank=document.getElementById('ef-bankfilter')?.value||'';
-  const headers=['Date','Bank','Description','Ref/Cheque No','Memo Account','Deposit (In)','Withdrawal (Out)','Reconciled'];
+  const headers=['Date','Bank','Description','Ref/Cheque No','Memo Account','Deposit (In)','Withdrawal (Out)'];
   const rows=[];
   if(singleBank){
     const bank=DB.banks.find(b=>b.id===singleBank);
-    if(bank) rows.push([fmtD(bank.opening_date),bank.name,'Opening Balance: Rs.'+(bank.opening_balance||0).toFixed(0),'','','','','']);
+    if(bank) rows.push([fmtD(bank.opening_date),bank.name,'Opening Balance: Rs.'+(bank.opening_balance||0).toFixed(0),'','','','']);
   }
-  list.forEach(e=>rows.push([fmtD(e.date), e.bank_id?bName(e.bank_id):'Memo Adj.', e.description, e.ref_no||'', e.memo_account_id?mName(e.memo_account_id):'', e.direction==='in'?e.amount.toFixed(0):'', e.direction==='out'?e.amount.toFixed(0):'', e.reconciled?'Yes':'No']));
+  list.forEach(e=>rows.push([fmtD(e.date), e.bank_id?bName(e.bank_id):'Memo Adj.', e.description, e.ref_no||'', e.memo_account_id?mName(e.memo_account_id):'', e.direction==='in'?e.amount.toFixed(0):'', e.direction==='out'?e.amount.toFixed(0):'']));
   exportCSV(headers,rows,'MainEntries');
 }
 
@@ -1117,7 +1111,7 @@ function postStaging(){
   if(!confirm(`Post ${toPost.length} entr${toPost.length===1?'y':'ies'} to the Main Entry sheet?`)) return;
   toPost.forEach(r=>{
     DB.entries.push({id:uid('ent'), date:r.date, bank_id:r.bank_id, direction:r.direction, amount:r.amount,
-      description:r.description, ref_no:'', memo_account_id:r.memo_account_id||null, reconciled:false,
+      description:r.description, ref_no:'', memo_account_id:r.memo_account_id||null,
       source:'import', created_at:Date.now()});
   });
   const postedIds=new Set(toPost.map(r=>r.id));
