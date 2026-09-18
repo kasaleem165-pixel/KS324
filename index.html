@@ -1996,6 +1996,7 @@ var cosoMap        = {}; // {obsId: 'CE'|'RA'|'CA'|'IC'|'M'}
 var avMap    = {};   // {obsId: manual audit view text}
 var actMap   = {};   // {obsId: action taken text}
 var respMap  = {};   // {obsId: auditee response text}
+var etaMap   = {};   // {obsId: estimated time to resolve (from auditee copy)}
 var respBHMap= {};   // {obsId: Head of School response}
 var respROMap= {};   // {obsId: RO/HO Supervisor response (formal review chain)}
 var respHistory   = {}; // {obsId: [{round,response,loadedAt}]} — previous rounds kept for audit trail
@@ -4224,6 +4225,7 @@ function captureSession() {
     avMap    : avMap,
     actMap   : actMap,
     respMap  : respMap,
+    etaMap   : etaMap,
     respBHMap: respBHMap,
     respROMap: respROMap,
     respHistory:   respHistory,
@@ -4288,6 +4290,7 @@ function restoreSession(sess) {
   avMap     = sess.avMap     || {};
   actMap    = sess.actMap    || {};
   respMap   = sess.respMap   || {};
+  etaMap    = sess.etaMap    || {};
   respBHMap     = sess.respBHMap     || {};
   respROMap     = sess.respROMap     || {};
   respHistory   = sess.respHistory   || {};
@@ -5397,6 +5400,14 @@ function renderRpt(){
           h+='<div class="osl" style="color:#1a3a5c">HO Section Response</div>';
           h+='<textarea class="oresp" readonly style="background:#f0f4ff;color:#1a2a5a;cursor:default;border-color:#90b0e8" title="HO Section Head response">'+esc(sectHOResp)+'</textarea>';
         }
+        // ETR — Estimated Time to Resolve (from auditee copy)
+        var etaVal=etaMap[o.id]||'';
+        if(etaVal){
+          h+='<div style="margin-top:8px;padding:7px 11px;background:#f0faf4;border:1px solid #90d0a8;border-radius:6px;display:flex;align-items:center;gap:10px">';
+          h+='<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#1a6030;white-space:nowrap">&#9200; Est. Time to Resolve:</span>';
+          h+='<span style="font-size:13px;font-weight:700;color:#1a6030">'+esc(etaVal)+'</span>';
+          h+='</div>';
+        }
       }
       // 5 & 6: Assessment-driven (after response load) or original mode
       if(responseLoaded){
@@ -6158,7 +6169,7 @@ function showClearSessionModal(){
 
 function _performFullClear(){
   // Data maps
-  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; respHistory={}; respAttachMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; etaMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; respHistory={}; respAttachMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
   roCustomApprovals={}; hoCustomApprovals={}; pendingAmendments={};
   // SRR / Risk Mapping state
   if(typeof srr_flagged!=='undefined') srr_flagged={};
@@ -6209,7 +6220,7 @@ function _performFullClear(){
 function doClear(){
   if(!confirm('Clear all selected observations and reset the report draft? Branch information will be kept.'))return;
   // Clear only observation selections and report content — keep branch/header fields intact
-  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; respHistory={}; respAttachMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
+  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; etaMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; respHistory={}; respAttachMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
   if(typeof srr_flagged!=='undefined') srr_flagged={};
   if(typeof srr_reassigned!=='undefined') srr_reassigned={};
   if(typeof srr_files!=='undefined') srr_files=[];
@@ -9668,6 +9679,9 @@ function loadAuditeeFile(evt){
             if(rval){ roComments[rnid]=rval; if(loadedObs.indexOf(rnid)<0) loadedObs.push(rnid); }
           } else if(rnm.indexOf('act_')===0){
             if(rval) actMap[rnm.slice(4)]=rval;
+          } else if(rnm.indexOf('eta_')===0){
+            var etaId=rnm.slice(4);
+            if(rval) etaMap[etaId]=rval;
           } else if(rnm.indexOf('attach_')===0){
             var attId=rnm.slice(7);
             if(rval&&rval.length) respAttachMap[attId]=rval;
@@ -13743,7 +13757,7 @@ function loadDemoData(){
   var hasData = Object.keys(selIds).length > 0;
 
   // --- Clear existing (inline, no confirm prompt) ---
-  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={};
+  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; etaMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={};
   _raReportsClear();
   responseLoaded=false; _brInfoHasData=false; _brInfoUnlocked=true;
   _reportEverGenerated=false;
