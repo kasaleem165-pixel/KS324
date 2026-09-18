@@ -10370,12 +10370,17 @@ function finalizeReport(){
 
   var finSections=[
     {key:'repeated',label:'1. Repeated Observations',obs:[]},
-    {key:'new',     label:'2. New Observations',                   obs:[]}
+    {key:'new',     label:'2. New Observations',     obs:[]}
   ];
-  for(var a=0;a<all.length;a++){
-    var effTfin=(obsTypeMap[all[a].id]||all[a].type||'New').toLowerCase();
-    if(effTfin==='repeated') finSections[0].obs.push(all[a]); else finSections[1].obs.push(all[a]);
-  }
+  // Populate from obsOrder (same sequence as main report) for consistent numbering
+  var _finObsById={};
+  for(var _fj=0;_fj<DB.observations.length;_fj++) _finObsById[DB.observations[_fj].id]=DB.observations[_fj];
+  for(var _fk=0;_fk<customs.length;_fk++) _finObsById[customs[_fk].id]=customs[_fk];
+  var _finIds=[obsOrder.repeated,obsOrder.new];
+  for(var _fsi=0;_fsi<_finIds.length;_fsi++){for(var _foi=0;_foi<_finIds[_fsi].length;_foi++){var _fO=_finObsById[_finIds[_fsi][_foi]];if(_fO&&selIds[_fO.id])finSections[_fsi].obs.push(_fO);}}
+  // Safety net: catch any selected obs not yet in obsOrder
+  var _finSeen={};for(var _fs2=0;_fs2<2;_fs2++){for(var _fs3=0;_fs3<finSections[_fs2].obs.length;_fs3++)_finSeen[finSections[_fs2].obs[_fs3].id]=1;}
+  for(var _fa=0;_fa<all.length;_fa++){var _fEx=all[_fa];if(_finSeen[_fEx.id])continue;var _fT=(obsTypeMap[_fEx.id]||_fEx.type||'New').toLowerCase();if(_fT==='repeated')finSections[0].obs.push(_fEx);else finSections[1].obs.push(_fEx);}
   // If no repeated observations, use plain "Observations" heading for the New section
   if(!finSections[0].obs.length){ finSections[1].label='Observations'; }
   function finCatGroups(ol){var cats={};for(var i=0;i<ol.length;i++){var c=ol[i].category||'Others';if(!cats[c])cats[c]=[];cats[c].push(ol[i]);}return{cats:cats,catOrder:catOrderByDef(cats)};}
@@ -10861,14 +10866,18 @@ function generateIssuedReport(forROCopy){
 
 
 
-  // Separate Repeated / New
+  // Separate Repeated / New — use obsOrder for consistent numbering with main report
+  var _irObsById={};
+  for(var _irj=0;_irj<DB.observations.length;_irj++) _irObsById[DB.observations[_irj].id]=DB.observations[_irj];
+  for(var _irk=0;_irk<customs.length;_irk++) _irObsById[customs[_irk].id]=customs[_irk];
   var repeated=[], newObs=[];
-  for(var a=0;a<all.length;a++){
-    var t=(obsTypeMap[all[a].id]||all[a].type||'New').toLowerCase();
-    if(t==='repeated') repeated.push(all[a]); else newObs.push(all[a]);
-  }
+  for(var _iri=0;_iri<obsOrder.repeated.length;_iri++){var _irO=_irObsById[obsOrder.repeated[_iri]];if(_irO&&selIds[_irO.id])repeated.push(_irO);}
+  for(var _irn=0;_irn<obsOrder.new.length;_irn++){var _irN=_irObsById[obsOrder.new[_irn]];if(_irN&&selIds[_irN.id])newObs.push(_irN);}
+  // Safety net
+  var _irSeen={};for(var _irs=0;_irs<repeated.length;_irs++)_irSeen[repeated[_irs].id]=1;for(var _irns=0;_irns<newObs.length;_irns++)_irSeen[newObs[_irns].id]=1;
+  for(var a=0;a<all.length;a++){var _irEx=all[a];if(_irSeen[_irEx.id])continue;var _irT=(obsTypeMap[_irEx.id]||_irEx.type||'New').toLowerCase();if(_irT==='repeated')repeated.push(_irEx);else newObs.push(_irEx);}
 
-  // Assign numbered labels e.g. 1.1, 1.2, 2.1, 2.2
+  // Assign numbered labels e.g. 1.1, 1.2, 2.1, 2.2 — dynamic prefix skips empty sections
   var labMap={};
   function assignLabels(list, sec){
     var n=0;
@@ -10878,7 +10887,9 @@ function generateIssuedReport(forROCopy){
       for(var oi=0;oi<obs.length;oi++){n++;labMap[obs[oi].id]=sec+'.'+n;}
     }
   }
-  assignLabels(repeated,1); assignLabels(newObs,2);
+  var _irPfx=0;
+  if(repeated.length){_irPfx++;assignLabels(repeated,_irPfx);}
+  if(newObs.length){_irPfx++;assignLabels(newObs,_irPfx);}
 
   // KPI counts
   var kpi={High:0,mh:0,lm:0,Low:0,total:all.length};
