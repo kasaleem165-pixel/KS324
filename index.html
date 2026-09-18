@@ -8910,10 +8910,17 @@ function getObsReportLabels(){
   for(var j=0;j<DB.observations.length;j++) obsById[DB.observations[j].id]=DB.observations[j];
   for(var k=0;k<customs.length;k++)          obsById[customs[k].id]=customs[k];
 
-  var sections=[
-    {pfx:'1', ids: obsOrder.repeated},
-    {pfx:'2', ids: obsOrder.new}
+  var _rawSections=[
+    {ids: obsOrder.repeated},
+    {ids: obsOrder.new}
   ];
+  var sections=[];
+  var _pfxIdx=0;
+  for(var _ri=0;_ri<_rawSections.length;_ri++){
+    if(!_rawSections[_ri].ids||!_rawSections[_ri].ids.length) continue;
+    _pfxIdx++;
+    sections.push({pfx:String(_pfxIdx),ids:_rawSections[_ri].ids});
+  }
   for(var si=0;si<sections.length;si++){
     var sec=sections[si];
     // Replicate renderRpt()'s area-grouping: area order = first appearance in obsOrder
