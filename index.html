@@ -3357,6 +3357,23 @@ function getSnippet(raw, toks) {
 // setObsType — called internally by _applyRepeatSelections (Detect Repeats).
 // No longer wired to any manual UI toggle; classification is via Detect Repeats only.
 function setObsType(id, val) {
+  // Warn when marking as Repeated if no previous report reference is set (first-time audit)
+  if(val==='Repeated'){
+    var _prevRpt=(document.getElementById('brprev')||{}).value||'';
+    var _prevRa=document.getElementById('ra-next_autype');
+    var _autype=(document.getElementById('brautype')||{}).value||'';
+    var _looksFirstAudit=!_prevRpt.trim();
+    if(_looksFirstAudit){
+      var _ok=confirm('Warning: No previous audit report reference has been entered.\n\nFor a first-time branch audit, observations should typically be classified as "New", not "Repeated".\n\nAre you sure you want to mark this observation as Repeated?');
+      if(!_ok){
+        // Revert the dropdown
+        var _sel=document.querySelector('select[onchange*="setObsType(\''+id+'\'"]');
+        if(!_sel){ var _all=document.querySelectorAll('select'); for(var _si=0;_si<_all.length;_si++){if((_all[_si].getAttribute('onchange')||'').indexOf("'"+id+"'")>=0){_sel=_all[_si];break;}} }
+        if(_sel) _sel.value=obsTypeMap[id]||'New';
+        return;
+      }
+    }
+  }
   obsTypeMap[id] = val;
   // Move between section order arrays when type changes
   _obsOrderRemove(id);
@@ -3379,6 +3396,13 @@ function setObsType(id, val) {
 }
 
 function setLastRef(id, val) {
+  // Warn if entering LARR when no previous report reference exists
+  if(val && val.trim()){
+    var _prevR=(document.getElementById('brprev')||{}).value||'';
+    if(!_prevR.trim() && !(lastRefMap[id])){
+      flash('larr-warn-'+id, 'Note: No previous report reference is set. LARR is only applicable for Repeated observations from a prior audit.', 'warn');
+    }
+  }
   if(val) lastRefMap[id]=val; else delete lastRefMap[id];
   _refreshObsBadge(id);
 }
@@ -5079,6 +5103,15 @@ function renderRpt(){
   if(pb)  h+='<div><strong>Prepared By:</strong> '+esc(pb)+'</div>'; else h+='<div></div>';
   if(per) h+='<div><strong>Audit Period:</strong> '+esc(per)+'</div>'; else h+='<div></div>';
   h+='</div></div>';
+
+  // First-audit warning: repeated obs present but no previous report reference
+  if(sections[0].obs.length && !brprev){
+    h+='<div style="margin:10px 0;padding:9px 14px;background:#fff3cd;border:1px solid #f0c040;border-left:4px solid #e0a000;border-radius:5px;font-size:12px;color:#7a5000;font-family:Inter,sans-serif">'
+      +'<strong>&#9888; First-Audit Warning:</strong> '
+      +sections[0].obs.length+' observation'+(sections[0].obs.length>1?'s are':' is')+' classified as <strong>Repeated</strong>, but no Previous Report Reference has been entered. '
+      +'For a first-time branch audit, these should be changed to <strong>New</strong> using the type dropdown in the observation list.'
+      +'</div>';
+  }
 
   // MIS box — show whenever any MIS field is filled
   var misFields=[brname,brregion,brcity,brhead,braddress,brautype,per,brvisit,brprev,brfwk];
