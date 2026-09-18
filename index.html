@@ -2941,6 +2941,7 @@ function _obsOrderRemove(id){
 }
 
 function handleSel(id, checked, div) {
+  _markChanged();
   if(checked){
     selIds[id]=true;
     // Seed obsTypeMap as 'New' if Detect Repeats hasn't already classified this obs.
@@ -3396,6 +3397,7 @@ function setObsType(id, val) {
 }
 
 function setLastRef(id, val) {
+  _markChanged();
   // Warn if entering LARR when no previous report reference exists
   if(val && val.trim()){
     var _prevR=(document.getElementById('brprev')||{}).value||'';
@@ -3555,6 +3557,7 @@ function _refreshObsBadge(id){
 }
 
 function setSensitivity(id, sel){
+  _markChanged();
   var val = sel.value;
   if(val) sensitivityMap[id]=val; else delete sensitivityMap[id];
   sel.className = 'sens-sel'+(val==='High'?' s-high':val==='M to H'?' s-mh':val==='L to M'?' s-lm':val==='Low'?' s-low':'');
@@ -3934,6 +3937,7 @@ function toggleStepGuide(){
 // ── End Step Guide ────────────────────────────────────────────────────────
 
 function setCoso(id, sel){
+  _markChanged();
   var val = sel.value;
   var prev = cosoMap[id]||'';
   if(val) cosoMap[id]=val; else delete cosoMap[id];
@@ -3960,6 +3964,7 @@ function findDbAssessText(id, type){
 }
 
 function setAssess(id, val) {
+  _markChanged();
   assessMap[id] = val;
   var agrBlk=document.getElementById('agr-blk-'+id);
   var actBlk=document.getElementById('act-blk-'+id);
@@ -4520,6 +4525,7 @@ function importFullBackup(event){
 
 function doSaveNow(){
   _lastSavedTs = Date.now();
+  _lastChangedTs = 0;  // reset dirty flag — session is now up to date
   closeVH();
   saveVersion(function(result){
     var msg='Version '+result.ver+' saved (IndexedDB).';
@@ -4666,7 +4672,10 @@ function importSessionFile(e){
 // DIRTY-REPORT FLOATING POPUP
 // ============================================================
 var _lastSavedTs = 0;
+var _lastChangedTs = 0;  // updated whenever auditor data changes after a save
 var _reportEverGenerated = false;  // dirty popup only active after first generate
+
+function _markChanged(){ _lastChangedTs = Date.now(); }
 
 // ============================================================
 // CONTINUOUS AUTO-SAVE
@@ -8375,9 +8384,13 @@ function downloadSoftCopy(){
   var cont=document.getElementById('rpcont');
   if(!cont||cont.style.display==='none'){toast('Generate report first.');return;}
 
-  // Block if the session has never been saved — auditor must save first so they
-  // can reload their own work after receiving the auditee response file back.
-  if(!_lastSavedTs){
+  // Block or warn if session is unsaved / has unsaved changes since last save.
+  var _hasUnsavedChanges = _lastSavedTs && _lastChangedTs && _lastChangedTs > _lastSavedTs;
+  if(!_lastSavedTs || _hasUnsavedChanges){
+    var _warnTitle = _lastSavedTs ? '&#9888; Unsaved Changes Detected' : '&#9888; Save Your Report First';
+    var _warnBody  = _lastSavedTs
+      ? 'You have made <strong>changes since your last save</strong>. Please save your report again before generating the Auditee Copy.<br><br>When you receive the auditee\'s response back, you will need to re-open the <strong>latest saved file</strong>. If you proceed now, your recent changes will be missing when you reload.'
+      : 'You must <strong>save your report file (.json)</strong> before generating the Auditee Copy.<br><br>When you receive the auditee\'s responses back, you will need to re-open this saved file first to restore all your work — then load the response file on top of it.<br><br>Without saving now, you will lose your observation selections, type overrides, sensitivity ratings, and LARR values.';
     var _ex=document.getElementById('_scSaveWarnModal');
     if(_ex) _ex.parentNode.removeChild(_ex);
     var _el=document.createElement('div');
@@ -8385,12 +8398,8 @@ function downloadSoftCopy(){
     _el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center';
     _el.innerHTML=
       '<div style="background:#fff;border-radius:8px;padding:28px 32px;max-width:460px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,.25);font-family:Inter,sans-serif">'+
-      '<div style="font-size:15px;font-weight:700;color:#c0392b;margin-bottom:10px">&#9888; Save Your Report First</div>'+
-      '<div style="font-size:13px;color:#2a3a50;line-height:1.7;margin-bottom:14px">'+
-      'You must <strong>save your report file (.json)</strong> before generating the Auditee Copy.<br><br>'+
-      'When you receive the auditee\'s responses back, you will need to <strong>re-open this saved file first</strong> to restore all your work — then load the response file on top of it.<br><br>'+
-      'Without saving now, you will lose your observation selections, type overrides, sensitivity ratings, and LARR values when you load the response later.'+
-      '</div>'+
+      '<div style="font-size:15px;font-weight:700;color:#c0392b;margin-bottom:10px">'+_warnTitle+'</div>'+
+      '<div style="font-size:13px;color:#2a3a50;line-height:1.7;margin-bottom:14px">'+_warnBody+'</div>'+
       '<div style="font-size:11.5px;color:#888;background:#f5f8fc;border-radius:5px;padding:8px 12px;margin-bottom:18px">'+
       'To save: click <strong>File &rarr; Save Report</strong> in the toolbar, then come back to generate the Auditee Copy.'+
       '</div>'+
