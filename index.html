@@ -9735,7 +9735,15 @@ function applyRespLoad(){
 
   responseLoaded=true;
   renderStepGuide();
+
+  // ── CRITICAL: replace selIds entirely with the loaded observation set ──────
+  // Merely adding to selIds would merge observations from a previously-open
+  // branch session into this one, causing cross-branch contamination.
+  selIds={};
+  obsOrder={repeated:[],new:[]};
+  obsTypeMap={};
   for(var j=0;j<loadedObs.length;j++) selIds[loadedObs[j]]=true;
+  // ──────────────────────────────────────────────────────────────────────────
 
   // ── Orphan recovery ───────────────────────────────────────────────────────
   // If an observation was deleted from the databank (via DBM changes) after the
