@@ -12391,8 +12391,9 @@ function showSaveDialog(){
           for(var oi=0;oi<ob.length;oi++){_n++;_pfNumMap[ob[oi].id]='Obs. '+secPfx+'.'+_n;_pfOrdered.push(ob[oi]);}
         }
       }
-      _assign(_rp,'1');
-      _assign(_nw,'2');
+      var _pfIdx=0;
+      if(_rp.length){_pfIdx++;_assign(_rp,String(_pfIdx));}
+      if(_nw.length){_pfIdx++;_assign(_nw,String(_pfIdx));}
     }());
 
     // ── Report-level: check for unlinked annexures ───────────────────────────
@@ -15652,8 +15653,12 @@ function generateReviewerHtml(role){
   var repObs=allObs.filter(function(o){return (o.type||'New').toLowerCase()==='repeated';});
   var newObs=allObs.filter(function(o){return (o.type||'New').toLowerCase()!=='repeated';});
   var orderedObs=[]; // [{obs, secNum, subNum, label}]
-  repObs.forEach(function(o,i){ orderedObs.push({obs:o,secNum:1,subNum:i+1,label:'1.'+(i+1)}); });
-  newObs.forEach(function(o,i){ orderedObs.push({obs:o,secNum:2,subNum:i+1,label:'2.'+(i+1)}); });
+  var _srrPfx=0;
+  var _repPfx=0,_newPfx=0;
+  if(repObs.length){_srrPfx++;_repPfx=_srrPfx;}
+  if(newObs.length){_srrPfx++;_newPfx=_srrPfx;}
+  repObs.forEach(function(o,i){ orderedObs.push({obs:o,secNum:_repPfx,subNum:i+1,label:_repPfx+'.'+(i+1)}); });
+  newObs.forEach(function(o,i){ orderedObs.push({obs:o,secNum:_newPfx,subNum:i+1,label:_newPfx+'.'+(i+1)}); });
 
   // Section header helper
   function sectionHeader(title, count, color){
