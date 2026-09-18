@@ -2275,6 +2275,7 @@ function showWelcomeBack(branchName, savedAt, wasAuto){
 // <\/script> occurrences inside string literals.
 // ============================================================
 function generateProtectedCopy(){
+  if(!_guardSaved()) return;
   var KEY='BSS_BRAINS_PROT_2026_KS324_v1';
   var kl=KEY.length, CHUNK=4096;
 
@@ -4676,6 +4677,35 @@ var _lastChangedTs = 0;  // updated whenever auditor data changes after a save
 var _reportEverGenerated = false;  // dirty popup only active after first generate
 
 function _markChanged(){ _lastChangedTs = Date.now(); }
+
+// Returns true if session is saved and up-to-date; otherwise shows modal and returns false.
+function _guardSaved(onContinue){
+  var _hasUnsaved = _lastSavedTs && _lastChangedTs && _lastChangedTs > _lastSavedTs;
+  if(!_lastSavedTs || _hasUnsaved){
+    var _title = _lastSavedTs ? '&#9888; Unsaved Changes Detected' : '&#9888; Save Your Report First';
+    var _body  = _lastSavedTs
+      ? 'You have made <strong>changes since your last save</strong>. Please save your report again before generating this file.<br><br>When you need to reload your work later, you will need the <strong>latest saved file</strong>. Proceeding without saving means your recent changes will be missing.'
+      : 'You must <strong>save your report file (.json)</strong> before generating any report output.<br><br>Without saving, you risk losing your observation selections, type overrides, sensitivity ratings, and LARR values if you need to reload your session later.';
+    var _ex=document.getElementById('_scSaveWarnModal');
+    if(_ex) _ex.parentNode.removeChild(_ex);
+    var _el=document.createElement('div');
+    _el.id='_scSaveWarnModal';
+    _el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center';
+    _el.innerHTML=
+      '<div style="background:#fff;border-radius:8px;padding:28px 32px;max-width:460px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,.25);font-family:Inter,sans-serif">'+
+      '<div style="font-size:15px;font-weight:700;color:#c0392b;margin-bottom:10px">'+_title+'</div>'+
+      '<div style="font-size:13px;color:#2a3a50;line-height:1.7;margin-bottom:14px">'+_body+'</div>'+
+      '<div style="font-size:11.5px;color:#888;background:#f5f8fc;border-radius:5px;padding:8px 12px;margin-bottom:18px">'+
+      'To save: click <strong>File &rarr; Save Report</strong> in the toolbar, then try again.'+
+      '</div>'+
+      '<div style="display:flex;gap:10px;justify-content:flex-end">'+
+      '<button onclick="document.getElementById(\'_scSaveWarnModal\').remove()" style="padding:8px 18px;border:1px solid #c8d8ec;border-radius:5px;background:#f0f4f8;font-family:Inter,sans-serif;font-size:13px;cursor:pointer;color:#4a6080">OK — I will save first</button>'+
+      '</div></div>';
+    document.body.appendChild(_el);
+    return false;
+  }
+  return true;
+}
 
 // ============================================================
 // CONTINUOUS AUTO-SAVE
@@ -8045,6 +8075,7 @@ function draftToggleAll(){
 }
 
 function downloadDraft(individual){
+  if(!_guardSaved()) return;
   var allCats=window._draftCats||[];
   var allObs=window._draftReferred||[];
 
@@ -8384,31 +8415,8 @@ function downloadSoftCopy(){
   var cont=document.getElementById('rpcont');
   if(!cont||cont.style.display==='none'){toast('Generate report first.');return;}
 
-  // Block or warn if session is unsaved / has unsaved changes since last save.
-  var _hasUnsavedChanges = _lastSavedTs && _lastChangedTs && _lastChangedTs > _lastSavedTs;
-  if(!_lastSavedTs || _hasUnsavedChanges){
-    var _warnTitle = _lastSavedTs ? '&#9888; Unsaved Changes Detected' : '&#9888; Save Your Report First';
-    var _warnBody  = _lastSavedTs
-      ? 'You have made <strong>changes since your last save</strong>. Please save your report again before generating the Auditee Copy.<br><br>When you receive the auditee\'s response back, you will need to re-open the <strong>latest saved file</strong>. If you proceed now, your recent changes will be missing when you reload.'
-      : 'You must <strong>save your report file (.json)</strong> before generating the Auditee Copy.<br><br>When you receive the auditee\'s responses back, you will need to re-open this saved file first to restore all your work — then load the response file on top of it.<br><br>Without saving now, you will lose your observation selections, type overrides, sensitivity ratings, and LARR values.';
-    var _ex=document.getElementById('_scSaveWarnModal');
-    if(_ex) _ex.parentNode.removeChild(_ex);
-    var _el=document.createElement('div');
-    _el.id='_scSaveWarnModal';
-    _el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center';
-    _el.innerHTML=
-      '<div style="background:#fff;border-radius:8px;padding:28px 32px;max-width:460px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,.25);font-family:Inter,sans-serif">'+
-      '<div style="font-size:15px;font-weight:700;color:#c0392b;margin-bottom:10px">'+_warnTitle+'</div>'+
-      '<div style="font-size:13px;color:#2a3a50;line-height:1.7;margin-bottom:14px">'+_warnBody+'</div>'+
-      '<div style="font-size:11.5px;color:#888;background:#f5f8fc;border-radius:5px;padding:8px 12px;margin-bottom:18px">'+
-      'To save: click <strong>File &rarr; Save Report</strong> in the toolbar, then come back to generate the Auditee Copy.'+
-      '</div>'+
-      '<div style="display:flex;gap:10px;justify-content:flex-end">'+
-      '<button onclick="document.getElementById(\'_scSaveWarnModal\').remove()" style="padding:8px 18px;border:1px solid #c8d8ec;border-radius:5px;background:#f0f4f8;font-family:Inter,sans-serif;font-size:13px;cursor:pointer;color:#4a6080">OK — I will save first</button>'+
-      '</div></div>';
-    document.body.appendChild(_el);
-    return;
-  }
+  // Block if session is unsaved or has unsaved changes since last save
+  if(!_guardSaved()) return;
 
   var H=getHdrVals();
   // Build obs lookup
@@ -9908,6 +9916,7 @@ function showFollowUpModal(){
 }
 
 function generateFollowUpFile(){
+  if(!_guardSaved()) return;
   // Collect selected obs IDs
   var chks=document.querySelectorAll('.fu-chk:checked');
   if(!chks.length){ alert('Please select at least one observation.'); return; }
@@ -10454,6 +10463,7 @@ function obsReadinessBadge(o){
 }
 
 function finalizeReport(){
+  if(!_guardSaved()) return;
   var H=getHdrVals();
   var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
@@ -10906,6 +10916,7 @@ function finalizeReport(){
 // ISSUED REPORT — polished interactive HTML (matching sample)
 // ============================================================
 function generateIssuedReport(forROCopy){
+  if(!_guardSaved()) return;
   if(!forROCopy && _viewerBlocked()) return; // block final Issue action only, not internal review generation
   var isReview=(forROCopy==='ro_review'||forROCopy==='ho_review');
   var reviewRole=isReview?forROCopy.replace('_review',''):null;
@@ -15492,6 +15503,7 @@ function ra_scoreCategory(catName,rpt1,rpt2,allParsed,currentCatMap,hasCurrentAu
    ══════════════════════════════════════════════════════════ */
 
 function generateReviewerHtml(role){
+  if(!_guardSaved()) return;
   // Collect current observation data with edits applied
   var allObs = [];
   var dbObs  = DB&&DB.observations ? DB.observations : [];
