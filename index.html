@@ -8343,20 +8343,39 @@ function downloadSoftCopy(){
   if(!cont||cont.style.display==='none'){toast('Generate report first.');return;}
 
   var H=getHdrVals();
-  var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
-  var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
-  var all=dbObs.concat(cuObs);
-  if(!all.length){toast('No observations selected.');return;}
+  // Build obs lookup
+  var _scObsById={};
+  for(var j=0;j<DB.observations.length;j++) _scObsById[DB.observations[j].id]=DB.observations[j];
+  for(var k=0;k<customs.length;k++) _scObsById[customs[k].id]=customs[k];
 
-  // Group by section then category
+  // Use obsOrder (same sequence as main report) to guarantee identical numbering
   var scSections=[
     {key:'repeated',label:'1. Repeated Observations',obs:[]},
-    {key:'new',     label:'2. New Observations',                   obs:[]}
+    {key:'new',     label:'2. New Observations',     obs:[]}
   ];
-  for(var a=0;a<all.length;a++){
-    var effTsc=(obsTypeMap[all[a].id]||all[a].type||'New').toLowerCase();
-    if(effTsc==='repeated') scSections[0].obs.push(all[a]); else scSections[1].obs.push(all[a]);
+  var _scIds=[obsOrder.repeated, obsOrder.new];
+  for(var _si2=0;_si2<_scIds.length;_si2++){
+    var _scList=_scIds[_si2];
+    for(var _si3=0;_si3<_scList.length;_si3++){
+      var _scO=_scObsById[_scList[_si3]];
+      if(_scO&&selIds[_scO.id]) scSections[_si2].obs.push(_scO);
+    }
   }
+  // Also catch any selected obs not yet in obsOrder (safety net)
+  var _scSeen={};
+  for(var _sx=0;_sx<scSections.length;_sx++){for(var _sy=0;_sy<scSections[_sx].obs.length;_sy++) _scSeen[scSections[_sx].obs[_sy].id]=1;}
+  var _scAll=[];
+  for(var j2=0;j2<DB.observations.length;j2++){if(selIds[DB.observations[j2].id])_scAll.push(DB.observations[j2]);}
+  for(var k2=0;k2<customs.length;k2++){if(selIds[customs[k2].id])_scAll.push(customs[k2]);}
+  for(var _sz=0;_sz<_scAll.length;_sz++){
+    var _scEx=_scAll[_sz];
+    if(_scSeen[_scEx.id]) continue;
+    var _scEffT=(obsTypeMap[_scEx.id]||_scEx.type||'New').toLowerCase();
+    if(_scEffT==='repeated') scSections[0].obs.push(_scEx); else scSections[1].obs.push(_scEx);
+  }
+  if(!_scAll.length&&!scSections[0].obs.length&&!scSections[1].obs.length){toast('No observations selected.');return;}
+  if(!scSections[0].obs.length&&!scSections[1].obs.length){toast('No observations selected.');return;}
+
   // If no repeated observations, use plain "Observations" heading for the New section
   if(!scSections[0].obs.length){ scSections[1].label='Observations'; }
   function scCatGroups(obsList){var cats={};for(var i=0;i<obsList.length;i++){var c=obsList[i].category||'Others';if(!cats[c])cats[c]=[];cats[c].push(obsList[i]);}return{cats:cats,catOrder:catOrderByDef(cats)};}
