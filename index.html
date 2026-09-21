@@ -4365,6 +4365,7 @@ function restoreSession(sess) {
   // must not block report generation immediately after loading.
   _lastSavedTs = Date.now();
   _lastChangedTs = 0;
+  _distChangeWarnShown = false;
 }
 
 function saveVersion(cb) {
@@ -4682,7 +4683,26 @@ var _lastSavedTs = 0;
 var _lastChangedTs = 0;  // updated whenever auditor data changes after a save
 var _reportEverGenerated = false;  // dirty popup only active after first generate
 
-function _markChanged(){ _lastChangedTs = Date.now(); }
+var _distChangeWarnShown = false;  // show once per session after distribution
+function _markChanged(){
+  _lastChangedTs = Date.now();
+  // Warn once if a distributed report already exists and the auditor is now modifying the report
+  if(!_distChangeWarnShown && (_wfSentAuditee || _wfSentRO)){
+    _distChangeWarnShown = true;
+    var _el=document.createElement('div');
+    _el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.50);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+    _el.innerHTML='<div style="background:#fff;border-radius:8px;padding:28px 32px;max-width:460px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,.25)">'
+      +'<div style="font-size:15px;font-weight:700;color:#b06000;margin-bottom:10px">&#9888; Distributed Report May Be Outdated</div>'
+      +'<div style="font-size:13px;color:#2a3a50;line-height:1.75;margin-bottom:16px">'
+      +'You are making changes to this report after a <strong>Distributed Report</strong> has already been sent out.<br><br>'
+      +'The copy already distributed will <strong>not reflect these changes</strong>. If this change is significant, please save your session and re-distribute the relevant report.'
+      +'</div>'
+      +'<div style="display:flex;justify-content:flex-end">'
+      +'<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="padding:8px 20px;background:#b06000;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Understood</button>'
+      +'</div></div>';
+    document.body.appendChild(_el);
+  }
+}
 
 // Returns true if session is saved and up-to-date; otherwise shows modal and returns false.
 function _guardSaved(onContinue){
@@ -6183,6 +6203,7 @@ function _performFullClear(){
   // Flags
   responseLoaded=false; _wfSentAuditee=false; _wfReceivedBack=false; _wfSentRO=false;
   _brInfoHasData=false; _brInfoUnlocked=true; _reportEverGenerated=false;
+  _distChangeWarnShown=false;
   window._pendingFinal=null;
   // Hide Report Nav panel and toolbar button — must not persist across sessions
   var _rnp=document.getElementById('rpt-nav-panel'); if(_rnp) _rnp.style.display='none';
