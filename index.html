@@ -3807,7 +3807,7 @@ function getMissingMateriality(allObs, labMapObj, obsTextFn){
 // ── Workflow Step Guide ───────────────────────────────────────────────────
 var _stepGuideVisible=true;
 // Manual-toggle state for post-finalization steps (persisted in session save/restore)
-var _wfSentAuditee=false, _wfReceivedBack=false, _wfSentRO=false;
+var _wfSentAuditee=false, _wfReceivedBack=false, _wfSentRO=false, _wfSentDraft=false;
 var STEPS=[
   {n:1,  icon:'&#127968;', label:'Branch Setup',           hint:'Select a branch from the left panel and fill in the Report No., Audit Visit dates, and other header fields at the top of the right panel.'},
   {n:2,  icon:'&#128221;', label:'Pick Observations',      hint:'Tick observations from the left panel databank list. Use category filters to quickly find relevant observations for this branch.'},
@@ -4250,7 +4250,7 @@ function captureSession() {
     pendingAmendments: pendingAmendments,
     customs  : customs,
     responseLoaded: responseLoaded,
-    wfSentAuditee: _wfSentAuditee, wfReceivedBack: _wfReceivedBack, wfSentRO: _wfSentRO,
+    wfSentAuditee: _wfSentAuditee, wfReceivedBack: _wfReceivedBack, wfSentRO: _wfSentRO, wfSentDraft: _wfSentDraft,
     introSections: getIntroSectionVals(),
     annexures: annexures.map(function(a){
       return {id:a.id,label:a.label,title:a.title,text:a.text||'',linkedObs:a.linkedObs||[],open:a.open,
@@ -4323,6 +4323,7 @@ function restoreSession(sess) {
   _wfSentAuditee  = sess.wfSentAuditee  || false;
   _wfReceivedBack = sess.wfReceivedBack || false;
   _wfSentRO       = sess.wfSentRO       || false;
+  _wfSentDraft    = sess.wfSentDraft    || false;
   customs   = sess.customs   || [];
   if(sess.obsOrder){ obsOrder.repeated = sess.obsOrder.repeated||[]; obsOrder.new = sess.obsOrder.new||[]; }
   else { obsOrder = { repeated:[], new:[] }; }
@@ -4687,7 +4688,7 @@ var _distChangeWarnShown = false;  // show once per session after distribution
 function _markChanged(){
   _lastChangedTs = Date.now();
   // Warn once if a distributed report already exists and the auditor is now modifying the report
-  if(!_distChangeWarnShown && (_wfSentAuditee || _wfSentRO)){
+  if(!_distChangeWarnShown && (_wfSentAuditee || _wfSentRO || _wfSentDraft)){
     _distChangeWarnShown = true;
     var _el=document.createElement('div');
     _el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.50);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
@@ -6201,9 +6202,9 @@ function _performFullClear(){
   // RA reports
   _raReportsClear();
   // Flags
-  responseLoaded=false; _wfSentAuditee=false; _wfReceivedBack=false; _wfSentRO=false;
+  responseLoaded=false; _wfSentAuditee=false; _wfReceivedBack=false; _wfSentRO=false; _wfSentDraft=false;
   _brInfoHasData=false; _brInfoUnlocked=true; _reportEverGenerated=false;
-  _distChangeWarnShown=false;
+  _distChangeWarnShown=false; _lastSavedTs=0; _lastChangedTs=0;
   window._pendingFinal=null;
   // Hide Report Nav panel and toolbar button — must not persist across sessions
   var _rnp=document.getElementById('rpt-nav-panel'); if(_rnp) _rnp.style.display='none';
@@ -6251,8 +6252,8 @@ function doClear(){
   if(typeof srr_flagged!=='undefined') srr_flagged={};
   if(typeof srr_reassigned!=='undefined') srr_reassigned={};
   if(typeof srr_files!=='undefined') srr_files=[];
-  responseLoaded=false; _wfSentAuditee=false; _wfReceivedBack=false; _wfSentRO=false;
-  _reportEverGenerated=false;
+  responseLoaded=false; _wfSentAuditee=false; _wfReceivedBack=false; _wfSentRO=false; _wfSentDraft=false;
+  _reportEverGenerated=false; _distChangeWarnShown=false;
   var _rnp2=document.getElementById('rpt-nav-panel'); if(_rnp2) _rnp2.style.display='none';
   var _rntb2=document.getElementById('rpt-nav-toggle-tb'); if(_rntb2) _rntb2.style.display='none';
   renderAnnexList();
@@ -8105,6 +8106,8 @@ function _roFmtSave(filename){
     })(items[ix], delay, pdfWins[ix]||null);
     delay+=(doHtml?700:0)+(doWord?700:0)+(doPdf?700:0);
   }
+  _wfSentDraft=true;
+  renderStepGuide();
 }
 
 function draftToggleAll(){
@@ -8268,6 +8271,8 @@ function downloadDraft(individual){
             h+='<div style="font-size:11.5px;font-weight:700;color:#2a6040;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">&#128172; Head of School Response</div>';
             h+='<div style="font-size:12.5px;line-height:1.6;color:#1a3a2a;background:#f0fff4;border:1px solid #80c8a0;border-radius:4px;padding:7px 9px;margin-bottom:10px;white-space:pre-wrap">'+esc(bhResp)+'</div>';
           }
+          var _rvEta=etaMap[o.id]||'';
+          if(_rvEta){h+='<div style="margin:0 0 10px;padding:6px 11px;background:#f0faf4;border:1px solid #90d0a8;border-left:4px solid #1a6030;border-radius:0 5px 5px 0;display:flex;align-items:center;gap:10px;font-size:12px"><strong style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#1a6030;white-space:nowrap">&#9200; Est. Time to Resolve:</strong> <span style="font-weight:700;color:#1a6030">'+esc(_rvEta)+'</span></div>';}
           var _existingSectResp=(_dRole==='ro'?(respSectROMap[o.id]||''):(respSectHOMap[o.id]||''));
           h+='<div style="font-size:11.5px;font-weight:700;color:'+navy+';text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">&#128172; '+_dRoleLabel+' Section Response <span style="font-size:10px;font-weight:400;color:#888;text-transform:none">(section head response to this observation)</span></div>';
           h+='<textarea name="sectresp_'+o.id+'" style="width:100%;box-sizing:border-box;border:1px dashed #b0c0d8;border-radius:4px;padding:7px 9px;font-family:Inter,sans-serif;font-size:12.5px;color:#2a3a50;background:#fffef0;resize:vertical;min-height:70px;outline:none" placeholder="Enter section response to this observation...">'+esc(_existingSectResp)+'</textarea>';
@@ -10055,6 +10060,8 @@ function generateFollowUpFile(){
       h+='<div class="lbl" style="color:#5b3fa0">Previous Response (Round '+(prevHist.length+1)+')</div>';
       h+='<div class="prev-resp">'+esc(prevResp)+'</div>';
     }
+    var _fuEta=etaMap[obs.id]||'';
+    if(_fuEta){h+='<div style="margin:6px 0 8px;padding:5px 10px;background:#f0faf4;border:1px solid #90d0a8;border-left:4px solid #1a6030;border-radius:0 4px 4px 0;font-size:12px;display:flex;align-items:center;gap:8px"><strong style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#1a6030;white-space:nowrap">&#9200; Est. Time to Resolve (Previous):</strong> <span style="font-weight:700;color:#1a6030">'+esc(_fuEta)+'</span></div>';}
     h+='<div class="lbl" style="color:#1a6030">Your Revised Response (Round '+round+')</div>';
     h+='<textarea class="resp-ta" name="resp_'+obs.id+'" placeholder="Enter revised or additional response here (minimum 10 letters)..." oninput="fuCheckHint(this)">'+esc(prevResp)+'</textarea>';
     h+='<div id="rh_resp_'+obs.id+'" style="display:none;font-size:11px;color:#c0392b;margin-top:3px"></div>';
@@ -13789,11 +13796,11 @@ function loadDemoData(){
   var hasData = Object.keys(selIds).length > 0;
 
   // --- Clear existing (inline, no confirm prompt) ---
-  selIds={}; annexMap={}; obsTypeMap={}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; etaMap={}; respBHMap={}; respROMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={};
+  selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; etaMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; respHistory={}; respAttachMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
   _raReportsClear();
-  responseLoaded=false; _brInfoHasData=false; _brInfoUnlocked=true;
-  _reportEverGenerated=false;
-  window.pendingSel={};
+  responseLoaded=false; _wfSentAuditee=false; _wfReceivedBack=false; _wfSentRO=false; _wfSentDraft=false;
+  _brInfoHasData=false; _brInfoUnlocked=true;
+  _reportEverGenerated=false; _distChangeWarnShown=false; _lastSavedTs=0; _lastChangedTs=0;
   setBrInfoDisabled(false);
   var _ov=document.getElementById('brinfo-lock-overlay'); if(_ov) _ov.style.display='none';
   var _badge=document.getElementById('brinfo-lockbadge'); if(_badge) _badge.style.display='none';
