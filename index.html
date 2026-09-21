@@ -4203,6 +4203,13 @@ var VH_KEY = 'bss_sessions';
 
 function captureSession() {
   syncAnnexTextFromDom();
+  // Sync observation/recommendation text edits from DOM (textarea may diverge from obsEdits in-memory map)
+  var _oeIds = Object.keys(selIds);
+  for(var _si=0;_si<_oeIds.length;_si++){
+    var _oid=_oeIds[_si];
+    var _oeEl=document.getElementById('oe-'+_oid);
+    if(_oeEl) obsEdits[_oid]={obs:_oeEl.value, rec:(document.getElementById('re-'+_oid)||{value:obsEdits[_oid]&&obsEdits[_oid].rec||''}).value};
+  }
   // Collect all form field values
   var fields = ['brcode','rno','rpt_stage','brname','brregion','brcity','brhead','brhemail','braddress','brautype','rdt',
                 'rper_from','rper_to','brvisit_from','brvisit_to','brprev','brfwk','spb'];
