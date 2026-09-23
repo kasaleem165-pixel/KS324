@@ -5936,7 +5936,7 @@ function downloadPDF(){
 
 function doCopy(){
   var c=document.getElementById('rpcont');
-  if(!c||c.style.display==='none'){toast('Generate report first.');return;}
+  if(!c||c.style.display==='none'){_warnGenerateFirst();return;}
   var text=c.innerText||'';
   navigator.clipboard.writeText(text).then(function(){
     toast('Copied to clipboard.');
@@ -8468,9 +8468,27 @@ function downloadDraft(individual){
 // ============================================================
 // SOFT COPY (HTML for auditee)
 // ============================================================
+function _warnGenerateFirst(){
+  var _ex=document.getElementById('_wgfModal');
+  if(_ex) _ex.parentNode.removeChild(_ex);
+  var _el=document.createElement('div');
+  _el.id='_wgfModal';
+  _el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+  _el.innerHTML='<div style="background:#fff;border-radius:8px;padding:28px 32px;max-width:440px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,.25)">'
+    +'<div style="font-size:15px;font-weight:700;color:#c0392b;margin-bottom:10px">&#9888; Generate Report First</div>'
+    +'<div style="font-size:13px;color:#2a3a50;line-height:1.75;margin-bottom:16px">'
+    +'Before generating any output file, you must first <strong>generate the report preview</strong>.<br><br>'
+    +'Click the <strong>&#9654; Generate Report</strong> button in the toolbar, then try again.'
+    +'</div>'
+    +'<div style="display:flex;justify-content:flex-end">'
+    +'<button onclick="document.getElementById(\'_wgfModal\').remove()" style="padding:8px 20px;background:#c0392b;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">OK</button>'
+    +'</div></div>';
+  document.body.appendChild(_el);
+}
+
 function downloadSoftCopy(){
   var cont=document.getElementById('rpcont');
-  if(!cont||cont.style.display==='none'){toast('Generate report first.');return;}
+  if(!cont||cont.style.display==='none'){_warnGenerateFirst();return;}
 
   // Block if session is unsaved or has unsaved changes since last save
   if(!_guardSaved()) return;
