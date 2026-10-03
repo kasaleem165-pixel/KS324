@@ -18,6 +18,7 @@
 <meta http-equiv="Expires" content="0">
 <title>Systems &amp; Audit — Report Builder</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--navy:#1a3a5c;--navydark:#0f2540;--navylt:#2a5080;--gold:#c9962a;--goldlt:#f0c040;--orange:#d06020;--bluenew:#2070b8;--gbg:#f3f5f8;--gbor:#dde2ea;--gtxt:#6a7888}
@@ -9370,7 +9371,26 @@ function renderAnnexList(){
           if(isImg) h+='<img src="'+fi.dataUrl+'" style="max-width:100%;max-height:120px;object-fit:contain;border-radius:3px;margin-bottom:5px;display:block">';
           h+='<div style="display:flex;align-items:center;gap:5px">';
           h+='<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(fi.name)+'">&#128196; '+esc(fi.name)+'</span>';
+          // Drive status badge
+          if(fi.driveId){
+            h+='<a href="'+esc(fi.driveUrl||'')+'" target="_blank" style="font-size:10px;background:#e8f5e9;color:#1a6030;border:1px solid #a5d6a7;border-radius:3px;padding:1px 5px;text-decoration:none;white-space:nowrap" title="Saved to Google Drive">&#9729; Drive</a>';
+          } else if(fi._driveStatus==='uploading'){
+            h+='<span style="font-size:10px;color:#888;white-space:nowrap">&#8987; Uploading...</span>';
+          } else if(fi._driveStatus==='error'){
+            h+='<span title="'+esc(fi._driveError||'Drive error')+'" style="font-size:10px;color:#c0392b;cursor:help;white-space:nowrap">&#9888; Drive error</span>';
+            h+='<button class="mib" onclick="_gdUploadAnnexFile(\''+a.id+'\','+f+')" style="font-size:10px">Retry</button>';
+          } else if(_gdIsConfigured()){
+            h+='<button class="mib" onclick="_gdUploadAnnexFile(\''+a.id+'\','+f+')" style="font-size:10px;white-space:nowrap">&#128194; Save to Drive</button>';
+          }
           h+='<button class="mib d" onclick="removeFile(\''+a.id+'\','+f+')">Remove</button></div>';
+          // Manual Drive link input
+          h+='<div style="display:flex;align-items:center;gap:4px;margin-top:4px">';
+          h+='<span style="font-size:10px;color:var(--gtxt);white-space:nowrap">Drive link:</span>';
+          h+='<input type="url" value="'+esc(fi.driveUrl||'')+'" placeholder="Paste Google Drive link (optional)" '
+           +'style="flex:1;font-size:10px;padding:2px 5px;border:1px solid var(--gbor);border-radius:3px;font-family:Inter,sans-serif" '
+           +'oninput="_gdSetManualLink(\''+a.id+'\','+f+',this.value)">';
+          if(fi.driveUrl) h+='<a href="'+esc(fi.driveUrl)+'" target="_blank" style="font-size:10px;color:#1a6030">Open &#8599;</a>';
+          h+='</div>';
         }
         h+='</div>';
       }
@@ -9420,7 +9440,14 @@ function renderAnnexList(){
     }
     h+='</div>';
     h+='<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--gbor)">';
-    h+='<div style="font-size:10px;font-weight:700;color:var(--gtxt);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">&#128206; Attached Files</div>';
+    h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+    h+='<div style="font-size:10px;font-weight:700;color:var(--gtxt);text-transform:uppercase;letter-spacing:.6px;flex:1">&#128206; Attached Files</div>';
+    if(_gdIsConfigured()){
+      var pendingDrive=0;
+      for(var pd=0;pd<a.files.length;pd++){ if(!a.files[pd].driveId&&!a.files[pd]._stripped) pendingDrive++; }
+      if(pendingDrive>0) h+='<button class="mib" onclick="_gdUploadAllAnnex()" style="font-size:10px;white-space:nowrap">&#9729; Upload '+pendingDrive+' to Drive</button>';
+    }
+    h+='</div>';
     h+='<div class="dropzone" id="dz-'+a.id+'" onclick="triggerFU(\''+a.id+'\')" ondragover="dzOver(event,\''+a.id+'\')" ondragleave="dzLeave(\''+a.id+'\')" ondrop="dzDrop(event,\''+a.id+'\')">Click or drag files here<br><span style="font-size:10px">Images &middot; PDF &middot; Excel &middot; Word &middot; any file</span></div>';
     h+='</div>';
     h+='<input type="file" id="fu-'+a.id+'" multiple style="display:none" onchange="handleFiles(\''+a.id+'\',this)">';
@@ -9553,8 +9580,11 @@ function processFileList(id,files){
       if(file.size>15*1024*1024){toast(file.name+' exceeds 15 MB limit.');rem--;if(!rem){renderAnnexList();renderRpt();}return;}
       var reader=new FileReader();
       reader.onload=function(e){
+        var newIdx=anx.files.length;
         anx.files.push({name:file.name,type:file.type||'application/octet-stream',dataUrl:e.target.result});
         rem--; if(!rem){renderAnnexList();renderRpt();}
+        // Auto-upload to Drive if configured (non-blocking)
+        if(_gdIsConfigured()) setTimeout(function(){ _gdUploadAnnexFile(anx.id, newIdx); }, 200);
       };
       reader.readAsDataURL(file);
     })(files[j]);
@@ -23130,6 +23160,15 @@ function showCloudSettings(){
   +'<input id="_cs_token" type="password" value="'+esc(cfg.token||'')+'" placeholder="github_pat_xxxxxxxxxxxxxxxxxxxx" style="'+inp+';margin-bottom:5px">'
   +'<div style="font-size:11px;color:#999">Needs <strong>Contents: Read &amp; Write</strong> permission. <a href="https://github.com/settings/tokens?type=beta" target="_blank" style="color:#1a6030">Create on GitHub &#8599;</a></div></div>'
   +'<div id="_cs_test_result" style="font-size:12px;min-height:18px;margin-bottom:14px"></div>'
+  +'<hr style="border:none;border-top:1px solid #e0e8f4;margin-bottom:14px">'
+  +'<div style="font-size:12.5px;font-weight:700;color:#1a5a30;margin-bottom:10px">&#128194; Google Drive (Annexure Storage) <span style="font-weight:400;color:#aaa;font-size:11px">— optional</span></div>'
+  +'<div style="'+row+'"><label style="'+lbl+'">Drive OAuth Client ID <span style="font-weight:400;color:#aaa">(from Google Cloud Console)</span></label>'
+  +'<input id="_cs_driveClientId" value="'+esc(cfg.driveClientId||'')+'" placeholder="xxxxxxxxxxxx-xxxxxxxxxxxxxxxx.apps.googleusercontent.com" style="'+inp+'"></div>'
+  +'<div style="'+row+'"><label style="'+lbl+'">Drive Root Folder Name <span style="font-weight:400;color:#aaa">(created in My Drive)</span></label>'
+  +'<input id="_cs_driveRoot" value="'+esc(cfg.driveRoot||'BRAINS-Annexures')+'" placeholder="BRAINS-Annexures" style="'+inp+'"></div>'
+  +'<div style="font-size:11px;color:#888;background:#f6f9f6;border:1px solid #c8dec8;border-radius:4px;padding:7px 10px;margin-bottom:14px">'
+  +'&#8505; Drive auto-upload works when BRAINS is opened via <strong>HTTPS</strong> (e.g. GitHub Pages). From a local file, paste Drive links manually per file. '
+  +'<a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:#1a6030">Create Client ID &#8599;</a></div>'
   +'<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end">'
   +'<button onclick="_csTestConnection()" style="padding:8px 15px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12.5px;cursor:pointer;font-family:Inter,sans-serif;color:#1a3a5c">Test Connection</button>'
   +'<button onclick="document.getElementById(\'_csSettingsModal\').remove()" style="padding:8px 15px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:12.5px;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>'
@@ -23146,7 +23185,9 @@ function _csSaveSettings(){
     repo:      (document.getElementById('_cs_repo').value||'').trim(),
     auditor:   (document.getElementById('_cs_auditor').value||'').trim(),
     auditYear: yr || (new Date().getFullYear()+''),
-    token:     (document.getElementById('_cs_token').value||'').trim()
+    token:     (document.getElementById('_cs_token').value||'').trim(),
+    driveClientId: (document.getElementById('_cs_driveClientId').value||'').trim(),
+    driveRoot: (document.getElementById('_cs_driveRoot').value||'BRAINS-Annexures').trim()||'BRAINS-Annexures'
   };
   if(!cfg.owner||!cfg.repo||!cfg.auditor||!cfg.token){ toast('Please fill all required fields.'); return; }
   _csSaveCfg(cfg);
@@ -23586,6 +23627,170 @@ function _lkOnSessionLoad(){
 // Clear all own locks when page closes
 window.addEventListener('beforeunload', function(){ try{ _lkClearAllMyLocks(); }catch(e){} });
 
+// ============================================================
+// GOOGLE DRIVE INTEGRATION (Step 4)
+// ============================================================
+var _GD_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+var _gdAccessToken = null;
+var _gdTokenExpiry = 0;
+var _gdTokenClient = null;
+var _gdFolderCache = {};
+
+function _gdCfg(){
+  var cfg=_csGetCfg();
+  return {clientId:(cfg.driveClientId||'').trim(), rootFolder:(cfg.driveRoot||'BRAINS-Annexures').trim()||'BRAINS-Annexures'};
+}
+
+function _gdIsConfigured(){ return !!_gdCfg().clientId; }
+
+function _gdGetToken(cb){
+  if(_gdAccessToken&&Date.now()<_gdTokenExpiry){ cb(null,_gdAccessToken); return; }
+  var clientId=_gdCfg().clientId;
+  if(!clientId){ cb('Drive Client ID not set in Cloud Settings.'); return; }
+  if(window.location.protocol==='file:'){
+    cb('Drive auto-upload requires HTTPS. Open BRAINS via GitHub Pages or paste a Drive link manually.'); return;
+  }
+  if(!window.google||!window.google.accounts||!window.google.accounts.oauth2){
+    cb('Google Identity library not loaded. Check your internet connection.'); return;
+  }
+  if(!_gdTokenClient){
+    _gdTokenClient=google.accounts.oauth2.initTokenClient({client_id:clientId,scope:_GD_SCOPE,callback:''});
+  }
+  _gdTokenClient.callback=function(resp){
+    if(resp.error){ cb(resp.error); return; }
+    _gdAccessToken=resp.access_token;
+    _gdTokenExpiry=Date.now()+((resp.expires_in||3600)-120)*1000;
+    cb(null,_gdAccessToken);
+  };
+  _gdTokenClient.requestAccessToken({prompt:_gdAccessToken?'':'select_account'});
+}
+
+function _gdFileSubfolder(name){
+  var ext=(name.split('.').pop()||'').toLowerCase();
+  if(['jpg','jpeg','png','gif','webp','bmp','svg','tiff'].indexOf(ext)>=0) return 'Photos';
+  if(['xlsx','xls','csv','ods','numbers'].indexOf(ext)>=0) return 'Schedules';
+  return 'Scanned-Documents';
+}
+
+function _gdFindFolder(name,parentId,token,cb){
+  var q="name='"+name.replace(/'/g,"\\'")+' and mimeType=\'application/vnd.google-apps.folder\' and \''+parentId+'\' in parents and trashed=false';
+  fetch('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent(q)+'&fields=files(id)',{
+    headers:{'Authorization':'Bearer '+token}
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.files&&d.files.length) cb(null,d.files[0].id);
+    else cb(null,null);
+  }).catch(function(e){cb(e.message||'Network error');});
+}
+
+function _gdCreateFolder(name,parentId,token,cb){
+  fetch('https://www.googleapis.com/drive/v3/files',{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+    body:JSON.stringify({name:name,mimeType:'application/vnd.google-apps.folder',parents:[parentId]})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.id) cb(null,d.id);
+    else cb('Cannot create folder: '+(d.error&&d.error.message||JSON.stringify(d)));
+  }).catch(function(e){cb(e.message||'Network error');});
+}
+
+function _gdFindOrCreate(name,parentId,token,cb){
+  var key=parentId+'/'+name;
+  if(_gdFolderCache[key]){cb(null,_gdFolderCache[key]);return;}
+  _gdFindFolder(name,parentId,token,function(err,id){
+    if(err){cb(err);return;}
+    if(id){_gdFolderCache[key]=id;cb(null,id);return;}
+    _gdCreateFolder(name,parentId,token,function(err2,newId){
+      if(err2){cb(err2);return;}
+      _gdFolderCache[key]=newId;cb(null,newId);
+    });
+  });
+}
+
+function _gdGetSubfolderId(subfolder,token,cb){
+  var cfg=_gdCfg(); var branch=_csBranchFolder();
+  _gdFindOrCreate(cfg.rootFolder,'root',token,function(err,rootId){
+    if(err){cb(err);return;}
+    _gdFindOrCreate(branch,rootId,token,function(err2,branchId){
+      if(err2){cb(err2);return;}
+      _gdFindOrCreate(subfolder,branchId,token,cb);
+    });
+  });
+}
+
+function _gdUploadFile(fi,folderId,token,cb){
+  try{
+    var b64=fi.dataUrl.split(',')[1];
+    var byteStr=atob(b64);
+    var ab=new ArrayBuffer(byteStr.length);
+    var ia=new Uint8Array(ab);
+    for(var i=0;i<byteStr.length;i++) ia[i]=byteStr.charCodeAt(i);
+    var blob=new Blob([ab],{type:fi.type||'application/octet-stream'});
+    var meta=JSON.stringify({name:fi.name,parents:[folderId]});
+    var fd=new FormData();
+    fd.append('metadata',new Blob([meta],{type:'application/json'}));
+    fd.append('file',blob);
+    fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',{
+      method:'POST',headers:{'Authorization':'Bearer '+token},body:fd
+    }).then(function(r){return r.json();}).then(function(d){
+      if(d.id) cb(null,d);
+      else cb('Upload failed: '+(d.error&&d.error.message||JSON.stringify(d)));
+    }).catch(function(e){cb(e.message||'Upload error');});
+  }catch(ex){cb(ex.message||'Encode error');}
+}
+
+function _gdUploadAnnexFile(anxId,fileIdx){
+  if(!_gdIsConfigured()) return;
+  var anx=null;
+  for(var i=0;i<annexures.length;i++){if(annexures[i].id===anxId){anx=annexures[i];break;}}
+  if(!anx||!anx.files[fileIdx]) return;
+  var fi=anx.files[fileIdx];
+  if(fi.driveId||fi._driveStatus==='uploading') return;
+  if(!fi.dataUrl||fi._stripped) return;
+  fi._driveStatus='uploading'; renderAnnexList();
+  _gdGetToken(function(err,token){
+    if(err){fi._driveStatus='error';fi._driveError=err;renderAnnexList();return;}
+    var subfolder=_gdFileSubfolder(fi.name);
+    _gdGetSubfolderId(subfolder,token,function(err2,subId){
+      if(err2){fi._driveStatus='error';fi._driveError=err2;renderAnnexList();return;}
+      _gdUploadFile(fi,subId,token,function(err3,result){
+        if(err3){fi._driveStatus='error';fi._driveError=err3;renderAnnexList();return;}
+        fi.driveId=result.id;
+        fi.driveUrl=result.webViewLink;
+        fi._driveStatus='done';
+        delete fi._driveError;
+        renderAnnexList();
+      });
+    });
+  });
+}
+
+function _gdUploadAllAnnex(){
+  if(!_gdIsConfigured()){toast('Configure Drive Client ID in Cloud Settings first.');return;}
+  var count=0;
+  for(var i=0;i<annexures.length;i++){
+    var a=annexures[i];
+    for(var j=0;j<a.files.length;j++){
+      var fi=a.files[j];
+      if(!fi.driveId&&fi.dataUrl&&!fi._stripped&&fi._driveStatus!=='uploading'){
+        _gdUploadAnnexFile(a.id,j); count++;
+      }
+    }
+  }
+  if(count) toast('Uploading '+count+' file(s) to Google Drive...');
+  else toast('All files are already saved to Drive.');
+}
+
+function _gdSetManualLink(anxId,fileIdx,url){
+  for(var i=0;i<annexures.length;i++){
+    if(annexures[i].id===anxId){
+      var fi=annexures[i].files[fileIdx];
+      if(fi){ fi.driveUrl=(url||'').trim(); fi.driveId=fi.driveUrl?'manual':null; }
+      break;
+    }
+  }
+}
+
+// ============================================================
 function _umDoChangeOwnPw(){
   var u=_umGetCurrentUser();
   var cur=(document.getElementById('_umCp_cur').value||'').trim();
