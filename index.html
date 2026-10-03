@@ -1205,6 +1205,17 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       </div>
     </div>
 
+    <!-- Cloud Sync dropdown -->
+    <div class="tb-dd" id="dd-cloud">
+      <button id="dd-cloud-tab" class="tb-dd-tab" onclick="tbDDToggle('dd-cloud')" title="Cloud Sync — not configured">&#9729; Cloud <span class="arr">&#9660;</span></button>
+      <div class="tb-dd-menu">
+        <button class="tb-dd-item" onclick="cloudSave();tbDDClose()" data-tip="Save current session to GitHub cloud storage">&#9729; Save to Cloud</button>
+        <button class="tb-dd-item" onclick="cloudBrowse();tbDDClose()" data-tip="Browse and load sessions saved to cloud by any auditor">&#128193; Browse Cloud Sessions</button>
+        <div class="tb-dd-sep"></div>
+        <button class="tb-dd-item" onclick="showCloudSettings();tbDDClose()" data-tip="Configure GitHub repository and access token for cloud sync">&#9881; Cloud Settings</button>
+      </div>
+    </div>
+
     <!-- Report Navigation toggle — standalone toolbar button -->
     <button id="rpt-nav-toggle-tb" onclick="_toggleRptNav()"
       title="Toggle Report Navigation Panel — jump to any area or observation"
@@ -22725,6 +22736,243 @@ function _brainsDoUnlock(){
   };
   fr.readAsText(inp.files[0]);
 }
+
+// ============================================================
+// CLOUD SYNC  (GitHub-backed centralized session storage)
+// All functions prefixed _cs* — fully additive, no existing code modified
+// ============================================================
+var _CS_CFG_KEY = 'bss_cloud_v1';
+
+function _csGetCfg(){
+  try{ return JSON.parse(localStorage.getItem(_CS_CFG_KEY)||'{}'); }catch(e){ return {}; }
+}
+function _csSaveCfg(cfg){
+  try{ localStorage.setItem(_CS_CFG_KEY, JSON.stringify(cfg)); }catch(e){}
+}
+function _csHdrs(cfg){
+  return {'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+}
+function _csAuditorSlug(cfg){
+  return (cfg.auditor||'unknown').replace(/[^a-zA-Z0-9\-_]/g,'_').replace(/_+/g,'_').toLowerCase();
+}
+function _csBranchFile(){
+  var H=getHdrVals();
+  var code=H.brcode||'000';
+  var name=(H.brname||'branch').replace(/[^a-zA-Z0-9]+/g,'_').replace(/_+/g,'_').substring(0,25);
+  return code+'_'+name+'.json';
+}
+function _csB64Enc(str){
+  return btoa(unescape(encodeURIComponent(str)));
+}
+function _csB64Dec(b64){
+  return decodeURIComponent(escape(atob(b64.replace(/\s/g,''))));
+}
+function _csRepoBase(cfg){
+  return 'https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo;
+}
+
+function cloudSave(){
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo||!cfg.auditor){ showCloudSettings(); return; }
+  var fname=_csBranchFile();
+  var path='sessions/'+_csAuditorSlug(cfg)+'/'+fname;
+  var url=_csRepoBase(cfg)+'/contents/'+path;
+  var hdrs=_csHdrs(cfg);
+  var content=_csB64Enc(JSON.stringify(captureSession(),null,2));
+  toast('Saving to cloud...');
+  fetch(url,{headers:hdrs})
+  .then(function(r){ return r.ok?r.json():null; })
+  .then(function(existing){
+    var body={message:'[BRAINS] '+fname+' ('+new Date().toISOString()+')',content:content};
+    if(existing&&existing.sha) body.sha=existing.sha;
+    return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+  })
+  .then(function(r){
+    if(r&&(r.status===200||r.status===201)){ toast('Saved to cloud: '+fname); _csUpdateIndicator(); }
+    else{ r.json().then(function(e){ toast('Cloud save failed: '+(e.message||r.status)); }); }
+  })
+  .catch(function(e){ toast('Cloud error: '+(e&&e.message?e.message:'Network error')); });
+}
+
+function cloudBrowse(){
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo){ showCloudSettings(); return; }
+  _csShowBrowser(null,cfg);
+  var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'};
+  fetch(_csRepoBase(cfg)+'/contents/sessions',{headers:hdrs})
+  .then(function(r){ return r.json(); })
+  .then(function(items){
+    if(!Array.isArray(items)){ _csShowBrowser([],cfg); return; }
+    var dirs=items.filter(function(d){ return d.type==='dir'; });
+    if(!dirs.length){ _csShowBrowser([],cfg); return; }
+    var results=[]; var pending=dirs.length;
+    dirs.forEach(function(dir){
+      fetch(dir.url,{headers:hdrs})
+      .then(function(r){ return r.json(); })
+      .then(function(files){
+        if(Array.isArray(files)){
+          files.forEach(function(f){
+            if(f.name.slice(-5)==='.json')
+              results.push({auditor:dir.name,name:f.name,path:f.path,size:f.size||0});
+          });
+        }
+        pending--; if(pending===0) _csShowBrowser(results,cfg);
+      })
+      .catch(function(){ pending--; if(pending===0) _csShowBrowser(results,cfg); });
+    });
+  })
+  .catch(function(e){ toast('Cloud browse error: '+(e&&e.message?e.message:e)); });
+}
+
+function _csShowBrowser(sessions,cfg){
+  var ex=document.getElementById('_csBrowserModal');
+  if(ex) ex.parentNode.removeChild(ex);
+  var el=document.createElement('div');
+  el.id='_csBrowserModal';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+  var h='<div style="background:#fff;border-radius:8px;width:92%;max-width:680px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.3)">';
+  h+='<div style="padding:16px 22px;border-bottom:1px solid #e0e8f0;display:flex;align-items:center;gap:10px">';
+  h+='<span style="font-size:22px">&#9729;</span>';
+  h+='<div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1a3a5c">Cloud Sessions</div>';
+  h+='<div style="font-size:11px;color:#888">'+esc(cfg.owner)+' / '+esc(cfg.repo)+'</div></div>';
+  h+='<button onclick="document.getElementById(\'_csBrowserModal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#999;line-height:1">&#x2715;</button>';
+  h+='</div><div style="padding:14px 22px;overflow-y:auto;flex:1">';
+  if(sessions===null){
+    h+='<div style="text-align:center;padding:40px;color:#888;font-size:13px">&#9203; Loading sessions...</div>';
+  } else if(!sessions.length){
+    h+='<div style="text-align:center;padding:40px;color:#888;font-size:13px">No sessions found in cloud.<br><small style="color:#aaa">Use Cloud &#9658; Save to Cloud to upload your first session.</small></div>';
+  } else {
+    var byAud={}; var audOrder=[];
+    sessions.forEach(function(s){
+      if(!byAud[s.auditor]){byAud[s.auditor]=[];audOrder.push(s.auditor);}
+      byAud[s.auditor].push(s);
+    });
+    audOrder.sort();
+    audOrder.forEach(function(aud){
+      h+='<div style="margin-bottom:16px">';
+      h+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#1a6030;padding:5px 0;border-bottom:2px solid #c8ead8;margin-bottom:8px">&#128100; '+esc(aud)+'</div>';
+      byAud[aud].sort(function(a,b){return a.name>b.name?1:-1;});
+      byAud[aud].forEach(function(s){
+        var label=s.name.replace('.json','').replace(/_/g,' ');
+        var kb=s.size>0?(Math.round(s.size/102.4)/10)+' KB':'';
+        h+='<div style="display:flex;align-items:center;padding:9px 12px;border:1px solid #e0e8f0;border-radius:5px;margin-bottom:6px;cursor:pointer" onmouseover="this.style.background=\'#f0f5fb\'" onmouseout="this.style.background=\'#fff\'" onclick="_csLoadFile(\''+esc(s.path)+'\')">';
+        h+='<span style="font-size:18px;margin-right:10px">&#128196;</span>';
+        h+='<div style="flex:1"><div style="font-size:13px;font-weight:600;color:#1a3a5c">'+esc(label)+'</div>';
+        if(kb) h+='<div style="font-size:10px;color:#aaa">'+kb+'</div>';
+        h+='</div><button onclick="event.stopPropagation();_csLoadFile(\''+esc(s.path)+'\')" style="padding:5px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Load</button>';
+        h+='</div>';
+      });
+      h+='</div>';
+    });
+  }
+  h+='</div><div style="padding:12px 22px;border-top:1px solid #e0e8f0;display:flex;justify-content:space-between">';
+  h+='<button onclick="cloudBrowse()" style="padding:7px 14px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif;color:#1a3a5c">&#8635; Refresh</button>';
+  h+='<button onclick="document.getElementById(\'_csBrowserModal\').remove()" style="padding:7px 14px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">Close</button>';
+  h+='</div></div>';
+  el.innerHTML=h;
+  document.body.appendChild(el);
+}
+
+function _csLoadFile(path){
+  var cfg=_csGetCfg();
+  if(!confirm('Load this session? Your current unsaved work will be replaced.')) return;
+  var url=_csRepoBase(cfg)+'/contents/'+path;
+  var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'};
+  toast('Loading from cloud...');
+  fetch(url,{headers:hdrs})
+  .then(function(r){ return r.json(); })
+  .then(function(file){
+    if(!file||!file.content){ toast('Could not read session file.'); return; }
+    var sess=JSON.parse(_csB64Dec(file.content));
+    if(!sess||!sess.ts){ toast('Invalid session file.'); return; }
+    var bm=document.getElementById('_csBrowserModal');
+    if(bm) bm.remove();
+    restoreSession(sess);
+    toast('Session loaded from cloud: '+path.split('/').pop());
+  })
+  .catch(function(e){ toast('Load error: '+(e&&e.message?e.message:e)); });
+}
+
+function showCloudSettings(){
+  var cfg=_csGetCfg();
+  var ex=document.getElementById('_csSettingsModal');
+  if(ex) ex.parentNode.removeChild(ex);
+  var el=document.createElement('div');
+  el.id='_csSettingsModal';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+  var row='margin-bottom:14px';
+  var lbl='font-size:11.5px;font-weight:700;color:#2a4060;display:block;margin-bottom:4px';
+  var inp='width:100%;padding:7px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:13px;font-family:Inter,sans-serif;box-sizing:border-box';
+  el.innerHTML='<div style="background:#fff;border-radius:8px;padding:28px 32px;max-width:490px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,.25)">'
+  +'<div style="font-size:15px;font-weight:700;color:#1a3a5c;margin-bottom:3px">&#9729; Cloud Sync Settings</div>'
+  +'<div style="font-size:11.5px;color:#888;margin-bottom:20px">Enter your GitHub repository details. Stored in this browser only.</div>'
+  +'<div style="'+row+'"><label style="'+lbl+'">GitHub Repository Owner</label>'
+  +'<input id="_cs_owner" value="'+esc(cfg.owner||'')+'" placeholder="e.g. kasaleem165-pixel" style="'+inp+'"></div>'
+  +'<div style="'+row+'"><label style="'+lbl+'">Repository Name</label>'
+  +'<input id="_cs_repo" value="'+esc(cfg.repo||'')+'" placeholder="e.g. KS324" style="'+inp+'"></div>'
+  +'<div style="'+row+'"><label style="'+lbl+'">Your Name <span style="font-weight:400;color:#aaa">(used as folder name in cloud)</span></label>'
+  +'<input id="_cs_auditor" value="'+esc(cfg.auditor||'')+'" placeholder="e.g. Kamran Saleem" style="'+inp+'"></div>'
+  +'<div style="'+row+'"><label style="'+lbl+'">GitHub Personal Access Token (PAT)</label>'
+  +'<input id="_cs_token" type="password" value="'+esc(cfg.token||'')+'" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" style="'+inp+';margin-bottom:5px">'
+  +'<div style="font-size:11px;color:#999">Needs <strong>Contents: Read &amp; Write</strong> permission. <a href="https://github.com/settings/tokens/new" target="_blank" style="color:#1a6030">Create on GitHub &#8599;</a></div></div>'
+  +'<div id="_cs_test_result" style="font-size:12px;min-height:18px;margin-bottom:14px"></div>'
+  +'<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end">'
+  +'<button onclick="_csTestConnection()" style="padding:8px 15px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12.5px;cursor:pointer;font-family:Inter,sans-serif;color:#1a3a5c">Test Connection</button>'
+  +'<button onclick="document.getElementById(\'_csSettingsModal\').remove()" style="padding:8px 15px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:12.5px;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>'
+  +'<button onclick="_csSaveSettings()" style="padding:8px 15px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Save Settings</button>'
+  +'</div></div>';
+  document.body.appendChild(el);
+}
+
+function _csSaveSettings(){
+  var cfg={
+    owner:   (document.getElementById('_cs_owner').value||'').trim(),
+    repo:    (document.getElementById('_cs_repo').value||'').trim(),
+    auditor: (document.getElementById('_cs_auditor').value||'').trim(),
+    token:   (document.getElementById('_cs_token').value||'').trim()
+  };
+  if(!cfg.owner||!cfg.repo||!cfg.auditor||!cfg.token){ toast('Please fill all four fields.'); return; }
+  _csSaveCfg(cfg);
+  var m=document.getElementById('_csSettingsModal');
+  if(m) m.remove();
+  toast('Cloud settings saved.');
+  _csUpdateIndicator();
+}
+
+function _csTestConnection(){
+  var owner=(document.getElementById('_cs_owner').value||'').trim();
+  var repo=(document.getElementById('_cs_repo').value||'').trim();
+  var token=(document.getElementById('_cs_token').value||'').trim();
+  var res=document.getElementById('_cs_test_result');
+  if(!owner||!repo||!token){ if(res) res.innerHTML='<span style="color:#c0392b">Please fill all fields first.</span>'; return; }
+  if(res) res.innerHTML='<span style="color:#888">Testing...</span>';
+  fetch('https://api.github.com/repos/'+owner+'/'+repo,{
+    headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if(res){
+      if(d.full_name) res.innerHTML='<span style="color:#1a6030">&#10003; Connected: '+esc(d.full_name)+'</span>';
+      else res.innerHTML='<span style="color:#c0392b">&#10007; '+esc(d.message||'Unknown error')+'</span>';
+    }
+  })
+  .catch(function(){ if(res) res.innerHTML='<span style="color:#c0392b">&#10007; Network error</span>'; });
+}
+
+function _csUpdateIndicator(){
+  var cfg=_csGetCfg();
+  var btn=document.getElementById('dd-cloud-tab');
+  if(!btn) return;
+  if(cfg.token&&cfg.owner&&cfg.repo&&cfg.auditor){
+    btn.style.color='#1a6030';
+    btn.title='Cloud Sync: '+cfg.owner+'/'+cfg.repo+' | '+cfg.auditor;
+  } else {
+    btn.style.color='';
+    btn.title='Cloud Sync — not configured. Click to set up.';
+  }
+}
+(function(){ setTimeout(_csUpdateIndicator,800); })();
+
 </script>
 
 <button id="ra-drawer-toggle" class="visible" title="Open / Close Risk Assessment" onclick="toggleRAPanel()">&#128202; RA</button>
