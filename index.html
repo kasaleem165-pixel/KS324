@@ -3011,8 +3011,18 @@ function _obsOrderRemove(id){
 }
 
 function handleSel(id, checked, div) {
+  // Lock check — if selecting and another auditor holds a lock, show alert and stop
+  if(checked && _lkIsLockedByOther(id)){
+    var li=(_lkCache||{})[id]||{};
+    _lkShowAlert(id, li.by||'Another auditor', li.since||'');
+    var cb=document.getElementById('cb-'+id);
+    if(cb) cb.checked=false;
+    if(div) div.className='ri';
+    return;
+  }
   _markChanged();
   if(checked){
+    _lkSetLock(id); // write lock to GitHub (async, non-blocking)
     selIds[id]=true;
     // Seed obsTypeMap as 'New' if Detect Repeats hasn't already classified this obs.
     // Do NOT read the databank type field here — that field is a general databank-level
@@ -3031,6 +3041,7 @@ function handleSel(id, checked, div) {
       window._pfWaivers[id+'|Financial Impact'] = true;
     }
   } else {
+    _lkClearLock(id); // release lock on GitHub (async, non-blocking)
     delete selIds[id]; _obsOrderRemove(id);
   }
   if(div){
@@ -4448,6 +4459,8 @@ function restoreSession(sess) {
   _lastSavedTs = Date.now();
   _lastChangedTs = 0;
   _distChangeWarnShown = false;
+  // Load observation locks for this branch session (async, non-blocking)
+  if(typeof _lkOnSessionLoad==='function') _lkOnSessionLoad();
 }
 
 function saveVersion(cb) {
@@ -23377,6 +23390,201 @@ function _umChangeOwnPassword(){
     +'</div></div>';
   document.body.appendChild(el);
 }
+
+// ── Observation Lock System (Hybrid — minimal API calls) ────────────────────
+var _lkCache = {};     // in-memory cache of locks.json content
+var _lkCacheSha = '';  // SHA of locks.json for updates
+var _lkPending = false;// prevent concurrent writes
+
+function _lkLockPath(){
+  var cfg=_csGetCfg();
+  return 'sessions/'+_csAuditYear(cfg)+'/'+_csBranchFolder()+'/locks.json';
+}
+
+function _lkMySlug(){
+  var u=_umGetCurrentUser();
+  var name=u.name||u.username||'unknown';
+  return name.replace(/[^a-zA-Z0-9\-_]/g,'_').replace(/_+/g,'_').toLowerCase();
+}
+
+function _lkMyName(){
+  var u=_umGetCurrentUser();
+  return u.name||u.username||'Unknown';
+}
+
+function _lkIsConfigured(){
+  var cfg=_csGetCfg();
+  return !!(cfg.token&&cfg.owner&&cfg.repo);
+}
+
+function _lkIsLockedByOther(obsId){
+  if(!_lkIsConfigured()) return false;
+  var lock=_lkCache[obsId];
+  if(!lock) return false;
+  return lock.bySlug!==_lkMySlug();
+}
+
+// Fetch locks.json once — called on session load + manual refresh
+function _lkLoadLocks(){
+  if(!_lkIsConfigured()) return;
+  var H=getHdrVals();
+  if(!H.brcode&&!H.brname) return; // no branch loaded yet
+  var cfg=_csGetCfg();
+  var url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+_lkLockPath();
+  fetch(url,{headers:{'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'}})
+  .then(function(r){ return r.json(); })
+  .then(function(f){
+    if(!f||!f.content){ _lkCache={}; _lkCacheSha=''; return; }
+    try{
+      var data=JSON.parse(_csB64Dec(f.content));
+      _lkCacheSha=f.sha||'';
+      // Clear stale locks older than 2 hours
+      var now=Date.now();
+      var staleIds=[];
+      Object.keys(data).forEach(function(k){
+        if(data[k].since && (now-new Date(data[k].since).getTime())>7200000) staleIds.push(k);
+      });
+      staleIds.forEach(function(k){ delete data[k]; });
+      _lkCache=data;
+      if(staleIds.length) _lkWriteCache(); // persist stale-cleared version
+      // Update visual indicators after load
+      _lkUpdateObsVisuals();
+    }catch(e){ _lkCache={}; }
+  })
+  .catch(function(){ _lkCache={}; });
+}
+
+// Write current _lkCache to GitHub
+function _lkWriteCache(){
+  if(!_lkIsConfigured()||_lkPending) return;
+  _lkPending=true;
+  var cfg=_csGetCfg();
+  var url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+_lkLockPath();
+  var body={message:'[BRAINS] locks',content:_csB64Enc(JSON.stringify(_lkCache,null,2))};
+  if(_lkCacheSha) body.sha=_lkCacheSha;
+  fetch(url,{method:'PUT',headers:_csHdrs(cfg),body:JSON.stringify(body)})
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    _lkPending=false;
+    if(d&&d.content&&d.content.sha) _lkCacheSha=d.content.sha;
+  })
+  .catch(function(){ _lkPending=false; });
+}
+
+// Set lock for obsId (called when auditor selects observation)
+function _lkSetLock(obsId){
+  if(!_lkIsConfigured()) return;
+  var H=getHdrVals();
+  if(!H.brcode&&!H.brname) return;
+  _lkCache[obsId]={by:_lkMyName(), bySlug:_lkMySlug(), since:new Date().toISOString()};
+  _lkUpdateObsVisuals();
+  _lkWriteCache();
+}
+
+// Clear lock for obsId (called when auditor deselects observation)
+function _lkClearLock(obsId){
+  if(!_lkIsConfigured()) return;
+  if(!_lkCache[obsId]) return;
+  if(_lkCache[obsId].bySlug!==_lkMySlug()) return; // only clear own locks
+  delete _lkCache[obsId];
+  _lkUpdateObsVisuals();
+  _lkWriteCache();
+}
+
+// Clear all locks belonging to current auditor (called on page unload)
+function _lkClearAllMyLocks(){
+  if(!_lkIsConfigured()) return;
+  var mySlug=_lkMySlug();
+  var changed=false;
+  Object.keys(_lkCache).forEach(function(k){
+    if(_lkCache[k].bySlug===mySlug){ delete _lkCache[k]; changed=true; }
+  });
+  if(!changed) return;
+  // Synchronous-style beacon for page unload — use sendBeacon if available
+  var cfg=_csGetCfg();
+  var url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+_lkLockPath();
+  var body=JSON.stringify({message:'[BRAINS] unlock on exit',content:_csB64Enc(JSON.stringify(_lkCache,null,2)),sha:_lkCacheSha||undefined});
+  if(navigator.sendBeacon){
+    var blob=new Blob([body],{type:'application/json'});
+    navigator.sendBeacon(url, blob);
+  } else {
+    fetch(url,{method:'PUT',headers:_csHdrs(cfg),body:body,keepalive:true}).catch(function(){});
+  }
+}
+
+// Show lock alert modal
+function _lkShowAlert(obsId, lockedBy, since){
+  var ex=document.getElementById('_lkAlertModal');
+  if(ex) ex.parentNode.removeChild(ex);
+  var el=document.createElement('div');
+  el.id='_lkAlertModal';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+  var title='';
+  for(var i=0;i<DB.observations.length;i++){ if(DB.observations[i].id===obsId){title=DB.observations[i].title;break;} }
+  if(!title) for(var ci=0;ci<customs.length;ci++){ if(customs[ci].id===obsId){title=customs[ci].title;break;} }
+  var timeStr='';
+  if(since){ try{ timeStr=' since '+new Date(since).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }catch(e){} }
+  el.innerHTML='<div style="background:#fff;border-radius:8px;padding:26px 30px;max-width:420px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,.25);font-family:Inter,sans-serif">'
+    +'<div style="font-size:15px;font-weight:700;color:#c0392b;margin-bottom:10px">&#128274; Observation In Use</div>'
+    +'<div style="font-size:13px;color:#2a3a50;line-height:1.75;margin-bottom:18px">'
+    +'<strong>'+esc(lockedBy)+'</strong> is currently working on:<br>'
+    +'<span style="color:#1a3a5c;font-weight:600">'+esc(obsId+(title?' — '+title.substring(0,50):''))+'</span>'
+    +(timeStr?'<br><span style="font-size:11px;color:#999">Locked'+esc(timeStr)+'</span>':'')
+    +'<br><br>Please select a different observation or check with '+esc(lockedBy)+'.'
+    +'</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center">'
+    +'<button onclick="_lkRefreshLocks()" style="padding:7px 14px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif;color:#1a3a5c">&#8635; Refresh Locks</button>'
+    +'<button onclick="document.getElementById(\'_lkAlertModal\').remove()" style="padding:8px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">OK</button>'
+    +'</div></div>';
+  document.body.appendChild(el);
+}
+
+// Manual refresh — re-fetch locks.json and update visuals
+function _lkRefreshLocks(){
+  var ex=document.getElementById('_lkAlertModal');
+  if(ex) ex.parentNode.removeChild(ex);
+  if(!_lkIsConfigured()){ toast('Cloud not configured.'); return; }
+  toast('Refreshing locks...');
+  _lkLoadLocks();
+  setTimeout(function(){ toast('Locks refreshed.'); },1200);
+}
+
+// Update lock badge visuals on observation rows in the selection list
+function _lkUpdateObsVisuals(){
+  // Add/remove lock badge (🔒) on observation rows based on current cache
+  Object.keys(_lkCache).forEach(function(obsId){
+    var row=document.getElementById('ri-'+obsId);
+    if(!row) return;
+    var isOther=_lkCache[obsId].bySlug!==_lkMySlug();
+    var badge=document.getElementById('_lkbadge-'+obsId);
+    if(isOther && !badge){
+      badge=document.createElement('span');
+      badge.id='_lkbadge-'+obsId;
+      badge.title=_lkCache[obsId].by+' is working on this';
+      badge.style.cssText='font-size:11px;color:#c0392b;margin-left:6px;font-weight:700;cursor:default';
+      badge.textContent='🔒';
+      row.appendChild(badge);
+    } else if(!isOther && badge){
+      badge.parentNode.removeChild(badge);
+    }
+  });
+  // Remove badges for observations no longer in cache
+  var badges=document.querySelectorAll('[id^="_lkbadge-"]');
+  for(var i=0;i<badges.length;i++){
+    var bid=badges[i].id.replace('_lkbadge-','');
+    if(!_lkCache[bid]){
+      badges[i].parentNode.removeChild(badges[i]);
+    }
+  }
+}
+
+// Hook: called after restoreSession() to load locks for the restored branch
+function _lkOnSessionLoad(){
+  setTimeout(_lkLoadLocks, 800);
+}
+
+// Clear all own locks when page closes
+window.addEventListener('beforeunload', function(){ try{ _lkClearAllMyLocks(); }catch(e){} });
 
 function _umDoChangeOwnPw(){
   var u=_umGetCurrentUser();
