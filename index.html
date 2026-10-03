@@ -8358,8 +8358,7 @@ function downloadDraft(individual){
           // Last Audit Report Reference — repeated observations only
           var oLarr=lastRefMap[o.id]||'';
           if(oLarr) h+='<div style="margin:0 0 10px;padding:6px 10px;background:#fff8f2;border:1px solid #f0c090;border-radius:6px;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#8a3000;text-transform:uppercase;letter-spacing:.5px">&#128196; Last Audit Report Reference (LARR):</strong> <span style="color:#5a2000;font-weight:600;margin-left:6px">'+esc(oLarr)+'</span></div>';
-          var oAxRef=getObsAnnexRef(o.id);
-          if(oAxRef) h+='<div style="display:flex;align-items:center;gap:7px;margin:0 0 10px;padding:7px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Ref:</strong> <span style="color:#1a3a5c;font-weight:700">'+esc(oAxRef)+'</span></div>';
+          h+=_obsAnnexBadges(o.id,true);
           // Show HOS response (read-only) if available
           var bhResp=respBHMap[o.id]!=null?respBHMap[o.id]:'';
           if(bhResp){
@@ -8639,8 +8638,7 @@ function downloadSoftCopy(){
     var scInstAmt=instAmountMap[o.id]||'';
     if(scInstCount||scInstAmt){h+='<div style="display:flex;gap:16px;margin:0 0 10px;padding:7px 10px;background:#f0f7e8;border:1px solid #b8d8a0;border-radius:6px;font-size:12px">';if(scInstCount)h+='<span><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Instances:</strong> <span style="color:#2a3a50;font-weight:600;margin-left:4px">'+esc(scInstCount+'')+'</span></span>';if(scInstAmt)h+='<span><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Financial Impact (Rs.):</strong> <span style="color:#8a1000;font-weight:700;margin-left:4px">'+esc(Number(scInstAmt).toLocaleString())+'</span></span>';h+='</div>';}
     if(scRecText){h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Recommendation</div>';h+=_renderText(scRecText,{fontSize:'12.5px',lineHeight:'1.65',color:'#2a3a50',marginBottom:'10px'});}
-    var scAxRef=getObsAnnexRef(o.id);
-    if(scAxRef) h+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Ref:</strong> <span style="color:#1a3a5c;font-weight:700">'+esc(scAxRef)+'</span></div>';
+    h+=_obsAnnexBadges(o.id,false);
     var scLarr=lastRefMap[o.id]||'';
     var scObsType=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
     if(scObsType==='repeated'&&scLarr) h+='<div style="margin:0 0 10px;padding:6px 10px;background:#fff8f2;border:1px solid #f0c090;border-radius:6px;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#8a3000;text-transform:uppercase;letter-spacing:.5px">&#128196; Last Audit Report Reference (LARR):</strong> <span style="color:#5a2000;font-weight:600;margin-left:6px">'+esc(scLarr)+'</span></div>';
@@ -9476,6 +9474,48 @@ function getLinkedAnnexures(obsId){
     if(annexures[i].linkedObs&&annexures[i].linkedObs.indexOf(obsId)>=0) res.push(annexures[i]);
   }
   return res;
+}
+
+// Renders annexure reference badges for an observation.
+// interactive=true: shows [View] button to scroll/expand annexure in left panel
+// interactive=false: shows Drive file links only (for report/print)
+function _obsAnnexBadges(obsId, interactive){
+  var linked=getLinkedAnnexures(obsId);
+  var old=(annexMap[obsId]||'').trim();
+  if(!linked.length&&!old) return '';
+  var h='<div style="display:flex;align-items:flex-start;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px;flex-wrap:wrap">';
+  h+='<strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;margin-top:3px">Annexure Ref:</strong>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:5px;flex:1">';
+  for(var i=0;i<linked.length;i++){
+    var a=linked[i];
+    var lbl=a.label||('Annex-'+(i+1));
+    var driveFiles=[];
+    if(a.files){for(var f=0;f<a.files.length;f++){if(a.files[f].driveUrl) driveFiles.push(a.files[f]);}}
+    h+='<span style="display:inline-flex;align-items:center;gap:4px;background:#eef3fa;border:1px solid #b8cce4;border-radius:4px;padding:2px 7px">';
+    h+='<strong style="color:#1a3a5c;font-size:11.5px">'+esc(lbl)+'</strong>';
+    if(a.title) h+='<span style="color:#6a7888;font-size:10.5px"> — '+esc(a.title)+'</span>';
+    if(interactive) h+='<button onclick="event.stopPropagation();_viewAnnex(\''+a.id+'\')" style="margin-left:4px;font-size:10px;background:#1a3a5c;color:#fff;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;font-family:Inter,sans-serif">View</button>';
+    for(var df=0;df<driveFiles.length;df++){
+      h+='<a href="'+esc(driveFiles[df].driveUrl)+'" target="_blank" style="font-size:10px;color:#1a6030;text-decoration:none;border:1px solid #a5d6a7;border-radius:3px;padding:1px 5px;background:#e8f5e9;white-space:nowrap" title="'+esc(driveFiles[df].name)+'">&#9729; '+esc(driveFiles[df].name)+'</a>';
+    }
+    h+='</span>';
+  }
+  if(old){
+    var shownLabels=linked.map(function(a){return a.label;}).join(',');
+    if(shownLabels.indexOf(old)<0) h+='<span style="color:#1a3a5c;font-weight:700;font-size:11.5px">'+esc(old)+'</span>';
+  }
+  h+='</div></div>';
+  return h;
+}
+
+function _viewAnnex(annexId){
+  // Expand and scroll to the annexure in the left panel
+  for(var i=0;i<annexures.length;i++){if(annexures[i].id===annexId){annexures[i].open=true;break;}}
+  renderAnnexList();
+  setTimeout(function(){
+    var el=document.getElementById('anxi-'+annexId);
+    if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
+  },100);
 }
 
 // Returns a combined annexure reference string for an observation,
@@ -10729,8 +10769,7 @@ function finalizeReport(){
     var finInstAmt=instAmountMap[o.id]||'';
     if(finInstCount||finInstAmt){h+='<div style="display:flex;gap:16px;margin:0 0 10px;padding:7px 10px;background:#f0f7e8;border:1px solid #b8d8a0;border-radius:6px;font-size:12px">';if(finInstCount)h+='<span><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Instances:</strong> <span style="color:#2a3a50;font-weight:600;margin-left:4px">'+esc(finInstCount+'')+'</span></span>';if(finInstAmt)h+='<span><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Financial Impact (Rs.):</strong> <span style="color:#8a1000;font-weight:700;margin-left:4px">'+esc(Number(finInstAmt).toLocaleString())+'</span></span>';h+='</div>';}
     if(recText) h+=sl('Recommendation')+st(recText);
-    var finAxRef=getObsAnnexRef(o.id);
-    if(finAxRef)         h+='<div style="display:flex;align-items:center;gap:7px;margin:8px 0;padding:7px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Ref:</strong> <span style="color:#1a3a5c;font-weight:700">'+esc(finAxRef)+'</span></div>';
+    h+=_obsAnnexBadges(o.id,false);
     var bhFin=respBHMap[o.id]!=null?respBHMap[o.id]:null;
     var roFin=respROMap[o.id]!=null?respROMap[o.id]:null;
     if(bhFin!==null) h+=sl('Auditee Response – HOS')+st(bhFin);
@@ -11317,6 +11356,7 @@ function generateIssuedReport(forROCopy){
     if(mbLarr) mBody+='<div class="modal-badge" style="background:#fff3e8;color:#8a3000;border:1px solid #f0b080">&#128196; LARR</div><div class="modal-section" style="color:#5a2000;font-weight:600">'+e(mbLarr)+'</div>';
     var mbAxRef=getObsAnnexRef(o.id);
     if(mbAxRef) mBody+='<div class="modal-badge" style="background:#e8f0fa;color:#1a3a5c;border:1px solid #b0c8e8">Annexure Ref</div><div class="modal-section" style="color:#1a3a5c;font-weight:700">'+e(mbAxRef)+'</div>';
+    mBody+=_obsAnnexBadges(o.id,false);
     if(resp.bh!==null&&resp.bh!=='') mBody+='<div class="modal-badge mb-resp">Auditee Response (HOS)</div><div class="modal-section ms-resp">'+e(resp.bh)+'</div>';
     if(resp.ro!==null&&resp.ro!=='') mBody+='<div class="modal-badge mb-roresp">RO Response</div><div class="modal-section ms-resp">'+e(resp.ro)+'</div>';
     if(resp.bh===null&&resp.ro===null&&resp.gen) mBody+='<div class="modal-badge mb-resp">Auditee Response</div><div class="modal-section ms-resp">'+e(resp.gen)+'</div>';
@@ -11375,8 +11415,7 @@ function generateIssuedReport(forROCopy){
     if(rt){h+='<div class="accordion"><div class="acc-toggle" onclick="toggleAcc(this)"><span>&#9989; Recommendation</span><span class="acc-arrow">&#9660;</span></div><div class="acc-body open">'+_renderText(rt,{fontSize:'.87rem',lineHeight:'1.6',color:'#2a3a50'})+'</div></div>';}
     var issLarr=lastRefMap[o.id]||'';
     if(issLarr) h+='<div style="margin:.5rem 0;padding:5px 9px;background:#fff8f2;border:1px solid #f0c090;border-radius:5px;font-size:.8rem"><strong style="font-size:.68rem;font-weight:700;color:#8a3000;text-transform:uppercase;letter-spacing:.5px">&#128196; LARR:</strong> <span style="color:#5a2000;font-weight:600;margin-left:5px">'+e(issLarr)+'</span></div>';
-    var issAxRef=getObsAnnexRef(o.id);
-    if(issAxRef) h+='<div style="display:flex;align-items:center;gap:6px;margin:.5rem 0;padding:6px 0;border-top:1px solid #eee;font-size:.8rem"><strong style="font-size:.68rem;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Annexure Ref:</strong> <span style="color:#1a3a5c;font-weight:700;margin-left:4px">'+e(issAxRef)+'</span></div>';
+    h+=_obsAnnexBadges(o.id,false);
     var respHtml='';
     if(resp.bh!==null&&resp.bh!=='') respHtml+='<div><strong style="font-size:.75rem;color:#2980b9">HOS:</strong> '+e(resp.bh)+'</div>';
     if(resp.ro!==null&&resp.ro!=='') respHtml+='<div><strong style="font-size:.75rem;color:#2980b9">RO/HO:</strong> '+e(resp.ro)+'</div>';
@@ -11510,6 +11549,7 @@ function generateIssuedReport(forROCopy){
     if(mbLarr2) mBody+='<div class="modal-badge" style="background:#fff3e8;color:#8a3000;border:1px solid #f0b080">&#128196; LARR</div><div class="modal-section" style="color:#5a2000;font-weight:600">'+e(mbLarr2)+'</div>';
     var mbAxRef2=getObsAnnexRef(o.id);
     if(mbAxRef2) mBody+='<div class="modal-badge" style="background:#e8f0fa;color:#1a3a5c;border:1px solid #b0c8e8">Annexure Ref</div><div class="modal-section" style="color:#1a3a5c;font-weight:700">'+e(mbAxRef2)+'</div>';
+    mBody+=_obsAnnexBadges(o.id,false);
     if(resp.bh!==null&&resp.bh!=='') mBody+='<div class="modal-badge mb-resp">Auditee Response (HOS)</div><div class="modal-section ms-resp">'+e(resp.bh)+'</div>';
     if(resp.ro!==null&&resp.ro!=='') mBody+='<div class="modal-badge mb-roresp">RO Response</div><div class="modal-section ms-resp">'+e(resp.ro)+'</div>';
     if(resp.bh===null&&resp.ro===null&&resp.gen) mBody+='<div class="modal-badge mb-resp">Auditee Response</div><div class="modal-section ms-resp">'+e(resp.gen)+'</div>';
@@ -16077,8 +16117,7 @@ function generateReviewerHtml(role){
     var rvInstAmt=instAmountMap[o.id]||'';
     if(rvInstCount||rvInstAmt){rv+='<div style="display:flex;gap:16px;margin:6px 0;padding:7px 10px;background:#f0f7e8;border:1px solid #b8d8a0;border-radius:6px;font-size:12px">';if(rvInstCount)rv+='<span><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Instances:</strong> <span style="color:#2a3a50;font-weight:600;margin-left:4px">'+esc(rvInstCount+'')+'</span></span>';if(rvInstAmt)rv+='<span><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Financial Impact (Rs.):</strong> <span style="color:#8a1000;font-weight:700;margin-left:4px">'+esc(Number(rvInstAmt).toLocaleString())+'</span></span>';rv+='</div>';}
     rv+='<div class="sec-lbl">Recommendation</div><div style="font-size:12.5px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:8px 10px;word-break:break-word">'+_renderText(o.recommendation,{fontSize:'12.5px',color:'#2a3a50',lineHeight:'1.6'})+'</div>';
-    var rvAxRef=getObsAnnexRef(o.id);
-    if(rvAxRef) rv+='<div style="display:flex;align-items:center;gap:7px;margin:6px 0;padding:6px 0;border-top:1px solid #eee;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">&#128203; Annexure Ref:</strong> <span style="color:#1a3a5c;font-weight:700">'+esc(rvAxRef)+'</span></div>';
+    rv+=_obsAnnexBadges(o.id,false);
     // Auditee responses — show split BH/RO responses if available, else combined
     var rvBhResp=respBHMap[o.id]!=null?respBHMap[o.id]:null;
     var rvRoResp=respROMap[o.id]!=null?respROMap[o.id]:null;
