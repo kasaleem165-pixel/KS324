@@ -1268,6 +1268,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       <div class="tb-dd-menu">
         <button class="tb-dd-item" onclick="cloudSave();tbDDClose()" data-tip="Save current session to GitHub cloud storage">&#9729; Save to Cloud</button>
         <button class="tb-dd-item" onclick="cloudBrowse();tbDDClose()" data-tip="Browse and load sessions saved to cloud by any auditor">&#128193; Browse Cloud Sessions</button>
+        <button class="tb-dd-item" onclick="cloudBrowse();tbDDClose()" data-tip="Merge sessions from multiple auditors on the same branch into one combined session">&#9889; Merge Coworker Sessions</button>
         <div class="tb-dd-sep"></div>
         <button class="tb-dd-item" onclick="showCloudSettings();tbDDClose()" data-tip="Configure GitHub repository and access token for cloud sync">&#9881; Cloud Settings</button>
         <button class="tb-dd-item" onclick="showUserManagement();tbDDClose()" data-tip="Add, edit or delete user accounts (Administrator only)">&#128100; User Management</button>
@@ -23157,9 +23158,16 @@ function _csBuildSessionList(sessions){
     h+='<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#1a3a5c;background:#e8f0fb;padding:5px 10px;border-radius:4px;margin-bottom:8px">&#128197; Audit Year: '+esc(yr)+'</div>';
     var brKeys=Object.keys(byYear[yr]).sort();
     brKeys.forEach(function(br){
+      var brSessions=byYear[yr][br];
+      var brPathsJson=JSON.stringify(brSessions.map(function(s){return s.path;}));
       h+='<div style="margin-bottom:10px;padding:10px 12px;border:1px solid #e0e8f0;border-radius:6px">';
-      h+='<div style="font-size:12px;font-weight:700;color:#1a3a5c;margin-bottom:8px">&#127970; '+esc(br)+'</div>';
-      byYear[yr][br].forEach(function(s){
+      h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+      h+='<div style="font-size:12px;font-weight:700;color:#1a3a5c;flex:1">&#127970; '+esc(br)+'</div>';
+      if(brSessions.length>1){
+        h+='<button onclick="_csMergeModal(\''+esc(brPathsJson.replace(/\\/g,'\\\\').replace(/'/g,"\\'"))+'\',\''+esc(br)+'\')" style="padding:3px 11px;background:#1a6030;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap">&#9889; Merge Sessions</button>';
+      }
+      h+='</div>';
+      brSessions.forEach(function(s){
         var kb=s.size>0?(Math.round(s.size/102.4)/10)+' KB':'';
         h+='<div style="display:flex;align-items:center;padding:7px 10px;background:#f8fbff;border:1px solid #ddeaf8;border-radius:4px;margin-bottom:5px">';
         h+='<span style="font-size:15px;margin-right:8px">&#128100;</span>';
@@ -23221,6 +23229,199 @@ function _csLoadFile(path){
     toast('Session loaded from cloud ✓');
   })
   .catch(function(e){ toast('Load error: '+(e&&e.message?e.message:e)); });
+}
+
+// ── Coworker Merge (Step 7) ───────────────────────────────────────────────────
+
+// _csMergeModal: show UI listing all sessions for a branch so user can pick which to merge
+function _csMergeModal(pathsJsonStr, branchName){
+  var paths;
+  try{ paths=JSON.parse(pathsJsonStr); }catch(e){ toast('Merge error: bad paths'); return; }
+  var cfg=_csGetCfg();
+  var ex=document.getElementById('_csMergeModal');
+  if(ex) ex.parentNode.removeChild(ex);
+  var el=document.createElement('div');
+  el.id='_csMergeModal';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+  el.innerHTML='<div style="background:#fff;border-radius:8px;padding:28px 30px;max-width:520px;width:93%;box-shadow:0 8px 32px rgba(0,0,0,.3)">'
+    +'<div style="font-size:15px;font-weight:700;color:#1a3a5c;margin-bottom:4px">&#9889; Merge Sessions — '+esc(branchName)+'</div>'
+    +'<div style="font-size:11.5px;color:#888;margin-bottom:16px">Loading auditor sessions…</div>'
+    +'</div>';
+  document.body.appendChild(el);
+
+  // Fetch all sessions in parallel
+  var fetched=[];
+  var pending=paths.length;
+  paths.forEach(function(path){
+    var url=_csRepoBase(cfg)+'/contents/'+path;
+    var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'};
+    fetch(url,{headers:hdrs})
+    .then(function(r){ return r.json(); })
+    .then(function(file){
+      if(file&&file.content){
+        try{
+          var sess=JSON.parse(_csB64Dec(file.content));
+          sess._sourcePath=path;
+          sess._sourceAuditor=sess._cloudMeta&&sess._cloudMeta.auditor ? sess._cloudMeta.auditor : path.split('/').pop().replace('.json','').replace(/_/g,' ');
+          fetched.push(sess);
+        }catch(e){}
+      }
+      pending--; if(!pending) _csMergeShowUI(el, fetched, branchName);
+    })
+    .catch(function(){ pending--; if(!pending) _csMergeShowUI(el, fetched, branchName); });
+  });
+}
+
+function _csMergeShowUI(el, sessions, branchName){
+  if(!sessions.length){ el.innerHTML='<div style="background:#fff;border-radius:8px;padding:28px 30px;max-width:520px;width:93%"><div style="color:#c00;font-size:13px">Could not load sessions. Check cloud settings.</div><br><button onclick="document.getElementById(\'_csMergeModal\').remove()" style="padding:5px 14px;background:#eee;border:1px solid #ccc;border-radius:4px;cursor:pointer">Close</button></div>'; return; }
+
+  sessions.sort(function(a,b){ return (a.ts||'') < (b.ts||'') ? -1 : 1; }); // oldest first = base
+
+  var rows='';
+  for(var i=0;i<sessions.length;i++){
+    var s=sessions[i];
+    var selCnt=Object.keys(s.selIds||{}).length;
+    var savedAt=s._cloudMeta&&s._cloudMeta.savedAt ? s._cloudMeta.savedAt.replace('T',' ').substring(0,16) : (s.ts||'').replace('T',' ').substring(0,16);
+    var isBase=(i===0);
+    rows+='<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:'+(isBase?'#f0f7ff':'#f8fbff')+';border:1px solid '+(isBase?'#b8cce4':'#ddeaf8')+';border-radius:5px;margin-bottom:7px">'
+      +'<input type="checkbox" id="_cmchk'+i+'" checked style="accent-color:#1a6030;width:15px;height:15px">'
+      +'<div style="flex:1">'
+      +'<div style="font-size:12.5px;font-weight:700;color:#2a4060">'+esc(s._sourceAuditor)+(isBase?' <span style="font-size:10px;font-weight:600;background:#1a3a5c;color:#fff;padding:1px 6px;border-radius:10px;margin-left:4px">BASE</span>':'')+'</div>'
+      +'<div style="font-size:10.5px;color:#888">'+selCnt+' observation'+(selCnt!==1?'s':'')+' &nbsp;|&nbsp; Saved: '+esc(savedAt)+'</div>'
+      +'</div>'
+      +'</div>';
+  }
+
+  var sessJson=JSON.stringify(sessions);
+  el.innerHTML='<div style="background:#fff;border-radius:8px;padding:28px 30px;max-width:520px;width:93%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.3)">'
+    +'<div style="font-size:15px;font-weight:700;color:#1a3a5c;margin-bottom:4px">&#9889; Merge Sessions — '+esc(branchName)+'</div>'
+    +'<div style="font-size:11.5px;color:#888;margin-bottom:14px">Select sessions to merge into the BASE session. The BASE session\'s report header is kept; all selected observations are combined.</div>'
+    +'<div style="overflow-y:auto;flex:1;margin-bottom:14px">'+rows+'</div>'
+    +'<div style="font-size:11px;color:#a06000;background:#fffbe6;border:1px solid #f0d070;border-radius:5px;padding:8px 12px;margin-bottom:14px">&#9888; This will replace your currently loaded session. Save your work first if needed.</div>'
+    +'<div style="display:flex;gap:10px;justify-content:flex-end">'
+    +'<button onclick="document.getElementById(\'_csMergeModal\').remove()" style="padding:7px 18px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>'
+    +'<button onclick="_csMergeApply(\''+esc(sessJson.replace(/\\/g,'\\\\').replace(/'/g,"\\'"))+'\','+sessions.length+')" style="padding:7px 18px;background:#1a6030;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#9889; Merge &amp; Load</button>'
+    +'</div>'
+    +'</div>';
+}
+
+function _csMergeApply(sessJsonStr, total){
+  var allSess;
+  try{ allSess=JSON.parse(sessJsonStr); }catch(e){ toast('Merge error'); return; }
+  // Collect checked sessions
+  var selected=[];
+  for(var i=0;i<total;i++){
+    var chk=document.getElementById('_cmchk'+i);
+    if(chk&&chk.checked) selected.push(allSess[i]);
+  }
+  if(selected.length<2){ toast('Select at least 2 sessions to merge.'); return; }
+
+  // Base = first (oldest) selected
+  var base=selected[0];
+
+  // Helper: merge object maps — base wins on conflict
+  function mergeMap(maps){
+    var out={};
+    for(var m=maps.length-1;m>=0;m--){
+      var src=maps[m]||{};
+      var keys=Object.keys(src);
+      for(var k=0;k<keys.length;k++) out[keys[k]]=src[keys[k]];
+    }
+    return out;
+  }
+
+  // Build merged session starting from base
+  var merged={};
+  var k;
+  var keys=Object.keys(base);
+  for(var ki=0;ki<keys.length;ki++){ k=keys[ki]; merged[k]=base[k]; }
+
+  // Merge selIds: union of all
+  var mergedSelIds={};
+  for(var si=0;si<selected.length;si++){
+    var sids=selected[si].selIds||{};
+    var sidKeys=Object.keys(sids);
+    for(var sk=0;sk<sidKeys.length;sk++) mergedSelIds[sidKeys[sk]]=true;
+  }
+  merged.selIds=mergedSelIds;
+
+  // Merge obsOrder: union, preserving base order then appending extras
+  var seenRep={}, seenNew={};
+  var mergedRep=[], mergedNew=[];
+  for(var oi=0;oi<selected.length;oi++){
+    var ord=selected[oi].obsOrder||{repeated:[],new:[]};
+    var rep=ord.repeated||[];
+    for(var ri=0;ri<rep.length;ri++){ if(!seenRep[rep[ri]]&&mergedSelIds[rep[ri]]){ seenRep[rep[ri]]=1; mergedRep.push(rep[ri]); } }
+    var nw=ord.new||[];
+    for(var ni=0;ni<nw.length;ni++){ if(!seenNew[nw[ni]]&&mergedSelIds[nw[ni]]){ seenNew[nw[ni]]=1; mergedNew.push(nw[ni]); } }
+  }
+  merged.obsOrder={repeated:mergedRep, new:mergedNew};
+
+  // Merge all per-obs maps (base wins on conflict = base last in mergeMap)
+  var mapKeys=['obsEdits','obsNotesMap','obsTypeMap','sensitivityMap','cosoMap','avMap','actMap',
+               'respMap','etaMap','respBHMap','respROMap','respHistory','respAttachMap',
+               'respSectROMap','respSectHOMap','assessMap','refMap','lastRefMap','annexMap',
+               'instCountMap','instAmountMap','instSourceMap','wordingChanges',
+               'roFlags','roComments','roCorrections','roAccepted',
+               'hoFlags','hoComments','hoCorrections','hoAccepted',
+               'respAmendments','roCustomApprovals','hoCustomApprovals','pendingAmendments'];
+  for(var mi=0;mi<mapKeys.length;mi++){
+    var mk=mapKeys[mi];
+    var maps=[];
+    for(var msi=0;msi<selected.length;msi++) maps.push(selected[msi][mk]);
+    merged[mk]=mergeMap(maps);
+  }
+
+  // Merge annexures: union by id, base wins on duplicate id
+  var annexById={};
+  for(var ai=selected.length-1;ai>=0;ai--){
+    var anns=selected[ai].annexures||[];
+    for(var ani=0;ani<anns.length;ani++) annexById[anns[ani].id]=anns[ani];
+  }
+  merged.annexures=Object.keys(annexById).map(function(id){ return annexById[id]; });
+
+  // Merge customs (custom observations): union by id
+  var custById={};
+  for(var ci=selected.length-1;ci>=0;ci--){
+    var custs=selected[ci].customs||[];
+    for(var cui=0;cui<custs.length;cui++) custById[custs[cui].id||cui]=custs[cui];
+  }
+  merged.customs=Object.keys(custById).map(function(id){ return custById[id]; });
+
+  // Merge obsAmendments and obsExtensions
+  var amendMaps=selected.map(function(s){ return s.obsAmendments||{}; });
+  merged.obsAmendments=mergeMap(amendMaps);
+  var extSeen={}, mergedExt=[];
+  for(var ei=0;ei<selected.length;ei++){
+    var exts=selected[ei].obsExtensions||[];
+    for(var exi=0;exi<exts.length;exi++){
+      var eid=exts[exi].id||JSON.stringify(exts[exi]);
+      if(!extSeen[eid]){ extSeen[eid]=1; mergedExt.push(exts[exi]); }
+    }
+  }
+  merged.obsExtensions=mergedExt;
+
+  // Stats for confirmation
+  var baseObsCnt=Object.keys(base.selIds||{}).length;
+  var mergedObsCnt=Object.keys(mergedSelIds).length;
+  var addedCnt=mergedObsCnt-baseObsCnt;
+
+  var summary='Merge '+selected.length+' sessions?\n\n'
+    +'Base session: '+esc(selected[0]._sourceAuditor)+' ('+baseObsCnt+' obs)\n'
+    +'Total after merge: '+mergedObsCnt+' observations'
+    +(addedCnt>0?' (+'+addedCnt+' from other auditors)':'')+'\n\n'
+    +'Report header (branch/dates) is kept from the BASE session.\n'
+    +'Click OK to apply.';
+
+  if(!confirm(summary)) return;
+
+  var bm=document.getElementById('_csBrowserModal');
+  if(bm) bm.remove();
+  var mm=document.getElementById('_csMergeModal');
+  if(mm) mm.remove();
+
+  restoreSession(merged);
+  toast('Merged '+selected.length+' sessions ✓ — '+mergedObsCnt+' observations loaded');
 }
 
 function showCloudSettings(){
