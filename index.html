@@ -628,11 +628,14 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
     <div style="font-size:10.5px;font-weight:600;letter-spacing:.5px;color:#aaa;text-transform:uppercase;margin-bottom:10px;white-space:nowrap">Beaconhouse Group &nbsp;&bull;&nbsp; Systems &amp; Audit</div>
     <div style="font-family:'Merriweather',serif;font-size:42px;font-weight:700;letter-spacing:10px;color:#1a3a5c;text-shadow:0 2px 8px rgba(26,58,92,.15);line-height:1;margin-bottom:6px">BRAINS</div>
     <div style="font-size:10px;font-weight:600;color:#c9962a;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:24px">Branch Risk Audit Investigation &amp; Supervision</div>
-    <div style="font-size:13px;font-weight:600;color:#1a3a5c;margin-bottom:8px">Enter Password to Continue</div>
+    <div id="pw-mode-label" style="font-size:13px;font-weight:600;color:#1a3a5c;margin-bottom:8px">Login</div>
+    <input id="pw-username" type="text" placeholder="Username (leave blank for shared login)" autocomplete="off"
+      onkeydown="if(event.key==='Enter')document.getElementById('pw-input').focus()"
+      style="width:100%;padding:10px 14px;border:2px solid #c8d8ec;border-radius:6px;font-size:14px;font-family:Inter,Arial,sans-serif;outline:none;box-sizing:border-box;margin-bottom:8px">
     <input id="pw-input" type="password" placeholder="Password" autocomplete="new-password" onkeydown="if(event.key==='Enter')pwCheck()"
       style="width:100%;padding:10px 14px;border:2px solid #c8d8ec;border-radius:6px;font-size:14px;font-family:Inter,Arial,sans-serif;outline:none;box-sizing:border-box;margin-bottom:10px">
     <div id="pw-err" style="font-size:12px;color:#c0392b;min-height:18px;margin-bottom:8px"></div>
-    <button onclick="pwCheck()" style="width:100%;padding:11px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;font-family:Inter,Arial,sans-serif">Access System</button>
+    <button onclick="pwCheck()" style="width:100%;padding:11px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;font-family:Inter,Arial,sans-serif">Login</button>
     <div style="font-size:10px;color:#aaa;margin-top:18px">&copy; 2026 Beaconhouse Group &mdash; S&amp;A Internal Use Only</div>
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid #e8edf5;font-size:10px;color:#999;line-height:1.6">
       Developed by <strong style="color:#1a3a5c">Kamran Saleem</strong><br>
@@ -653,69 +656,121 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
 })();
 var APP_BUILD = '23-Aug-2026';
 var APP_VERSION = '02/2026';
+
+// ── Per-user login helpers ──────────────────────────────────────────────────
+function _umSimpleHash(str){
+  var h=5381;
+  for(var i=0;i<str.length;i++){ h=((h<<5)+h)+str.charCodeAt(i); h=h&h; }
+  return (h>>>0).toString(36);
+}
+function _umHashPw(pass, salt){ return _umSimpleHash(salt+'::'+pass+'::brains'); }
+function _umMakeSalt(){
+  return Math.random().toString(36).substring(2)+Math.random().toString(36).substring(2);
+}
+function _umGetCurrentUser(){
+  try{ return JSON.parse(sessionStorage.getItem('sa_current_user')||'{}'); }catch(e){ return {}; }
+}
+function _umIsAdmin(){
+  var u=_umGetCurrentUser(); return u.role==='administrator';
+}
+
+function _pwGrantAccess(userObj){
+  // userObj: {role, name, username}
+  try{
+    sessionStorage.setItem('sa_auth_2026','1');
+    sessionStorage.setItem('sa_current_user', JSON.stringify(userObj));
+  }catch(e){}
+  var isAdmin=(userObj.role==='administrator'||userObj.role==='viewer');
+  if(isAdmin){ window._hoAuthed=true; try{_hoActivateBtns();}catch(e){} }
+  if(userObj.role==='viewer'){ window._viewerMode=true; }
+  document.getElementById('pw-screen').style.display='none';
+  // Auto-fill Cloud Settings name from logged-in user
+  if(userObj.name){
+    try{
+      var cfg=JSON.parse(localStorage.getItem(_CS_CFG_KEY)||'{}');
+      if(!cfg.auditor){ cfg.auditor=userObj.name; localStorage.setItem(_CS_CFG_KEY,JSON.stringify(cfg)); }
+    }catch(e){}
+  }
+  // Show logged-in user in toolbar
+  setTimeout(function(){
+    _umShowLoginBadge(userObj);
+    _applyRoleUI();
+    _startRestore();
+  },0);
+}
+
+function _umShowLoginBadge(userObj){
+  var tb=document.getElementById('main-toolbar');
+  if(!tb) return;
+  var ex=document.getElementById('_um_badge');
+  if(ex) ex.parentNode.removeChild(ex);
+  var d=document.createElement('span');
+  d.id='_um_badge';
+  d.title='Logged in as '+((userObj.name||userObj.username||userObj.role));
+  d.style.cssText='font-size:11px;color:#1a6030;font-weight:700;padding:0 8px;cursor:default;white-space:nowrap;display:flex;align-items:center;gap:3px';
+  d.innerHTML='&#128100; '+(userObj.name||userObj.username||userObj.role);
+  tb.appendChild(d);
+}
+
 function pwCheck(){
   var v = document.getElementById('pw-input').value;
+  var uname = (document.getElementById('pw-username').value||'').trim().toLowerCase();
+  var err=document.getElementById('pw-err');
 
+  // ── Per-user login via GitHub users.json ────────────────────────────────
+  if(uname){
+    err.textContent='Verifying...';
+    var cfg; try{ cfg=JSON.parse(localStorage.getItem(_CS_CFG_KEY)||'{}'); }catch(e){ cfg={}; }
+    if(!cfg.token||!cfg.owner||!cfg.repo){
+      err.textContent='Cloud not configured. Use shared login (leave username blank) or configure Cloud Settings first.';
+      return;
+    }
+    var url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/sessions/_system/users.json';
+    fetch(url,{headers:{'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'}})
+    .then(function(r){ return r.json(); })
+    .then(function(f){
+      if(!f||!f.content){ err.textContent='User list not found. Ask admin to set up User Management.'; return; }
+      var users; try{ users=JSON.parse(_csB64Dec(f.content)); }catch(e){ err.textContent='User list corrupted. Contact admin.'; return; }
+      var found=null;
+      for(var i=0;i<users.length;i++){
+        if((users[i].username||'').toLowerCase()===uname){ found=users[i]; break; }
+      }
+      if(!found){ err.textContent='Username not found. Check spelling or leave blank for shared login.'; document.getElementById('pw-input').value=''; return; }
+      var hash=_umHashPw(v, found.salt||'');
+      if(hash!==found.pwHash){ err.textContent='Incorrect password. Please try again.'; document.getElementById('pw-input').value=''; document.getElementById('pw-input').focus(); return; }
+      err.textContent='';
+      _pwGrantAccess({role:found.role||'auditor', name:found.name||found.username, username:found.username});
+    })
+    .catch(function(){ err.textContent='Could not connect to verify login. Check internet or use shared login.'; });
+    return;
+  }
+
+  // ── Shared / built-in accounts (username left blank) ────────────────────
   // Built-in Administrator account
   var _defHO=[78,105,109,100,64,83,38,65,50,48,50,54].map(function(c){return String.fromCharCode(c);}).join('');
   var _curHO=''; try{_curHO=localStorage.getItem('sa_pw_ho')||_defHO;}catch(e){_curHO=_defHO;}
-  if(v===_curHO){
-    try{sessionStorage.setItem('sa_auth_2026','1'); sessionStorage.setItem('sa_current_user', JSON.stringify({role:'administrator'}));}catch(e){}
-    window._hoAuthed=true;
-    try{_hoActivateBtns();}catch(e){}
-    document.getElementById('pw-screen').style.display='none';
-    _startRestore();
-    return;
-  }
+  if(v===_curHO){ _pwGrantAccess({role:'administrator',name:'Administrator',username:'admin'}); return; }
 
   // Built-in HO Supervisor account
   var _defHOSup='HOSuper@2026';
   var _curHOSup=''; try{_curHOSup=localStorage.getItem('sa_pw_ho_sup')||_defHOSup;}catch(e){_curHOSup=_defHOSup;}
-  if(v===_curHOSup){
-    try{sessionStorage.setItem('sa_auth_2026','1'); sessionStorage.setItem('sa_current_user', JSON.stringify({role:'ho_supervisor'}));}catch(e){}
-    document.getElementById('pw-screen').style.display='none';
-    setTimeout(_applyRoleUI, 0);
-    _startRestore();
-    return;
-  }
+  if(v===_curHOSup){ _pwGrantAccess({role:'ho_supervisor',name:'HO Supervisor',username:'ho_supervisor'}); return; }
 
   // Built-in RO Supervisor account
   var _defROSup='RO@S&A2026';
   var _curROSup=''; try{_curROSup=localStorage.getItem('sa_pw_ro')||_defROSup;}catch(e){_curROSup=_defROSup;}
-  if(v===_curROSup){
-    try{sessionStorage.setItem('sa_auth_2026','1'); sessionStorage.setItem('sa_current_user', JSON.stringify({role:'ro_supervisor'}));}catch(e){}
-    document.getElementById('pw-screen').style.display='none';
-    setTimeout(_applyRoleUI, 0);
-    _startRestore();
-    return;
-  }
+  if(v===_curROSup){ _pwGrantAccess({role:'ro_supervisor',name:'RO Supervisor',username:'ro_supervisor'}); return; }
 
   // Built-in Auditor account
   var _defUser='S&A-BA2026';
   var _curUser=''; try{_curUser=localStorage.getItem('sa_pw_user')||_defUser;}catch(e){_curUser=_defUser;}
-  if(v===_curUser){
-    try{sessionStorage.setItem('sa_auth_2026','1'); sessionStorage.setItem('sa_current_user', JSON.stringify({role:'auditor'}));}catch(e){}
-    document.getElementById('pw-screen').style.display='none';
-    setTimeout(_applyRoleUI, 0);
-    _startRestore();
-    return;
-  }
+  if(v===_curUser){ _pwGrantAccess({role:'auditor',name:'Auditor',username:'auditor'}); return; }
 
-  // Built-in Viewer (Tester) account — all tabs visible, admin actions blocked
+  // Built-in Viewer account
   var _defViewer='Br@insTest#2026';
   var _curViewer=''; try{_curViewer=localStorage.getItem('sa_pw_viewer')||_defViewer;}catch(e){_curViewer=_defViewer;}
-  if(v===_curViewer){
-    try{sessionStorage.setItem('sa_auth_2026','1'); sessionStorage.setItem('sa_current_user', JSON.stringify({role:'viewer'}));}catch(e){}
-    window._hoAuthed=true;   // lets all tabs open without auth prompts
-    window._viewerMode=true; // blocks destructive admin actions
-    try{_hoActivateBtns();}catch(e){}
-    document.getElementById('pw-screen').style.display='none';
-    setTimeout(_applyRoleUI, 0);
-    _startRestore();
-    return;
-  }
+  if(v===_curViewer){ _pwGrantAccess({role:'viewer',name:'Viewer',username:'viewer'}); return; }
 
-  var err=document.getElementById('pw-err');
   err.textContent='Incorrect password. Please try again.';
   document.getElementById('pw-input').value='';
   document.getElementById('pw-input').focus();
@@ -1213,6 +1268,8 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <button class="tb-dd-item" onclick="cloudBrowse();tbDDClose()" data-tip="Browse and load sessions saved to cloud by any auditor">&#128193; Browse Cloud Sessions</button>
         <div class="tb-dd-sep"></div>
         <button class="tb-dd-item" onclick="showCloudSettings();tbDDClose()" data-tip="Configure GitHub repository and access token for cloud sync">&#9881; Cloud Settings</button>
+        <button class="tb-dd-item" onclick="showUserManagement();tbDDClose()" data-tip="Add, edit or delete user accounts (Administrator only)">&#128100; User Management</button>
+        <button class="tb-dd-item" onclick="_umChangeOwnPassword();tbDDClose()" data-tip="Change your own login password">&#128272; Change My Password</button>
       </div>
     </div>
 
@@ -23119,6 +23176,237 @@ function _csUpdateIndicator(){
   }
 }
 (function(){ setTimeout(_csUpdateIndicator,800); })();
+
+// ── User Management ──────────────────────────────────────────────────────────
+var _UM_PATH = 'sessions/_system/users.json';
+
+function _umFetchUsers(cb){
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo){ cb(null,'Cloud not configured.'); return; }
+  var url=_csRepoBase(cfg)+'/contents/'+_UM_PATH;
+  fetch(url,{headers:_csHdrs(cfg)})
+  .then(function(r){ return r.json(); })
+  .then(function(f){
+    if(!f||!f.content){ cb([],null,null); return; }
+    try{ cb(JSON.parse(_csB64Dec(f.content)),null,f.sha); }
+    catch(e){ cb(null,'Corrupted user list.'); }
+  })
+  .catch(function(e){ cb(null,e&&e.message?e.message:'Network error'); });
+}
+
+function _umSaveUsers(users, sha, cb){
+  var cfg=_csGetCfg();
+  var url=_csRepoBase(cfg)+'/contents/'+_UM_PATH;
+  var body={message:'[BRAINS] Update users',content:_csB64Enc(JSON.stringify(users,null,2))};
+  if(sha) body.sha=sha;
+  fetch(url,{method:'PUT',headers:_csHdrs(cfg),body:JSON.stringify(body)})
+  .then(function(r){ return r.json(); })
+  .then(function(d){ cb(d&&d.content?null:'Save failed — '+JSON.stringify(d)); })
+  .catch(function(e){ cb(e&&e.message?e.message:'Network error'); });
+}
+
+function showUserManagement(){
+  if(!_umIsAdmin()){ toast('Administrator access required.'); return; }
+  var ex=document.getElementById('_umModal');
+  if(ex) ex.parentNode.removeChild(ex);
+  var el=document.createElement('div');
+  el.id='_umModal';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+  el.innerHTML='<div style="background:#fff;border-radius:8px;width:94%;max-width:680px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.3)">'
+    +'<div style="padding:14px 20px;border-bottom:1px solid #e0e8f0;display:flex;align-items:center;gap:10px;flex-shrink:0">'
+    +'<span style="font-size:18px">&#128100;</span>'
+    +'<div style="flex:1;font-size:14px;font-weight:700;color:#1a3a5c">User Management</div>'
+    +'<button onclick="document.getElementById(\'_umModal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#999">&#x2715;</button>'
+    +'</div>'
+    +'<div id="_umList" style="padding:14px 20px;overflow-y:auto;flex:1"><div style="color:#888;font-size:13px;text-align:center;padding:30px">Loading users...</div></div>'
+    +'<div style="padding:12px 20px;border-top:1px solid #e0e8f0;display:flex;justify-content:space-between;flex-shrink:0">'
+    +'<button onclick="_umOpenAddUser()" style="padding:7px 16px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#43; Add User</button>'
+    +'<button onclick="document.getElementById(\'_umModal\').remove()" style="padding:7px 14px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">Close</button>'
+    +'</div></div>';
+  document.body.appendChild(el);
+  _umRefreshList();
+}
+
+function _umRefreshList(){
+  var list=document.getElementById('_umList');
+  if(!list) return;
+  _umFetchUsers(function(users,err){
+    if(err||!users){
+      list.innerHTML='<div style="color:#c0392b;font-size:13px;text-align:center;padding:30px">'+(err||'No users found.')+'</div>';
+      return;
+    }
+    if(!users.length){
+      list.innerHTML='<div style="color:#888;font-size:13px;text-align:center;padding:30px">No users yet.<br><small>Click + Add User to create the first account.</small></div>';
+      return;
+    }
+    var roleLabel={'administrator':'Admin','auditor':'Auditor','supervisor':'Supervisor','ho_supervisor':'HO Supervisor','ro_supervisor':'RO Supervisor','viewer':'Viewer'};
+    var roleColor={'administrator':'#c0392b','auditor':'#1a3a5c','supervisor':'#1a6030','ho_supervisor':'#7b3fa0','ro_supervisor':'#1a6030','viewer':'#888'};
+    var h='';
+    users.forEach(function(u,i){
+      var rl=roleLabel[u.role]||u.role;
+      var rc=roleColor[u.role]||'#555';
+      h+='<div style="display:flex;align-items:center;padding:9px 12px;border:1px solid #e0e8f0;border-radius:6px;margin-bottom:7px">';
+      h+='<div style="flex:1">';
+      h+='<div style="font-size:13px;font-weight:600;color:#1a3a5c">'+esc(u.name||u.username)+'</div>';
+      h+='<div style="font-size:11px;color:#888">@'+esc(u.username)+'</div></div>';
+      h+='<span style="font-size:11px;font-weight:700;color:'+rc+';background:'+rc+'18;padding:2px 8px;border-radius:10px;margin-right:10px">'+esc(rl)+'</span>';
+      h+='<button onclick="_umOpenEditUser('+i+')" style="padding:4px 10px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:4px;font-size:11px;cursor:pointer;font-family:Inter,sans-serif;margin-right:5px">Edit</button>';
+      h+='<button onclick="_umDeleteUser('+i+')" style="padding:4px 10px;background:#fdf0f0;border:1px solid #f5c6c6;border-radius:4px;font-size:11px;cursor:pointer;font-family:Inter,sans-serif;color:#c0392b">Delete</button>';
+      h+='</div>';
+    });
+    list.innerHTML=h;
+  });
+}
+
+function _umOpenAddUser(){
+  _umOpenUserForm(null, null);
+}
+function _umOpenEditUser(idx){
+  _umFetchUsers(function(users,err,sha){
+    if(err||!users){ toast(err||'Could not load users.'); return; }
+    _umOpenUserForm(users[idx],idx);
+  });
+}
+
+function _umOpenUserForm(user, idx){
+  var ex=document.getElementById('_umFormModal');
+  if(ex) ex.parentNode.removeChild(ex);
+  var isEdit=(user!==null&&user!==undefined);
+  var el=document.createElement('div');
+  el.id='_umFormModal';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+  var inp='width:100%;padding:7px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:13px;font-family:Inter,sans-serif;box-sizing:border-box';
+  var lbl='font-size:11.5px;font-weight:700;color:#2a4060;display:block;margin-bottom:4px';
+  var row='margin-bottom:12px';
+  var roles=['auditor','supervisor','ho_supervisor','ro_supervisor','administrator','viewer'];
+  var roleNames={'auditor':'Auditor','supervisor':'Supervisor','ho_supervisor':'HO Supervisor','ro_supervisor':'RO Supervisor','administrator':'Administrator','viewer':'Viewer (Read-only)'};
+  var ropts='';
+  roles.forEach(function(r){
+    ropts+='<option value="'+r+'"'+(isEdit&&user.role===r?' selected':(!isEdit&&r==='auditor'?' selected':''))+'>'+roleNames[r]+'</option>';
+  });
+  el.innerHTML='<div style="background:#fff;border-radius:8px;padding:26px 30px;max-width:420px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,.3)">'
+    +'<div style="font-size:14px;font-weight:700;color:#1a3a5c;margin-bottom:16px">'+(isEdit?'Edit User':'Add New User')+'</div>'
+    +'<div style="'+row+'"><label style="'+lbl+'">Full Name</label><input id="_umF_name" value="'+esc(isEdit?user.name||'':'')+'" placeholder="e.g. Ahmed Khan" style="'+inp+'"></div>'
+    +'<div style="'+row+'"><label style="'+lbl+'">Username <span style="font-weight:400;color:#aaa">(used to log in)</span></label><input id="_umF_uname" value="'+esc(isEdit?user.username||'':'')+'" placeholder="e.g. ahmed.khan" '+(isEdit?'readonly style="'+inp+';background:#f5f5f5"':'style="'+inp+'"')+'></div>'
+    +'<div style="'+row+'"><label style="'+lbl+'">Role</label><select id="_umF_role" style="'+inp+'">'+ropts+'</select></div>'
+    +'<div style="'+row+'"><label style="'+lbl+'">'+(isEdit?'New Password <span style="font-weight:400;color:#aaa">(leave blank to keep current)</span>':'Password')+'</label><input id="_umF_pw" type="password" placeholder="'+(isEdit?'Leave blank to keep unchanged':'Min 6 characters')+'" style="'+inp+'"></div>'
+    +'<div id="_umF_err" style="font-size:12px;color:#c0392b;min-height:16px;margin-bottom:10px"></div>'
+    +'<div style="display:flex;gap:10px;justify-content:flex-end">'
+    +'<button onclick="_umSaveUserForm('+(isEdit?idx:'null')+')" style="padding:8px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Save</button>'
+    +'<button onclick="document.getElementById(\'_umFormModal\').remove()" style="padding:8px 14px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>'
+    +'</div></div>';
+  document.body.appendChild(el);
+}
+
+function _umSaveUserForm(editIdx){
+  var name=(document.getElementById('_umF_name').value||'').trim();
+  var uname=(document.getElementById('_umF_uname').value||'').trim().toLowerCase();
+  var role=(document.getElementById('_umF_role').value||'auditor');
+  var pw=(document.getElementById('_umF_pw').value||'').trim();
+  var errEl=document.getElementById('_umF_err');
+  if(!name){ errEl.textContent='Full name is required.'; return; }
+  if(!uname){ errEl.textContent='Username is required.'; return; }
+  if(!/^[a-z0-9._\-]+$/.test(uname)){ errEl.textContent='Username: letters, numbers, dots, hyphens only.'; return; }
+  if(editIdx===null && !pw){ errEl.textContent='Password is required for new users.'; return; }
+  if(pw && pw.length<6){ errEl.textContent='Password must be at least 6 characters.'; return; }
+  errEl.textContent='Saving...';
+  _umFetchUsers(function(users,err,sha){
+    if(err){ errEl.textContent=err; return; }
+    if(!users) users=[];
+    var isEdit=(editIdx!==null&&editIdx!==undefined);
+    // Check duplicate username
+    for(var i=0;i<users.length;i++){
+      if(!isEdit && (users[i].username||'').toLowerCase()===uname){ errEl.textContent='Username already exists.'; return; }
+    }
+    var userObj;
+    if(isEdit){
+      userObj=users[editIdx];
+      userObj.name=name;
+      userObj.role=role;
+      if(pw){ userObj.salt=_umMakeSalt(); userObj.pwHash=_umHashPw(pw,userObj.salt); }
+    } else {
+      var salt=_umMakeSalt();
+      userObj={name:name,username:uname,role:role,salt:salt,pwHash:_umHashPw(pw,salt)};
+      users.push(userObj);
+    }
+    _umSaveUsers(users,sha,function(saveErr){
+      if(saveErr){ errEl.textContent='Save failed: '+saveErr; return; }
+      document.getElementById('_umFormModal').remove();
+      _umRefreshList();
+      toast((isEdit?'User updated':'User added')+': '+name);
+    });
+  });
+}
+
+function _umDeleteUser(idx){
+  if(!confirm('Delete this user? They will no longer be able to log in.')) return;
+  _umFetchUsers(function(users,err,sha){
+    if(err||!users){ toast(err||'Could not load users.'); return; }
+    var name=users[idx].name||users[idx].username;
+    users.splice(idx,1);
+    _umSaveUsers(users,sha,function(saveErr){
+      if(saveErr){ toast('Delete failed: '+saveErr); return; }
+      _umRefreshList();
+      toast('User deleted: '+name);
+    });
+  });
+}
+
+function _umChangeOwnPassword(){
+  var u=_umGetCurrentUser();
+  if(!u||!u.username||u.username==='auditor'||u.username==='admin'||u.username==='viewer'){
+    toast('Only named user accounts can change password here. Use Settings → Change Password for shared accounts.');
+    return;
+  }
+  var ex=document.getElementById('_umChPwModal');
+  if(ex) ex.parentNode.removeChild(ex);
+  var el=document.createElement('div');
+  el.id='_umChPwModal';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+  var inp='width:100%;padding:8px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:13px;font-family:Inter,sans-serif;box-sizing:border-box;margin-bottom:10px';
+  el.innerHTML='<div style="background:#fff;border-radius:8px;padding:26px 30px;max-width:380px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,.3)">'
+    +'<div style="font-size:14px;font-weight:700;color:#1a3a5c;margin-bottom:16px">&#128272; Change My Password</div>'
+    +'<div style="font-size:12px;color:#666;margin-bottom:14px">Changing password for: <strong>'+esc(u.name||u.username)+'</strong></div>'
+    +'<input id="_umCp_cur" type="password" placeholder="Current password" style="'+inp+'">'
+    +'<input id="_umCp_new" type="password" placeholder="New password (min 6 chars)" style="'+inp+'">'
+    +'<input id="_umCp_cfm" type="password" placeholder="Confirm new password" style="'+inp+'">'
+    +'<div id="_umCp_err" style="font-size:12px;color:#c0392b;min-height:16px;margin-bottom:10px"></div>'
+    +'<div style="display:flex;gap:10px;justify-content:flex-end">'
+    +'<button onclick="_umDoChangeOwnPw()" style="padding:8px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Save</button>'
+    +'<button onclick="document.getElementById(\'_umChPwModal\').remove()" style="padding:8px 14px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>'
+    +'</div></div>';
+  document.body.appendChild(el);
+}
+
+function _umDoChangeOwnPw(){
+  var u=_umGetCurrentUser();
+  var cur=(document.getElementById('_umCp_cur').value||'').trim();
+  var nw=(document.getElementById('_umCp_new').value||'').trim();
+  var cfm=(document.getElementById('_umCp_cfm').value||'').trim();
+  var errEl=document.getElementById('_umCp_err');
+  if(!cur||!nw||!cfm){ errEl.textContent='All fields are required.'; return; }
+  if(nw!==cfm){ errEl.textContent='New passwords do not match.'; return; }
+  if(nw.length<6){ errEl.textContent='New password must be at least 6 characters.'; return; }
+  errEl.textContent='Saving...';
+  _umFetchUsers(function(users,err,sha){
+    if(err||!users){ errEl.textContent=err||'Could not load users.'; return; }
+    var found=null, foundIdx=-1;
+    for(var i=0;i<users.length;i++){
+      if((users[i].username||'').toLowerCase()===(u.username||'').toLowerCase()){ found=users[i]; foundIdx=i; break; }
+    }
+    if(!found){ errEl.textContent='Your account was not found. Contact admin.'; return; }
+    var curHash=_umHashPw(cur, found.salt||'');
+    if(curHash!==found.pwHash){ errEl.textContent='Current password is incorrect.'; return; }
+    var newSalt=_umMakeSalt();
+    users[foundIdx].salt=newSalt;
+    users[foundIdx].pwHash=_umHashPw(nw,newSalt);
+    _umSaveUsers(users,sha,function(saveErr){
+      if(saveErr){ errEl.textContent='Save failed: '+saveErr; return; }
+      document.getElementById('_umChPwModal').remove();
+      toast('Password changed successfully.');
+    });
+  });
+}
 
 </script>
 
