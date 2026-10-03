@@ -1264,6 +1264,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
     <!-- Cloud Sync dropdown -->
     <div class="tb-dd" id="dd-cloud">
       <button id="dd-cloud-tab" class="tb-dd-tab" onclick="tbDDToggle('dd-cloud')" title="Cloud Sync — not configured">&#9729; Cloud <span class="arr">&#9660;</span></button>
+      <span id="_cs_autosave_lbl" style="font-size:10px;color:#1a6030;white-space:nowrap;margin-left:4px;font-weight:600;opacity:.85;letter-spacing:.1px;align-self:center"></span>
       <div class="tb-dd-menu">
         <button class="tb-dd-item" onclick="cloudSave();tbDDClose()" data-tip="Save current session to GitHub cloud storage">&#9729; Save to Cloud</button>
         <button class="tb-dd-item" onclick="cloudBrowse();tbDDClose()" data-tip="Browse and load sessions saved to cloud by any auditor">&#128193; Browse Cloud Sessions</button>
@@ -22920,9 +22921,36 @@ function _csRepoBase(cfg){
   return 'https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo;
 }
 
-function cloudSave(){
+var _csLastCloudSaveTs = 0;
+var _csAutoSaveStatus = ''; // '', 'saving', 'ok', 'err'
+
+function _csCloudSaveIndicatorTick(){
+  var el=document.getElementById('_cs_autosave_lbl');
+  if(!el) return;
+  if(!_csLastCloudSaveTs){
+    el.textContent='';
+    el.title='';
+    return;
+  }
+  var diffMs=Date.now()-_csLastCloudSaveTs;
+  var mins=Math.floor(diffMs/60000);
+  var txt;
+  if(mins<1) txt='Last cloud saved: just now';
+  else if(mins===1) txt='Last cloud saved: 1 min ago';
+  else txt='Last cloud saved: '+mins+' mins ago';
+  el.textContent=txt;
+  el.title=txt;
+  if(_csAutoSaveStatus==='saving') el.textContent='Saving to cloud…';
+  if(_csAutoSaveStatus==='err')    el.textContent='Cloud save failed ⚠';
+}
+
+function cloudSave(opts){
+  var silent=(opts&&opts.silent);
   var cfg=_csGetCfg();
-  if(!cfg.token||!cfg.owner||!cfg.repo||!cfg.auditor){ showCloudSettings(); return; }
+  if(!cfg.token||!cfg.owner||!cfg.repo||!cfg.auditor){
+    if(!silent) showCloudSettings();
+    return;
+  }
   var path=_csSessionPath(cfg);
   var fname=path.split('/').pop();
   var url=_csRepoBase(cfg)+'/contents/'+path;
@@ -22936,7 +22964,9 @@ function cloudSave(){
     savedAt: new Date().toISOString()
   };
   var content=_csB64Enc(JSON.stringify(sess,null,2));
-  toast('Saving to cloud...');
+  if(!silent) toast('Saving to cloud...');
+  _csAutoSaveStatus='saving';
+  _csCloudSaveIndicatorTick();
   fetch(url,{headers:hdrs})
   .then(function(r){ return r.ok?r.json():null; })
   .then(function(existing){
@@ -22947,14 +22977,38 @@ function cloudSave(){
   .then(function(r){
     if(r&&(r.status===200||r.status===201)){
       _csBrowseCache=null; // invalidate cache on save
-      toast('Saved to cloud ✓');
+      _csLastCloudSaveTs=Date.now();
+      _csAutoSaveStatus='ok';
+      _csCloudSaveIndicatorTick();
+      if(!silent) toast('Saved to cloud ✓');
       _csUpdateIndicator();
     } else {
-      r.json().then(function(e){ toast('Cloud save failed: '+(e.message||r.status)); });
+      _csAutoSaveStatus='err';
+      _csCloudSaveIndicatorTick();
+      r.json().then(function(e){
+        if(!silent) toast('Cloud save failed: '+(e.message||r.status));
+      });
     }
   })
-  .catch(function(e){ toast('Cloud error: '+(e&&e.message?e.message:'Network error')); });
+  .catch(function(e){
+    _csAutoSaveStatus='err';
+    _csCloudSaveIndicatorTick();
+    if(!silent) toast('Cloud error: '+(e&&e.message?e.message:'Network error'));
+  });
 }
+
+// Auto-save to cloud every 10 minutes (silent, only when cloud is configured)
+(function startCloudAutoSave(){
+  // Update "X mins ago" label every minute
+  setInterval(_csCloudSaveIndicatorTick, 60000);
+  // Auto-save every 10 minutes
+  setInterval(function(){
+    var cfg=_csGetCfg();
+    if(cfg.token&&cfg.owner&&cfg.repo&&cfg.auditor){
+      cloudSave({silent:true});
+    }
+  }, 600000);
+})();
 
 // Recursively list all .json files under sessions/ by walking year -> branch -> auditor
 function _csFetchAllSessions(cfg, cb){
