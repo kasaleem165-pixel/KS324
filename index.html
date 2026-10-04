@@ -23539,15 +23539,13 @@ function _csUploadSessionFileRead(evt){
     if(!sess||!sess.ts){ toast('File does not appear to be a BRAINS session.'); return; }
     // Determine cloud path — use branch+auditor from the session's own cloudMeta if available,
     // else fall back to current settings
+    // Always use current auditor's own name — never allow uploading as someone else
     var year=(sess._cloudMeta&&sess._cloudMeta.auditYear)||cfg.auditYear||(new Date().getFullYear()+'');
     var brFolder=(sess._cloudMeta&&sess._cloudMeta.branchFolder)||_csBranchFolder();
-    var audSlug=(sess._cloudMeta&&sess._cloudMeta.auditor)
-      ? sess._cloudMeta.auditor.replace(/[^a-zA-Z0-9\-_]/g,'_').replace(/_+/g,'_').toLowerCase()
-      : _csAuditorSlug(cfg);
+    var audSlug=_csAuditorSlug(cfg); // always own name from Cloud Settings
     var path='sessions/'+year+'/'+brFolder+'/'+audSlug+'.json';
-    // Show confirmation with resolved path
     var brDisplay=brFolder.replace(/_/g,' ');
-    if(!confirm('Upload "'+file.name+'" to cloud?\n\nBranch: '+brDisplay+'\nAuditor: '+audSlug+'\nPath: '+path+'\n\nThis will overwrite any existing session at this path.')) return;
+    if(!confirm('Upload "'+file.name+'" to cloud?\n\nBranch: '+brDisplay+'\nSaved as: '+cfg.auditor+'\nPath: '+path+'\n\nThis will overwrite your existing session at this path.')) return;
     var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
     var url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+path;
     toast('Uploading session to cloud…');
