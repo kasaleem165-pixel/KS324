@@ -1267,6 +1267,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       <span id="_cs_autosave_lbl" style="font-size:10px;color:#1a6030;white-space:nowrap;margin-left:4px;font-weight:600;opacity:.85;letter-spacing:.1px;align-self:center"></span>
       <div class="tb-dd-menu">
         <button class="tb-dd-item" onclick="cloudSave();tbDDClose()" data-tip="Save current session to GitHub cloud storage">&#9729; Save to Cloud</button>
+        <button class="tb-dd-item" onclick="_csUploadSessionFile();tbDDClose()" data-tip="Upload a saved .json session file from your computer to GitHub cloud">&#128228; Upload Session File</button>
         <button class="tb-dd-item" onclick="cloudBrowse();tbDDClose()" data-tip="Browse and load sessions saved to cloud by any auditor">&#128193; Browse Cloud Sessions</button>
         <button class="tb-dd-item" onclick="cloudBrowse();tbDDClose()" data-tip="Merge sessions from multiple auditors on the same branch into one combined session">&#9889; Merge Coworker Sessions</button>
         <div class="tb-dd-sep"></div>
@@ -1306,6 +1307,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
     </button>
 
     <input type="file" id="srr-proposals-input" accept=".json" style="display:none" onchange="srrLoadProposalsFile(event)">
+    <input type="file" id="_cs_upload_fileinp" accept=".json" style="display:none" onchange="_csUploadSessionFileRead(event)">
     <input type="file" id="ro-review-fileinp" accept=".html" style="display:none" onchange="loadReviewerHtml(event,'ro')">
     <input type="file" id="ho-review-fileinp" accept=".html" style="display:none" onchange="loadReviewerHtml(event,'ho')">
     <input type="file" id="ro-sect-resp-fileinp" accept=".html" style="display:none" onchange="loadSectResponseFile(event,'ro')">
@@ -23515,6 +23517,66 @@ function _csImportDoLoad(){
     if(errEl){errEl.textContent=msg;errEl.style.display='block';}
     toast('Import failed: '+msg);
   });
+}
+
+function _csUploadSessionFile(){
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo){ showCloudSettings(); return; }
+  var inp=document.getElementById('_cs_upload_fileinp');
+  if(inp){ inp.value=''; inp.click(); }
+}
+
+function _csUploadSessionFileRead(evt){
+  var file=evt.target.files&&evt.target.files[0];
+  if(!file) return;
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo||!cfg.auditor){ toast('Cloud not configured.'); return; }
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var text=e.target.result;
+    var sess;
+    try{ sess=JSON.parse(text); }catch(ex){ toast('Invalid file — not a JSON session.'); return; }
+    if(!sess||!sess.ts){ toast('File does not appear to be a BRAINS session.'); return; }
+    // Determine cloud path — use branch+auditor from the session's own cloudMeta if available,
+    // else fall back to current settings
+    var year=(sess._cloudMeta&&sess._cloudMeta.auditYear)||cfg.auditYear||(new Date().getFullYear()+'');
+    var brFolder=(sess._cloudMeta&&sess._cloudMeta.branchFolder)||_csBranchFolder();
+    var audSlug=(sess._cloudMeta&&sess._cloudMeta.auditor)
+      ? sess._cloudMeta.auditor.replace(/[^a-zA-Z0-9\-_]/g,'_').replace(/_+/g,'_').toLowerCase()
+      : _csAuditorSlug(cfg);
+    var path='sessions/'+year+'/'+brFolder+'/'+audSlug+'.json';
+    // Show confirmation with resolved path
+    var brDisplay=brFolder.replace(/_/g,' ');
+    if(!confirm('Upload "'+file.name+'" to cloud?\n\nBranch: '+brDisplay+'\nAuditor: '+audSlug+'\nPath: '+path+'\n\nThis will overwrite any existing session at this path.')) return;
+    var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+    var url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+path;
+    toast('Uploading session to cloud…');
+    // Add cloudMeta before uploading
+    sess._cloudMeta={
+      auditor: audSlug,
+      auditYear: year,
+      branchFolder: brFolder,
+      savedAt: new Date().toISOString()
+    };
+    var content=_csB64Enc(JSON.stringify(sess,null,2));
+    fetch(url,{headers:hdrs})
+    .then(function(r){ return r.ok?r.json():null; })
+    .then(function(existing){
+      var body={message:'[BRAINS] Upload '+path,content:content};
+      if(existing&&existing.sha) body.sha=existing.sha;
+      return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+    })
+    .then(function(r){
+      if(r&&(r.status===200||r.status===201)){
+        _csBrowseCache=null;
+        toast('Session uploaded to cloud ✓');
+      } else {
+        r.json().then(function(er){ toast('Upload failed: '+(er.message||r.status)); });
+      }
+    })
+    .catch(function(er){ toast('Upload error: '+(er&&er.message?er.message:'Network error')); });
+  };
+  reader.readAsText(file);
 }
 
 function showCloudSettings(){
