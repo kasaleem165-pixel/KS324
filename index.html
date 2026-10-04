@@ -23528,20 +23528,22 @@ function showCloudSettings(){
   var lbl='font-size:11.5px;font-weight:700;color:#2a4060;display:block;margin-bottom:4px';
   var inp='width:100%;padding:7px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:13px;font-family:Inter,sans-serif;box-sizing:border-box';
   var curYear=new Date().getFullYear()+'';
-  el.innerHTML='<div style="background:#fff;border-radius:8px;padding:28px 32px;max-width:490px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,.25)">'
+  el.innerHTML='<div style="background:#fff;border-radius:8px;padding:28px 32px;max-width:490px;width:92%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.25)">'
   +'<div style="font-size:15px;font-weight:700;color:#1a3a5c;margin-bottom:3px">&#9729; Cloud Sync Settings</div>'
-  +'<div style="font-size:11.5px;color:#888;margin-bottom:20px">Enter your GitHub repository details. Stored in this browser only.</div>'
+  +'<div style="font-size:11.5px;color:#888;margin-bottom:12px">Settings sync automatically across devices. On a new device: enter your Token + Owner + Repo, then click <strong>Auto-fill from Cloud</strong>.</div>'
   +'<div style="'+row+'"><label style="'+lbl+'">GitHub Repository Owner</label>'
   +'<input id="_cs_owner" value="'+esc(cfg.owner||'')+'" placeholder="e.g. kasaleem165-pixel" style="'+inp+'"></div>'
   +'<div style="'+row+'"><label style="'+lbl+'">Repository Name</label>'
   +'<input id="_cs_repo" value="'+esc(cfg.repo||'')+'" placeholder="e.g. brains-sessions" style="'+inp+'"></div>'
+  +'<div style="'+row+'"><label style="'+lbl+'">GitHub Personal Access Token (PAT)</label>'
+  +'<input id="_cs_token" type="password" value="'+esc(cfg.token||'')+'" placeholder="github_pat_xxxxxxxxxxxxxxxxxxxx" style="'+inp+';margin-bottom:5px">'
+  +'<div style="font-size:11px;color:#999">Needs <strong>Contents: Read &amp; Write</strong> permission. <a href="https://github.com/settings/tokens?type=beta" target="_blank" style="color:#1a6030">Create on GitHub &#8599;</a></div></div>'
+  +'<div style="margin-bottom:16px"><button onclick="_csAutoFill()" style="width:100%;padding:8px;background:#eef6f0;border:1px solid #a8d0b0;border-radius:5px;font-size:12.5px;font-weight:700;color:#1a5a30;cursor:pointer;font-family:Inter,sans-serif">&#9729; Auto-fill from Cloud</button>'
+  +'<div id="_cs_autofill_result" style="font-size:11.5px;min-height:16px;margin-top:5px;text-align:center"></div></div>'
   +'<div style="'+row+'"><label style="'+lbl+'">Your Name <span style="font-weight:400;color:#aaa">(used as your file name in cloud)</span></label>'
   +'<input id="_cs_auditor" value="'+esc(cfg.auditor||'')+'" placeholder="e.g. Khurram Saleem" style="'+inp+'"></div>'
   +'<div style="'+row+'"><label style="'+lbl+'">Audit Year <span style="font-weight:400;color:#aaa">(year audit was conducted — not report issue year)</span></label>'
   +'<input id="_cs_auditYear" value="'+esc(cfg.auditYear||curYear)+'" placeholder="'+curYear+'" style="'+inp+'"></div>'
-  +'<div style="'+row+'"><label style="'+lbl+'">GitHub Personal Access Token (PAT)</label>'
-  +'<input id="_cs_token" type="password" value="'+esc(cfg.token||'')+'" placeholder="github_pat_xxxxxxxxxxxxxxxxxxxx" style="'+inp+';margin-bottom:5px">'
-  +'<div style="font-size:11px;color:#999">Needs <strong>Contents: Read &amp; Write</strong> permission. <a href="https://github.com/settings/tokens?type=beta" target="_blank" style="color:#1a6030">Create on GitHub &#8599;</a></div></div>'
   +'<div id="_cs_test_result" style="font-size:12px;min-height:18px;margin-bottom:14px"></div>'
   +'<hr style="border:none;border-top:1px solid #e0e8f4;margin-bottom:14px">'
   +'<div style="font-size:12.5px;font-weight:700;color:#1a5a30;margin-bottom:10px">&#128194; Google Drive (Annexure Storage) <span style="font-weight:400;color:#aaa;font-size:11px">— optional</span></div>'
@@ -23578,6 +23580,55 @@ function _csSaveSettings(){
   if(m) m.remove();
   toast('Cloud settings saved.');
   _csUpdateIndicator();
+  // Push shared settings to GitHub so other devices can auto-fill
+  _csPushSharedSettings(cfg);
+}
+
+var _CS_SHARED_PATH='_settings/shared.json';
+
+function _csPushSharedSettings(cfg){
+  if(!cfg.token||!cfg.owner||!cfg.repo) return;
+  var shared={
+    owner:cfg.owner, repo:cfg.repo, auditYear:cfg.auditYear,
+    driveClientId:cfg.driveClientId||'', driveRoot:cfg.driveRoot||'BRAINS-Annexures',
+    lastAuditor:cfg.auditor // hint for new devices (user can change)
+  };
+  var url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+_CS_SHARED_PATH;
+  var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+  fetch(url,{headers:hdrs})
+  .then(function(r){ return r.ok?r.json():null; })
+  .then(function(existing){
+    var body={message:'[BRAINS] Update shared settings',content:_csB64Enc(JSON.stringify(shared,null,2))};
+    if(existing&&existing.sha) body.sha=existing.sha;
+    return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+  })
+  .catch(function(){}); // silent — settings save already confirmed
+}
+
+function _csAutoFill(){
+  var owner=(document.getElementById('_cs_owner')||{}).value||'';
+  var repo=(document.getElementById('_cs_repo')||{}).value||'';
+  var token=(document.getElementById('_cs_token')||{}).value||'';
+  var res=document.getElementById('_cs_autofill_result');
+  owner=owner.trim(); repo=repo.trim(); token=token.trim();
+  if(!owner||!repo||!token){
+    if(res) res.innerHTML='<span style="color:#c00">Enter Owner, Repo and Token first.</span>';
+    return;
+  }
+  if(res) res.innerHTML='<span style="color:#888">Fetching settings…</span>';
+  var url='https://api.github.com/repos/'+owner+'/'+repo+'/contents/'+_CS_SHARED_PATH;
+  fetch(url,{headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}})
+  .then(function(r){ return r.json(); })
+  .then(function(f){
+    if(!f||!f.content){ if(res) res.innerHTML='<span style="color:#c00">No shared settings found. Save settings on another device first.</span>'; return; }
+    var shared=JSON.parse(_csB64Dec(f.content.replace(/\s/g,'')));
+    if(shared.auditYear){ var el=document.getElementById('_cs_auditYear'); if(el) el.value=shared.auditYear; }
+    if(shared.driveClientId){ var el2=document.getElementById('_cs_driveClientId'); if(el2) el2.value=shared.driveClientId; }
+    if(shared.driveRoot){ var el3=document.getElementById('_cs_driveRoot'); if(el3) el3.value=shared.driveRoot; }
+    if(shared.lastAuditor){ var el4=document.getElementById('_cs_auditor'); if(el4&&!el4.value) el4.value=shared.lastAuditor; }
+    if(res) res.innerHTML='<span style="color:#1a6030">&#10003; Settings loaded — check Your Name then Save.</span>';
+  })
+  .catch(function(){ if(res) res.innerHTML='<span style="color:#c00">Could not reach GitHub. Check Owner, Repo and Token.</span>'; });
 }
 
 function _csTestConnection(){
