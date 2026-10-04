@@ -2169,8 +2169,13 @@ window.onload = function() {
         sess._autoSavedAt = new Date().toISOString();
         localStorage.setItem(AS_KEY, JSON.stringify(sess));
       }catch(ex){}
-      var msg = 'Your work has been auto-saved. To access it on another computer, use \u{1F4BE} Save / Versions before closing.';
-      e.returnValue = msg;
+      // Check if a merge situation is active and add that to the warning
+      var mergeEl=document.getElementById('_csMergeAlert');
+      var mergeActive=mergeEl&&mergeEl.style.display!=='none'&&!_csMergeAlertDismissed;
+      var msg=mergeActive
+        ? 'Multiple auditors have sessions for this branch — please merge before closing. Your work has also been auto-saved locally.'
+        : 'Your work has been auto-saved. To access it on another computer, use Save / Versions before closing.';
+      e.returnValue=msg;
       return msg;
     }
   });
@@ -23609,15 +23614,7 @@ function _csMergeCheck(sessions){
   }
 }
 
-function _csMergeBeforeUnload(e){
-  var el=document.getElementById('_csMergeAlert');
-  if(el&&el.style.display!=='none'&&!_csMergeAlertDismissed){
-    var msg='Multiple auditors have saved sessions for this branch. Please merge sessions before closing to avoid losing combined work.';
-    e.preventDefault();
-    e.returnValue=msg;
-    return msg;
-  }
-}
+function _csMergeBeforeUnload(){ /* merged into main beforeunload handler */ }
 
 function _csMergeAlertDismiss(){
   _csMergeAlertDismissed=true;
