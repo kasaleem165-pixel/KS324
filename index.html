@@ -23233,7 +23233,14 @@ function _csRefreshBrowser(){
 
 function _csLoadFile(path, sha){
   var cfg=_csGetCfg();
-  if(!confirm('Load this session? Your current unsaved work will be replaced.')) return;
+  // Warn if loading another auditor's session
+  var mySlug=_csAuditorSlug(cfg);
+  var fileSlug=path.split('/').pop().replace('.json','');
+  var isOwn=(fileSlug===mySlug);
+  var confirmMsg=isOwn
+    ? 'Load your session? Your current unsaved work will be replaced.'
+    : 'This session belongs to another auditor ('+fileSlug.replace(/_/g,' ')+').\n\nYou can view it but if you Save to Cloud it will be saved under YOUR name, not theirs.\n\nContinue?';
+  if(!confirm(confirmMsg)) return;
   // Use blob API when sha available — no 1MB size limit
   var url=sha
     ? _csRepoBase(cfg)+'/git/blobs/'+sha
