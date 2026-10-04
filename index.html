@@ -23557,9 +23557,19 @@ function _csMergeCheck(sessions){
   if(!sessions||!sessions.length) return;
   var cfg=_csGetCfg();
   if(!cfg.auditor) return;
-  var brFolder=_csBranchFolder();
   var curYear=_csAuditYear(cfg);
-  // Find sessions for this branch and year
+  // Find which branch this auditor's own session belongs to
+  var myAuditorRaw=(cfg.auditor||'').toLowerCase().replace(/\s+/g,'_');
+  var mySession=null;
+  for(var i=0;i<sessions.length;i++){
+    if(sessions[i].year===curYear && sessions[i].auditorRaw===myAuditorRaw){
+      mySession=sessions[i]; break;
+    }
+  }
+  // If we can identify the auditor's branch from cloud, use that;
+  // otherwise fall back to reading branch from current form values
+  var brFolder=mySession ? mySession.branchRaw : _csBranchFolder();
+  // Find all sessions for this branch and year
   var brSess=sessions.filter(function(s){
     return s.branchRaw===brFolder && s.year===curYear;
   });
@@ -23570,7 +23580,6 @@ function _csMergeCheck(sessions){
     var audNames=brSess.map(function(s){return s.auditor;}).join(', ');
     msg.textContent=brSess.length+' auditors have saved sessions for this branch ('+audNames+'). Merge before closing to combine all observations.';
     el.style.display='flex';
-    _csMergeAlertDismissed=false;
     // Register beforeunload warning
     window.addEventListener('beforeunload',_csMergeBeforeUnload);
   } else {
