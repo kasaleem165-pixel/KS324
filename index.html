@@ -23556,23 +23556,29 @@ function _csMergeCheck(sessions){
   if(_csMergeAlertDismissed) return;
   if(!sessions||!sessions.length) return;
   var cfg=_csGetCfg();
-  if(!cfg.auditor) return;
   var curYear=_csAuditYear(cfg);
-  // Find which branch this auditor's own session belongs to
-  var myAuditorRaw=(cfg.auditor||'').toLowerCase().replace(/\s+/g,'_');
-  var mySession=null;
-  for(var i=0;i<sessions.length;i++){
-    if(sessions[i].year===curYear && sessions[i].auditorRaw===myAuditorRaw){
-      mySession=sessions[i]; break;
+  // Match by branch code prefix from the form (most reliable — works even
+  // if the current auditor has no cloud session yet)
+  var brcode=(getHdrVals().brcode||'').trim();
+  var brSess=[];
+  if(brcode){
+    brSess=sessions.filter(function(s){
+      return s.year===curYear && s.branchRaw.indexOf(brcode+'_')===0;
+    });
+  }
+  // Fallback: if branch code not in form, try matching by auditor's own saved session
+  if(!brSess.length&&cfg.auditor){
+    var mySlug=(cfg.auditor||'').replace(/[^a-zA-Z0-9\-_]/g,'_').replace(/_+/g,'_').toLowerCase();
+    var mySession=null;
+    for(var i=0;i<sessions.length;i++){
+      if(sessions[i].year===curYear&&sessions[i].auditorRaw===mySlug){mySession=sessions[i];break;}
+    }
+    if(mySession){
+      brSess=sessions.filter(function(s){
+        return s.year===curYear&&s.branchRaw===mySession.branchRaw;
+      });
     }
   }
-  // If we can identify the auditor's branch from cloud, use that;
-  // otherwise fall back to reading branch from current form values
-  var brFolder=mySession ? mySession.branchRaw : _csBranchFolder();
-  // Find all sessions for this branch and year
-  var brSess=sessions.filter(function(s){
-    return s.branchRaw===brFolder && s.year===curYear;
-  });
   var el=document.getElementById('_csMergeAlert');
   var msg=document.getElementById('_csMergeAlertMsg');
   if(!el||!msg) return;
@@ -23580,7 +23586,6 @@ function _csMergeCheck(sessions){
     var audNames=brSess.map(function(s){return s.auditor;}).join(', ');
     msg.textContent=brSess.length+' auditors have saved sessions for this branch ('+audNames+'). Merge before closing to combine all observations.';
     el.style.display='flex';
-    // Register beforeunload warning
     window.addEventListener('beforeunload',_csMergeBeforeUnload);
   } else {
     el.style.display='none';
