@@ -23549,6 +23549,22 @@ function _csUpdateIndicator(){
 }
 (function(){ setTimeout(_csUpdateIndicator,800); })();
 
+// Auto-check for merge situation on startup (5s delay, silent)
+(function(){
+  setTimeout(function(){
+    var cfg=_csGetCfg();
+    if(!cfg.token||!cfg.owner||!cfg.repo) return; // cloud not configured
+    if(_csBrowseCache&&_csBrowseCache.length){
+      _csMergeCheck(_csBrowseCache); // already have cache from this session
+    } else {
+      _csFetchAllSessions(cfg,function(results){
+        _csBrowseCache=results;
+        _csMergeCheck(results);
+      });
+    }
+  },5000);
+})();
+
 // ── Merge Alert (Step 8) ──────────────────────────────────────────────────────
 var _csMergeAlertDismissed = false; // declared here so all functions below can reference it
 
