@@ -1269,6 +1269,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <button class="tb-dd-item" onclick="cloudSave();tbDDClose()" data-tip="Save current session to GitHub cloud storage">&#9729; Save to Cloud</button>
         <button class="tb-dd-item" onclick="cloudBrowse();tbDDClose()" data-tip="Browse and load sessions saved to cloud by any auditor">&#128193; Browse Cloud Sessions</button>
         <button class="tb-dd-item" onclick="cloudBrowse();tbDDClose()" data-tip="Merge sessions from multiple auditors on the same branch into one combined session">&#9889; Merge Coworker Sessions</button>
+        <button class="tb-dd-item" onclick="_csImportFromLink();tbDDClose()" data-tip="Load a session from a Google Drive or direct download link">&#128279; Import from Link</button>
         <div class="tb-dd-sep"></div>
         <button class="tb-dd-item" onclick="showCloudSettings();tbDDClose()" data-tip="Configure GitHub repository and access token for cloud sync">&#9881; Cloud Settings</button>
         <button class="tb-dd-item" onclick="showUserManagement();tbDDClose()" data-tip="Add, edit or delete user accounts (Administrator only)">&#128100; User Management</button>
@@ -23455,6 +23456,66 @@ function _csMergeApply(sessJsonStr, total){
   var _mae=document.getElementById('_csMergeAlert');
   if(_mae) _mae.style.display='none';
   window.removeEventListener('beforeunload',_csMergeBeforeUnload);
+}
+
+function _csImportFromLink(){
+  var ex=document.getElementById('_csImportModal');
+  if(ex) ex.parentNode.removeChild(ex);
+  var el=document.createElement('div');
+  el.id='_csImportModal';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+  el.innerHTML='<div style="background:#fff;border-radius:8px;padding:28px 30px;max-width:500px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,.28)">'
+    +'<div style="font-size:15px;font-weight:700;color:#1a3a5c;margin-bottom:4px">&#128279; Import Session from Link</div>'
+    +'<div style="font-size:11.5px;color:#888;margin-bottom:16px">Paste a direct download link to a <strong>.json</strong> session file. Works with Google Drive direct-download links or any public URL.</div>'
+    +'<div style="margin-bottom:8px"><label style="font-size:11.5px;font-weight:700;color:#2a4060;display:block;margin-bottom:5px">Session File URL</label>'
+    +'<input id="_csImportUrl" placeholder="https://drive.google.com/uc?export=download&id=..." style="width:100%;padding:8px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:12.5px;font-family:Inter,sans-serif;box-sizing:border-box"></div>'
+    +'<div style="font-size:11px;color:#a06000;background:#fffbe6;border:1px solid #f0d070;border-radius:5px;padding:8px 12px;margin-bottom:16px">'
+    +'<strong>Google Drive tip:</strong> Right-click the file → Get link → change <code>open?id=</code> to <code>uc?export=download&id=</code> in the URL.'
+    +'</div>'
+    +'<div id="_csImportErr" style="color:#c00;font-size:12px;margin-bottom:10px;display:none"></div>'
+    +'<div style="display:flex;gap:10px;justify-content:flex-end">'
+    +'<button onclick="document.getElementById(\'_csImportModal\').remove()" style="padding:7px 18px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>'
+    +'<button onclick="_csImportDoLoad()" style="padding:7px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#128228; Load Session</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(el);
+  setTimeout(function(){ var inp=document.getElementById('_csImportUrl'); if(inp) inp.focus(); },100);
+}
+
+function _csImportDoLoad(){
+  var url=(document.getElementById('_csImportUrl')||{}).value||'';
+  url=url.trim();
+  var errEl=document.getElementById('_csImportErr');
+  if(!url){ if(errEl){errEl.textContent='Please paste a URL first.';errEl.style.display='block';} return; }
+  if(errEl) errEl.style.display='none';
+  // Convert Google Drive share links to direct download links
+  // Pattern: drive.google.com/file/d/{id}/view -> uc?export=download&id={id}
+  var driveMatch=url.match(/drive\.google\.com\/file\/d\/([^\/\?]+)/);
+  if(driveMatch) url='https://drive.google.com/uc?export=download&id='+driveMatch[1];
+  // open?id= -> uc?export=download&id=
+  var openMatch=url.match(/drive\.google\.com\/open\?id=([^&]+)/);
+  if(openMatch) url='https://drive.google.com/uc?export=download&id='+openMatch[1];
+  toast('Fetching session from link…');
+  fetch(url)
+  .then(function(r){
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.text();
+  })
+  .then(function(text){
+    var sess;
+    try{ sess=JSON.parse(text); }catch(e){ throw new Error('File is not valid JSON. Make sure the URL points directly to a .json session file.'); }
+    if(!sess||!sess.ts) throw new Error('File does not appear to be a BRAINS session.');
+    if(!confirm('Load this session? Your current unsaved work will be replaced.')) return;
+    var mm=document.getElementById('_csImportModal');
+    if(mm) mm.remove();
+    restoreSession(sess);
+    toast('Session loaded from link ✓');
+  })
+  .catch(function(e){
+    var msg=e&&e.message?e.message:'Network error — check the URL and try again.';
+    if(errEl){errEl.textContent=msg;errEl.style.display='block';}
+    toast('Import failed: '+msg);
+  });
 }
 
 function showCloudSettings(){
