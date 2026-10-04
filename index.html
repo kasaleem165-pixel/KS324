@@ -23049,6 +23049,7 @@ function _csFetchAllSessions(cfg, cb){
                     auditorRaw: f.name.replace('.json',''),
                     name: f.name,
                     path: f.path,
+                    sha: f.sha||'',
                     size: f.size||0
                   });
                 }
@@ -23159,7 +23160,7 @@ function _csBuildSessionList(sessions){
     var brKeys=Object.keys(byYear[yr]).sort();
     brKeys.forEach(function(br){
       var brSessions=byYear[yr][br];
-      var brPathsJson=JSON.stringify(brSessions.map(function(s){return s.path;}));
+      var brPathsJson=JSON.stringify(brSessions.map(function(s){return {path:s.path,sha:s.sha||''};}));
       h+='<div style="margin-bottom:10px;padding:10px 12px;border:1px solid #e0e8f0;border-radius:6px">';
       h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
       h+='<div style="font-size:12px;font-weight:700;color:#1a3a5c;flex:1">&#127970; '+esc(br)+'</div>';
@@ -23175,7 +23176,7 @@ function _csBuildSessionList(sessions){
         h+='<div style="font-size:12.5px;font-weight:600;color:#2a4060">'+esc(s.auditor)+'</div>';
         if(kb) h+='<div style="font-size:10px;color:#aaa">'+kb+'</div>';
         h+='</div>';
-        h+='<button onclick="_csLoadFile(\''+esc(s.path)+'\')" style="padding:5px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Load</button>';
+        h+='<button onclick="_csLoadFile(\''+esc(s.path)+'\',\''+esc(s.sha||'')+'\')" style="padding:5px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Load</button>';
         h+='</div>';
       });
       h+='</div>';
@@ -23211,17 +23212,21 @@ function _csRefreshBrowser(){
   });
 }
 
-function _csLoadFile(path){
+function _csLoadFile(path, sha){
   var cfg=_csGetCfg();
   if(!confirm('Load this session? Your current unsaved work will be replaced.')) return;
-  var url=_csRepoBase(cfg)+'/contents/'+path;
+  // Use blob API when sha available — no 1MB size limit
+  var url=sha
+    ? _csRepoBase(cfg)+'/git/blobs/'+sha
+    : _csRepoBase(cfg)+'/contents/'+path;
   var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'};
   toast('Loading from cloud...');
   fetch(url,{headers:hdrs})
   .then(function(r){ return r.json(); })
   .then(function(file){
     if(!file||!file.content){ toast('Could not read session file.'); return; }
-    var sess=JSON.parse(_csB64Dec(file.content));
+    var raw=file.content.replace(/\s/g,'');
+    var sess=JSON.parse(_csB64Dec(raw));
     if(!sess||!sess.ts){ toast('Invalid session file.'); return; }
     var bm=document.getElementById('_csBrowserModal');
     if(bm) bm.remove();
@@ -23249,18 +23254,24 @@ function _csMergeModal(pathsJsonStr, branchName){
     +'</div>';
   document.body.appendChild(el);
 
-  // Fetch all sessions in parallel
+  // Fetch all sessions in parallel using git blob API (handles large files >1MB)
   var fetched=[];
   var pending=paths.length;
-  paths.forEach(function(path){
-    var url=_csRepoBase(cfg)+'/contents/'+path;
-    var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'};
+  var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'};
+  paths.forEach(function(item){
+    var path=item.path||item;
+    var sha=item.sha||'';
+    // Use blob API if we have sha (no 1MB limit); fall back to contents API
+    var url=sha
+      ? _csRepoBase(cfg)+'/git/blobs/'+sha
+      : _csRepoBase(cfg)+'/contents/'+path;
     fetch(url,{headers:hdrs})
     .then(function(r){ return r.json(); })
     .then(function(file){
       if(file&&file.content){
         try{
-          var sess=JSON.parse(_csB64Dec(file.content));
+          var raw=file.content.replace(/\s/g,''); // blob API may add newlines
+          var sess=JSON.parse(_csB64Dec(raw));
           sess._sourcePath=path;
           sess._sourceAuditor=sess._cloudMeta&&sess._cloudMeta.auditor ? sess._cloudMeta.auditor : path.split('/').pop().replace('.json','').replace(/_/g,' ');
           fetched.push(sess);
