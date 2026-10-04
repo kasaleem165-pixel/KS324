@@ -1320,6 +1320,14 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
   </div>
 </div>
 
+<!-- Merge alert banner — shown when multiple auditors have sessions for this branch -->
+<div id="_csMergeAlert" style="display:none;background:#7a4f00;color:#fff;font-size:12px;font-weight:600;padding:7px 16px;align-items:center;gap:10px;border-bottom:2px solid #c9962a;font-family:Inter,sans-serif;flex-shrink:0">
+  <span style="font-size:15px">&#9888;</span>
+  <span id="_csMergeAlertMsg" style="flex:1"></span>
+  <button onclick="_csMergeAlertDismiss()" style="background:none;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:4px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap">Dismiss</button>
+  <button onclick="cloudBrowse()" style="background:#c9962a;border:none;color:#fff;border-radius:4px;padding:3px 12px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap">&#9889; Open Merge</button>
+</div>
+
 <!-- ══════════════════════════════════════════════════════════
      AUDIT TRAIL PANEL
      ══════════════════════════════════════════════════════════ -->
@@ -22983,6 +22991,9 @@ function cloudSave(opts){
       _csCloudSaveIndicatorTick();
       if(!silent) toast('Saved to cloud ✓');
       _csUpdateIndicator();
+      // Re-check for merge situation after saving (another auditor may have saved too)
+      _csMergeAlertDismissed=false;
+      _csFetchAllSessions(cfg,function(results){ _csBrowseCache=results; _csMergeCheck(results); });
     } else {
       _csAutoSaveStatus='err';
       _csCloudSaveIndicatorTick();
@@ -23073,6 +23084,7 @@ function cloudBrowse(){
   _csFetchAllSessions(cfg,function(results){
     _csBrowseCache=results;
     _csShowBrowser(results,cfg);
+    _csMergeCheck(results);
   });
 }
 
@@ -23433,6 +23445,11 @@ function _csMergeApply(sessJsonStr, total){
 
   restoreSession(merged);
   toast('Merged '+selected.length+' sessions ✓ — '+mergedObsCnt+' observations loaded');
+  // Clear merge alert — merge is done
+  _csMergeAlertDismissed=true;
+  var _mae=document.getElementById('_csMergeAlert');
+  if(_mae) _mae.style.display='none';
+  window.removeEventListener('beforeunload',_csMergeBeforeUnload);
 }
 
 function showCloudSettings(){
@@ -23531,6 +23548,53 @@ function _csUpdateIndicator(){
   }
 }
 (function(){ setTimeout(_csUpdateIndicator,800); })();
+
+// ── Merge Alert (Step 8) ──────────────────────────────────────────────────────
+var _csMergeAlertDismissed = false;
+
+function _csMergeCheck(sessions){
+  if(_csMergeAlertDismissed) return;
+  if(!sessions||!sessions.length) return;
+  var cfg=_csGetCfg();
+  if(!cfg.auditor) return;
+  var brFolder=_csBranchFolder();
+  var curYear=_csAuditYear(cfg);
+  // Find sessions for this branch and year
+  var brSess=sessions.filter(function(s){
+    return s.branchRaw===brFolder && s.year===curYear;
+  });
+  var el=document.getElementById('_csMergeAlert');
+  var msg=document.getElementById('_csMergeAlertMsg');
+  if(!el||!msg) return;
+  if(brSess.length>1){
+    var audNames=brSess.map(function(s){return s.auditor;}).join(', ');
+    msg.textContent=brSess.length+' auditors have saved sessions for this branch ('+audNames+'). Merge before closing to combine all observations.';
+    el.style.display='flex';
+    _csMergeAlertDismissed=false;
+    // Register beforeunload warning
+    window.addEventListener('beforeunload',_csMergeBeforeUnload);
+  } else {
+    el.style.display='none';
+    window.removeEventListener('beforeunload',_csMergeBeforeUnload);
+  }
+}
+
+function _csMergeBeforeUnload(e){
+  var el=document.getElementById('_csMergeAlert');
+  if(el&&el.style.display!=='none'&&!_csMergeAlertDismissed){
+    var msg='Multiple auditors have saved sessions for this branch. Please merge sessions before closing to avoid losing combined work.';
+    e.preventDefault();
+    e.returnValue=msg;
+    return msg;
+  }
+}
+
+function _csMergeAlertDismiss(){
+  _csMergeAlertDismissed=true;
+  var el=document.getElementById('_csMergeAlert');
+  if(el) el.style.display='none';
+  window.removeEventListener('beforeunload',_csMergeBeforeUnload);
+}
 
 // ── User Management ──────────────────────────────────────────────────────────
 var _UM_PATH = 'sessions/_system/users.json';
