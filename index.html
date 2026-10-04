@@ -23001,6 +23001,10 @@ function cloudSave(opts){
       // Re-check for merge situation after saving (another auditor may have saved too)
       _csMergeAlertDismissed=false;
       _csFetchAllSessions(cfg,function(results){ _csBrowseCache=results; _csMergeCheck(results); });
+      // Step 2: notify original auditor if this session was loaded from their file
+      if(sess._loadedFrom){
+        _csWriteNotification(cfg, sess._loadedFrom, sess);
+      }
     } else {
       _csAutoSaveStatus='err';
       _csCloudSaveIndicatorTick();
@@ -23254,6 +23258,16 @@ function _csLoadFile(path, sha){
     var raw=file.content.replace(/\s/g,'');
     var sess=JSON.parse(_csB64Dec(raw));
     if(!sess||!sess.ts){ toast('Invalid session file.'); return; }
+    // Stamp session if loaded from another auditor's file
+    if(!isOwn){
+      sess._loadedFrom=fileSlug;
+      sess._loadedFromAt=new Date().toISOString();
+      sess._loadedByName=cfg.auditor;
+    } else {
+      delete sess._loadedFrom;
+      delete sess._loadedFromAt;
+      delete sess._loadedByName;
+    }
     var bm=document.getElementById('_csBrowserModal');
     if(bm) bm.remove();
     restoreSession(sess);
@@ -23730,6 +23744,79 @@ function _csUpdateIndicator(){
     btn.title='Cloud Sync — not configured. Click to set up.';
   }
 }
+
+// ── Cross-auditor Notification System ────────────────────────────────────────
+function _csNotifPath(auditorSlug){
+  return '_notifications/'+auditorSlug+'.json';
+}
+
+function _csWriteNotification(cfg, targetSlug, sess){
+  // Append a notification to _notifications/{targetSlug}.json in GitHub
+  var path=_csNotifPath(targetSlug);
+  var url=_csRepoBase(cfg)+'/contents/'+path;
+  var hdrs=_csHdrs(cfg);
+  var branchInfo=(sess._cloudMeta&&sess._cloudMeta.branchFolder)||_csBranchFolder()||'unknown branch';
+  var entry={
+    from: _csAuditorSlug(cfg),
+    fromName: cfg.auditor,
+    at: new Date().toISOString(),
+    branch: branchInfo,
+    msg: cfg.auditor+' loaded and saved a copy of your session for branch "'+branchInfo+'" on '+new Date().toLocaleDateString()+'.'
+  };
+  fetch(url,{headers:hdrs})
+  .then(function(r){ return r.ok?r.json():{content:'W10=',sha:null}; }) // W10= = []
+  .then(function(existing){
+    var raw=(existing&&existing.content?existing.content.replace(/\s/g,''):'W10=');
+    var arr;
+    try{ arr=JSON.parse(_csB64Dec(raw)); }catch(e){ arr=[]; }
+    if(!Array.isArray(arr)) arr=[];
+    arr.push(entry);
+    var body={message:'[BRAINS] notification for '+targetSlug,content:_csB64Enc(JSON.stringify(arr,null,2))};
+    if(existing&&existing.sha) body.sha=existing.sha;
+    return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+  })
+  .catch(function(){}); // silent fail — notifications are best-effort
+}
+
+function _csCheckNotifications(cfg){
+  if(!cfg.token||!cfg.owner||!cfg.repo||!cfg.auditor) return;
+  var mySlug=_csAuditorSlug(cfg);
+  var path=_csNotifPath(mySlug);
+  var url=_csRepoBase(cfg)+'/contents/'+path;
+  var hdrs=_csHdrs(cfg);
+  fetch(url,{headers:hdrs})
+  .then(function(r){ return r.ok?r.json():null; })
+  .then(function(file){
+    if(!file||!file.content) return;
+    var raw=file.content.replace(/\s/g,'');
+    var arr;
+    try{ arr=JSON.parse(_csB64Dec(raw)); }catch(e){ return; }
+    if(!Array.isArray(arr)||!arr.length) return;
+    // Show notification banner
+    var msgs=arr.map(function(e){ return e.msg||((e.fromName||e.from)+' modified a session for '+e.branch); });
+    _csShowNotifBanner(msgs, function(){
+      // Clear notifications file after user has seen them
+      var body={message:'[BRAINS] clear notifications for '+mySlug,content:_csB64Enc('[]'),sha:file.sha};
+      fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)}).catch(function(){});
+    });
+  })
+  .catch(function(){});
+}
+
+function _csShowNotifBanner(msgs, onDismiss){
+  var el=document.getElementById('_csNotifBanner');
+  if(!el){ el=document.createElement('div'); el.id='_csNotifBanner'; document.body.prepend(el); }
+  el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#1a3a5c;color:#fff;font-size:12px;font-weight:600;padding:9px 18px;display:flex;align-items:flex-start;gap:10px;font-family:Inter,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.25)';
+  var listHtml=msgs.map(function(m){ return '<div style="margin-bottom:3px">&#8226; '+esc(m)+'</div>'; }).join('');
+  el.innerHTML='<span style="font-size:16px;flex-shrink:0">&#128276;</span>'
+    +'<div style="flex:1"><div style="margin-bottom:4px;font-size:12.5px">Session Activity Notifications:</div>'+listHtml+'</div>'
+    +'<button id="_csNotifDismissBtn" style="padding:4px 12px;background:#fff;color:#1a3a5c;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;font-family:Inter,sans-serif">Dismiss</button>';
+  document.getElementById('_csNotifDismissBtn').onclick=function(){
+    el.remove();
+    if(onDismiss) onDismiss();
+  };
+}
+
 (function(){ setTimeout(_csUpdateIndicator,800); })();
 
 // Auto-check for merge situation on startup (5s delay, silent)
@@ -23745,6 +23832,8 @@ function _csUpdateIndicator(){
         _csMergeCheck(results);
       });
     }
+    // Check for cross-auditor notifications (6s delay to stagger from merge check)
+    setTimeout(function(){ _csCheckNotifications(cfg); }, 1000);
   },5000);
 })();
 
