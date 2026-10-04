@@ -22972,9 +22972,14 @@ function cloudSave(opts){
   var url=_csRepoBase(cfg)+'/contents/'+path;
   var hdrs=_csHdrs(cfg);
   var sess=captureSession();
+  // Warn on manual save if this session was originally loaded from another auditor
+  if(!silent&&sess._loadedFrom){
+    var origName=sess._loadedFrom.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+    if(!confirm('WARNING: This session was originally loaded from another auditor\'s file ('+origName+').\n\nIt will be saved under YOUR name ('+cfg.auditor+'). The original auditor ('+origName+') will be notified about this.\n\nContinue saving?')) return;
+  }
   // Store audit year and branch info inside session for browse display
   sess._cloudMeta={
-    auditor: cfg.auditor,
+    auditor: _csAuditorSlug(cfg),
     auditYear: _csAuditYear(cfg),
     branchFolder: _csBranchFolder(),
     savedAt: new Date().toISOString()
@@ -23564,6 +23569,17 @@ function _csUploadSessionFileRead(evt){
     var year=(sess._cloudMeta&&sess._cloudMeta.auditYear)||cfg.auditYear||(new Date().getFullYear()+'');
     var brFolder=(sess._cloudMeta&&sess._cloudMeta.branchFolder)||_csBranchFolder();
     var audSlug=_csAuditorSlug(cfg); // always own name from Cloud Settings
+    // Detect if this file originally belonged to a different auditor
+    var origAudSlug=(sess._cloudMeta&&sess._cloudMeta.auditor)||'';
+    var isOtherAuditor=origAudSlug&&origAudSlug!==audSlug;
+    if(isOtherAuditor){
+      var origName=origAudSlug.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+      if(!confirm('WARNING: This session file belongs to another auditor ('+origName+').\n\nIf you upload it, it will be saved under YOUR name ('+cfg.auditor+') — not under '+origName+'.\n\nThe original auditor will be notified when you next Save to Cloud.\n\nDo you still want to continue?')) return;
+      // Stamp the session as loaded from another auditor
+      sess._loadedFrom=origAudSlug;
+      sess._loadedFromAt=new Date().toISOString();
+      sess._loadedByName=cfg.auditor;
+    }
     var path='sessions/'+year+'/'+brFolder+'/'+audSlug+'.json';
     var brDisplay=brFolder.replace(/_/g,' ');
     if(!confirm('Upload "'+file.name+'" to cloud?\n\nBranch: '+brDisplay+'\nSaved as: '+cfg.auditor+'\nPath: '+path+'\n\nThis will overwrite your existing session at this path.')) return;
