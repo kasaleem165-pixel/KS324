@@ -654,6 +654,27 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
   if(ps){ ps.style.display='flex'; }
   var pi=document.getElementById('pw-input');
   if(pi){ pi.value=''; }
+  // ?mode=supervisor — customise login screen for supervisor direct URL
+  if(window.location.search.indexOf('mode=supervisor')>=0){
+    var lbl=document.getElementById('pw-mode-label');
+    if(lbl){
+      lbl.innerHTML='&#127775; Supervisor Login';
+      lbl.style.color='#c9962a';
+    }
+    // Pre-fill username field hint
+    var uname=document.getElementById('pw-username');
+    if(uname) uname.placeholder='Supervisor username';
+    // Add a subtle banner below the login button
+    var btn=ps&&ps.querySelector('button[onclick="pwCheck()"]');
+    if(btn){
+      var hint=document.createElement('div');
+      hint.style.cssText='font-size:11px;color:#888;margin-top:14px;background:#f8f9fa;border-radius:6px;padding:8px 12px;text-align:left;line-height:1.6';
+      hint.innerHTML='<strong style="color:#1a3a5c">Supervisor Portal</strong><br>Log in with your supervisor username and password. The Supervisor Dashboard will open automatically after login.';
+      btn.parentNode.insertBefore(hint,btn.nextSibling);
+    }
+    // Clean mode param from URL without reload
+    try{ window.history.replaceState({},'',window.location.pathname); }catch(e){}
+  }
 })();
 var APP_BUILD = '23-Aug-2026';
 var APP_VERSION = '02/2026';
