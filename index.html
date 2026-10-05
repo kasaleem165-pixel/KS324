@@ -1191,7 +1191,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       <button class="tb-dd-tab" onclick="tbDDToggle('dd-file')">File <span class="arr">&#9660;</span></button>
       <div class="tb-dd-menu">
         <button id="file-new" class="tb-dd-item rpt-btn" onclick="doNewReport();tbDDClose()" data-tip="Start a fresh audit report for a new branch visit"><span class="di">&#43;</span> New Report</button>
-        <button id="file-load" class="tb-dd-item rpt-btn" onclick="triggerLoadReport();tbDDClose()" data-tip="Open a previously saved report file (.html or .json)"><span class="di">&#128228;</span> Load Report</button>
+        <button id="file-load" class="tb-dd-item rpt-btn" onclick="triggerLoadOfflineSave();tbDDClose()" data-tip="Load a report file saved on your local machine (offline). This does NOT upload or sync to cloud."><span class="di">&#128228;</span> Load Offline Save</button>
         <button id="file-versions" class="tb-dd-item rpt-btn" onclick="showVersionHistory();tbDDClose()" data-tip="Save the current report and browse version history"><span class="di">&#128190;</span> Save / Versions</button>
         <div id="file-sep" class="tb-dd-sep"></div>
         <button id="file-clear" class="tb-dd-item rpt-btn" onclick="doClear();tbDDClose()" data-tip="Erase all current work and start from scratch"><span class="di">&#10005;</span> Clear Draft</button>
@@ -13143,6 +13143,50 @@ function setRefPreset(id, val){
 
 function triggerLoadReport(){
   _guardLoad('a report / session file',function(){document.getElementById('rptinp').click();});
+}
+
+function triggerLoadOfflineSave(){
+  _csShowOfflineLoadAlert(function(){
+    _guardLoad('a report / session file',function(){document.getElementById('rptinp').click();});
+  });
+}
+
+function _csShowOfflineLoadAlert(onProceed){
+  var ex=document.getElementById('_csOfflineLoadAlert');
+  if(ex) ex.remove();
+  var el=document.createElement('div');
+  el.id='_csOfflineLoadAlert';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+  var h='<div style="background:#fff;border-radius:8px;width:94%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,.3)">';
+  // Header
+  h+='<div style="padding:14px 20px;border-bottom:1px solid #e0e8f0;display:flex;align-items:center;gap:10px">';
+  h+='<span style="font-size:22px">&#128421;</span>';
+  h+='<div style="font-size:14px;font-weight:700;color:#1a3a5c">Load Offline Save</div>';
+  h+='</div>';
+  // Body
+  h+='<div style="padding:18px 20px">';
+  h+='<div style="background:#fff8e1;border-left:4px solid #e6a817;border-radius:4px;padding:12px 14px;margin-bottom:14px">';
+  h+='<div style="font-size:12.5px;font-weight:700;color:#7a4f00;margin-bottom:4px">&#9888; Local Machine Only</div>';
+  h+='<div style="font-size:12px;color:#7a4f00;line-height:1.6">This will load a report file saved on <strong>your local computer</strong>. It does <strong>not</strong> upload or sync the file to cloud.</div>';
+  h+='</div>';
+  h+='<div style="font-size:12px;color:#444;line-height:1.7">';
+  h+='<strong>After loading:</strong><br>';
+  h+='&#8226; Your session will be restored from the local file.<br>';
+  h+='&#8226; Cloud auto-save will push it online within 10 minutes.<br>';
+  h+='&#8226; Or use <em>Cloud &rarr; Save to Cloud</em> to push immediately.';
+  h+='</div>';
+  h+='</div>';
+  // Footer
+  h+='<div style="padding:12px 20px;border-top:1px solid #e0e8f0;display:flex;gap:10px;justify-content:flex-end">';
+  h+='<button id="_csOfflineLoadProceedBtn" style="padding:8px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#128228; Select File</button>';
+  h+='<button onclick="document.getElementById(\'_csOfflineLoadAlert\').remove()" style="padding:8px 14px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>';
+  h+='</div></div>';
+  el.innerHTML=h;
+  document.body.appendChild(el);
+  document.getElementById('_csOfflineLoadProceedBtn').onclick=function(){
+    el.remove();
+    onProceed();
+  };
 }
 
 function loadReportFile(e){
