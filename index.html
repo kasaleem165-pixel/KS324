@@ -638,6 +638,10 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
     <div id="pw-err" style="font-size:12px;color:#c0392b;min-height:18px;margin-bottom:8px"></div>
     <button onclick="pwCheck()" style="width:100%;padding:11px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;font-family:Inter,Arial,sans-serif">Login</button>
     <div style="font-size:10px;color:#aaa;margin-top:18px">&copy; 2026 Beaconhouse Group &mdash; S&amp;A Internal Use Only</div>
+    <div style="margin-top:12px;padding:9px 12px;background:#f0f5fb;border-radius:6px;border:1px solid #d0e0f0;font-size:11.5px;color:#1a3a5c;text-align:center">
+      &#128218; First time? &nbsp;<a id="_pw_guide_link" href="#" target="_blank" style="color:#1a3a5c;font-weight:700;text-decoration:underline">Open User Guide</a>
+      <div style="font-size:10px;color:#888;margin-top:2px">Step-by-step instructions for auditors</div>
+    </div>
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid #e8edf5;font-size:10px;color:#999;line-height:1.6">
       Developed by <strong style="color:#1a3a5c">Kamran Saleem</strong><br>
       Senior Manager Systems &amp; Audit, Beaconhouse Group
@@ -654,6 +658,14 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
   if(ps){ ps.style.display='flex'; }
   var pi=document.getElementById('pw-input');
   if(pi){ pi.value=''; }
+  // Set User Guide link — uses localStorage override or default artifact URL
+  (function(){
+    var link=document.getElementById('_pw_guide_link');
+    if(!link) return;
+    var stored=''; try{ stored=localStorage.getItem('brains_guide_url')||''; }catch(e){}
+    var url=stored||'https://claude.ai/artifact/8FJAyUhR1EYmq1bZV354hB';
+    link.href=url;
+  })();
   // ?mode=supervisor — customise login screen for supervisor direct URL
   if(window.location.search.indexOf('mode=supervisor')>=0){
     var lbl=document.getElementById('pw-mode-label');
@@ -24831,6 +24843,12 @@ function _adminRenderCloud(c){
     +'<input id="_apCloud_repo" type="text" placeholder="brains-sessions" style="'+inp+'" value="'+(cfg.repo?esc(cfg.repo):'')+'">'
     +'<label style="'+lbl+'">Your Name (Auditor/Admin)</label>'
     +'<input id="_apCloud_auditor" type="text" placeholder="Your full name" style="'+inp+'" value="'+(cfg.auditor?esc(cfg.auditor):'')+'">'
+    +'</div>'
+    +'<div style="background:#fff;border:1px solid #e0e8f0;border-radius:8px;padding:20px 22px;margin-top:14px">'
+    +'<div style="font-size:12.5px;font-weight:700;color:#2a4060;margin-bottom:8px">&#128218; User Guide URL</div>'
+    +'<div style="font-size:11.5px;color:#666;margin-bottom:10px">The URL auditors see on the login screen under "Open User Guide". Paste a SharePoint, Google Drive, or any hosted link to the guide. Leave blank to use the default.</div>'
+    +'<label style="'+lbl+'">Guide URL</label>'
+    +'<input id="_apCloud_guideUrl" type="text" placeholder="https://... (leave blank for default)" style="'+inp+'" value="'+(function(){ try{ return esc(localStorage.getItem('brains_guide_url')||''); }catch(e){ return ''; } }())+'">'
     +'<div id="_apCloud_err" style="font-size:12px;color:#c0392b;min-height:16px;margin-top:8px"></div>'
     +'<div style="display:flex;gap:10px;margin-top:14px">'
     +'<button onclick="_adminSaveCloud()" style="padding:8px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Save Cloud Settings</button>'
@@ -24849,6 +24867,8 @@ function _adminSaveCloud(){
   cfg.token=token; cfg.owner=owner; cfg.repo=repo;
   if(auditor) cfg.auditor=auditor;
   _csSaveCfg(cfg);
+  var guideUrl=(document.getElementById('_apCloud_guideUrl').value||'').trim();
+  try{ if(guideUrl) localStorage.setItem('brains_guide_url',guideUrl); else localStorage.removeItem('brains_guide_url'); }catch(e){}
   errEl.style.color='#1a6030';
   errEl.textContent='Cloud settings saved.';
   toast('Cloud settings saved.');
