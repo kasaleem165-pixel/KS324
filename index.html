@@ -697,6 +697,10 @@ function _pwGrantAccess(userObj){
     _umShowLoginBadge(userObj);
     _applyRoleUI();
     _startRestore();
+    // Auto-launch supervisor dashboard for supervisor roles
+    if(userObj.role==='ro_supervisor'||userObj.role==='ho_supervisor'){
+      setTimeout(_supShowDashboard, 400);
+    }
   },0);
 }
 
@@ -925,6 +929,8 @@ function _applyRoleUI(){
     // HO hides: Issue Report (admin-only), Send to RO, Load RO Review, sep1, Send to HO, sep2
     ['rev-send-ro','rev-load-ro','rev-sep-1','rev-send-ho','rev-sep-2','rev-issue'].forEach(hide);
   }
+  // Enable supervisor toolbar button for supervisor roles
+  setTimeout(_supToolbarBtn, 100);
 }
 
 function brainsLogout(){
@@ -1299,6 +1305,13 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <button class="tb-dd-item" onclick="updbExportApp();tbDDClose()" data-tip="Bake approved databank changes into a new distributable app file"><span class="di">&#128229;</span> Export Updated App</button>
       </div>
     </div>
+
+    <!-- Supervisor Dashboard button — visible to all, enabled only for supervisors -->
+    <button id="_supToolbarBtn" onclick="_supShowDashboard()" disabled
+      title="Supervisor access only"
+      style="margin-left:4px;padding:5px 13px;background:rgba(201,150,42,.15);color:#c9962a;border:1px solid rgba(201,150,42,.4);border-radius:5px;font-size:11px;font-weight:700;cursor:not-allowed;font-family:Inter,Arial,sans-serif;white-space:nowrap;flex-shrink:0;letter-spacing:.3px;opacity:.4">
+      &#127775; Supervisor
+    </button>
 
     <!-- Logout button — always visible to all roles -->
     <button id="logout-btn" onclick="brainsLogout()" title="Log out and return to login screen"
@@ -23837,6 +23850,531 @@ function _csDoUpload(ctx){
     }
   })
   .catch(function(er){ toast('Upload error: '+(er&&er.message?er.message:'Network error')); });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SUPERVISOR DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════
+var _SUP_REVIEW_PATH = '_reviews/'; // _reviews/{branch_slug}.json
+var _supActiveTab = 'progress';     // 'progress' | 'pending' | 'reviewed'
+var _supSessionCache = null;
+
+function _supShowDashboard(){
+  var ex=document.getElementById('_supDashboard');
+  if(ex) ex.remove();
+  var role=(_umGetCurrentUser().role||'');
+  var isHO=(role==='ho_supervisor');
+  var el=document.createElement('div');
+  el.id='_supDashboard';
+  el.style.cssText='position:fixed;inset:0;z-index:9990;background:#f0f4f8;display:flex;flex-direction:column;font-family:Inter,sans-serif;overflow:hidden';
+
+  // ── Header bar ──────────────────────────────────────────────────────────
+  var h='<div style="background:#1a3a5c;color:#fff;padding:0 20px;display:flex;align-items:center;gap:14px;height:52px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.25)">';
+  h+='<div style="font-family:Merriweather,serif;font-size:18px;font-weight:700;letter-spacing:4px;color:#fff">BRAINS</div>';
+  h+='<div style="width:1px;height:24px;background:rgba(255,255,255,.2)"></div>';
+  h+='<div style="font-size:12px;font-weight:700;color:#c9962a;text-transform:uppercase;letter-spacing:.8px">'+(isHO?'HO':'RO')+' Supervisor Dashboard</div>';
+  h+='<div style="flex:1"></div>';
+  // Summary chips — filled after load
+  h+='<div id="_supChips" style="display:flex;gap:8px"></div>';
+  h+='<div style="width:1px;height:24px;background:rgba(255,255,255,.2)"></div>';
+  h+='<button onclick="_supShowDashboard()" title="Refresh" style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer;padding:4px 8px;opacity:.8">&#8635;</button>';
+  h+='<button onclick="document.getElementById(\'_supDashboard\').remove()" title="Close Dashboard" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:12px;font-weight:700;cursor:pointer;padding:5px 14px;border-radius:4px;font-family:Inter,sans-serif">&#10005; Close</button>';
+  h+='</div>';
+
+  // ── Tab bar ─────────────────────────────────────────────────────────────
+  h+='<div style="background:#fff;border-bottom:2px solid #e0e8f0;display:flex;gap:0;flex-shrink:0;padding:0 20px">';
+  var tabs=[['progress','&#128202; Branch Progress'],['pending','&#9203; Pending Review'],['reviewed','&#10003; Reviewed']];
+  tabs.forEach(function(t){
+    var active=(_supActiveTab===t[0]);
+    h+='<button onclick="_supSetTab(\''+t[0]+'\')" id="_supTab_'+t[0]+'" style="padding:11px 20px;border:none;background:none;font-size:12.5px;font-weight:'+(active?'800':'600')+';color:'+(active?'#1a3a5c':'#888')+';cursor:pointer;font-family:Inter,sans-serif;border-bottom:'+(active?'3px solid #1a3a5c':'3px solid transparent')+';margin-bottom:-2px">'+t[1]+'</button>';
+  });
+  h+='</div>';
+
+  // ── Main content area ────────────────────────────────────────────────────
+  h+='<div id="_supContent" style="flex:1;overflow-y:auto;padding:20px">';
+  h+='<div style="text-align:center;padding:60px 20px;color:#888;font-size:13px">&#9203; Loading sessions from cloud...</div>';
+  h+='</div>';
+
+  el.innerHTML=h;
+  document.body.appendChild(el);
+
+  // Fetch data
+  _supLoadData();
+}
+
+function _supSetTab(tab){
+  _supActiveTab=tab;
+  // Update tab styles
+  ['progress','pending','reviewed'].forEach(function(t){
+    var btn=document.getElementById('_supTab_'+t);
+    if(!btn) return;
+    var active=(t===tab);
+    btn.style.fontWeight=active?'800':'600';
+    btn.style.color=active?'#1a3a5c':'#888';
+    btn.style.borderBottom=active?'3px solid #1a3a5c':'3px solid transparent';
+  });
+  if(_supSessionCache) _supRender(_supSessionCache.sessions, _supSessionCache.reviews);
+}
+
+function _supLoadData(){
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo){
+    _supSetContent('<div style="text-align:center;padding:60px;color:#c0392b;font-size:13px">&#9888; Cloud not configured. Please set up Cloud Settings first.</div>');
+    return;
+  }
+  // Fetch sessions and reviews in parallel
+  var sessions=null, reviews={}, pending=0, done=0;
+  function finish(){
+    done++;
+    if(done<2) return;
+    _supSessionCache={sessions:sessions,reviews:reviews};
+    _supRender(sessions,reviews);
+  }
+  _csFetchAllSessions(cfg,function(results){
+    sessions=results||[];
+    finish();
+  });
+  _supFetchAllReviews(cfg,function(rv){
+    reviews=rv||{};
+    finish();
+  });
+}
+
+function _supFetchAllReviews(cfg, cb){
+  var url=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH;
+  fetch(url,{headers:_csHdrs(cfg)})
+  .then(function(r){ return r.ok?r.json():[]; })
+  .then(function(files){
+    if(!Array.isArray(files)){ cb({}); return; }
+    var reviews={};
+    var pending=files.filter(function(f){ return f.name.slice(-5)==='.json'; });
+    if(!pending.length){ cb({}); return; }
+    var left=pending.length;
+    pending.forEach(function(f){
+      fetch(f.download_url,{headers:_csHdrs(cfg)})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        reviews[f.name.replace('.json','')]=d;
+        left--; if(!left) cb(reviews);
+      })
+      .catch(function(){ left--; if(!left) cb(reviews); });
+    });
+  })
+  .catch(function(){ cb({}); });
+}
+
+function _supRender(sessions, reviews){
+  if(_supActiveTab==='progress') _supRenderProgress(sessions,reviews);
+  else if(_supActiveTab==='pending') _supRenderPending(sessions,reviews);
+  else _supRenderReviewed(sessions,reviews);
+  _supRenderChips(sessions,reviews);
+}
+
+function _supRenderChips(sessions,reviews){
+  var el=document.getElementById('_supChips');
+  if(!el) return;
+  var total=(sessions||[]).length;
+  var pending=0; var reviewed=0;
+  var rkeys=Object.keys(reviews||{});
+  rkeys.forEach(function(k){
+    var rv=reviews[k];
+    if(rv&&rv.status==='pending') pending++;
+    else if(rv&&(rv.status==='approved'||rv.status==='rejected'||rv.status==='changes_requested')) reviewed++;
+  });
+  function chip(label,val,bg){
+    return '<div style="background:'+bg+';color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;white-space:nowrap">'+val+' '+label+'</div>';
+  }
+  el.innerHTML=chip('Sessions',total,'rgba(255,255,255,.18)')+chip('Pending',pending,'#c9962a')+chip('Reviewed',reviewed,'#1a6030');
+}
+
+function _supRenderProgress(sessions,reviews){
+  if(!sessions||!sessions.length){
+    _supSetContent('<div style="text-align:center;padding:60px;color:#888;font-size:13px">No sessions found on cloud.</div>');
+    return;
+  }
+  var role=(_umGetCurrentUser().role||'');
+  var isHO=(role==='ho_supervisor');
+  // Group by year then branch
+  var byYear={};
+  sessions.forEach(function(s){
+    if(!byYear[s.year]) byYear[s.year]={};
+    if(!byYear[s.year][s.branchRaw]) byYear[s.year][s.branchRaw]=[];
+    byYear[s.year][s.branchRaw].push(s);
+  });
+  var h='';
+  var yearKeys=Object.keys(byYear).sort().reverse();
+  yearKeys.forEach(function(yr){
+    h+='<div style="margin-bottom:24px">';
+    h+='<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#1a3a5c;background:#e8f0fb;padding:6px 12px;border-radius:5px;margin-bottom:10px">&#128197; Audit Year: '+esc(yr)+'</div>';
+    // Table header
+    h+='<div style="background:#fff;border-radius:6px;border:1px solid #e0e8f0;overflow:hidden">';
+    h+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+    h+='<thead><tr style="background:#f0f4f8;color:#2a4060;font-weight:700;font-size:11px">';
+    h+='<th style="padding:9px 12px;text-align:left;border-bottom:1px solid #e0e8f0">Branch</th>';
+    h+='<th style="padding:9px 12px;text-align:left;border-bottom:1px solid #e0e8f0">Auditor(s)</th>';
+    h+='<th style="padding:9px 12px;text-align:center;border-bottom:1px solid #e0e8f0">Last Saved</th>';
+    h+='<th style="padding:9px 12px;text-align:center;border-bottom:1px solid #e0e8f0">Review Status</th>';
+    h+='<th style="padding:9px 12px;text-align:center;border-bottom:1px solid #e0e8f0">Actions</th>';
+    h+='</tr></thead><tbody>';
+    var brKeys=Object.keys(byYear[yr]).sort();
+    brKeys.forEach(function(brRaw,bi){
+      var brSessions=byYear[yr][brRaw];
+      var brDisplay=brRaw.replace(/_/g,' ');
+      var rv=reviews[yr+'_'+brRaw]||{};
+      var statusHtml=_supStatusBadge(rv.status||'');
+      var lastSave=''; var latestTs=0;
+      brSessions.forEach(function(s){
+        var t=s._savedAt?new Date(s._savedAt).getTime():0;
+        if(t>latestTs){ latestTs=t; lastSave=s._savedAt||''; }
+      });
+      var lastSaveFmt=lastSave?_supFmtDate(lastSave):'-';
+      var audNames=brSessions.map(function(s){return esc(s.auditor);}).join(', ');
+      var rowBg=(bi%2===0)?'#fff':'#fafcff';
+      h+='<tr style="background:'+rowBg+';border-bottom:1px solid #f0f4f8">';
+      h+='<td style="padding:9px 12px;font-weight:600;color:#1a3a5c">'+esc(brDisplay)+'</td>';
+      h+='<td style="padding:9px 12px;color:#444">'+audNames+'</td>';
+      h+='<td style="padding:9px 12px;text-align:center;color:#666;font-size:11px">'+lastSaveFmt+'</td>';
+      h+='<td style="padding:9px 12px;text-align:center">'+statusHtml+'</td>';
+      h+='<td style="padding:9px 12px;text-align:center">';
+      // Load session button (first auditor's session)
+      var firstSess=brSessions[0];
+      h+='<button onclick="_supViewSession(\''+esc(firstSess.path)+'\',\''+esc(firstSess.sha||'')+'\',\''+esc(yr+'_'+brRaw)+'\')" style="padding:4px 12px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;margin-right:4px">&#128065; View</button>';
+      if(rv.status==='pending'){
+        h+='<button onclick="_supOpenReview(\''+esc(yr+'_'+brRaw)+'\')" style="padding:4px 12px;background:#c9962a;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#9998; Review</button>';
+      }
+      h+='</td></tr>';
+    });
+    h+='</tbody></table></div></div>';
+  });
+  _supSetContent(h);
+}
+
+function _supRenderPending(sessions,reviews){
+  var pending=[];
+  Object.keys(reviews).forEach(function(k){
+    var rv=reviews[k];
+    if(rv&&rv.status==='pending') pending.push({key:k,rv:rv});
+  });
+  if(!pending.length){
+    _supSetContent('<div style="text-align:center;padding:60px;color:#888;font-size:13px">&#10003; No pending reviews. All caught up!</div>');
+    return;
+  }
+  var h='<div style="display:grid;gap:12px">';
+  pending.forEach(function(p){
+    var rv=p.rv;
+    h+='<div style="background:#fff;border:1px solid #f5c842;border-left:4px solid #c9962a;border-radius:6px;padding:16px 18px;display:flex;align-items:center;gap:14px">';
+    h+='<div style="font-size:28px">&#9203;</div>';
+    h+='<div style="flex:1">';
+    h+='<div style="font-size:13px;font-weight:700;color:#1a3a5c">'+esc(rv.branchDisplay||p.key)+'</div>';
+    h+='<div style="font-size:11px;color:#666;margin-top:2px">Submitted by <strong>'+esc(rv.submittedBy||'Unknown')+'</strong> on '+_supFmtDate(rv.submittedAt||'')+'</div>';
+    if(rv.note) h+='<div style="font-size:11px;color:#444;margin-top:4px;font-style:italic">"'+esc(rv.note)+'"</div>';
+    h+='</div>';
+    h+='<button onclick="_supOpenReview(\''+esc(p.key)+'\')" style="padding:7px 18px;background:#c9962a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#9998; Review Now</button>';
+    h+='</div>';
+  });
+  h+='</div>';
+  _supSetContent(h);
+}
+
+function _supRenderReviewed(sessions,reviews){
+  var done=[];
+  Object.keys(reviews).forEach(function(k){
+    var rv=reviews[k];
+    if(rv&&rv.status&&rv.status!=='pending') done.push({key:k,rv:rv});
+  });
+  if(!done.length){
+    _supSetContent('<div style="text-align:center;padding:60px;color:#888;font-size:13px">No reviewed reports yet.</div>');
+    return;
+  }
+  var h='<div style="display:grid;gap:10px">';
+  done.forEach(function(p){
+    var rv=p.rv;
+    var badge=_supStatusBadge(rv.status);
+    h+='<div style="background:#fff;border:1px solid #e0e8f0;border-radius:6px;padding:14px 18px;display:flex;align-items:center;gap:12px">';
+    h+='<div style="flex:1">';
+    h+='<div style="font-size:13px;font-weight:700;color:#1a3a5c">'+esc(rv.branchDisplay||p.key)+'</div>';
+    h+='<div style="font-size:11px;color:#666;margin-top:2px">Auditor: <strong>'+esc(rv.submittedBy||'-')+'</strong> &nbsp;|&nbsp; Reviewed: '+_supFmtDate(rv.reviewedAt||'')+'</div>';
+    if(rv.supervisorComment) h+='<div style="font-size:11px;color:#444;margin-top:4px;background:#f8f9fa;padding:6px 10px;border-radius:4px;border-left:3px solid #1a3a5c">'+esc(rv.supervisorComment)+'</div>';
+    h+='</div>'+badge;
+    h+='</div>';
+  });
+  h+='</div>';
+  _supSetContent(h);
+}
+
+function _supStatusBadge(status){
+  var map={
+    'pending':    ['&#9203; Pending Review','#c9962a','#fff8e6'],
+    'approved':   ['&#10003; Approved',     '#1a6030','#e8f8ee'],
+    'rejected':   ['&#10007; Rejected',     '#c0392b','#fdf0f0'],
+    'changes_requested':['&#9998; Changes Requested','#1a3a5c','#e8f0fb']
+  };
+  var s=map[status];
+  if(!s) return '<span style="font-size:10.5px;color:#aaa">—</span>';
+  return '<span style="font-size:10.5px;font-weight:700;color:'+s[1]+';background:'+s[2]+';padding:3px 9px;border-radius:10px;white-space:nowrap">'+s[0]+'</span>';
+}
+
+function _supFmtDate(iso){
+  if(!iso) return '-';
+  try{
+    var d=new Date(iso);
+    return d.getDate()+' '+'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ')[d.getMonth()]+' '+d.getFullYear()+', '+_supPad(d.getHours())+':'+_supPad(d.getMinutes());
+  }catch(e){ return iso; }
+}
+function _supPad(n){ return n<10?'0'+n:n+''; }
+
+function _supSetContent(html){
+  var el=document.getElementById('_supContent');
+  if(el) el.innerHTML=html;
+}
+
+function _supViewSession(path, sha, reviewKey){
+  var cfg=_csGetCfg();
+  var url=sha
+    ? _csRepoBase(cfg)+'/git/blobs/'+sha
+    : _csRepoBase(cfg)+'/contents/'+path;
+  toast('Loading session for review...');
+  fetch(url,{headers:_csHdrs(cfg)})
+  .then(function(r){ return r.json(); })
+  .then(function(file){
+    if(!file||!file.content){ toast('Could not load session.'); return; }
+    var raw=file.content.replace(/\s/g,'');
+    var sess=JSON.parse(_csB64Dec(raw));
+    if(!sess||!sess.ts){ toast('Invalid session file.'); return; }
+    _supShowSessionViewer(sess, reviewKey);
+  })
+  .catch(function(e){ toast('Load error: '+(e&&e.message?e.message:e)); });
+}
+
+function _supShowSessionViewer(sess, reviewKey){
+  var ex=document.getElementById('_supViewer');
+  if(ex) ex.remove();
+  var el=document.createElement('div');
+  el.id='_supViewer';
+  el.style.cssText='position:fixed;inset:0;z-index:9995;background:#fff;display:flex;flex-direction:column;font-family:Inter,sans-serif;overflow:hidden';
+
+  var meta=sess._cloudMeta||{};
+  var branchDisplay=(meta.branchFolder||'').replace(/_/g,' ');
+  var auditor=meta.auditor||'Unknown';
+  var savedAt=_supFmtDate(meta.savedAt||'');
+
+  var selIds=sess.selIds||[];
+  var observations=sess.observations||[];
+  var selected=observations.filter(function(o){ return selIds.indexOf(o.id)>=0; });
+
+  // Header
+  var h='<div style="background:#1a3a5c;color:#fff;padding:0 20px;display:flex;align-items:center;gap:12px;height:48px;flex-shrink:0">';
+  h+='<button onclick="document.getElementById(\'_supViewer\').remove()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:12px;font-weight:700;cursor:pointer;padding:4px 12px;border-radius:4px;font-family:Inter,sans-serif">&#8592; Back</button>';
+  h+='<div style="font-size:13px;font-weight:700">'+esc(branchDisplay)+'</div>';
+  h+='<div style="font-size:11px;color:rgba(255,255,255,.65)">Auditor: '+esc(auditor)+' &nbsp;|&nbsp; Saved: '+savedAt+'</div>';
+  h+='<div style="flex:1"></div>';
+  h+='<span style="font-size:11px;background:#c9962a;color:#fff;padding:3px 10px;border-radius:10px;font-weight:700">READ ONLY</span>';
+  h+='<button onclick="_supOpenReview(\''+esc(reviewKey)+'\')" style="padding:5px 16px;background:#c9962a;color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;margin-left:8px">&#9998; Write Review</button>';
+  h+='</div>';
+
+  // Branch info summary
+  h+='<div style="background:#f0f4f8;border-bottom:1px solid #e0e8f0;padding:10px 20px;display:flex;gap:20px;flex-shrink:0;flex-wrap:wrap">';
+  var hdr=sess.hdr||{};
+  if(hdr.brcode) h+='<div style="font-size:11px"><span style="color:#888;font-weight:600">Branch Code: </span><span style="color:#1a3a5c;font-weight:700">'+esc(hdr.brcode)+'</span></div>';
+  if(hdr.brname) h+='<div style="font-size:11px"><span style="color:#888;font-weight:600">Branch Name: </span><span style="color:#1a3a5c;font-weight:700">'+esc(hdr.brname)+'</span></div>';
+  if(hdr.region) h+='<div style="font-size:11px"><span style="color:#888;font-weight:600">Region: </span><span style="color:#1a3a5c;font-weight:700">'+esc(hdr.region)+'</span></div>';
+  h+='<div style="font-size:11px"><span style="color:#888;font-weight:600">Observations in Report: </span><span style="color:#1a3a5c;font-weight:700">'+selected.length+'</span></div>';
+  h+='</div>';
+
+  // Observations list
+  h+='<div style="flex:1;overflow-y:auto;padding:20px">';
+  if(!selected.length){
+    h+='<div style="text-align:center;padding:40px;color:#888;font-size:13px">No observations selected in this report.</div>';
+  } else {
+    selected.forEach(function(o,i){
+      var obsText=(sess.obsEdits&&sess.obsEdits[o.id])||o.observation||'';
+      var recText=(sess.recEdits&&sess.recEdits[o.id])||o.recommendation||'';
+      var typeLabel=(sess.obsTypeMap&&sess.obsTypeMap[o.id])||o.type||'';
+      h+='<div style="background:#fff;border:1px solid #e0e8f0;border-radius:6px;margin-bottom:12px;overflow:hidden">';
+      h+='<div style="background:#f0f4f8;padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #e0e8f0">';
+      h+='<span style="font-size:11px;font-weight:800;color:#1a3a5c;background:#e8f0fb;padding:2px 8px;border-radius:10px">'+(i+1)+'</span>';
+      h+='<div style="font-size:12.5px;font-weight:700;color:#1a3a5c;flex:1">'+esc(o.title||o.id)+'</div>';
+      if(typeLabel) h+='<span style="font-size:10px;font-weight:700;color:#1a6030;background:#e8f8ee;padding:2px 8px;border-radius:10px">'+esc(typeLabel)+'</span>';
+      h+='</div>';
+      h+='<div style="padding:12px 14px">';
+      if(obsText) h+='<div style="margin-bottom:8px"><div style="font-size:10.5px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Observation</div><div style="font-size:12px;color:#333;line-height:1.6;white-space:pre-wrap">'+esc(obsText)+'</div></div>';
+      if(recText) h+='<div><div style="font-size:10.5px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Recommendation</div><div style="font-size:12px;color:#333;line-height:1.6;white-space:pre-wrap">'+esc(recText)+'</div></div>';
+      h+='</div></div>';
+    });
+  }
+  h+='</div>';
+
+  el.innerHTML=h;
+  document.body.appendChild(el);
+}
+
+function _supOpenReview(reviewKey){
+  var cfg=_csGetCfg();
+  var userObj=_umGetCurrentUser();
+  var ex=document.getElementById('_supReviewModal');
+  if(ex) ex.remove();
+  var el=document.createElement('div');
+  el.id='_supReviewModal';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+
+  var brDisplay=reviewKey.replace(/_/g,' ');
+  var h='<div style="background:#fff;border-radius:8px;width:94%;max-width:560px;box-shadow:0 8px 32px rgba(0,0,0,.3)">';
+  h+='<div style="padding:14px 20px;border-bottom:1px solid #e0e8f0;display:flex;align-items:center;gap:10px">';
+  h+='<span style="font-size:20px">&#9998;</span>';
+  h+='<div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1a3a5c">Supervisor Review</div>';
+  h+='<div style="font-size:11px;color:#888">'+esc(brDisplay)+'</div></div>';
+  h+='<button onclick="document.getElementById(\'_supReviewModal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#999">&#x2715;</button>';
+  h+='</div>';
+  h+='<div style="padding:20px">';
+  // Decision
+  h+='<div style="margin-bottom:14px"><div style="font-size:11.5px;font-weight:700;color:#2a4060;margin-bottom:8px">Decision</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
+  var decisions=[['approved','&#10003; Approve','#1a6030','#e8f8ee'],['changes_requested','&#9998; Request Changes','#1a3a5c','#e8f0fb'],['rejected','&#10007; Reject','#c0392b','#fdf0f0']];
+  decisions.forEach(function(d){
+    h+='<label style="cursor:pointer;border:2px solid #e0e8f0;border-radius:6px;padding:9px 8px;text-align:center;font-size:11.5px;font-weight:700;color:'+d[2]+'" id="_supDecLbl_'+d[0]+'">';
+    h+='<input type="radio" name="_supDecision" value="'+d[0]+'" onchange="_supDecisionChange()" style="display:none">'+d[1]+'</label>';
+  });
+  h+='</div></div>';
+  // Comment
+  h+='<div style="margin-bottom:16px"><div style="font-size:11.5px;font-weight:700;color:#2a4060;margin-bottom:6px">Comments / Remarks</div>';
+  h+='<textarea id="_supReviewComment" rows="5" placeholder="Enter your review comments, specific amendments required, or approval remarks..." style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#1a3a5c"></textarea></div>';
+  h+='</div>';
+  h+='<div style="padding:12px 20px;border-top:1px solid #e0e8f0;display:flex;gap:10px;justify-content:flex-end">';
+  h+='<button id="_supSubmitReviewBtn" onclick="_supSubmitReview(\''+esc(reviewKey)+'\')" style="padding:8px 22px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Submit Review</button>';
+  h+='<button onclick="document.getElementById(\'_supReviewModal\').remove()" style="padding:8px 14px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>';
+  h+='</div></div>';
+
+  el.innerHTML=h;
+  document.body.appendChild(el);
+}
+
+function _supDecisionChange(){
+  var decisions=['approved','changes_requested','rejected'];
+  var colors={'approved':'#1a6030','changes_requested':'#1a3a5c','rejected':'#c0392b'};
+  var bgs={'approved':'#e8f8ee','changes_requested':'#e8f0fb','rejected':'#fdf0f0'};
+  decisions.forEach(function(d){
+    var inp=document.querySelector('input[name="_supDecision"][value="'+d+'"]');
+    var lbl=document.getElementById('_supDecLbl_'+d);
+    if(!inp||!lbl) return;
+    if(inp.checked){
+      lbl.style.border='2px solid '+colors[d];
+      lbl.style.background=bgs[d];
+    } else {
+      lbl.style.border='2px solid #e0e8f0';
+      lbl.style.background='#fff';
+    }
+  });
+}
+
+function _supSubmitReview(reviewKey){
+  var inp=document.querySelector('input[name="_supDecision"]:checked');
+  if(!inp){ toast('Please select a decision (Approve / Request Changes / Reject).'); return; }
+  var decision=inp.value;
+  var comment=(document.getElementById('_supReviewComment')||{}).value||'';
+  var userObj=_umGetCurrentUser();
+  var cfg=_csGetCfg();
+
+  var reviewData={
+    reviewKey: reviewKey,
+    branchDisplay: reviewKey.replace(/_/g,' '),
+    status: decision,
+    supervisorComment: comment,
+    supervisorName: userObj.name||userObj.username||'Supervisor',
+    supervisorRole: userObj.role||'ro_supervisor',
+    reviewedAt: new Date().toISOString()
+  };
+
+  var path=_SUP_REVIEW_PATH+reviewKey+'.json';
+  var url=_csRepoBase(cfg)+'/contents/'+path;
+  var hdrs=_csHdrs(cfg);
+
+  toast('Submitting review...');
+  fetch(url,{headers:hdrs})
+  .then(function(r){ return r.ok?r.json():{sha:null}; })
+  .then(function(existing){
+    // Preserve original submission data
+    var orig=existing&&existing.content?JSON.parse(_csB64Dec(existing.content.replace(/\s/g,''))):({});
+    reviewData.submittedBy=orig.submittedBy||reviewData.supervisorName;
+    reviewData.submittedAt=orig.submittedAt||reviewData.reviewedAt;
+    reviewData.sessionPath=orig.sessionPath||'';
+    var body={message:'[BRAINS] Supervisor review: '+reviewKey,content:_csB64Enc(JSON.stringify(reviewData,null,2))};
+    if(existing&&existing.sha) body.sha=existing.sha;
+    return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+  })
+  .then(function(r){
+    if(r&&(r.status===200||r.status===201)){
+      // Notify auditor
+      _supNotifyAuditor(reviewData);
+      var modal=document.getElementById('_supReviewModal');
+      if(modal) modal.remove();
+      var viewer=document.getElementById('_supViewer');
+      if(viewer) viewer.remove();
+      toast('Review submitted ✓');
+      // Refresh dashboard
+      _supSessionCache=null;
+      setTimeout(_supShowDashboard,600);
+    } else {
+      toast('Failed to save review.');
+    }
+  })
+  .catch(function(e){ toast('Error: '+(e&&e.message?e.message:e)); });
+}
+
+function _supNotifyAuditor(reviewData){
+  // Find auditor slug from reviewKey to write notification
+  var cfg=_csGetCfg();
+  var parts=reviewData.reviewKey.split('_');
+  // reviewKey format: year_branchslug — auditor slug comes from session path
+  if(!reviewData.sessionPath) return;
+  var audSlug=reviewData.sessionPath.split('/').pop().replace('.json','');
+  var decisionLabel={'approved':'Approved','changes_requested':'Changes Requested','rejected':'Rejected'};
+  var entry={
+    from: _csAuditorSlug(cfg),
+    fromName: reviewData.supervisorName,
+    at: new Date().toISOString(),
+    branch: reviewData.branchDisplay,
+    type: 'supervisor_review',
+    decision: reviewData.status,
+    msg: 'Your report for "'+reviewData.branchDisplay+'" has been reviewed by '+reviewData.supervisorName+' — '+
+         (decisionLabel[reviewData.status]||reviewData.status)+
+         (reviewData.supervisorComment?'. Comment: '+reviewData.supervisorComment:'')+'.'
+  };
+  _csWriteNotification(cfg, audSlug, {_loadedFrom:audSlug,_cloudMeta:{branchFolder:reviewData.branchDisplay}});
+  // Write directly to auditor notification file
+  var path='_notifications/'+audSlug+'.json';
+  var url=_csRepoBase(cfg)+'/contents/'+path;
+  var hdrs=_csHdrs(cfg);
+  fetch(url,{headers:hdrs})
+  .then(function(r){ return r.ok?r.json():{content:'W10=',sha:null}; })
+  .then(function(existing){
+    var arr;
+    try{ arr=JSON.parse(_csB64Dec((existing.content||'W10=').replace(/\s/g,''))); }catch(e){ arr=[]; }
+    if(!Array.isArray(arr)) arr=[];
+    arr.push(entry);
+    var body={message:'[BRAINS] Review notification for '+audSlug,content:_csB64Enc(JSON.stringify(arr,null,2))};
+    if(existing&&existing.sha) body.sha=existing.sha;
+    return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+  })
+  .catch(function(){});
+}
+
+// Supervisor Dashboard button in toolbar — locked for non-supervisors
+function _supToolbarBtn(){
+  var role=(_umGetCurrentUser().role||'');
+  var isSup=(role==='ro_supervisor'||role==='ho_supervisor');
+  var btn=document.getElementById('_supToolbarBtn');
+  if(!btn) return;
+  if(isSup){
+    btn.disabled=false;
+    btn.style.opacity='1';
+    btn.style.cursor='pointer';
+    btn.title='Open Supervisor Dashboard';
+  } else {
+    btn.disabled=true;
+    btn.style.opacity='.4';
+    btn.style.cursor='not-allowed';
+    btn.title='Supervisor access only';
+  }
 }
 
 function showCloudSettings(){
