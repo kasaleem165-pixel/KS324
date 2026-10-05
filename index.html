@@ -639,7 +639,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
     <button onclick="pwCheck()" style="width:100%;padding:11px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;font-family:Inter,Arial,sans-serif">Login</button>
     <div style="font-size:10px;color:#aaa;margin-top:18px">&copy; 2026 Beaconhouse Group &mdash; S&amp;A Internal Use Only</div>
     <div style="margin-top:12px;padding:9px 12px;background:#f0f5fb;border-radius:6px;border:1px solid #d0e0f0;font-size:11.5px;color:#1a3a5c;text-align:center">
-      &#128218; First time? &nbsp;<a id="_pw_guide_link" href="#" target="_blank" style="color:#1a3a5c;font-weight:700;text-decoration:underline">Open User Guide</a>
+      &#128218; First time? &nbsp;<a href="#" onclick="event.preventDefault();brainsShowGuide()" style="color:#1a3a5c;font-weight:700;text-decoration:underline">Open User Guide</a>
       <div style="font-size:10px;color:#888;margin-top:2px">Step-by-step instructions for auditors</div>
     </div>
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid #e8edf5;font-size:10px;color:#999;line-height:1.6">
@@ -658,14 +658,6 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
   if(ps){ ps.style.display='flex'; }
   var pi=document.getElementById('pw-input');
   if(pi){ pi.value=''; }
-  // Set User Guide link — uses localStorage override or default artifact URL
-  (function(){
-    var link=document.getElementById('_pw_guide_link');
-    if(!link) return;
-    var stored=''; try{ stored=localStorage.getItem('brains_guide_url')||''; }catch(e){}
-    var url=stored||'https://claude.ai/artifact/8FJAyUhR1EYmq1bZV354hB';
-    link.href=url;
-  })();
   // ?mode=supervisor — customise login screen for supervisor direct URL
   if(window.location.search.indexOf('mode=supervisor')>=0){
     var lbl=document.getElementById('pw-mode-label');
@@ -988,6 +980,124 @@ function _applyRoleUI(){
   }
   // Enable supervisor toolbar button for supervisor roles
   setTimeout(_supToolbarBtn, 100);
+}
+
+// ── Built-in User Guide ───────────────────────────────────────────────────────
+function brainsShowGuide(){
+  var ex=document.getElementById('_brainsGuideOverlay');
+  if(ex){ ex.style.display='flex'; return; }
+  var el=document.createElement('div');
+  el.id='_brainsGuideOverlay';
+  el.style.cssText='position:fixed;inset:0;z-index:9999999;background:rgba(15,25,40,.7);display:flex;align-items:flex-start;justify-content:center;font-family:Inter,Arial,sans-serif;overflow-y:auto;padding:30px 16px 40px';
+  el.innerHTML='<div style="background:#fff;border-radius:10px;width:100%;max-width:760px;box-shadow:0 12px 48px rgba(0,0,0,.4);overflow:hidden">'
+
+  // ── Header ──
+  +'<div style="background:#1a3a5c;color:#fff;padding:18px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:1">'
+  +'<div style="font-family:monospace;font-size:18px;font-weight:800;letter-spacing:4px">BRAINS</div>'
+  +'<div style="width:1px;height:20px;background:rgba(255,255,255,.2)"></div>'
+  +'<div style="font-size:12px;font-weight:700;color:#c9962a;flex:1">Auditor User Guide</div>'
+  +'<button onclick="document.getElementById(\'_brainsGuideOverlay\').style.display=\'none\'" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:5px;padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#10005; Close</button>'
+  +'</div>'
+
+  // ── Body ──
+  +'<div style="padding:28px 28px 36px;font-size:14px;line-height:1.7;color:#1a2535">'
+
+  // Section helper styles via inline span approach
+  +'<style>.bg-s{margin-bottom:28px}.bg-h1{font-size:17px;font-weight:800;color:#1a3a5c;border-bottom:2px solid #c9962a;padding-bottom:6px;margin:0 0 14px}.bg-h2{font-size:14.5px;font-weight:700;color:#1a3a5c;margin:18px 0 6px}.bg-p{margin:0 0 10px}.bg-box{border-radius:6px;padding:10px 14px;font-size:13px;margin:12px 0}.bg-note{background:#e8f0fb;border:1px solid #c0d4f0;color:#1a3a5c}.bg-warn{background:#fff8e6;border:1px solid #f0d080;color:#7a5900}.bg-tip{background:#e8f8ee;border:1px solid #b2dfca;color:#1a4025}.bg-steps{display:flex;flex-direction:column;gap:8px;margin:12px 0}.bg-step{display:flex;gap:12px;align-items:flex-start}.bg-snum{flex-shrink:0;width:24px;height:24px;background:#1a3a5c;color:#fff;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px}.bg-stxt{flex:1;font-size:13.5px}.bg-stxt strong{color:#1a3a5c}</style>'
+
+  // 1. Logging In
+  +'<div class="bg-s"><div class="bg-h1">1. Logging In</div>'
+  +'<p class="bg-p">BRAINS shows a login screen every time it opens. Two ways to log in:</p>'
+  +'<div class="bg-steps">'
+  +'<div class="bg-step"><div class="bg-snum">A</div><div class="bg-stxt"><strong>Named account (recommended)</strong> — Enter your username (e.g. <code style="background:#eef2f8;padding:1px 5px;border-radius:3px;font-size:12px">ali.hassan</code>) and your personal password given by the administrator.</div></div>'
+  +'<div class="bg-step"><div class="bg-snum">B</div><div class="bg-stxt"><strong>Shared login</strong> — Leave the username blank and enter the shared auditor password. Use this only if your personal account has not been set up yet.</div></div>'
+  +'</div>'
+  +'<div class="bg-box bg-warn"><strong>Forgot your password?</strong> Contact your administrator. Do not share your password with colleagues.</div>'
+  +'</div>'
+
+  // 2. Cloud Sync
+  +'<div class="bg-s"><div class="bg-h1">2. Cloud Sync</div>'
+  +'<p class="bg-p">BRAINS automatically saves your session to the cloud every few minutes. No action needed — it runs silently in the background.</p>'
+  +'<p class="bg-p">Cloud sync requires a token configured on your machine. Your administrator will either do this in person or send you a <strong>setup link</strong>.</p>'
+  +'<div class="bg-box bg-note"><strong>If you received a setup link:</strong> Open BRAINS, paste the link into the address bar, press Enter. Cloud Settings are configured automatically. Then log in normally.</div>'
+  +'</div>'
+
+  // 3. First-Time Setup
+  +'<div class="bg-s"><div class="bg-h1">3. First-Time Setup</div>'
+  +'<div class="bg-steps">'
+  +'<div class="bg-step"><div class="bg-snum">1</div><div class="bg-stxt">Open BRAINS (index.html) in your browser.</div></div>'
+  +'<div class="bg-step"><div class="bg-snum">2</div><div class="bg-stxt">Paste the setup link in the address bar if your administrator sent one, or ask them to configure Cloud Settings in person.</div></div>'
+  +'<div class="bg-step"><div class="bg-snum">3</div><div class="bg-stxt">Log in with your username and password.</div></div>'
+  +'<div class="bg-step"><div class="bg-snum">4</div><div class="bg-stxt">Go to <strong>File → New Report</strong>, fill in the branch header (Branch Code, Branch Name, Region), then begin entering observations.</div></div>'
+  +'</div></div>'
+
+  // 4. Saving
+  +'<div class="bg-s"><div class="bg-h1">4. Saving Your Work</div>'
+  +'<div class="bg-steps">'
+  +'<div class="bg-step"><div class="bg-snum">1</div><div class="bg-stxt"><strong>Auto-save to cloud</strong> — runs every few minutes automatically. No action needed.</div></div>'
+  +'<div class="bg-step"><div class="bg-snum">2</div><div class="bg-stxt"><strong>Manual cloud save</strong> — click <strong>Cloud → Save to Cloud</strong> before closing or switching computers.</div></div>'
+  +'<div class="bg-step"><div class="bg-snum">3</div><div class="bg-stxt"><strong>Offline save</strong> — click <strong>File → Save / Versions</strong> to download a backup file to your computer.</div></div>'
+  +'</div>'
+  +'<div class="bg-box bg-warn"><strong>Before closing your browser:</strong> Always save to cloud or use Save / Versions. The last few minutes of work may not have auto-saved yet.</div>'
+  +'</div>'
+
+  // 5. Loading
+  +'<div class="bg-s"><div class="bg-h1">5. Loading a Session</div>'
+  +'<div class="bg-steps">'
+  +'<div class="bg-step"><div class="bg-snum">A</div><div class="bg-stxt"><strong>From cloud</strong> — click <strong>Cloud → Browse Cloud Sessions</strong>, search by branch code or your name, click Load.</div></div>'
+  +'<div class="bg-step"><div class="bg-snum">B</div><div class="bg-stxt"><strong>From local file</strong> — click <strong>File → Load Offline Save</strong> if you have a .json backup on your computer.</div></div>'
+  +'</div>'
+  +'<div class="bg-box bg-note"><strong>Loading another auditor\'s file:</strong> BRAINS will warn you. If you save it, it is stored under your name and the original auditor is notified.</div>'
+  +'</div>'
+
+  // 6. Offline
+  +'<div class="bg-s"><div class="bg-h1">6. Working Offline</div>'
+  +'<p class="bg-p">Everything works offline — observations, edits, all report features. Auto-save pauses until you reconnect. Use <strong>File → Save / Versions</strong> while offline. When reconnected, click <strong>Cloud → Save to Cloud</strong>.</p>'
+  +'<div class="bg-box bg-tip"><strong>Switching computers?</strong> Save to cloud on the first machine. On the second, use Browse Cloud Sessions to load your latest version before starting work.</div>'
+  +'</div>'
+
+  // 7. Review Workflow
+  +'<div class="bg-s"><div class="bg-h1">7. Sending for Review</div>'
+  +'<div class="bg-steps">'
+  +'<div class="bg-step"><div class="bg-snum">1</div><div class="bg-stxt">Go to the <strong>Review</strong> tab and click <strong>Send to RO Audit Supervisor</strong>. A review request is uploaded to the cloud automatically.</div></div>'
+  +'<div class="bg-step"><div class="bg-snum">2</div><div class="bg-stxt">Your supervisor is notified in their dashboard — no email needed.</div></div>'
+  +'<div class="bg-step"><div class="bg-snum">3</div><div class="bg-stxt">The supervisor reviews, records Approved / Changes Requested / Rejected with comments, and submits.</div></div>'
+  +'<div class="bg-step"><div class="bg-snum">4</div><div class="bg-stxt">You receive a notification. Click <strong>Load RO Supervisor Review</strong> in the Review tab to see their comments.</div></div>'
+  +'</div>'
+  +'<div class="bg-box bg-note">The RO Supervisor may forward the report to the HO Supervisor for a second review. You will be notified when their comments are available too.</div>'
+  +'</div>'
+
+  // 8. Roles
+  +'<div class="bg-s"><div class="bg-h1">8. Roles &amp; Access</div>'
+  +'<table style="width:100%;border-collapse:collapse;font-size:13px">'
+  +'<thead><tr style="background:#1a3a5c;color:#fff"><th style="padding:8px 10px;text-align:left">Role</th><th style="padding:8px 10px;text-align:left">Can Do</th></tr></thead>'
+  +'<tbody>'
+  +'<tr style="background:#e8f0fb"><td style="padding:8px 10px;font-weight:700;color:#1a3a5c">Auditor</td><td style="padding:8px 10px">Create &amp; edit reports, send to RO Supervisor for review</td></tr>'
+  +'<tr style="background:#e8f8ee"><td style="padding:8px 10px;font-weight:700;color:#1a6030">RO Supervisor</td><td style="padding:8px 10px">Review region reports, approve/request changes, forward to HO</td></tr>'
+  +'<tr style="background:#f5eeff"><td style="padding:8px 10px;font-weight:700;color:#7b3fa0">HO Supervisor</td><td style="padding:8px 10px">Second-level review and final approval</td></tr>'
+  +'<tr style="background:#fdecea"><td style="padding:8px 10px;font-weight:700;color:#c0392b">Administrator</td><td style="padding:8px 10px">Manages users, cloud settings, full access</td></tr>'
+  +'</tbody></table>'
+  +'</div>'
+
+  // 9. FAQ
+  +'<div class="bg-s"><div class="bg-h1">9. Frequently Asked Questions</div>'
+  +'<div class="bg-h2">I closed the browser by accident. Is my work lost?</div>'
+  +'<p class="bg-p">No. BRAINS saves to the cloud automatically and keeps a local draft in your browser. When you reopen and log in, you will be prompted to restore your last session.</p>'
+  +'<div class="bg-h2">I switched computers. How do I get my report back?</div>'
+  +'<p class="bg-p">Log in, then go to <strong>Cloud → Browse Cloud Sessions</strong>. Search by branch name or code and click Load.</p>'
+  +'<div class="bg-h2">Cloud sync stopped working. What should I check?</div>'
+  +'<p class="bg-p">Check your internet connection. If connected, go to <strong>Cloud → Cloud Settings</strong> and verify the token, owner and repo are filled in. If not, ask your administrator for a new setup link.</p>'
+  +'<div class="bg-h2">I forgot my password. What do I do?</div>'
+  +'<p class="bg-p">Contact your administrator. They can reset it through the Admin Panel. Your report data will not be affected.</p>'
+  +'<div class="bg-h2">Can I use BRAINS on my phone?</div>'
+  +'<p class="bg-p" style="margin-bottom:0">Yes. BRAINS works in any modern mobile browser. All features including cloud sync work the same way on mobile.</p>'
+  +'</div>'
+
+  +'<div style="text-align:center;font-size:11.5px;color:#aaa;padding-top:16px;border-top:1px solid #e0e8f0">BRAINS v02/2026 &nbsp;&bull;&nbsp; Beaconhouse Group &mdash; Systems &amp; Audit &nbsp;&bull;&nbsp; Internal use only</div>'
+  +'</div></div>';
+  document.body.appendChild(el);
+  // Close on backdrop click
+  el.addEventListener('click',function(e){ if(e.target===el) el.style.display='none'; });
 }
 
 function brainsLogout(){
@@ -24843,12 +24953,6 @@ function _adminRenderCloud(c){
     +'<input id="_apCloud_repo" type="text" placeholder="brains-sessions" style="'+inp+'" value="'+(cfg.repo?esc(cfg.repo):'')+'">'
     +'<label style="'+lbl+'">Your Name (Auditor/Admin)</label>'
     +'<input id="_apCloud_auditor" type="text" placeholder="Your full name" style="'+inp+'" value="'+(cfg.auditor?esc(cfg.auditor):'')+'">'
-    +'</div>'
-    +'<div style="background:#fff;border:1px solid #e0e8f0;border-radius:8px;padding:20px 22px;margin-top:14px">'
-    +'<div style="font-size:12.5px;font-weight:700;color:#2a4060;margin-bottom:8px">&#128218; User Guide URL</div>'
-    +'<div style="font-size:11.5px;color:#666;margin-bottom:10px">The URL auditors see on the login screen under "Open User Guide". Paste a SharePoint, Google Drive, or any hosted link to the guide. Leave blank to use the default.</div>'
-    +'<label style="'+lbl+'">Guide URL</label>'
-    +'<input id="_apCloud_guideUrl" type="text" placeholder="https://... (leave blank for default)" style="'+inp+'" value="'+(function(){ try{ return esc(localStorage.getItem('brains_guide_url')||''); }catch(e){ return ''; } }())+'">'
     +'<div id="_apCloud_err" style="font-size:12px;color:#c0392b;min-height:16px;margin-top:8px"></div>'
     +'<div style="display:flex;gap:10px;margin-top:14px">'
     +'<button onclick="_adminSaveCloud()" style="padding:8px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Save Cloud Settings</button>'
@@ -24867,8 +24971,6 @@ function _adminSaveCloud(){
   cfg.token=token; cfg.owner=owner; cfg.repo=repo;
   if(auditor) cfg.auditor=auditor;
   _csSaveCfg(cfg);
-  var guideUrl=(document.getElementById('_apCloud_guideUrl').value||'').trim();
-  try{ if(guideUrl) localStorage.setItem('brains_guide_url',guideUrl); else localStorage.removeItem('brains_guide_url'); }catch(e){}
   errEl.style.color='#1a6030';
   errEl.textContent='Cloud settings saved.';
   toast('Cloud settings saved.');
