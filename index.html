@@ -16598,6 +16598,60 @@ function generateReviewerHtml(role){
   var fname='BSS_Review_'+role.toUpperCase()+'_'+branch.replace(/[^a-zA-Z0-9]/g,'_').slice(0,20)+'_'+dt+'.html';
   var blob=new Blob([rv],{type:'text/html'});
   _showDownloadChoice(blob, fname, (role==='ro'?'RO':'HO')+' Reviewer File');
+  // Also create cloud review request so supervisor sees it in dashboard
+  _supCreateReviewRequest(role, sess);
+}
+
+function _supCreateReviewRequest(role, sess){
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo) return; // cloud not configured — silent
+  var H=getHdrVals();
+  var brFolder=_csBranchFolder();
+  var year=_csAuditYear(cfg)||new Date().getFullYear()+'';
+  var audSlug=_csAuditorSlug(cfg);
+  var reviewKey=year+'_'+brFolder;
+  var branchDisplay=(H.brname||brFolder).replace(/_/g,' ');
+  var sessionPath='sessions/'+year+'/'+brFolder+'/'+audSlug+'.json';
+
+  var reviewData={
+    reviewKey: reviewKey,
+    branchDisplay: branchDisplay,
+    branchCode: H.brcode||'',
+    region: H.region||'',
+    status: 'pending',
+    submittedBy: cfg.auditor||audSlug,
+    submittedAt: new Date().toISOString(),
+    submittedForRole: role,   // 'ro' or 'ho'
+    sessionPath: sessionPath,
+    note: ''
+  };
+
+  var path=_SUP_REVIEW_PATH+reviewKey+'.json';
+  var url=_csRepoBase(cfg)+'/contents/'+path;
+  var hdrs=_csHdrs(cfg);
+
+  // Preserve any existing review data (don't overwrite a previous review decision)
+  fetch(url,{headers:hdrs})
+  .then(function(r){ return r.ok?r.json():{sha:null}; })
+  .then(function(existing){
+    var prev=null;
+    if(existing&&existing.content){
+      try{ prev=JSON.parse(_csB64Dec(existing.content.replace(/\s/g,''))); }catch(e){}
+    }
+    // If already reviewed and not pending, create a new round entry
+    if(prev&&prev.status&&prev.status!=='pending'){
+      reviewData.previousReview=prev;
+    }
+    var body={message:'[BRAINS] Review request: '+reviewKey+' ('+role.toUpperCase()+')',content:_csB64Enc(JSON.stringify(reviewData,null,2))};
+    if(existing&&existing.sha) body.sha=existing.sha;
+    return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+  })
+  .then(function(r){
+    if(r&&(r.status===200||r.status===201)){
+      toast('Review request sent to supervisor ✓');
+    }
+  })
+  .catch(function(){}); // silent — email file already downloaded
 }
 
 function triggerLoadSectResponse(role){
