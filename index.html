@@ -1279,6 +1279,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <div class="tb-dd-sep"></div>
         <button class="tb-dd-item" onclick="showCloudSettings();tbDDClose()" data-tip="Configure GitHub repository and access token for cloud sync">&#9881; Cloud Settings</button>
         <button class="tb-dd-item" onclick="showUserManagement();tbDDClose()" data-tip="Add, edit or delete user accounts (Administrator only)">&#128100; User Management</button>
+        <button class="tb-dd-item" onclick="showAdminPanel();tbDDClose()" data-tip="Full admin panel: users, cloud setup, setup links, system health (Administrator only)">&#128736; Admin Panel</button>
         <button class="tb-dd-item" onclick="_umChangeOwnPassword();tbDDClose()" data-tip="Change your own login password">&#128272; Change My Password</button>
       </div>
     </div>
@@ -2143,6 +2144,7 @@ function showDemoAuth(){
 // INIT
 // ============================================================
 window.onload = function() {
+  _adminHandleSetupUrl();
   _ensureRADrawerToggle();
   buildObsSrrCache();
   if(_hoAuthed) _hoActivateBtns();
@@ -24505,6 +24507,449 @@ function _supToolbarBtn(){
     btn.style.opacity='.4';
     btn.style.cursor='not-allowed';
     btn.title='Supervisor access only';
+  }
+}
+
+// ── Admin Panel ───────────────────────────────────────────────────────────────
+var _adminTab = 'users';
+
+function showAdminPanel(){
+  if(!_umIsAdmin()){ toast('Administrator access required.'); return; }
+  var ex=document.getElementById('_adminPanelOverlay');
+  if(ex) ex.parentNode.removeChild(ex);
+  var el=document.createElement('div');
+  el.id='_adminPanelOverlay';
+  el.style.cssText='position:fixed;inset:0;background:#f0f4f8;z-index:9800;display:flex;flex-direction:column;font-family:Inter,Arial,sans-serif;overflow:hidden';
+  el.innerHTML=''
+    +'<div style="background:#1a3a5c;color:#fff;padding:0 20px;display:flex;align-items:center;gap:12px;flex-shrink:0;min-height:50px">'
+    +'<span style="font-size:18px">&#9881;</span>'
+    +'<span style="font-size:15px;font-weight:700;letter-spacing:.3px;flex:1">BRAINS Admin Panel</span>'
+    +'<button onclick="document.getElementById(\'_adminPanelOverlay\').remove()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:5px;padding:4px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#x2715; Close</button>'
+    +'</div>'
+    +'<div style="background:#fff;border-bottom:1px solid #d0dcea;padding:0 20px;display:flex;gap:0;flex-shrink:0">'
+    +'<button id="_apTab_users" onclick="_adminSetTab(\'users\')" style="padding:11px 18px;border:none;border-bottom:3px solid #1a3a5c;background:none;font-size:12.5px;font-weight:700;color:#1a3a5c;cursor:pointer;font-family:Inter,sans-serif">&#128100; Users</button>'
+    +'<button id="_apTab_cloud" onclick="_adminSetTab(\'cloud\')" style="padding:11px 18px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:Inter,sans-serif">&#9729; Cloud Setup</button>'
+    +'<button id="_apTab_links" onclick="_adminSetTab(\'links\')" style="padding:11px 18px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:Inter,sans-serif">&#128279; Setup Links</button>'
+    +'<button id="_apTab_system" onclick="_adminSetTab(\'system\')" style="padding:11px 18px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:Inter,sans-serif">&#9989; System</button>'
+    +'</div>'
+    +'<div id="_apContent" style="flex:1;overflow-y:auto;padding:20px"></div>';
+  document.body.appendChild(el);
+  _adminTab='users';
+  _adminSetTab('users');
+}
+
+function _adminSetTab(tab){
+  _adminTab=tab;
+  var tabs=['users','cloud','links','system'];
+  for(var i=0;i<tabs.length;i++){
+    var btn=document.getElementById('_apTab_'+tabs[i]);
+    if(!btn) continue;
+    if(tabs[i]===tab){
+      btn.style.borderBottomColor='#1a3a5c';
+      btn.style.color='#1a3a5c';
+    } else {
+      btn.style.borderBottomColor='transparent';
+      btn.style.color='#666';
+    }
+  }
+  var c=document.getElementById('_apContent');
+  if(!c) return;
+  if(tab==='users') _adminRenderUsers(c);
+  else if(tab==='cloud') _adminRenderCloud(c);
+  else if(tab==='links') _adminRenderLinks(c);
+  else if(tab==='system') _adminRenderSystem(c);
+}
+
+// ── Admin Tab: Users ──────────────────────────────────────────────────────────
+function _adminRenderUsers(c){
+  c.innerHTML='<div style="max-width:740px;margin:0 auto">'
+    +'<div style="display:flex;align-items:center;margin-bottom:16px;gap:10px">'
+    +'<div style="flex:1;font-size:14px;font-weight:700;color:#1a3a5c">User Accounts</div>'
+    +'<button onclick="_adminAddUser()" style="padding:7px 16px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#43; Add User</button>'
+    +'</div>'
+    +'<div id="_apUserList"><div style="color:#888;font-size:13px;text-align:center;padding:40px">Loading users...</div></div>'
+    +'</div>';
+  _adminRefreshUsers();
+}
+
+function _adminRefreshUsers(){
+  var list=document.getElementById('_apUserList');
+  if(!list) return;
+  _umFetchUsers(function(users,err){
+    if(err||!users){
+      list.innerHTML='<div style="color:#c0392b;font-size:13px;padding:20px;background:#fdf0f0;border-radius:6px">'+(err||'No users found. Check Cloud Settings.')+'</div>';
+      return;
+    }
+    if(!users.length){
+      list.innerHTML='<div style="color:#888;font-size:13px;text-align:center;padding:40px;background:#fff;border-radius:8px;border:1px dashed #c8d8ec">No users yet.<br><small>Click + Add User to create the first account.</small></div>';
+      return;
+    }
+    var roleLabel={'administrator':'Admin','auditor':'Auditor','ho_supervisor':'HO Supervisor','ro_supervisor':'RO Supervisor','viewer':'Viewer'};
+    var roleColor={'administrator':'#c0392b','auditor':'#1a3a5c','ho_supervisor':'#7b3fa0','ro_supervisor':'#1a6030','viewer':'#888'};
+    var h='<div style="display:flex;flex-direction:column;gap:7px">';
+    users.forEach(function(u,i){
+      var rl=roleLabel[u.role]||u.role;
+      var rc=roleColor[u.role]||'#555';
+      var regionHint=(u.region?' &nbsp;<span style="font-size:10px;color:#999">Region: '+esc(u.region)+'</span>':'');
+      h+='<div style="display:flex;align-items:center;padding:10px 14px;background:#fff;border:1px solid #e0e8f0;border-radius:7px;gap:8px">';
+      h+='<div style="flex:1">';
+      h+='<div style="font-size:13px;font-weight:600;color:#1a3a5c">'+esc(u.name||u.username)+regionHint+'</div>';
+      h+='<div style="font-size:11px;color:#888;margin-top:2px">@'+esc(u.username)+'</div>';
+      h+='</div>';
+      h+='<span style="font-size:11px;font-weight:700;color:'+rc+';background:'+rc+'18;padding:2px 8px;border-radius:10px">'+esc(rl)+'</span>';
+      h+='<button onclick="_adminEditUser('+i+')" style="padding:4px 11px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:4px;font-size:11px;cursor:pointer;font-family:Inter,sans-serif">Edit</button>';
+      h+='<button onclick="_adminDeleteUser('+i+')" style="padding:4px 11px;background:#fdf0f0;border:1px solid #f5c6c6;border-radius:4px;font-size:11px;cursor:pointer;font-family:Inter,sans-serif;color:#c0392b">Delete</button>';
+      h+='</div>';
+    });
+    h+='</div>';
+    list.innerHTML=h;
+  });
+}
+
+function _adminAddUser(){ _adminOpenUserForm(null,null); }
+function _adminEditUser(idx){
+  _umFetchUsers(function(users,err){
+    if(err||!users){ toast(err||'Could not load users.'); return; }
+    _adminOpenUserForm(users[idx],idx);
+  });
+}
+function _adminDeleteUser(idx){
+  if(!confirm('Delete this user? They will no longer be able to log in.')) return;
+  _umFetchUsers(function(users,err,sha){
+    if(err||!users){ toast(err||'Could not load users.'); return; }
+    var name=users[idx].name||users[idx].username;
+    users.splice(idx,1);
+    _umSaveUsers(users,sha,function(saveErr){
+      if(saveErr){ toast('Delete failed: '+saveErr); return; }
+      _adminRefreshUsers();
+      toast('User deleted: '+name);
+    });
+  });
+}
+
+function _adminOpenUserForm(user,idx){
+  var ex=document.getElementById('_adminUserFormModal');
+  if(ex) ex.parentNode.removeChild(ex);
+  var isEdit=(user!==null&&user!==undefined);
+  var el=document.createElement('div');
+  el.id='_adminUserFormModal';
+  el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+  var inp='width:100%;padding:7px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:12.5px;font-family:Inter,sans-serif;box-sizing:border-box';
+  var lbl='font-size:11px;font-weight:700;color:#2a4060;display:block;margin-bottom:3px;margin-top:10px';
+  var roleOpts=['auditor','ro_supervisor','ho_supervisor','administrator','viewer'];
+  var roleLabels={'auditor':'Auditor','ro_supervisor':'RO Supervisor','ho_supervisor':'HO Supervisor','administrator':'Administrator','viewer':'Viewer'};
+  var roleOptsHtml='';
+  roleOpts.forEach(function(r){
+    var sel=(isEdit&&user.role===r)?' selected':'(!isEdit&&r===\'auditor\'?\' selected\':\'\')';
+    roleOptsHtml+='<option value="'+r+'"'+(isEdit?(user.role===r?' selected':''):(r==='auditor'?' selected':''))+'>'+roleLabels[r]+'</option>';
+  });
+  el.innerHTML='<div style="background:#fff;border-radius:8px;width:92%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,.3);padding:24px 28px">'
+    +'<div style="font-size:14px;font-weight:700;color:#1a3a5c;margin-bottom:16px">'+(isEdit?'&#9998; Edit User':'&#43; Add User')+'</div>'
+    +'<label style="'+lbl+'">Full Name</label>'
+    +'<input id="_apUF_name" type="text" placeholder="e.g. Ali Hassan" style="'+inp+'" value="'+(isEdit?esc(user.name||user.username):'')+'">'
+    +'<label style="'+lbl+'">Username <span style="color:#999;font-weight:400">(for login, no spaces)</span></label>'
+    +'<input id="_apUF_uname" type="text" placeholder="e.g. ali.hassan" style="'+inp+'"'+(isEdit?' value="'+esc(user.username)+'" readonly':'')+'>'
+    +(isEdit?'<div style="font-size:10px;color:#888;margin-top:3px">Username cannot be changed after creation.</div>':'')
+    +'<label style="'+lbl+'">Role</label>'
+    +'<select id="_apUF_role" style="'+inp+'">'+roleOptsHtml+'</select>'
+    +'<label style="'+lbl+'">Region <span style="color:#999;font-weight:400">(for supervisors — optional)</span></label>'
+    +'<input id="_apUF_region" type="text" placeholder="e.g. Punjab, Sindh, Federal" style="'+inp+'" value="'+(isEdit?esc(user.region||''):'')+'">'
+    +'<label style="'+lbl+'">'+(isEdit?'New Password <span style="color:#999;font-weight:400">(leave blank to keep current)</span>':'Password')+'</label>'
+    +'<input id="_apUF_pw" type="password" placeholder="'+(isEdit?'Leave blank to keep current':'Min 6 characters')+'" style="'+inp+'">'
+    +'<div id="_apUF_err" style="font-size:12px;color:#c0392b;min-height:16px;margin-top:8px"></div>'
+    +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">'
+    +'<button onclick="_adminSaveUserForm('+idx+')" style="padding:8px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">'+(isEdit?'Save Changes':'Add User')+'</button>'
+    +'<button onclick="document.getElementById(\'_adminUserFormModal\').remove()" style="padding:8px 14px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>'
+    +'</div></div>';
+  document.body.appendChild(el);
+  setTimeout(function(){ var n=document.getElementById('_apUF_name'); if(n) n.focus(); },100);
+}
+
+function _adminSaveUserForm(editIdx){
+  var name=(document.getElementById('_apUF_name').value||'').trim();
+  var uname=(document.getElementById('_apUF_uname').value||'').trim().toLowerCase();
+  var role=(document.getElementById('_apUF_role').value||'auditor');
+  var region=(document.getElementById('_apUF_region').value||'').trim();
+  var pw=(document.getElementById('_apUF_pw').value||'').trim();
+  var errEl=document.getElementById('_apUF_err');
+  if(!name){ errEl.textContent='Full name is required.'; return; }
+  if(!uname){ errEl.textContent='Username is required.'; return; }
+  if(!/^[a-z0-9._\-]+$/.test(uname)){ errEl.textContent='Username: letters, numbers, dots, hyphens only.'; return; }
+  var isEdit=(editIdx!==null&&editIdx!==undefined);
+  if(!isEdit && !pw){ errEl.textContent='Password is required for new users.'; return; }
+  if(pw && pw.length<6){ errEl.textContent='Password must be at least 6 characters.'; return; }
+  errEl.textContent='Saving...';
+  _umFetchUsers(function(users,err,sha){
+    if(err){ errEl.textContent=err; return; }
+    if(!users) users=[];
+    if(!isEdit){
+      for(var i=0;i<users.length;i++){
+        if((users[i].username||'').toLowerCase()===uname){ errEl.textContent='Username already exists.'; return; }
+      }
+    }
+    var userObj;
+    if(isEdit){
+      userObj=users[editIdx];
+      userObj.name=name;
+      userObj.role=role;
+      if(region) userObj.region=region; else delete userObj.region;
+      if(pw){ userObj.salt=_umMakeSalt(); userObj.pwHash=_umHashPw(pw,userObj.salt); }
+    } else {
+      var salt=_umMakeSalt();
+      userObj={name:name,username:uname,role:role,salt:salt,pwHash:_umHashPw(pw,salt)};
+      if(region) userObj.region=region;
+      users.push(userObj);
+    }
+    _umSaveUsers(users,sha,function(saveErr){
+      if(saveErr){ errEl.textContent='Save failed: '+saveErr; return; }
+      document.getElementById('_adminUserFormModal').remove();
+      _adminRefreshUsers();
+      toast((isEdit?'User updated':'User added')+': '+name);
+    });
+  });
+}
+
+// ── Admin Tab: Cloud Setup ────────────────────────────────────────────────────
+function _adminRenderCloud(c){
+  var cfg=_csGetCfg();
+  var inp='width:100%;padding:8px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:13px;font-family:Inter,sans-serif;box-sizing:border-box';
+  var lbl='font-size:11.5px;font-weight:700;color:#2a4060;display:block;margin-bottom:4px;margin-top:12px';
+  c.innerHTML='<div style="max-width:560px;margin:0 auto">'
+    +'<div style="font-size:14px;font-weight:700;color:#1a3a5c;margin-bottom:4px">&#9729; Cloud Setup (GitHub)</div>'
+    +'<div style="font-size:12px;color:#666;margin-bottom:18px">Configure the GitHub repository where all session files, notifications and review requests are stored.</div>'
+    +'<div style="background:#fff;border:1px solid #e0e8f0;border-radius:8px;padding:20px 22px">'
+    +'<label style="'+lbl+'">GitHub Token</label>'
+    +'<input id="_apCloud_token" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" style="'+inp+'" value="'+(cfg.token?cfg.token:'')+'">'
+    +'<div style="font-size:10.5px;color:#888;margin-top:3px">Personal access token with <code>contents:write</code> permission. Never shared to GitHub — stored in browser only.</div>'
+    +'<label style="'+lbl+'">Repository Owner</label>'
+    +'<input id="_apCloud_owner" type="text" placeholder="your-github-username" style="'+inp+'" value="'+(cfg.owner?esc(cfg.owner):'')+'">'
+    +'<label style="'+lbl+'">Repository Name</label>'
+    +'<input id="_apCloud_repo" type="text" placeholder="brains-sessions" style="'+inp+'" value="'+(cfg.repo?esc(cfg.repo):'')+'">'
+    +'<label style="'+lbl+'">Your Name (Auditor/Admin)</label>'
+    +'<input id="_apCloud_auditor" type="text" placeholder="Your full name" style="'+inp+'" value="'+(cfg.auditor?esc(cfg.auditor):'')+'">'
+    +'<div id="_apCloud_err" style="font-size:12px;color:#c0392b;min-height:16px;margin-top:8px"></div>'
+    +'<div style="display:flex;gap:10px;margin-top:14px">'
+    +'<button onclick="_adminSaveCloud()" style="padding:8px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Save Cloud Settings</button>'
+    +'<button onclick="_adminTestCloud()" style="padding:8px 16px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">Test Connection</button>'
+    +'</div></div></div>';
+}
+
+function _adminSaveCloud(){
+  var token=(document.getElementById('_apCloud_token').value||'').trim();
+  var owner=(document.getElementById('_apCloud_owner').value||'').trim();
+  var repo=(document.getElementById('_apCloud_repo').value||'').trim();
+  var auditor=(document.getElementById('_apCloud_auditor').value||'').trim();
+  var errEl=document.getElementById('_apCloud_err');
+  if(!token||!owner||!repo){ errEl.style.color='#c0392b'; errEl.textContent='Token, Owner and Repository are required.'; return; }
+  var cfg=_csGetCfg();
+  cfg.token=token; cfg.owner=owner; cfg.repo=repo;
+  if(auditor) cfg.auditor=auditor;
+  _csSaveCfg(cfg);
+  errEl.style.color='#1a6030';
+  errEl.textContent='Cloud settings saved.';
+  toast('Cloud settings saved.');
+}
+
+function _adminTestCloud(){
+  var token=(document.getElementById('_apCloud_token').value||'').trim();
+  var owner=(document.getElementById('_apCloud_owner').value||'').trim();
+  var repo=(document.getElementById('_apCloud_repo').value||'').trim();
+  var errEl=document.getElementById('_apCloud_err');
+  if(!token||!owner||!repo){ errEl.style.color='#c0392b'; errEl.textContent='Fill in all fields before testing.'; return; }
+  errEl.style.color='#1a6030'; errEl.textContent='Testing...';
+  fetch('https://api.github.com/repos/'+owner+'/'+repo,{headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}})
+  .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+  .then(function(res){
+    if(res.ok){
+      errEl.style.color='#1a6030';
+      errEl.textContent='Connection successful. Repository: '+esc(res.d.full_name)+' ('+(res.d.private?'private':'public')+')';
+    } else {
+      errEl.style.color='#c0392b';
+      errEl.textContent='Connection failed: '+(res.d.message||'Unknown error');
+    }
+  })
+  .catch(function(e){ errEl.style.color='#c0392b'; errEl.textContent='Network error: '+(e&&e.message?e.message:'check internet'); });
+}
+
+// ── Admin Tab: Setup Links ────────────────────────────────────────────────────
+function _adminRenderLinks(c){
+  var cfg=_csGetCfg();
+  var inp='padding:7px 10px;border:1px solid #c8d8ec;border-radius:5px;font-size:12.5px;font-family:Inter,sans-serif;box-sizing:border-box';
+  c.innerHTML='<div style="max-width:640px;margin:0 auto">'
+    +'<div style="font-size:14px;font-weight:700;color:#1a3a5c;margin-bottom:4px">&#128279; Setup Links for Auditors</div>'
+    +'<div style="font-size:12px;color:#666;margin-bottom:18px">Generate a URL to send to an auditor. When they open it, BRAINS will automatically configure their Cloud Settings (token + repo) so they don\'t have to enter it manually.</div>'
+    +'<div style="background:#fff;border:1px solid #e0e8f0;border-radius:8px;padding:20px 22px;margin-bottom:16px">'
+    +'<div style="font-size:12.5px;font-weight:700;color:#2a4060;margin-bottom:12px">Generate Setup Link</div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">'
+    +'<div style="flex:1;min-width:160px"><label style="font-size:11px;font-weight:700;color:#2a4060;display:block;margin-bottom:3px">Auditor Name</label>'
+    +'<input id="_apLink_name" type="text" placeholder="e.g. Muhammad Ali" style="'+inp+';width:100%"></div>'
+    +'<div style="flex:1;min-width:160px"><label style="font-size:11px;font-weight:700;color:#2a4060;display:block;margin-bottom:3px">Token Override <span style="color:#999;font-weight:400">(leave blank = use saved)</span></label>'
+    +'<input id="_apLink_token" type="text" placeholder="ghp_... (or leave blank)" style="'+inp+';width:100%"></div>'
+    +'</div>'
+    +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
+    +'<label style="font-size:11px;font-weight:700;color:#2a4060;display:flex;align-items:center;gap:5px"><input id="_apLink_hideToken" type="checkbox"> Hide token from URL (auditor must enter manually)</label>'
+    +'</div>'
+    +'<button onclick="_adminGenLink()" style="margin-top:12px;padding:7px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Generate Link</button>'
+    +'</div>'
+    +'<div id="_apLinkResult" style="display:none;background:#f0f8ff;border:1px solid #a8d4f0;border-radius:8px;padding:16px 18px">'
+    +'<div style="font-size:12px;font-weight:700;color:#1a3a5c;margin-bottom:8px">Setup Link</div>'
+    +'<div id="_apLinkUrl" style="font-size:11.5px;color:#1a3a5c;word-break:break-all;background:#fff;border:1px solid #c8d8ec;border-radius:5px;padding:10px;font-family:monospace;margin-bottom:10px"></div>'
+    +'<div style="font-size:11.5px;color:#555;margin-bottom:10px"><strong>Instructions for auditor:</strong><br>1. Open BRAINS (index.html) in a browser.<br>2. Paste this URL into the address bar and press Enter.<br>3. BRAINS will automatically configure their Cloud Settings.<br>4. They can then log in with their username and password.</div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button onclick="_adminCopyLink()" style="padding:6px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">&#128203; Copy Link</button>'
+    +'<button onclick="_adminEmailLink()" style="padding:6px 14px;background:#f0f5fb;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">&#128233; Open in Email</button>'
+    +'</div></div>'
+    +'<div style="background:#fffbea;border:1px solid #f0c040;border-radius:8px;padding:14px 16px;margin-top:14px;font-size:11.5px;color:#7a5900">'
+    +'<strong>&#9888; Security Note:</strong> The setup link contains your GitHub token in the URL. Share only via a private, trusted channel (e.g. WhatsApp, direct email). Anyone who has the link can access your GitHub repository. If compromised, revoke the token from GitHub settings immediately.'
+    +'</div></div>';
+}
+
+function _adminGenLink(){
+  var name=(document.getElementById('_apLink_name').value||'').trim();
+  var tokenOverride=(document.getElementById('_apLink_token').value||'').trim();
+  var hideToken=document.getElementById('_apLink_hideToken').checked;
+  var cfg=_csGetCfg();
+  if(!cfg.owner||!cfg.repo){ toast('Cloud Setup not complete. Configure owner and repo first.'); return; }
+  var token=hideToken?'':(tokenOverride||cfg.token||'');
+  if(!hideToken&&!token){ toast('No token available. Enter a token or check Cloud Setup.'); return; }
+  var base=window.location.href.split('?')[0].split('#')[0];
+  var params='?mode=setup';
+  if(name) params+='&auditor='+encodeURIComponent(name);
+  params+='&owner='+encodeURIComponent(cfg.owner)+'&repo='+encodeURIComponent(cfg.repo);
+  if(!hideToken) params+='&token='+encodeURIComponent(token);
+  var url=base+params;
+  document.getElementById('_apLinkResult').style.display='block';
+  document.getElementById('_apLinkUrl').textContent=url;
+  window._adminLastLink=url;
+  window._adminLastLinkName=name||'Auditor';
+}
+
+function _adminCopyLink(){
+  var url=window._adminLastLink||'';
+  if(!url) return;
+  try{
+    navigator.clipboard.writeText(url).then(function(){ toast('Link copied to clipboard.'); }).catch(function(){ _adminFallbackCopy(url); });
+  } catch(e){ _adminFallbackCopy(url); }
+}
+function _adminFallbackCopy(text){
+  var ta=document.createElement('textarea');
+  ta.value=text; ta.style.cssText='position:fixed;top:-9999px;left:-9999px';
+  document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+  ta.parentNode.removeChild(ta); toast('Link copied.');
+}
+function _adminEmailLink(){
+  var url=window._adminLastLink||'';
+  var name=window._adminLastLinkName||'Auditor';
+  var cfg=_csGetCfg();
+  var sub='BRAINS Setup Link for '+name;
+  var body='Dear '+name+',\n\nPlease use the following link to configure BRAINS on your machine:\n\n'+url+'\n\n'
+    +'Instructions:\n1. Open BRAINS (index.html) in your browser.\n2. Paste the above URL in the address bar and press Enter.\n3. BRAINS will automatically set up your cloud connection.\n4. Log in with your username and password.\n\nRepository: '+cfg.owner+'/'+cfg.repo+'\n\nNote: Keep this link private. Do not share with others.\n\nRegards,\nBRAINS Administrator';
+  window.location.href='mailto:?subject='+encodeURIComponent(sub)+'&body='+encodeURIComponent(body);
+}
+
+// ── Admin Tab: System ─────────────────────────────────────────────────────────
+function _adminRenderSystem(c){
+  c.innerHTML='<div style="max-width:640px;margin:0 auto">'
+    +'<div style="font-size:14px;font-weight:700;color:#1a3a5c;margin-bottom:16px">&#9989; System Health</div>'
+    +'<div id="_apSysContent"><div style="color:#888;font-size:13px;text-align:center;padding:40px">Running checks...</div></div>'
+    +'</div>';
+  _adminRunSystemChecks();
+}
+
+function _adminRunSystemChecks(){
+  var out=document.getElementById('_apSysContent');
+  if(!out) return;
+  var cfg=_csGetCfg();
+  var checks=[];
+
+  // Check 1: Cloud configured
+  checks.push({label:'Cloud Settings',pass:!!(cfg.token&&cfg.owner&&cfg.repo),detail:cfg.token&&cfg.owner&&cfg.repo?'Token, Owner and Repo are set.':'Missing token, owner, or repo — go to Cloud Setup tab.'});
+
+  // Check 2: Logged in user
+  var u=_umGetCurrentUser();
+  checks.push({label:'Current Session',pass:!!(u&&u.username),detail:u&&u.username?'Logged in as '+esc(u.name||u.username)+' ('+esc(u.role||'unknown')+')':'Not logged in.'});
+
+  var html='<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">';
+  checks.forEach(function(ck){
+    html+='<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#fff;border:1px solid '+(ck.pass?'#b2dfdb':'#f5c6c6')+';border-radius:6px">'
+      +'<span style="font-size:16px">'+(ck.pass?'&#9989;':'&#10060;')+'</span>'
+      +'<div><div style="font-size:12.5px;font-weight:700;color:#1a3a5c">'+esc(ck.label)+'</div>'
+      +'<div style="font-size:11.5px;color:#555">'+ck.detail+'</div></div></div>';
+  });
+  html+='</div>';
+
+  // Live cloud test
+  html+='<div style="background:#fff;border:1px solid #e0e8f0;border-radius:8px;padding:16px 18px">'
+    +'<div style="font-size:12.5px;font-weight:700;color:#2a4060;margin-bottom:8px">Live Cloud Tests</div>'
+    +'<div id="_apSysLive" style="font-size:12px;color:#888">Connecting...</div>'
+    +'</div>';
+
+  out.innerHTML=html;
+
+  if(!cfg.token||!cfg.owner||!cfg.repo){
+    document.getElementById('_apSysLive').textContent='Cannot run — Cloud Settings not configured.';
+    return;
+  }
+
+  // Test 1: repo access
+  fetch('https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo,{headers:_csHdrs(cfg)})
+  .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+  .then(function(res){
+    var liveDiv=document.getElementById('_apSysLive');
+    if(!liveDiv) return;
+    if(res.ok){
+      liveDiv.innerHTML='<div style="color:#1a6030;margin-bottom:6px">&#9989; GitHub repository accessible: <strong>'+esc(res.d.full_name)+'</strong></div>';
+      // Test 2: users.json
+      return fetch('https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+_UM_PATH,{headers:_csHdrs(cfg)})
+        .then(function(r2){ return r2.json().then(function(d){ return {ok:r2.ok,d:d}; }); })
+        .then(function(res2){
+          var liveDiv2=document.getElementById('_apSysLive');
+          if(!liveDiv2) return;
+          if(res2.ok&&res2.d&&res2.d.content){
+            var users; try{ users=JSON.parse(_csB64Dec(res2.d.content)); }catch(e){ users=null; }
+            liveDiv2.innerHTML+='<div style="color:#1a6030">&#9989; User list accessible: <strong>'+(users?users.length+' user(s)':'file exists but could not parse')+'</strong></div>';
+          } else if(res2.d&&res2.d.message==='Not Found'){
+            liveDiv2.innerHTML+='<div style="color:#e67e22">&#9888; User list not found (sessions/_system/users.json). Click + Add User to create it.</div>';
+          } else {
+            liveDiv2.innerHTML+='<div style="color:#c0392b">&#10060; User list error: '+(res2.d&&res2.d.message?esc(res2.d.message):'unknown')+'</div>';
+          }
+        });
+    } else {
+      liveDiv.innerHTML='<div style="color:#c0392b">&#10060; Repository not accessible: '+(res.d&&res.d.message?esc(res.d.message):'unknown error')+'</div>';
+    }
+  })
+  .catch(function(e){
+    var liveDiv=document.getElementById('_apSysLive');
+    if(liveDiv) liveDiv.textContent='Network error: '+(e&&e.message?e.message:'check connection');
+  });
+}
+
+// ── Setup URL handler (runs on page load if ?mode=setup) ──────────────────────
+function _adminHandleSetupUrl(){
+  var params=window.location.search;
+  if(params.indexOf('mode=setup')<0) return;
+  var get=function(k){
+    var m=params.match(new RegExp('[?&]'+k+'=([^&]*)'));
+    return m?decodeURIComponent(m[1].replace(/\+/g,' ')):'';
+  };
+  var token=get('token'), owner=get('owner'), repo=get('repo'), auditor=get('auditor');
+  if(!owner||!repo) return;
+  var cfg=_csGetCfg();
+  var changed=false;
+  if(token&&token!==cfg.token){ cfg.token=token; changed=true; }
+  if(owner&&owner!==cfg.owner){ cfg.owner=owner; changed=true; }
+  if(repo&&repo!==cfg.repo){ cfg.repo=repo; changed=true; }
+  if(auditor&&auditor!==cfg.auditor){ cfg.auditor=auditor; changed=true; }
+  if(changed) _csSaveCfg(cfg);
+  // Remove params from URL without reload
+  try{ window.history.replaceState({},'',window.location.pathname); }catch(e){}
+  if(changed){
+    setTimeout(function(){
+      var msg='&#9989; Cloud Settings configured automatically!\n\n'
+        +'Repository: '+owner+'/'+repo+(auditor?'\nName: '+auditor:'')+'\n\n'
+        +'You can now log in with your username and password.';
+      alert(msg.replace(/&#9989; /,''));
+    },600);
   }
 }
 
