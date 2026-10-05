@@ -675,9 +675,29 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
     // Clean mode param from URL without reload
     try{ window.history.replaceState({},'',window.location.pathname); }catch(e){}
   }
+  // ?mode=admin — customise login screen for administrator direct URL
+  if(window.location.search.indexOf('mode=admin')>=0){
+    var lblA=document.getElementById('pw-mode-label');
+    if(lblA){
+      lblA.innerHTML='&#9881; Administrator Login';
+      lblA.style.color='#c0392b';
+    }
+    var unameA=document.getElementById('pw-username');
+    if(unameA) unameA.placeholder='Admin username (or leave blank)';
+    var btnA=ps&&ps.querySelector('button[onclick="pwCheck()"]');
+    if(btnA){
+      var hintA=document.createElement('div');
+      hintA.style.cssText='font-size:11px;color:#888;margin-top:14px;background:#f8f9fa;border-radius:6px;padding:8px 12px;text-align:left;line-height:1.6';
+      hintA.innerHTML='<strong style="color:#c0392b">Admin Portal</strong><br>Log in with your administrator credentials. The Admin Panel will open automatically after login.';
+      btnA.parentNode.insertBefore(hintA,btnA.nextSibling);
+    }
+    try{ window.history.replaceState({},'',window.location.pathname); }catch(e){}
+  }
 })();
 var APP_BUILD = '23-Aug-2026';
 var APP_VERSION = '02/2026';
+var _MODE_ADMIN = (window.location.search.indexOf('mode=admin')>=0);
+var _MODE_SUPERVISOR = (window.location.search.indexOf('mode=supervisor')>=0);
 
 // ── Per-user login helpers ──────────────────────────────────────────────────
 function _umSimpleHash(str){
@@ -721,6 +741,10 @@ function _pwGrantAccess(userObj){
     // Auto-launch supervisor dashboard for supervisor roles
     if(userObj.role==='ro_supervisor'||userObj.role==='ho_supervisor'){
       setTimeout(_supShowDashboard, 400);
+    }
+    // Auto-launch admin panel when arrived via ?mode=admin
+    if(_MODE_ADMIN && userObj.role==='administrator'){
+      setTimeout(showAdminPanel, 400);
     }
   },0);
 }
