@@ -23991,6 +23991,7 @@ function _csDoUpload(ctx){
 var _SUP_REVIEW_PATH = '_reviews/'; // _reviews/{branch_slug}.json
 var _supActiveTab = 'progress';     // 'progress' | 'pending' | 'reviewed'
 var _supSessionCache = null;
+var _supRegionFilter = '';          // supervisor's own region ('' = show all)
 
 function _supShowDashboard(){
   var ex=document.getElementById('_supDashboard');
@@ -24006,6 +24007,7 @@ function _supShowDashboard(){
   h+='<div style="font-family:Merriweather,serif;font-size:18px;font-weight:700;letter-spacing:4px;color:#fff">BRAINS</div>';
   h+='<div style="width:1px;height:24px;background:rgba(255,255,255,.2)"></div>';
   h+='<div style="font-size:12px;font-weight:700;color:#c9962a;text-transform:uppercase;letter-spacing:.8px">'+(isHO?'HO':'RO')+' Supervisor Dashboard</div>';
+  h+='<div id="_supRegionBadge" style="font-size:11px;color:rgba(255,255,255,.7);background:rgba(255,255,255,.1);padding:3px 10px;border-radius:10px;display:none"></div>';
   h+='<div style="flex:1"></div>';
   // Summary chips — filled after load
   h+='<div id="_supChips" style="display:flex;gap:8px"></div>';
@@ -24055,22 +24057,51 @@ function _supLoadData(){
     _supSetContent('<div style="text-align:center;padding:60px;color:#c0392b;font-size:13px">&#9888; Cloud not configured. Please set up Cloud Settings first.</div>');
     return;
   }
-  // Fetch sessions and reviews in parallel
-  var sessions=null, reviews={}, pending=0, done=0;
-  function finish(){
-    done++;
-    if(done<2) return;
-    _supSessionCache={sessions:sessions,reviews:reviews};
-    _supRender(sessions,reviews);
+  var u=_umGetCurrentUser();
+  _supRegionFilter='';
+  // Fetch supervisor's region from users.json (if a named user account)
+  function doFetch(region){
+    _supRegionFilter=region||'';
+    // Update region badge in header
+    var badge=document.getElementById('_supRegionBadge');
+    if(badge){
+      if(region){
+        badge.textContent='Region: '+region;
+        badge.style.display='block';
+      } else {
+        badge.style.display='none';
+      }
+    }
+    // Fetch sessions and reviews in parallel
+    var sessions=null, reviews={}, done=0;
+    function finish(){
+      done++;
+      if(done<2) return;
+      _supSessionCache={sessions:sessions,reviews:reviews};
+      _supRender(sessions,reviews);
+    }
+    _csFetchAllSessions(cfg,function(results){
+      sessions=results||[];
+      finish();
+    });
+    _supFetchAllReviews(cfg,function(rv){
+      reviews=rv||{};
+      finish();
+    });
   }
-  _csFetchAllSessions(cfg,function(results){
-    sessions=results||[];
-    finish();
-  });
-  _supFetchAllReviews(cfg,function(rv){
-    reviews=rv||{};
-    finish();
-  });
+  // Try to get region from user record; fall back to no filter
+  if(u&&u.username&&u.username!=='ro_supervisor'&&u.username!=='ho_supervisor'){
+    _umFetchUsers(function(users,err){
+      if(err||!users){ doFetch(''); return; }
+      var found=null;
+      for(var i=0;i<users.length;i++){
+        if((users[i].username||'').toLowerCase()===(u.username||'').toLowerCase()){ found=users[i]; break; }
+      }
+      doFetch(found&&found.region?found.region:'');
+    });
+  } else {
+    doFetch('');
+  }
 }
 
 function _supFetchAllReviews(cfg, cb){
@@ -24106,10 +24137,19 @@ function _supRender(sessions, reviews){
 function _supRenderChips(sessions,reviews){
   var el=document.getElementById('_supChips');
   if(!el) return;
-  var total=(sessions||[]).length;
+  // Count only sessions/reviews matching supervisor's region filter
+  var total=0;
+  var seenBranches={};
+  (sessions||[]).forEach(function(s){
+    var reviewKey=s.year+'_'+s.branchRaw;
+    if(!_supInRegion(reviewKey,reviews)) return;
+    seenBranches[reviewKey]=1;
+  });
+  total=Object.keys(seenBranches).length;
   var pending=0; var reviewed=0;
   var rkeys=Object.keys(reviews||{});
   rkeys.forEach(function(k){
+    if(!_supInRegion(k,reviews)) return;
     var rv=reviews[k];
     if(rv&&rv.status==='pending') pending++;
     else if(rv&&(rv.status==='approved'||rv.status==='rejected'||rv.status==='changes_requested')) reviewed++;
@@ -24118,6 +24158,20 @@ function _supRenderChips(sessions,reviews){
     return '<div style="background:'+bg+';color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;white-space:nowrap">'+val+' '+label+'</div>';
   }
   el.innerHTML=chip('Sessions',total,'rgba(255,255,255,.18)')+chip('Pending',pending,'#c9962a')+chip('Reviewed',reviewed,'#1a6030');
+}
+
+function _supSessionRegion(reviewKey, reviews){
+  // Returns region string from the review record for this branch, or '' if unknown
+  var rv=reviews&&reviews[reviewKey];
+  return rv&&rv.region ? rv.region : '';
+}
+
+function _supInRegion(reviewKey, reviews){
+  // Returns true if this branch is in the supervisor's region (or filter is off)
+  if(!_supRegionFilter) return true;
+  var region=_supSessionRegion(reviewKey, reviews);
+  if(!region) return true; // unknown region — include by default (can't filter)
+  return region.toLowerCase()===_supRegionFilter.toLowerCase();
 }
 
 function _supRenderProgress(sessions,reviews){
@@ -24130,11 +24184,16 @@ function _supRenderProgress(sessions,reviews){
   // Group by year then branch
   var byYear={};
   sessions.forEach(function(s){
+    var reviewKey=s.year+'_'+s.branchRaw;
+    if(!_supInRegion(reviewKey,reviews)) return;
     if(!byYear[s.year]) byYear[s.year]={};
     if(!byYear[s.year][s.branchRaw]) byYear[s.year][s.branchRaw]=[];
     byYear[s.year][s.branchRaw].push(s);
   });
   var h='';
+  if(_supRegionFilter){
+    h+='<div style="font-size:11.5px;color:#1a6030;background:#e8f8ee;border:1px solid #b2dfdb;border-radius:5px;padding:6px 12px;margin-bottom:14px;display:inline-block">&#127758; Showing branches for region: <strong>'+esc(_supRegionFilter)+'</strong> &nbsp;<span style="color:#888;font-weight:400">(branches without a region tag are also shown)</span></div>';
+  }
   var yearKeys=Object.keys(byYear).sort().reverse();
   yearKeys.forEach(function(yr){
     h+='<div style="margin-bottom:24px">';
@@ -24186,7 +24245,7 @@ function _supRenderPending(sessions,reviews){
   var pending=[];
   Object.keys(reviews).forEach(function(k){
     var rv=reviews[k];
-    if(rv&&rv.status==='pending') pending.push({key:k,rv:rv});
+    if(rv&&rv.status==='pending'&&_supInRegion(k,reviews)) pending.push({key:k,rv:rv});
   });
   if(!pending.length){
     _supSetContent('<div style="text-align:center;padding:60px;color:#888;font-size:13px">&#10003; No pending reviews. All caught up!</div>');
@@ -24213,7 +24272,7 @@ function _supRenderReviewed(sessions,reviews){
   var done=[];
   Object.keys(reviews).forEach(function(k){
     var rv=reviews[k];
-    if(rv&&rv.status&&rv.status!=='pending') done.push({key:k,rv:rv});
+    if(rv&&rv.status&&rv.status!=='pending'&&_supInRegion(k,reviews)) done.push({key:k,rv:rv});
   });
   if(!done.length){
     _supSetContent('<div style="text-align:center;padding:60px;color:#888;font-size:13px">No reviewed reports yet.</div>');
