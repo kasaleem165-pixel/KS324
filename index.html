@@ -8844,12 +8844,12 @@ function downloadSoftCopy(){
   var fname='AuditReport'+(H.brcode?'_'+H.brcode:'')+(H.brname?'_'+H.brname.replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_'):'')+'_AuditeeResponse.html';
 
   // Build each observation block
-  function obsHtml(o, num){
+  function obsHtml(o, num, anchorId){
     var effType=obsTypeMap[o.id]||o.type||'New';
     var tc=effType.toLowerCase();
     var ax=getObsAnnexRef(o.id)||(o._annex||'');
     var bdr=tc==='repeated'?'#d06020':'#2070b8';
-    var h='<div style="border:1px solid #dde2ea;border-left:4px solid '+bdr+';border-radius:5px;margin-bottom:18px;overflow:hidden;page-break-inside:avoid">';
+    var h='<div '+(anchorId?'id="'+anchorId+'" ':'')+' style="border:1px solid #dde2ea;border-left:4px solid '+bdr+';border-radius:5px;margin-bottom:18px;overflow:hidden;page-break-inside:avoid;scroll-margin-top:12px">';
     h+='<div style="display:flex;align-items:center;padding:8px 12px;background:#fafbfc;border-bottom:1px solid #dde2ea;gap:8px">';
     h+='<span style="font-size:11px;font-weight:700;color:#6a7888">Obs. '+num+'</span>';
     h+='<span style="flex:1;font-size:13px;font-weight:700;color:#1e2d40">'+esc(o.title)+'</span>';
@@ -8900,21 +8900,50 @@ function downloadSoftCopy(){
   var sectHd='font-family:Merriweather,serif;font-size:14px;font-weight:700;color:#fff;background:#1a3a5c;padding:10px 16px;margin-bottom:16px;border-radius:4px;letter-spacing:.3px';
   var catHd='font-family:Merriweather,serif;font-size:12px;font-weight:700;color:#1a3a5c;background:#edf2f8;border-left:4px solid #1a3a5c;padding:7px 12px;margin-bottom:10px;border-radius:0 4px 4px 0;text-transform:uppercase;letter-spacing:.4px';
   var _scSecIdx=0;
+  var _sumRows=''; var _sumTotal=0;
   for(var si=0;si<scSections.length;si++){
     if(!scSections[si].obs.length) continue;
     _scSecIdx++;
     var num=0; var scPfx=String(_scSecIdx);
     obsSection+='<div style="'+sectHd+'">'+esc(scSections[si].label)+'</div>';
+    _sumRows+='<tr style="background:#1a3a5c"><td colspan="3" style="padding:6px 12px;font-size:11px;font-weight:700;color:#fff;letter-spacing:.5px;text-transform:uppercase">'+esc(scSections[si].label)+'</td></tr>';
     var grp=scCatGroups(scSections[si].obs);
     for(var ci=0;ci<grp.catOrder.length;ci++){
       var cat=grp.catOrder[ci];
       obsSection+='<div style="margin-bottom:24px">';
       obsSection+='<div style="'+catHd+'">'+esc(cat)+'</div>';
       var obsList=grp.cats[cat];
-      for(var oi=0;oi<obsList.length;oi++){num++;obsSection+=obsHtml(obsList[oi],scPfx+'.'+num);}
+      for(var oi=0;oi<obsList.length;oi++){
+        num++; _sumTotal++;
+        var _oRef=scPfx+'.'+num;
+        var _oAnchor='obs-sc-'+obsList[oi].id;
+        obsSection+=obsHtml(obsList[oi],_oRef,_oAnchor);
+        var _effT2=(obsTypeMap[obsList[oi].id]||obsList[oi].type||'New').toLowerCase();
+        var _badge=_effT2==='repeated'
+          ?'<span style="font-size:9px;font-weight:700;background:#fff3ee;color:#c05800;border:1px solid #f0b080;border-radius:8px;padding:1px 6px;white-space:nowrap">Repeated</span>'
+          :'<span style="font-size:9px;font-weight:700;background:#eaf2fb;color:#1a5090;border:1px solid #a0c0e0;border-radius:8px;padding:1px 6px;white-space:nowrap">New</span>';
+        _sumRows+='<tr style="border-bottom:1px solid #e8edf4;cursor:pointer" onclick="document.getElementById(\''+_oAnchor+'\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">'
+          +'<td style="padding:7px 12px;font-weight:700;color:#1a3a5c;white-space:nowrap;font-size:12.5px">Obs. '+esc(_oRef)+'</td>'
+          +'<td style="padding:7px 12px;font-size:12.5px;color:#2a3a50">'+esc(obsList[oi].title||'')+'</td>'
+          +'<td style="padding:7px 12px;text-align:center">'+_badge+'</td>'
+          +'</tr>';
+      }
       obsSection+='</div>';
     }
   }
+  var obsSummaryHtml='<div id="obs-summary-wrap" style="margin-bottom:24px;border:1px solid #c8d8ec;border-radius:6px;overflow:hidden;font-family:Inter,Arial,sans-serif">'
+    +'<div onclick="(function(){var b=document.getElementById(\'obs-summary-body\');var a=document.getElementById(\'obs-summary-arrow\');var open=b.style.display!==\'none\';b.style.display=open?\'none\':\'block\';a.textContent=open?\'▶\':\'▼\';})()" style="display:flex;align-items:center;justify-content:space-between;background:#1a3a5c;color:#fff;padding:10px 16px;cursor:pointer;user-select:none">'
+    +'<span style="font-size:13px;font-weight:700;letter-spacing:.3px">&#128203; Observation Summary &nbsp;<span style="font-size:11px;font-weight:400;opacity:.8">('+_sumTotal+' observation'+(+_sumTotal===1?'':'s')+')</span></span>'
+    +'<span id="obs-summary-arrow" style="font-size:12px">&#9660;</span>'
+    +'</div>'
+    +'<div id="obs-summary-body" style="display:block">'
+    +'<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+    +'<thead><tr style="background:#edf2f8"><th style="padding:7px 12px;text-align:left;font-size:11px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px;width:80px">Obs. No.</th><th style="padding:7px 12px;text-align:left;font-size:11px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px">Observation Heading</th><th style="padding:7px 12px;text-align:center;font-size:11px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:.5px;width:90px">Type</th></tr></thead>'
+    +'<tbody>'+_sumRows+'</tbody>'
+    +'</table>'
+    +'<div style="padding:6px 12px;font-size:10.5px;color:#888;border-top:1px solid #e8edf4;background:#fafbfc">&#128161; Click any row to jump to that observation</div>'
+    +'</div>'
+    +'</div>';
 
   // Build MIS box
   var misHtml='';
@@ -8996,6 +9025,7 @@ function downloadSoftCopy(){
   if(H.per) softHtml+='<div><strong style="color:#1a3a5c;display:inline-block;min-width:96px">Audit Period:</strong> '+esc(H.per)+'</div>';
   softHtml+='</div></div>\n';
   softHtml+=misHtml;
+  softHtml+=obsSummaryHtml;
   softHtml+=obsSection;
   softHtml+=annexParts.body;
   softHtml+='</div>\n'; // end #rp
