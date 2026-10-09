@@ -3271,7 +3271,14 @@ function _renderText(text, opts){
     if(lines[i].trim().charAt(0)==='|'){
       // ── Pipe-markdown table ──────────────────────────────────────────────
       var tbl=[];
-      while(i<lines.length && lines[i].trim().charAt(0)==='|'){tbl.push(lines[i]);i++;}
+      while(i<lines.length){
+        if(lines[i].trim().charAt(0)==='|'){tbl.push(lines[i]);i++;}
+        // continuation line: no leading | but next line is a pipe row — merge into previous cell
+        else if(tbl.length>0 && i+1<lines.length && lines[i+1].trim().charAt(0)==='|'){
+          if(tbl.length>0) tbl[tbl.length-1]=tbl[tbl.length-1].trimRight()+' '+lines[i].trim();
+          i++;
+        } else { break; }
+      }
       var rows=[];
       for(var ti=0;ti<tbl.length;ti++){
         var ln=tbl[ti].trim();
