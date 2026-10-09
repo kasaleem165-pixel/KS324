@@ -5271,10 +5271,18 @@ function renderRpt(){
       // ── Row 1: number badge + full-width title ──────────────────────────
       h+='<div class="och-title">';
       h+='<span class="onum">Obs. '+secPfx+'.'+num+'</span>';
-      h+='<span class="otl">'+esc(o.title)
-        +(tc==='repeated'&&priorRefDraft?'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fff8f0;color:#8a3000;border:1px solid #f0b080;margin-left:3px">Prior: '+esc(priorRefDraft)+'</span>':'')
-        +'<span id="rbadge-'+o.id+'">'+obsReadinessBadge(o)+'</span>'
-      +'</span>';
+      if(o.custom){
+        h+='<input type="text" class="otl" id="ctitle-'+o.id+'" value="'+esc(o.title)+'" '
+          +'style="flex:1;border:1px dashed #b0c8e8;border-radius:4px;padding:2px 6px;font-size:inherit;font-weight:inherit;font-family:inherit;color:inherit;background:#f0f7ff;min-width:0" '
+          +'title="Edit custom observation heading" '
+          +'oninput="(function(el,id){for(var i=0;i<customs.length;i++){if(customs[i].id===id){customs[i].title=el.value;break;}}document.getElementById(\'rbadge-\'+id).innerHTML=obsReadinessBadge(customs.filter(function(x){return x.id===id;})[0]||{});})(this,\''+o.id+'\')">';
+        h+='<span id="rbadge-'+o.id+'">'+obsReadinessBadge(o)+'</span>';
+      } else {
+        h+='<span class="otl">'+esc(o.title)
+          +(tc==='repeated'&&priorRefDraft?'<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;background:#fff8f0;color:#8a3000;border:1px solid #f0b080;margin-left:3px">Prior: '+esc(priorRefDraft)+'</span>':'')
+          +'<span id="rbadge-'+o.id+'">'+obsReadinessBadge(o)+'</span>'
+        +'</span>';
+      }
       h+='</div>';
       // ── Row 2: controls ─────────────────────────────────────────────────
       h+='<div class="och-ctrl">';
