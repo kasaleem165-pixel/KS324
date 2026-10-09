@@ -13389,6 +13389,13 @@ function loadReportFile(e){
       if(match){
         try{ sess=JSON.parse(match[1]); } catch(ex){}
       }
+      // Fallback: try review-copy embed (id="bss-session")
+      if(!sess){
+        var matchRv=text.match(/<script[^>]+id="bss-session"[^>]*>([\s\S]*?)<\/script>/i);
+        if(matchRv){
+          try{ sess=JSON.parse(matchRv[1]); } catch(ex){}
+        }
+      }
       // Fallback: try legacy auditee response JSON embed
       if(!sess){
         var match2=text.match(/<script[^>]+id="bhs-resp-data"[^>]*>([\s\S]*?)<\/script>/i);
