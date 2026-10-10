@@ -21,7 +21,10 @@ Standalone single-file HTML app (`animal_sales/AnimalSales.html`) for managing a
 # BRAINS — Complete Project Reference
 
 ## What is BRAINS
-**Branch Risk Audit Investigation & Supervision** — a single-file HTML audit management system for Beaconhouse Group, Systems & Audit department. Developed by Kamran Saleem, Senior Manager Systems & Audit.
+**Branch Risk Audit Investigation & Supervision** — a single-file HTML audit management system for Beaconhouse Group, Systems & Audit department. Developed by Kamran Saleem, Senior Manager Systems & Audit. Version: v02/2026. Build: 27-Aug-2026.
+
+## Project Goal
+Go fully live/online for all auditors, supervisors, and administrator. Auditors use the Beaconhouse intranet. The system uses GitHub for session storage and Google Drive for annexure files.
 
 ## Two-Version Strategy (CRITICAL — read every session)
 
@@ -29,10 +32,10 @@ Standalone single-file HTML app (`animal_sales/AnimalSales.html`) for managing a
 |---|---|---|
 | File | `old/index.html` | `index.html` |
 | Badge | 🟢 LIVE (green) | 🟡 DEV (amber) |
-| Hosted on | Beaconhouse intranet (central server) | GitHub Pages |
-| URL | Intranet URL (internal) | `https://kasaleem165-pixel.github.io/KS324/` |
-| Users | All auditors & supervisors | Kamran only (testing) |
-| Update method | Download from GitHub → upload to intranet | Auto on push (just refresh browser) |
+| Hosted on | Beaconhouse intranet (`beams.beaconhouse.edu.pk`) | GitHub Pages |
+| URL | Intranet URL — internal only | `https://kasaleem165-pixel.github.io/KS324/` |
+| Users | All auditors & supervisors (production) | Kamran only (testing) |
+| Update method | Download `old/index.html` from GitHub → upload to intranet server | Auto on push — just refresh browser |
 | Changes allowed | **Bug fixes only** | All new features + improvements |
 
 ### Amendment Rule (NEVER violate)
@@ -42,119 +45,181 @@ Standalone single-file HTML app (`animal_sales/AnimalSales.html`) for managing a
 
 ## Infrastructure & Services
 
-### GitHub
-- **Repo**: `kasaleem165-pixel/KS324` — stores app files (`index.html`, `old/index.html`)
-- **GitHub Pages**: `https://kasaleem165-pixel.github.io/KS324/` — serves DEV version online (auto-updates on push)
-- **Sessions repo**: `brains-sessions` — stores all audit session JSON files (cloud sync)
-- **PAT**: stored securely by Kamran — do not store in this file (GitHub blocks it as a secret)
-- **PAT permissions**: `brains-sessions` repo, Contents → Read and write only
+### 1. GitHub — App Files
+- **Repo**: `kasaleem165-pixel/KS324`
+- **GitHub Pages**: `https://kasaleem165-pixel.github.io/KS324/` — serves `index.html` (DEV) online, auto-updates on push
+- **App files**: `index.html` (DEV), `old/index.html` (LIVE)
 
-### Google Drive
-- **Purpose**: Stores annexure files uploaded by auditors (Photos, Scanned-Documents, Schedules)
-- **Folder structure**: `BRAINS-Annexures` → subfolders per type
-- **Client ID**: `22287998975-hb9nqe71q43jtv7j0g0ctkiksomdv84j.apps.googleusercontent.com`
-- **Requirement**: Only works on HTTPS — works on GitHub Pages URL, NOT on local `file://`
+### 2. GitHub — Session Storage
+- **Repo**: `kasaleem165-pixel/brains-sessions` (private)
+- **Purpose**: Stores all audit session JSON files for cloud sync
+- **Session path format**: `sessions/{auditor-name}/{BRCODE_BranchName}.json`
+  - Example: `sessions/khurram-saleem/BR001_Main-Branch.json`
+- **User list**: `sessions/_system/users.json`
+- **PAT**: Stored securely by Kamran — never store in this file (GitHub blocks as secret)
+- **PAT type**: Fine-grained personal access token
+- **PAT permissions**: `brains-sessions` repo only, Contents → Read and write
+- **PAT expiry**: 1 year from creation — Kamran must regenerate when expired
 
-### Beaconhouse Intranet
-- Hosts `old/index.html` — the LIVE production version
-- All auditors and supervisors access BRAINS from here
-- Kamran manually uploads updated `old/index.html` when releasing a fix
+### 3. Google Drive — Annexure Files
+- **Purpose**: Stores annexure files attached by auditors during audit
+- **Folder structure**: `BRAINS-Annexures` → `Photos` / `Scanned-Documents` / `Schedules`
+- **Google Cloud Client ID**: `22287998975-hb9nqe71q43jtv7j0g0ctkiksomdv84j.apps.googleusercontent.com`
+- **Status**: ✅ Working — folders being created correctly, verified by Kamran
+- **Requirement**: HTTPS only — works on intranet and GitHub Pages, NOT on local `file://`
+- **Fallback**: Auditor can paste a Google Drive link manually if auto-upload fails
+
+### 4. Beaconhouse Intranet
+- **URL**: `beams.beaconhouse.edu.pk` (example — actual URL known to Kamran)
+- **Hosts**: `old/index.html` — the LIVE production version
+- **Users**: All auditors and supervisors access BRAINS from here
+- **Update process**: Kamran downloads `old/index.html` from GitHub → uploads to intranet server → all users get it on next browser refresh (no action needed from auditors)
 
 ## How Everything Connects
 ```
-Auditor opens intranet URL
-  → loads old/index.html (LIVE)
+AUDITOR (on intranet):
+  Opens beams.beaconhouse.edu.pk → old/index.html (LIVE 🟢)
+  → logs in with username + password
   → works on audit report
-  → session auto-saves to GitHub (brains-sessions repo)
-  → annexures upload to Google Drive (BRAINS-Annexures folder)
+  → session auto-saves every few minutes → brains-sessions repo (GitHub)
+  → attaches annexures → uploaded to Google Drive (BRAINS-Annexures)
+  → sends report for review → notification goes to supervisor's dashboard
 
-Supervisor opens intranet URL
-  → loads old/index.html
-  → opens Supervisor Dashboard
-  → sees pending reviews from auditors (read from brains-sessions repo)
+SUPERVISOR (on intranet):
+  Opens same intranet URL → old/index.html (LIVE 🟢)
+  → logs in → Supervisor Dashboard opens automatically
+  → sees pending reviews from auditors in their region
+  → reviews report → records decision + comments
+  → auditor gets notification + can load response
 
-Kamran (Admin) opens GitHub Pages URL
-  → loads index.html (DEV) for testing
-  → Admin Panel opens automatically after admin login
+KAMRAN (Admin — testing on GitHub Pages):
+  Opens kasaleem165-pixel.github.io/KS324/ → index.html (DEV 🟡)
+  → logs in with admin password (username blank) → Admin Panel opens automatically
   → manages users, cloud settings, setup links
+  → tests new features before releasing to intranet
 ```
 
 ## User Roles & Login
-- **Single URL for all roles** — role determined by credentials, not URL
-- **Administrator**: leave username blank + admin password → Admin Panel opens automatically
-- **RO Supervisor**: username + password (named account) → Supervisor Dashboard opens
-- **Auditor**: username + password (named account) → Audit screen opens
-- **Shared passwords** (legacy, blank username): Auditor (`S&A-BA2026`), RO Sup (`RO@S&A2026`), HO Sup (`HOSuper@2026`), Viewer (`Br@insTest#2026`)
-- **Named users**: stored in `brains-sessions/sessions/_system/users.json` on GitHub
-- **Note**: `?mode=admin` and `?mode=supervisor` URL params still work but are no longer required
+- **One URL for everyone** — role is determined by credentials alone, not URL
+- **Administrator** (Kamran): username blank + admin password → Admin Panel opens automatically (DEV only)
+- **RO Supervisor**: username + personal password → Supervisor Dashboard opens automatically
+- **HO Supervisor**: username + personal password → Supervisor Dashboard opens automatically
+- **Auditor**: username + personal password → Audit screen opens
+- **Viewer**: read-only access, no edit/submit buttons
+- **Named users**: managed in Admin Panel → Users tab, stored in `brains-sessions/sessions/_system/users.json`
+- **Shared/legacy passwords** (username left blank): Auditor `S&A-BA2026` · RO Sup `RO@S&A2026` · HO Sup `HOSuper@2026` · Viewer `Br@insTest#2026`
+- **`?mode=admin` / `?mode=supervisor`**: still work as cosmetic hints but no longer required
 
-## Features — Current Status (as of Oct 2026)
+## Cloud Sync — Daily Workflow
+```
+Each auditor (one-time setup per computer):
+  Cloud → Cloud Settings → enter GitHub Owner, Repo, Token, Name → Test → Save
 
-### ✅ Fully Working (LIVE + DEV)
-- Audit report creation (observations, evidence, custom observations)
-- Annexures with Google Drive upload
-- Cloud sync (save/load sessions from GitHub)
+Daily use:
+  Open BRAINS → Cloud → Browse Cloud Sessions → Load last session
+  Work on audit
+  Cloud → Save to Cloud (regularly, like saving a Word doc)
+  Before closing browser → Save to Cloud one final time
+```
+
+## Admin Panel — Cloud Settings Fields
+| Field | Value |
+|---|---|
+| GitHub Owner | `kasaleem165-pixel` |
+| Repository | `brains-sessions` |
+| Access Token | PAT (Kamran shares via trusted channel) |
+| Your Name | Auditor's own name (e.g. Khurram Saleem) |
+| Google Drive Client ID | `22287998975-hb9nqe71q43jtv7j0g0ctkiksomdv84j.apps.googleusercontent.com` |
+
+## Features — Verified Status (Oct 2026)
+
+### ✅ Working in LIVE (intranet — old/index.html)
+- Audit report creation (observations, evidence, custom observations, draft editing)
+- Annexures with Google Drive upload — folders creating correctly ✅ verified
+- Cloud sync — session save/load from GitHub ✅ verified
+- Co-work status & cross-auditor alerts ✅ verified
 - Supervisor review workflow (send → notify → review → respond)
-- RO/HO response file (export + direct open fix)
-- Co-work status & cross-auditor alerts
-- Collapsible observation summary index
-- Obs ↔ Annexure two-way navigation links
+- RO/HO response file (export + direct open)
+- Collapsible observation summary index at top of reports
+- Obs ↔ Annexure two-way clickable navigation
 - Sortable tables across all report views
-- Offline/local mode (localStorage)
-- Import/Export session files
+- Offline/local mode (localStorage fallback)
+- Import/Export session files (.json)
+- Print / PDF from browser
 
-### ✅ DEV Only (not yet in LIVE)
-- Admin Panel with 4 tabs (Users · Cloud Setup · Setup Links · System)
-- User Management (add/edit/delete named users)
-- Single-URL role-based login (no ?mode= needed)
-- Setup Links (one-click cloud config URL for auditors)
+### ✅ Working in DEV only (GitHub Pages — index.html)
+- Admin Panel with 4 tabs ✅ tested by Kamran
+- User Management — add/edit/delete named users ✅ tested (2 auditors + 1 supervisor created)
+- Single-URL role-based login (no ?mode= needed) ✅ tested
+- Setup Links tab — one-click URL to auto-configure auditor Cloud Settings
+- System tab — version info, change admin password
 - LIVE/DEV version badges on login screen and footer
 
-### ⏳ Pending / Not Yet Tested
+### ⏳ Pending
 - Full supervisor review cycle end-to-end test on live intranet
-- Google Drive Client ID configured in Cloud Settings on intranet version
+- Release DEV features to LIVE (when Kamran approves DEV is ready)
 
-## Admin Panel (DEV only — index.html)
-Four tabs accessible after administrator login:
-1. **Users** — Add/Edit/Delete auditors and supervisors with role, region, password
-2. **Cloud Setup** — GitHub token, owner, repo, Google Drive Client ID
-3. **Setup Links** — Generate one-click URL to auto-configure any auditor's Cloud Settings
-4. **System** — Version info, change admin password
+## Admin Panel Tabs (DEV — index.html only)
+1. **Users** — Add/Edit/Delete auditors and supervisors (role, region, password)
+2. **Cloud Setup** — GitHub token, owner, repo name, Google Drive Client ID
+3. **Setup Links** — Generate one-click URL that auto-fills Cloud Settings on any computer
+4. **System** — BRAINS version info, change administrator password
 
-## ES5-Only Rule (CRITICAL for all code changes)
+## Setup Link Flow (for new auditors)
+1. Admin opens Admin Panel → Setup Links → Generate → Copy URL
+2. Admin sends URL to auditor via WhatsApp or email (URL contains GitHub token — share privately)
+3. Auditor opens BRAINS, pastes URL in address bar, presses Enter
+4. BRAINS shows "Cloud Settings configured automatically!" → auditor logs in normally
+5. Cloud sync ready — no manual setup needed
+
+## ES5-Only Rule (CRITICAL — all code changes)
 - **No arrow functions** (`=>`) — use `function(){}` instead
 - **No `const`/`let`** — use `var` only
-- **No template literals** (backticks) — use string concatenation
-- **No destructuring, spread, classes** — plain ES5 only
-- Always validate after changes: `sed -n '/<script>/,/<\/script>/p' index.html | grep -v "<script>\|<\/script>" > /tmp/extracted.js && node --check /tmp/extracted.js`
+- **No template literals** (backticks) — use `'string'+'concat'` instead
+- **No destructuring, spread operators, classes** — plain ES5 only
+- **Validate after every change** (both files if bug fix)
 
-## Syntax Validation Command
+## Syntax Validation Commands
 ```bash
-# For DEV (index.html)
+# DEV (index.html)
 sed -n '/<script>/,/<\/script>/p' /home/user/KS324/index.html | grep -v "<script>\|<\/script>" > /tmp/e.js && node --check /tmp/e.js && echo OK
 
-# For LIVE (old/index.html)
+# LIVE (old/index.html)
 sed -n '/<script>/,/<\/script>/p' /home/user/KS324/old/index.html | grep -v "<script>\|<\/script>" > /tmp/e2.js && node --check /tmp/e2.js && echo OK
 ```
 
-## Key Technical Notes
-- Single-file HTML app — all JS, CSS, data in one file
-- Session data in browser `localStorage` + GitHub cloud sync
-- `_csGetCfg()` — returns Cloud Settings config object
-- `_CS_CFG_KEY` — localStorage key for cloud settings
-- `_csB64Dec()` — base64 decode for GitHub API responses
-- `showAdminPanel()` — opens the 4-tab Admin Panel overlay
-- `_supShowDashboard()` — opens Supervisor Dashboard
-- `_pwGrantAccess(userObj)` — called after successful login, routes to correct panel
-- `saveDraftResponses()` — generates RO/HO response HTML file
-- `buildAnnexHtml()` — builds annexure section with back-links to observations
-- `obsHtml(o, num, anchorId)` — renders one observation with optional anchor
+## Key Technical Functions
+| Function | Purpose |
+|---|---|
+| `_csGetCfg()` | Returns Cloud Settings config object from localStorage |
+| `_CS_CFG_KEY` | localStorage key for cloud settings |
+| `_csB64Dec()` | Base64 decode for GitHub API responses |
+| `showAdminPanel()` | Opens the 4-tab Admin Panel overlay (DEV only) |
+| `_supShowDashboard()` | Opens Supervisor Dashboard |
+| `_pwGrantAccess(userObj)` | Called after successful login — routes to correct panel by role |
+| `saveDraftResponses()` | Generates RO/HO response HTML file |
+| `buildAnnexHtml()` | Builds annexure section with back-links to observations |
+| `obsHtml(o, num, anchorId)` | Renders one observation with optional anchor ID |
+| `_gdIsConfigured()` | Returns true if Google Drive Client ID is set |
+| `_gdGetToken(cb)` | Gets Google OAuth token for Drive upload |
+| `_startRestore()` | Called after login — restores last session from localStorage/cloud |
+
+## Troubleshooting Reference
+| Problem | Solution |
+|---|---|
+| Cloud button stays grey after saving settings | Click Test Connection — check token and repo name for typos |
+| "403 Forbidden" on Save | PAT may have expired — Kamran regenerates and reshares |
+| "404 Not Found" on Browse | Repo name or owner incorrect in Cloud Settings |
+| Google Drive upload fails | Check HTTPS (not file://), check Client ID in Cloud Settings |
+| Admin Panel not opening after login | Ensure using DEV version (index.html), hard-refresh with Ctrl+Shift+R |
+| Supervisor sees no pending reviews | Auditor must have clicked "Send to RO Supervisor" first |
 
 ## What To Do At Start of Every Session
-1. Read this CLAUDE.md — already done automatically
-2. Check which file the user is working on (LIVE or DEV)
-3. Apply the amendment rule strictly — never put new features in `old/index.html`
-4. Always push to both feature branch AND main with --force
+1. This CLAUDE.md is read automatically — no need to ask Kamran for context
+2. Confirm which file is being worked on (LIVE = `old/index.html` / DEV = `index.html`)
+3. Apply amendment rule strictly — new features in DEV only
+4. After any code change — run syntax validation on the changed file(s)
+5. Always push to both feature branch AND main with `--force`
 
 ## Database Structure
 ```javascript
