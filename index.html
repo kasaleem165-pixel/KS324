@@ -24929,6 +24929,29 @@ function _supBuildReviewModal(reviewKey, rvData, obsList){
       h+='</div>';
     });
   }
+  // Revision history
+  var history=rvData.reviewHistory||[];
+  if(history.length){
+    h+='<div style="margin-top:8px;border-top:2px dashed #e0e8f0;padding-top:16px">';
+    h+='<div style="font-size:11.5px;font-weight:700;color:#888;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">&#128336; Revision History ('+history.length+')</div>';
+    var histCopy=history.slice().reverse();
+    histCopy.forEach(function(h2,hi){
+      var dLabel={'approved':'&#10003; Approved','changes_requested':'&#9998; Changes Requested','rejected':'&#10007; Rejected'};
+      var dColor={'approved':'#1a6030','changes_requested':'#1a3a5c','rejected':'#c0392b'};
+      h+='<div style="background:#f8fafc;border:1px solid #e0e8f0;border-left:3px solid #c8d8ec;border-radius:5px;padding:10px 14px;margin-bottom:8px;opacity:.85">';
+      h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">';
+      h+='<span style="font-size:11px;font-weight:800;color:'+(dColor[h2.status]||'#444')+'">'+(dLabel[h2.status]||h2.status)+'</span>';
+      h+='<span style="font-size:10.5px;color:#888">by '+esc(h2.supervisorName||'Supervisor')+' &nbsp;·&nbsp; '+_supFmtDate(h2.reviewedAt||'')+'</span>';
+      h+='</div>';
+      if(h2.supervisorComment) h+='<div style="font-size:11.5px;color:#555;margin-bottom:4px">'+esc(h2.supervisorComment)+'</div>';
+      var obsKeys=Object.keys(h2.obsComments||{});
+      if(obsKeys.length){
+        h+='<div style="font-size:10.5px;color:#888;margin-top:4px">Per-observation comments: '+obsKeys.length+' observation(s)</div>';
+      }
+      h+='</div>';
+    });
+    h+='</div>';
+  }
   h+='</div>';
   h+='<div style="padding:12px 20px;border-top:1px solid #e0e8f0;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0">';
   window._supReviewArgs={reviewKey:reviewKey,obsIds:obsList.map(function(o){return o.id;}),sessionPath:rvData.sessionPath||'',submittedBy:rvData.submittedBy||'',submittedAt:rvData.submittedAt||''};
@@ -24987,42 +25010,65 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
     });
   }
 
-  var reviewData={
-    reviewKey: reviewKey,
-    branchDisplay: reviewKey.replace(/_/g,' '),
-    status: decision,
-    supervisorComment: comment,
-    obsComments: obsComments,
-    supervisorName: userObj.name||userObj.username||'Supervisor',
-    supervisorRole: userObj.role||'ro_supervisor',
-    reviewedAt: new Date().toISOString(),
-    sessionPath: sessionPath||'',
-    submittedBy: origSubmittedBy||'',
-    submittedAt: origSubmittedAt||''
-  };
-
   var path=_SUP_REVIEW_PATH+reviewKey+'.json';
   var url=_csRepoBase(cfg)+'/contents/'+path;
   var hdrs=_csHdrs(cfg);
 
   toast('Submitting review...');
-  // Get current SHA (needed for GitHub PUT to update existing file)
+  // Fetch existing record first — to get SHA and preserve history
   fetch(url,{headers:hdrs})
   .then(function(r){ return r.ok?r.json():{sha:null}; })
   .then(function(existing){
-    var body={message:'[BRAINS] Supervisor review: '+reviewKey,content:_csB64Enc(JSON.stringify(reviewData,null,2))};
+    var prevData={};
+    var history=[];
+    if(existing&&existing.content){
+      try{
+        prevData=JSON.parse(_csB64Dec(existing.content.replace(/\s/g,'')));
+        history=(prevData.reviewHistory||[]).slice();
+        // If there was a real previous review, archive it into history
+        if(prevData.status&&prevData.status!=='pending'){
+          history.push({
+            status: prevData.status,
+            supervisorComment: prevData.supervisorComment||'',
+            obsComments: prevData.obsComments||{},
+            supervisorName: prevData.supervisorName||'',
+            reviewedAt: prevData.reviewedAt||'',
+            archivedAt: new Date().toISOString()
+          });
+        }
+      }catch(e){}
+    }
+    var reviewData={
+      reviewKey: reviewKey,
+      branchDisplay: (prevData.branchDisplay||reviewKey).replace(/_/g,' '),
+      status: decision,
+      supervisorComment: comment,
+      obsComments: obsComments,
+      supervisorName: userObj.name||userObj.username||'Supervisor',
+      supervisorRole: userObj.role||'ro_supervisor',
+      reviewedAt: new Date().toISOString(),
+      sessionPath: prevData.sessionPath||sessionPath||'',
+      submittedBy: prevData.submittedBy||origSubmittedBy||'',
+      submittedAt: prevData.submittedAt||origSubmittedAt||'',
+      reviewHistory: history
+    };
+    var isUpdate=history.length>0;
+    var body={message:'[BRAINS] '+(isUpdate?'Review updated':'Review')+': '+reviewKey,content:_csB64Enc(JSON.stringify(reviewData,null,2))};
     if(existing&&existing.sha) body.sha=existing.sha;
-    return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+    return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)})
+    .then(function(r){ return {r:r,reviewData:reviewData,isUpdate:isUpdate}; });
   })
-  .then(function(r){
+  .then(function(obj){
+    var r=obj.r; var reviewData=obj.reviewData; var isUpdate=obj.isUpdate;
     if(r&&(r.status===200||r.status===201)){
-      // Notify auditor
-      _supNotifyAuditor(reviewData);
+      // Notify auditor — amended message if this is an update
+      if(isUpdate) _supNotifyAuditorAmended(reviewData);
+      else _supNotifyAuditor(reviewData);
       var modal=document.getElementById('_supReviewModal');
       if(modal) modal.remove();
       var viewer=document.getElementById('_supViewer');
       if(viewer) viewer.remove();
-      toast('Review submitted ✓');
+      toast(isUpdate?'Review updated ✓':'Review submitted ✓');
       // Refresh dashboard
       _supSessionCache=null;
       setTimeout(_supShowDashboard,600);
@@ -25065,6 +25111,39 @@ function _supNotifyAuditor(reviewData){
     if(!Array.isArray(arr)) arr=[];
     arr.push(entry);
     var body={message:'[BRAINS] Review notification for '+audSlug,content:_csB64Enc(JSON.stringify(arr,null,2))};
+    if(existing&&existing.sha) body.sha=existing.sha;
+    return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+  })
+  .catch(function(){});
+}
+
+function _supNotifyAuditorAmended(reviewData){
+  var cfg=_csGetCfg();
+  if(!reviewData.sessionPath) return;
+  var audSlug=reviewData.sessionPath.split('/').pop().replace('.json','');
+  var decisionLabel={'approved':'Approved','changes_requested':'Changes Requested','rejected':'Rejected'};
+  var entry={
+    from: _csAuditorSlug(cfg),
+    fromName: reviewData.supervisorName,
+    at: new Date().toISOString(),
+    branch: reviewData.branchDisplay,
+    type: 'supervisor_review_amended',
+    decision: reviewData.status,
+    msg: '&#9888;&#65039; Supervisor '+reviewData.supervisorName+' has AMENDED the review comments for "'+reviewData.branchDisplay+'" — '+
+         (decisionLabel[reviewData.status]||reviewData.status)+
+         '. Please re-read the updated comments before continuing your work.'
+  };
+  var path='_notifications/'+audSlug+'.json';
+  var url=_csRepoBase(cfg)+'/contents/'+path;
+  var hdrs=_csHdrs(cfg);
+  fetch(url,{headers:hdrs})
+  .then(function(r){ return r.ok?r.json():{content:'W10=',sha:null}; })
+  .then(function(existing){
+    var arr;
+    try{ arr=JSON.parse(_csB64Dec((existing.content||'W10=').replace(/\s/g,''))); }catch(e){ arr=[]; }
+    if(!Array.isArray(arr)) arr=[];
+    arr.push(entry);
+    var body={message:'[BRAINS] Amended review notification for '+audSlug,content:_csB64Enc(JSON.stringify(arr,null,2))};
     if(existing&&existing.sha) body.sha=existing.sha;
     return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
   })
