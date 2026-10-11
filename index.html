@@ -25024,6 +25024,9 @@ function _adminRenderCloud(c){
     +'<input id="_apCloud_repo" type="text" placeholder="brains-sessions" style="'+inp+'" value="'+(cfg.repo?esc(cfg.repo):'')+'">'
     +'<label style="'+lbl+'">Your Name (Auditor/Admin)</label>'
     +'<input id="_apCloud_auditor" type="text" placeholder="Your full name" style="'+inp+'" value="'+(cfg.auditor?esc(cfg.auditor):'')+'">'
+    +'<label style="'+lbl+'">Google Drive Client ID</label>'
+    +'<input id="_apCloud_driveClientId" type="text" placeholder="xxxxxxxxx-xxxx.apps.googleusercontent.com" style="'+inp+'" value="'+(cfg.driveClientId?esc(cfg.driveClientId):'')+'">'
+    +'<div style="font-size:10.5px;color:#888;margin-top:3px">Required for annexure uploads to Google Drive. Get from Google Cloud Console → OAuth 2.0 Client ID.</div>'
     +'<div id="_apCloud_err" style="font-size:12px;color:#c0392b;min-height:16px;margin-top:8px"></div>'
     +'<div style="display:flex;gap:10px;margin-top:14px">'
     +'<button onclick="_adminSaveCloud()" style="padding:8px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Save Cloud Settings</button>'
@@ -25036,11 +25039,13 @@ function _adminSaveCloud(){
   var owner=(document.getElementById('_apCloud_owner').value||'').trim();
   var repo=(document.getElementById('_apCloud_repo').value||'').trim();
   var auditor=(document.getElementById('_apCloud_auditor').value||'').trim();
+  var driveClientId=(document.getElementById('_apCloud_driveClientId').value||'').trim();
   var errEl=document.getElementById('_apCloud_err');
   if(!token||!owner||!repo){ errEl.style.color='#c0392b'; errEl.textContent='Token, Owner and Repository are required.'; return; }
   var cfg=_csGetCfg();
   cfg.token=token; cfg.owner=owner; cfg.repo=repo;
   if(auditor) cfg.auditor=auditor;
+  if(driveClientId) cfg.driveClientId=driveClientId; else delete cfg.driveClientId;
   _csSaveCfg(cfg);
   errEl.style.color='#1a6030';
   errEl.textContent='Cloud settings saved.';
@@ -25058,8 +25063,10 @@ function _adminTestCloud(){
   .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
   .then(function(res){
     if(res.ok){
+      var driveClientId=(document.getElementById('_apCloud_driveClientId').value||'').trim();
+      var driveStatus=driveClientId ? ' | Drive ✅' : ' | Drive ⚠️ (Client ID not set)';
       errEl.style.color='#1a6030';
-      errEl.textContent='Connection successful. Repository: '+esc(res.d.full_name)+' ('+(res.d.private?'private':'public')+')';
+      errEl.textContent='GitHub ✅ Repository: '+esc(res.d.full_name)+' ('+(res.d.private?'private':'public')+')'+driveStatus;
     } else {
       errEl.style.color='#c0392b';
       errEl.textContent='Connection failed: '+(res.d.message||'Unknown error');
