@@ -17332,17 +17332,14 @@ function _supJumpToObs(anchorId, obsId){
       anchorId=foundByTitle.id;
       target=foundByTitle;
     } else {
-      // Title search also failed — regenerate then retry
-      toast('Refreshing report...');
-      try{ renderRpt(); }catch(e){}
-      setTimeout(function(){
-        var retryTarget=document.getElementById(anchorId);
-        if(!retryTarget&&dbTitle2){
-          document.querySelectorAll('[id^="obs-sc-"]').forEach(function(el){ if(!retryTarget&&el.textContent.indexOf(dbTitle2)!==-1) retryTarget=el; });
-        }
-        if(retryTarget){ _supJumpToObs(retryTarget.id, obsId); }
-        else{ toast('Observation not in report. Select it from the checklist and click Generate / Refresh Report.'); }
-      }, 300);
+      // Diagnostic: show what obs-sc-* IDs exist and whether selIds has this obs
+      var diagDivs=document.querySelectorAll('[id^="obs-sc-"]');
+      var diagIds=[];
+      diagDivs.forEach(function(el){ diagIds.push(el.id); });
+      var diagSel=(typeof selIds!=='undefined')&&selIds[obsId]?'YES':'NO';
+      var diagRpcont=document.getElementById('rpcont');
+      var diagRpLen=diagRpcont?diagRpcont.children.length:0;
+      alert('DEBUG\nLooking for: '+anchorId+'\nIn selIds: '+diagSel+'\nrpcont children: '+diagRpLen+'\nobs-sc-* found ('+diagIds.length+'): '+diagIds.slice(0,5).join(', '));
       return;
     }
   }
