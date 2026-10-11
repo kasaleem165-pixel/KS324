@@ -25121,6 +25121,7 @@ function _adminGenLink(){
   if(name) params+='&auditor='+encodeURIComponent(name);
   params+='&owner='+encodeURIComponent(cfg.owner)+'&repo='+encodeURIComponent(cfg.repo);
   if(!hideToken) params+='&token='+encodeURIComponent(token);
+  if(cfg.driveClientId) params+='&driveClientId='+encodeURIComponent(cfg.driveClientId);
   var url=base+params;
   document.getElementById('_apLinkResult').style.display='block';
   document.getElementById('_apLinkUrl').textContent=url;
@@ -25236,7 +25237,7 @@ function _adminHandleSetupUrl(){
     var m=params.match(new RegExp('[?&]'+k+'=([^&]*)'));
     return m?decodeURIComponent(m[1].replace(/\+/g,' ')):'';
   };
-  var token=get('token'), owner=get('owner'), repo=get('repo'), auditor=get('auditor');
+  var token=get('token'), owner=get('owner'), repo=get('repo'), auditor=get('auditor'), driveClientId=get('driveClientId');
   if(!owner||!repo) return;
   var cfg=_csGetCfg();
   var changed=false;
@@ -25244,6 +25245,7 @@ function _adminHandleSetupUrl(){
   if(owner&&owner!==cfg.owner){ cfg.owner=owner; changed=true; }
   if(repo&&repo!==cfg.repo){ cfg.repo=repo; changed=true; }
   if(auditor&&auditor!==cfg.auditor){ cfg.auditor=auditor; changed=true; }
+  if(driveClientId&&driveClientId!==cfg.driveClientId){ cfg.driveClientId=driveClientId; changed=true; }
   if(changed) _csSaveCfg(cfg);
   // Remove params from URL without reload
   try{ window.history.replaceState({},'',window.location.pathname); }catch(e){}
