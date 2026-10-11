@@ -1405,10 +1405,10 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       <button class="tb-dd-tab" onclick="tbDDToggle('dd-review')">Review <span class="arr">&#9660;</span></button>
       <div class="tb-dd-menu">
 
-        <button id="rev-send-ro" class="tb-dd-item rpt-btn" onclick="generateReviewerHtml('ro');tbDDClose()" data-tip="Export the report for RO supervisor review and sign-off"><span class="di">&#128228;</span> Send to RO Audit Supervisor</button>
-        <button id="rev-load-ro" class="tb-dd-item rpt-btn" onclick="triggerLoadReviewerHtml('ro');tbDDClose()" data-tip="Import the reviewed and annotated file returned by the RO supervisor"><span class="di">&#128194;</span> Load RO Supervisor Review</button>
+        <button id="rev-send-ro" class="tb-dd-item rpt-btn" onclick="_csSubmitReviewRequest('ro');tbDDClose()" data-tip="Send report to RO Supervisor for review (cloud first, file fallback)"><span class="di">&#128228;</span> Send to RO Audit Supervisor</button>
+        <button id="rev-load-ro" class="tb-dd-item rpt-btn" onclick="_csLoadReviewCloud('ro');tbDDClose()" data-tip="Load RO Supervisor review comments from cloud (or import file)"><span class="di">&#128204;</span> Load RO Supervisor Review</button>
         <div id="rev-sep-1" class="tb-dd-sep"></div>
-        <button id="rev-send-ho" class="tb-dd-item rpt-btn" onclick="generateReviewerHtml('ho');tbDDClose()" data-tip="Export the report for HO supervisor review and sign-off"><span class="di">&#128228;</span> Send to HO Audit Supervisor</button>
+        <button id="rev-send-ho" class="tb-dd-item rpt-btn" onclick="_csSubmitReviewRequest('ho');tbDDClose()" data-tip="Send report to HO Supervisor for review (cloud first, file fallback)"><span class="di">&#128228;</span> Send to HO Audit Supervisor</button>
         <button id="rev-load-ho" class="tb-dd-item rpt-btn" onclick="if(_canIssue()){triggerLoadReviewerHtml('ho');tbDDClose();}else{tbDDClose();showHOAuthModal(function(){triggerLoadReviewerHtml('ho');});}" data-tip="Import the reviewed and annotated file returned by the HO supervisor"><span class="di">&#128194;</span> Load HO Supervisor Review</button>
         <div id="rev-sep-2" class="tb-dd-sep"></div>
         <button id="rev-issue" class="tb-dd-item rpt-btn" onclick="if(_canIssue()){generateIssuedReport();tbDDClose();}else{tbDDClose();showHOAuthModal(function(){generateIssuedReport();});}" data-tip="Finalise and officially issue the completed audit report"><span class="di">&#10003;</span> Issue Report</button>
@@ -17009,6 +17009,92 @@ function loadReviewerHtml(evt, role){
   reader.readAsText(file);
 }
 
+// ── Cloud-first Review Request (auditor sends to supervisor) ─────────────────
+function _csSubmitReviewRequest(role){
+  var cfg=_csGetCfg();
+  var roleLabel=(role==='ro'?'RO':'HO');
+  var isCloud=!!(cfg.token&&cfg.owner&&cfg.repo&&cfg.auditor);
+  if(!isCloud){
+    alert('WARNING: Cloud not configured.\n\nYou are using the OFFLINE file method.\nDownload the file and send it to your '+roleLabel+' Supervisor manually.\n\nTo use cloud-based review, set up Cloud Settings first.');
+    generateReviewerHtml(role);
+    return;
+  }
+  var sess=captureSession();
+  var path=_csSessionPath(cfg);
+  var year=_csAuditYear(cfg)||new Date().getFullYear()+'';
+  var brFolder=_csBranchFolder();
+  var reviewKey=year+'_'+brFolder;
+  sess._reviewStatus='pending_'+role;
+  sess._reviewRequestedAt=new Date().toISOString();
+  sess._reviewRequestedBy=cfg.auditor;
+  sess._cloudMeta={auditor:_csAuditorSlug(cfg),auditYear:year,branchFolder:brFolder,savedAt:new Date().toISOString()};
+  var content=_csB64Enc(JSON.stringify(sess,null,2));
+  var sessionUrl=_csRepoBase(cfg)+'/contents/'+path;
+  var reviewPath=_SUP_REVIEW_PATH+reviewKey+'.json';
+  var reviewUrl=_csRepoBase(cfg)+'/contents/'+reviewPath;
+  var hdrs=_csHdrs(cfg);
+  toast('Sending review request to cloud...');
+  // Step 1: save session
+  fetch(sessionUrl,{headers:hdrs})
+  .then(function(r){ return r.ok?r.json():null; })
+  .then(function(ex){
+    var body={message:'[BRAINS] Review request: '+path,content:content};
+    if(ex&&ex.sha) body.sha=ex.sha;
+    return fetch(sessionUrl,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+  })
+  .then(function(r){
+    if(!r||(r.status!==200&&r.status!==201)) throw new Error('Session save failed ('+r.status+')');
+    // Step 2: create/update review request record
+    var region='';
+    try{ var fd=sess.formData||{}; region=fd.brregion||fd.region||''; }catch(e){}
+    var reviewData={reviewKey:reviewKey,branchDisplay:brFolder.replace(/_/g,' '),status:'pending',submittedBy:cfg.auditor,submittedAt:new Date().toISOString(),sessionPath:path,region:region,note:''};
+    return fetch(reviewUrl,{headers:hdrs})
+    .then(function(r2){ return r2.ok?r2.json():{sha:null}; })
+    .then(function(ex2){
+      var body2={message:'[BRAINS] Review request for '+reviewKey,content:_csB64Enc(JSON.stringify(reviewData,null,2))};
+      if(ex2&&ex2.sha) body2.sha=ex2.sha;
+      return fetch(reviewUrl,{method:'PUT',headers:hdrs,body:JSON.stringify(body2)});
+    });
+  })
+  .then(function(r){
+    if(r&&(r.status===200||r.status===201)){
+      _csLastCloudSaveTs=Date.now();
+      _csBrowseCache=null;
+      toast('✅ Review request sent to '+roleLabel+' Supervisor via cloud');
+    } else {
+      throw new Error('Review record save failed');
+    }
+  })
+  .catch(function(e){
+    var msg='⚠️ Cloud unavailable: '+(e&&e.message?e.message:'Network error')+'.\n\nYou are now using the OFFLINE file method.\nDownload the file and send it manually to your '+roleLabel+' Supervisor.\n\nCheck Cloud Settings and try again when online.';
+    alert(msg);
+    generateReviewerHtml(role);
+  });
+}
+
+// ── Cloud-first Load Review (auditor loads supervisor response) ───────────────
+function _csLoadReviewCloud(role){
+  var cfg=_csGetCfg();
+  var isCloud=!!(cfg.token&&cfg.owner&&cfg.repo);
+  if(isCloud){
+    _supFetchAndShowReviewComments(role);
+    // Also offer file import as secondary option via toast
+    setTimeout(function(){
+      var t=document.createElement('div');
+      t.innerHTML='Not showing? <span onclick="_csLoadReviewFile(\''+role+'\')" style="text-decoration:underline;cursor:pointer;font-weight:700">Import file instead</span>';
+      t.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#1a3a5c;color:#fff;padding:9px 18px;border-radius:6px;font-size:12px;z-index:9999;white-space:nowrap';
+      document.body.appendChild(t);
+      setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); },5000);
+    },800);
+  } else {
+    _csLoadReviewFile(role);
+  }
+}
+function _csLoadReviewFile(role){
+  alert('⚠️ You are using the OFFLINE file method.\nSelect the reviewed file sent back by your '+(role==='ro'?'RO':'HO')+' Supervisor.');
+  triggerLoadReviewerHtml(role);
+}
+
 function _supFetchAndShowReviewComments(role){
   var cfg=_csGetCfg();
   if(!cfg.token||!cfg.owner||!cfg.repo) return;
@@ -24798,7 +24884,7 @@ function _supNotifyAuditor(reviewData){
 // Supervisor Dashboard button in toolbar — locked for non-supervisors
 function _supToolbarBtn(){
   var role=(_umGetCurrentUser().role||'');
-  var isSup=(role==='ro_supervisor'||role==='ho_supervisor');
+  var isSup=(role==='ro_supervisor'||role==='ho_supervisor'||role==='supervisor');
   var btn=document.getElementById('_supToolbarBtn');
   if(!btn) return;
   if(isSup){
