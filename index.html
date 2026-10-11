@@ -17313,22 +17313,9 @@ function _supJumpToObs(anchorId, obsId){
   var activeCard=document.getElementById('_supObsCard_'+obsId);
   if(activeCard){ activeCard.style.border='2px solid #c9962a'; activeCard.style.background='#fffef5'; }
 
-  // The main report uses oc-{id} as the observation content anchor
-  // Use the existing _rnavJump which handles scroll + highlight
+  // Use _cgGoTo which correctly scrolls to oc-{id} in the draft report
   if(!target){
-    var rnavTarget=document.getElementById('oc-'+obsId);
-    if(rnavTarget){
-      // Highlight active card in sidebar
-      document.querySelectorAll('[id^="_supObsCard_"]').forEach(function(c){ c.style.border='1px solid #f5c842'; c.style.background=''; });
-      var ac2=document.getElementById('_supObsCard_'+obsId);
-      if(ac2){ ac2.style.border='2px solid #c9962a'; ac2.style.background='#fffef5'; }
-      _rnavJump('oc-'+obsId);
-      return;
-    }
-    var obsSelected=(typeof selIds!=='undefined')&&selIds[obsId];
-    toast(obsSelected
-      ? 'Please click "Generate / Refresh Report" first, then try again.'
-      : 'Obs. '+obsId+' is not selected. Tick it in the checklist and regenerate.');
+    _cgGoTo(obsId);
     return;
   }
 
