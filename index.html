@@ -24442,14 +24442,21 @@ function _supFetchAllReviews(cfg, cb){
   .then(function(files){
     if(!Array.isArray(files)){ cb({}); return; }
     var reviews={};
-    var pending=files.filter(function(f){ return f.name.slice(-5)==='.json'; });
-    if(!pending.length){ cb({}); return; }
-    var left=pending.length;
-    pending.forEach(function(f){
-      fetch(f.download_url,{headers:_csHdrs(cfg)})
-      .then(function(r){ return r.json(); })
-      .then(function(d){
-        reviews[f.name.replace('.json','')]=d;
+    var jsonFiles=files.filter(function(f){ return f.name.slice(-5)==='.json'; });
+    if(!jsonFiles.length){ cb({}); return; }
+    var left=jsonFiles.length;
+    jsonFiles.forEach(function(f){
+      // Use f.url (GitHub API endpoint) not f.download_url — download_url on private repos
+      // already embeds a token in the URL and adding an Authorization header causes a conflict
+      fetch(f.url,{headers:_csHdrs(cfg)})
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(apiResp){
+        if(apiResp&&apiResp.content){
+          try{
+            var d=JSON.parse(_csB64Dec(apiResp.content.replace(/\s/g,'')));
+            reviews[f.name.replace('.json','')]=d;
+          }catch(e){}
+        }
         left--; if(!left) cb(reviews);
       })
       .catch(function(){ left--; if(!left) cb(reviews); });
@@ -24574,20 +24581,9 @@ function _supRenderProgress(sessions,reviews){
 
 function _supRenderPending(sessions,reviews){
   var pending=[];
-  var seenKeys={};
   Object.keys(reviews).forEach(function(k){
     var rv=reviews[k];
-    if(rv&&rv.status==='pending'&&_supInRegion(k,reviews)){ pending.push({key:k,rv:rv}); seenKeys[k]=1; }
-  });
-  // Fallback: sessions with _reviewStatus set but no review record yet
-  (sessions||[]).forEach(function(s){
-    var reviewKey=s.year+'_'+s.branchRaw;
-    if(seenKeys[reviewKey]) return;
-    if(s._reviewStatus&&s._reviewStatus.indexOf('pending')===0){
-      var rv={status:'pending',branchDisplay:(s.branchRaw||reviewKey).replace(/_/g,' '),submittedBy:s.auditor,submittedAt:s._reviewRequestedAt||s._savedAt||'',sessionPath:s.path||''};
-      if(_supInRegion(reviewKey,reviews)) pending.push({key:reviewKey,rv:rv});
-      seenKeys[reviewKey]=1;
-    }
+    if(rv&&rv.status==='pending'&&_supInRegion(k,reviews)) pending.push({key:k,rv:rv});
   });
   if(!pending.length){
     _supSetContent('<div style="text-align:center;padding:60px;color:#888;font-size:13px">&#10003; No pending reviews. All caught up!</div>');
@@ -24685,6 +24681,40 @@ function _supViewSession(path, sha, reviewKey){
   .catch(function(e){ toast('Load error: '+(e&&e.message?e.message:e)); });
 }
 
+var _supViewerSession=null; // holds {sess, reviewKey, orderedIds} while viewer is open
+
+function _supOpenReviewFromViewer(reviewKey){
+  // Collect any obs comments already typed in the viewer, pass obs list to review modal
+  var cfg=_csGetCfg();
+  var sv=_supViewerSession;
+  if(!sv||sv.reviewKey!==reviewKey){ _supOpenReview(reviewKey); return; }
+  // Build obsList from viewer's session data
+  var obsList=sv.orderedIds.map(function(id){
+    var o=(sv.obsLookup&&sv.obsLookup[id])||{id:id,title:id};
+    return o;
+  });
+  var rvData=sv.rvData||{};
+  _supBuildReviewModal(reviewKey,rvData,obsList,sv.orderedIds);
+  // Copy any obs comments already typed in viewer into the new modal
+  setTimeout(function(){
+    sv.orderedIds.forEach(function(id){
+      var viewerTa=document.getElementById('_supObsComment_'+id);
+      var modalTa=document.getElementById('_supObsComment_modal_'+id);
+      if(viewerTa&&modalTa&&viewerTa.value.trim()) modalTa.value=viewerTa.value;
+    });
+  },100);
+}
+
+function _supToggleObsComment(safeId){
+  var box=document.getElementById('_supObsCommentBox_'+safeId);
+  var btn=document.getElementById('_supObsFlag_'+safeId);
+  if(!box) return;
+  var open=box.style.display==='none';
+  box.style.display=open?'block':'none';
+  if(btn){ btn.style.background=open?'#c9962a':'#f5c842'; btn.style.color=open?'#fff':'#7a5500'; }
+  if(open){ var ta=box.querySelector('textarea'); if(ta) ta.focus(); }
+}
+
 function _supViewSessionByPath(path, reviewKey){
   var cfg=_csGetCfg();
   var url=_csRepoBase(cfg)+'/contents/'+path;
@@ -24742,6 +24772,11 @@ function _supShowSessionViewer(sess, reviewKey){
   // Filter to only selected
   orderedIds=orderedIds.filter(function(id){ return selIdsObj[id]; });
 
+  // Store session context for Write Review button
+  _supViewerSession={sess:sess,reviewKey:reviewKey,orderedIds:orderedIds,obsLookup:obsLookup,rvData:{}};
+  // Try to enrich rvData from review record (async — not critical)
+  (function(rk){ var cfg2=_csGetCfg(); fetch(_csRepoBase(cfg2)+'/contents/'+_SUP_REVIEW_PATH+rk+'.json',{headers:_csHdrs(cfg2)}).then(function(r){ return r.ok?r.json():null; }).then(function(f){ if(f&&f.content){ try{ _supViewerSession.rvData=JSON.parse(_csB64Dec(f.content.replace(/\s/g,''))); }catch(e){} } }).catch(function(){}); })(reviewKey);
+
   // Header
   var h='<div style="background:#1a3a5c;color:#fff;padding:0 20px;display:flex;align-items:center;gap:12px;height:48px;flex-shrink:0">';
   h+='<button onclick="document.getElementById(\'_supViewer\').remove()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:12px;font-weight:700;cursor:pointer;padding:4px 12px;border-radius:4px;font-family:Inter,sans-serif">&#8592; Back</button>';
@@ -24749,7 +24784,7 @@ function _supShowSessionViewer(sess, reviewKey){
   h+='<div style="font-size:11px;color:rgba(255,255,255,.65)">Auditor: '+esc(auditor)+' &nbsp;|&nbsp; Saved: '+savedAt+'</div>';
   h+='<div style="flex:1"></div>';
   h+='<span style="font-size:11px;background:#c9962a;color:#fff;padding:3px 10px;border-radius:10px;font-weight:700">READ ONLY</span>';
-  h+='<button onclick="_supOpenReview(\''+esc(reviewKey)+'\')" style="padding:5px 16px;background:#c9962a;color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;margin-left:8px">&#9998; Write Review</button>';
+  h+='<button onclick="_supOpenReviewFromViewer(\''+esc(reviewKey)+'\')" style="padding:5px 16px;background:#c9962a;color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;margin-left:8px">&#9998; Write Review</button>';
   h+='</div>';
 
   // Branch info summary
@@ -24774,10 +24809,16 @@ function _supShowSessionViewer(sess, reviewKey){
       var recText=editObj.recommendation||o.recommendation||'';
       var typeLabel=(sess.obsTypeMap&&sess.obsTypeMap[id])||o.type||'';
       h+='<div style="background:#fff;border:1px solid #e0e8f0;border-radius:6px;margin-bottom:12px;overflow:hidden">';
+      var safeId=id.replace(/[^a-zA-Z0-9_]/g,'_');
       h+='<div style="background:#f0f4f8;padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #e0e8f0">';
       h+='<span style="font-size:11px;font-weight:800;color:#1a3a5c;background:#e8f0fb;padding:2px 8px;border-radius:10px">'+(i+1)+'</span>';
       h+='<div style="font-size:12.5px;font-weight:700;color:#1a3a5c;flex:1">'+esc(o.title||id)+'</div>';
       if(typeLabel) h+='<span style="font-size:10px;font-weight:700;color:#1a6030;background:#e8f8ee;padding:2px 8px;border-radius:10px">'+esc(typeLabel)+'</span>';
+      h+='<button onclick="_supToggleObsComment(\''+safeId+'\')" id="_supObsFlag_'+safeId+'" title="Add supervisor comment on this observation" style="background:#f5c842;border:none;border-radius:5px;padding:3px 9px;font-size:13px;cursor:pointer;font-weight:700;color:#7a5500;transition:background .15s">&#128172;</button>';
+      h+='</div>';
+      h+='<div id="_supObsCommentBox_'+safeId+'" style="display:none;padding:10px 14px;background:#fffbe6;border-bottom:1px solid #f5e090">';
+      h+='<div style="font-size:10.5px;font-weight:700;color:#7a5500;margin-bottom:5px">&#9998; Supervisor comment on this observation:</div>';
+      h+='<textarea id="_supObsComment_'+esc(id)+'" rows="2" placeholder="Type your comment for this specific observation..." style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #f5c842;border-radius:4px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#333;background:#fff"></textarea>';
       h+='</div>';
       h+='<div style="padding:12px 14px">';
       if(obsText) h+='<div style="margin-bottom:8px"><div style="font-size:10.5px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Observation</div><div style="font-size:12px;color:#333;line-height:1.6;white-space:pre-wrap">'+esc(obsText)+'</div></div>';
@@ -24865,7 +24906,7 @@ function _supBuildReviewModal(reviewKey, rvData, obsList){
     obsList.forEach(function(o,i){
       h+='<div style="background:#f8fafc;border:1px solid #e0e8f0;border-radius:6px;padding:12px 14px;margin-bottom:10px">';
       h+='<div style="font-size:12px;font-weight:700;color:#1a3a5c;margin-bottom:7px"><span style="background:#e8f0fb;color:#1a3a5c;font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:10px;margin-right:7px">'+(i+1)+'</span>'+esc(o.title||o.id)+'</div>';
-      h+='<textarea id="_supObsComment_'+esc(o.id)+'" rows="2" placeholder="Comment on this observation (leave blank if no specific remark)..." style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #c8d8ec;border-radius:4px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#333"></textarea>';
+      h+='<textarea id="_supObsComment_modal_'+esc(o.id)+'" rows="2" placeholder="Comment on this observation (leave blank if no specific remark)..." style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #c8d8ec;border-radius:4px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#333"></textarea>';
       h+='</div>';
     });
   }
@@ -24905,12 +24946,14 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
   var userObj=_umGetCurrentUser();
   var cfg=_csGetCfg();
 
-  // Collect per-observation comments
+  // Collect per-observation comments — check modal textareas first, then viewer flag boxes
   var obsComments={};
   if(obsIds&&obsIds.length){
     obsIds.forEach(function(id){
-      var el=document.getElementById('_supObsComment_'+id);
-      if(el&&el.value.trim()) obsComments[id]=el.value.trim();
+      var fromModal=document.getElementById('_supObsComment_modal_'+id);
+      var fromViewer=document.getElementById('_supObsComment_'+id);
+      var val=(fromModal&&fromModal.value.trim())||(fromViewer&&fromViewer.value.trim())||'';
+      if(val) obsComments[id]=val;
     });
   }
 
