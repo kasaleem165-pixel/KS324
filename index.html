@@ -2387,6 +2387,11 @@ function pad(n){return n<10?'0'+n:n;}
 // Reads IndexedDB for the most recent saved/auto-saved session and, if found,
 // restores it and shows the Welcome Back prompt. Never runs before login.
 function _doAutoRestore(sessions, autoSaved){
+  // Supervisors and admins never restore an audit session
+  try{
+    var _cu=JSON.parse(sessionStorage.getItem('sa_current_user')||'{}');
+    if(_cu.role==='ro_supervisor'||_cu.role==='ho_supervisor'||_cu.role==='administrator'){ updateStageBadge(); showPrompt(); return; }
+  }catch(e){}
   var manualLatest = null;
   if(sessions && sessions.length){
     sessions.sort(function(a,b){return (b.ver||0)-(a.ver||0);});
