@@ -24880,6 +24880,11 @@ function _supBuildReviewModal(reviewKey, rvData, obsList){
   el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
 
   var brDisplay=(rvData.branchDisplay||reviewKey).replace(/_/g,' ');
+  var existingDecision=rvData.status&&rvData.status!=='pending'?rvData.status:'';
+  var existingComment=rvData.supervisorComment||'';
+  var existingObsComments=rvData.obsComments||{};
+  var alreadyReviewed=!!(existingDecision);
+  var decisionLabels={'approved':'Approved ✓','changes_requested':'Changes Requested','rejected':'Rejected ✗'};
   var h='<div style="background:#fff;border-radius:8px;width:96%;max-width:680px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.3)">';
   h+='<div style="padding:14px 20px;border-bottom:1px solid #e0e8f0;display:flex;align-items:center;gap:10px;flex-shrink:0">';
   h+='<span style="font-size:20px">&#9998;</span>';
@@ -24887,33 +24892,47 @@ function _supBuildReviewModal(reviewKey, rvData, obsList){
   h+='<div style="font-size:11px;color:#888">'+esc(brDisplay)+'</div></div>';
   h+='<button onclick="document.getElementById(\'_supReviewModal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#999">&#x2715;</button>';
   h+='</div>';
+  // Banner if already reviewed
+  if(alreadyReviewed){
+    var bannerColors={'approved':'#1a6030','changes_requested':'#1a3a5c','rejected':'#c0392b'};
+    var bannerBg={'approved':'#e8f8ee','changes_requested':'#e8f0fb','rejected':'#fdf0f0'};
+    h+='<div style="background:'+bannerBg[existingDecision]+';border-bottom:1px solid #e0e8f0;padding:9px 20px;font-size:12px;font-weight:700;color:'+(bannerColors[existingDecision]||'#1a3a5c')+'">';
+    h+='&#9432; Previously reviewed: '+(decisionLabels[existingDecision]||existingDecision);
+    if(rvData.reviewedAt) h+=' &nbsp;·&nbsp; <span style="font-weight:400">'+_supFmtDate(rvData.reviewedAt)+'</span>';
+    h+=' &nbsp;·&nbsp; <span style="font-weight:400;color:#888">You can update this review below.</span>';
+    h+='</div>';
+  }
   h+='<div style="overflow-y:auto;padding:20px;flex:1">';
   // Decision
-  h+='<input type="hidden" id="_supDecisionVal" value="">';
+  h+='<input type="hidden" id="_supDecisionVal" value="'+esc(existingDecision)+'">';
   h+='<div style="margin-bottom:16px"><div style="font-size:11.5px;font-weight:700;color:#2a4060;margin-bottom:8px">Overall Decision</div>';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
-  var decBtns=[['approved','&#10003; Approve','#1a6030','#e8f8ee','#b2dfcd'],['changes_requested','&#9998; Request Changes','#1a3a5c','#e8f0fb','#b2c8e8'],['rejected','&#10007; Reject','#c0392b','#fdf0f0','#f5b8b8']];
+  var decBtns=[['approved','&#10003; Approve','#1a6030','#e8f8ee'],['changes_requested','&#9998; Request Changes','#1a3a5c','#e8f0fb'],['rejected','&#10007; Reject','#c0392b','#fdf0f0']];
+  var decBorders={'approved':'#1a6030','changes_requested':'#1a3a5c','rejected':'#c0392b'};
   decBtns.forEach(function(d){
-    h+='<button type="button" id="_supDecBtn_'+d[0]+'" onclick="_supSelectDecision(\''+d[0]+'\')" style="cursor:pointer;border:2px solid #e0e8f0;border-radius:6px;padding:11px 8px;text-align:center;font-size:11.5px;font-weight:700;color:'+d[2]+';background:#fff;font-family:Inter,sans-serif;transition:all .15s">'+d[1]+'</button>';
+    var isSelected=(existingDecision===d[0]);
+    var btnStyle='cursor:pointer;border:2px solid '+(isSelected?decBorders[d[0]]:'#e0e8f0')+';border-radius:6px;padding:11px 8px;text-align:center;font-size:11.5px;font-weight:700;color:'+d[2]+';background:'+(isSelected?d[3]:'#fff')+';font-family:Inter,sans-serif;transition:all .15s'+(isSelected?';box-shadow:0 0 0 2px '+decBorders[d[0]]+'44':'');
+    h+='<button type="button" id="_supDecBtn_'+d[0]+'" onclick="_supSelectDecision(\''+d[0]+'\')" style="'+btnStyle+'">'+d[1]+'</button>';
   });
   h+='</div></div>';
   // Overall comment
   h+='<div style="margin-bottom:16px"><div style="font-size:11.5px;font-weight:700;color:#2a4060;margin-bottom:6px">Overall Comments / Remarks</div>';
-  h+='<textarea id="_supReviewComment" rows="3" placeholder="Overall remarks, general direction, approval notes..." style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#1a3a5c"></textarea></div>';
+  h+='<textarea id="_supReviewComment" rows="3" placeholder="Overall remarks, general direction, approval notes..." style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#1a3a5c">'+esc(existingComment)+'</textarea></div>';
   // Per-observation comments
   if(obsList.length){
     h+='<div style="font-size:11.5px;font-weight:700;color:#2a4060;margin-bottom:10px">Comments Per Observation ('+obsList.length+')</div>';
     obsList.forEach(function(o,i){
-      h+='<div style="background:#f8fafc;border:1px solid #e0e8f0;border-radius:6px;padding:12px 14px;margin-bottom:10px">';
+      var prevObs=existingObsComments[o.id]||'';
+      h+='<div style="background:#f8fafc;border:1px solid '+(prevObs?'#c9962a':'#e0e8f0')+';border-radius:6px;padding:12px 14px;margin-bottom:10px">';
       h+='<div style="font-size:12px;font-weight:700;color:#1a3a5c;margin-bottom:7px"><span style="background:#e8f0fb;color:#1a3a5c;font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:10px;margin-right:7px">'+(i+1)+'</span>'+esc(o.title||o.id)+'</div>';
-      h+='<textarea id="_supObsComment_modal_'+esc(o.id)+'" rows="2" placeholder="Comment on this observation (leave blank if no specific remark)..." style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #c8d8ec;border-radius:4px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#333"></textarea>';
+      h+='<textarea id="_supObsComment_modal_'+esc(o.id)+'" rows="2" placeholder="Comment on this observation (leave blank if no specific remark)..." style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #c8d8ec;border-radius:4px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#333">'+esc(prevObs)+'</textarea>';
       h+='</div>';
     });
   }
   h+='</div>';
   h+='<div style="padding:12px 20px;border-top:1px solid #e0e8f0;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0">';
   window._supReviewArgs={reviewKey:reviewKey,obsIds:obsList.map(function(o){return o.id;}),sessionPath:rvData.sessionPath||'',submittedBy:rvData.submittedBy||'',submittedAt:rvData.submittedAt||''};
-  h+='<button id="_supSubmitReviewBtn" onclick="_supSubmitReviewFromModal()" style="padding:8px 22px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Submit Review</button>';
+  h+='<button id="_supSubmitReviewBtn" onclick="_supSubmitReviewFromModal()" style="padding:8px 22px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">'+(alreadyReviewed?'Update Review':'Submit Review')+'</button>';
   h+='<button onclick="document.getElementById(\'_supReviewModal\').remove()" style="padding:8px 14px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>';
   h+='</div></div>';
 
