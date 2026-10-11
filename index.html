@@ -17209,9 +17209,9 @@ function _supShowReviewCommentPanel(rv, role, sha){
   // Build a map: obsId -> {title, num, anchorId} by scanning rendered report DOM
   // Main report (#rpcont) uses rnav-obs-{id} anchors
   var obsInfoMap={};
-  document.querySelectorAll('[id^="rnav-obs-"]').forEach(function(el){
+  document.querySelectorAll('[id^="oc-"]').forEach(function(el){
     var anchorId=el.id;
-    var obsId=anchorId.replace('rnav-obs-','');
+    var obsId=anchorId.replace('oc-','');
     // Number from first cell of summary row OR from the obs heading
     var numEl=el.querySelector('[data-obsnum]');
     var numStr='';
@@ -17228,7 +17228,7 @@ function _supShowReviewCommentPanel(rv, role, sha){
     obsInfoMap[obsId]={title:title,num:numStr,anchorId:anchorId};
   });
   // Also fill titles from DB customs if loaded
-  if(DB&&DB.customs){ DB.customs.forEach(function(c){ if(c&&c.id&&!obsInfoMap[c.id]) obsInfoMap[c.id]={title:c.title||c.id,num:'',anchorId:'rnav-obs-'+c.id}; }); }
+  if(DB&&DB.customs){ DB.customs.forEach(function(c){ if(c&&c.id&&!obsInfoMap[c.id]) obsInfoMap[c.id]={title:c.title||c.id,num:'',anchorId:'oc-'+c.id}; }); }
 
   var roleLabel=(rv.supervisorRole==='ro_supervisor'?'RO':'HO')+' Supervisor';
   var decMap={
@@ -17275,7 +17275,7 @@ function _supShowReviewCommentPanel(rv, role, sha){
       var dbTitle=id;
       if(DB&&DB.observations){ for(var _di=0;_di<DB.observations.length;_di++){ if(DB.observations[_di].id===id){ dbTitle=DB.observations[_di].title||id; break; } } }
       if(dbTitle===id&&DB&&DB.customs){ for(var _ci=0;_ci<DB.customs.length;_ci++){ if(DB.customs[_ci].id===id){ dbTitle=DB.customs[_ci].title||id; break; } } }
-      var info=obsInfoMap[id]||{title:dbTitle,num:'',anchorId:'rnav-obs-'+id};
+      var info=obsInfoMap[id]||{title:dbTitle,num:'',anchorId:'oc-'+id};
       if(info.title===id) info.title=dbTitle; // upgrade raw-id fallback with real title
       var numBadge=info.num?'<span style="background:#c9962a;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:8px;margin-right:6px;flex-shrink:0">Obs. '+esc(info.num)+'</span>':'<span style="background:#888;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:8px;margin-right:6px;flex-shrink:0">'+esc(id)+'</span>';
       h+='<div id="_supObsCard_'+esc(id)+'" onclick="_supJumpToObs(\''+esc(info.anchorId)+'\',\''+esc(id)+'\')" style="cursor:pointer;border:1px solid #f5c842;border-radius:6px;margin-bottom:8px;overflow:hidden;transition:box-shadow .15s" onmouseover="this.style.boxShadow=\'0 2px 10px rgba(201,150,42,.35)\'" onmouseout="this.style.boxShadow=\'none\'">';
@@ -17313,28 +17313,23 @@ function _supJumpToObs(anchorId, obsId){
   var activeCard=document.getElementById('_supObsCard_'+obsId);
   if(activeCard){ activeCard.style.border='2px solid #c9962a'; activeCard.style.background='#fffef5'; }
 
-  // The main report (#rpcont) uses id="rnav-obs-{id}", not obs-sc-{id}
-  // Try rnav-obs-{id} first, then fall back to title search in rpcont
-  if(!target) target=document.getElementById('rnav-obs-'+obsId);
+  // The main report uses oc-{id} as the observation content anchor
+  // Use the existing _rnavJump which handles scroll + highlight
   if(!target){
+    var rnavTarget=document.getElementById('oc-'+obsId);
+    if(rnavTarget){
+      // Highlight active card in sidebar
+      document.querySelectorAll('[id^="_supObsCard_"]').forEach(function(c){ c.style.border='1px solid #f5c842'; c.style.background=''; });
+      var ac2=document.getElementById('_supObsCard_'+obsId);
+      if(ac2){ ac2.style.border='2px solid #c9962a'; ac2.style.background='#fffef5'; }
+      _rnavJump('oc-'+obsId);
+      return;
+    }
     var obsSelected=(typeof selIds!=='undefined')&&selIds[obsId];
-    if(!obsSelected){
-      toast('Obs. '+obsId+' is not selected. Tick it in the checklist and click Generate / Refresh Report.');
-      return;
-    }
-    // Find by title text inside #rpcont
-    var dbTitle2='';
-    if(DB&&DB.observations){ for(var _fx=0;_fx<DB.observations.length;_fx++){ if(DB.observations[_fx].id===obsId){ dbTitle2=DB.observations[_fx].title||''; break; } } }
-    if(!dbTitle2&&DB&&DB.customs){ for(var _cx=0;_cx<DB.customs.length;_cx++){ if(DB.customs[_cx].id===obsId){ dbTitle2=DB.customs[_cx].title||''; break; } } }
-    var rpcont=document.getElementById('rpcont');
-    if(dbTitle2&&rpcont){
-      var allDivs=rpcont.querySelectorAll('[id]');
-      allDivs.forEach(function(el){ if(!target&&el.textContent.indexOf(dbTitle2)!==-1) target=el; });
-    }
-    if(!target){
-      toast('Please click "Generate / Refresh Report" first, then try again.');
-      return;
-    }
+    toast(obsSelected
+      ? 'Please click "Generate / Refresh Report" first, then try again.'
+      : 'Obs. '+obsId+' is not selected. Tick it in the checklist and regenerate.');
+    return;
   }
 
   // Small delay to let any pending layout settle before measuring
