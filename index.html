@@ -24995,11 +24995,28 @@ function _supBuildReviewModal(reviewKey, rvData, obsList){
 }
 
 function _supSelectDecision(val){
-  // Approval confirmation — prevent accidental click
+  // Approval confirmation — custom dialog (browser confirm() can be suppressed)
   if(val==='approved'){
-    var brDisplay=(document.getElementById('_supDecisionVal')||{}).dataset&&document.getElementById('_supDecisionVal').dataset.branch||'this report';
-    var confirmed=window.confirm('Confirm Approval\n\nYou are about to APPROVE the audit report.\n\nOnce approved:\n• No observation-level comments will be sent to the auditor\n• Only an optional approval note can be added\n• The auditor will be notified of approval\n\nAre you sure you want to approve?');
-    if(!confirmed) return;
+    var ex=document.getElementById('_supApproveConfirm');
+    if(ex) ex.remove();
+    var overlay=document.createElement('div');
+    overlay.id='_supApproveConfirm';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10500;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+    overlay.innerHTML='<div style="background:#fff;border-radius:8px;width:92%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.3);overflow:hidden">'
+      +'<div style="background:#1a6030;color:#fff;padding:14px 18px;font-size:14px;font-weight:700">&#10003; Confirm Approval</div>'
+      +'<div style="padding:18px 20px;font-size:13px;color:#333;line-height:1.7">'
+      +'You are about to <strong>APPROVE</strong> this audit report.<br><br>'
+      +'<span style="color:#1a6030">&#10003;</span> Observation comment boxes will be hidden<br>'
+      +'<span style="color:#1a6030">&#10003;</span> Only an optional approval note can be added<br>'
+      +'<span style="color:#1a6030">&#10003;</span> Auditor will be notified of approval<br><br>'
+      +'<strong style="color:#c0392b">This action cannot be undone without updating the review.</strong>'
+      +'</div>'
+      +'<div style="padding:12px 20px;border-top:1px solid #e0e8f0;display:flex;gap:10px;justify-content:flex-end">'
+      +'<button onclick="document.getElementById(\'_supApproveConfirm\').remove()" style="padding:8px 18px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:13px;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>'
+      +'<button onclick="document.getElementById(\'_supApproveConfirm\').remove();_supConfirmApproval()" style="padding:8px 22px;background:#1a6030;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Yes, Approve</button>'
+      +'</div></div>';
+    document.body.appendChild(overlay);
+    return; // wait for user to confirm
   }
 
   var borders={'approved':'#1a6030','changes_requested':'#1a3a5c','rejected':'#c0392b'};
@@ -25041,6 +25058,33 @@ function _supSelectDecision(val){
         :'Overall Comments / Remarks <span style="color:#c0392b">*</span>';
     }
   }
+}
+
+function _supConfirmApproval(){
+  var val='approved';
+  var borders={'approved':'#1a6030','changes_requested':'#1a3a5c','rejected':'#c0392b'};
+  var bgs={'approved':'#e8f8ee','changes_requested':'#e8f0fb','rejected':'#fdf0f0'};
+  var hidden=document.getElementById('_supDecisionVal');
+  if(hidden) hidden.value=val;
+  ['approved','changes_requested','rejected'].forEach(function(d){
+    var btn=document.getElementById('_supDecBtn_'+d);
+    if(!btn) return;
+    if(d===val){
+      btn.style.border='2px solid '+borders[d];
+      btn.style.background=bgs[d];
+      btn.style.boxShadow='0 0 0 2px '+borders[d]+'44';
+    } else {
+      btn.style.border='2px solid #e0e8f0';
+      btn.style.background='#fff';
+      btn.style.boxShadow='none';
+    }
+  });
+  var approvalNoteSection=document.getElementById('_supApprovalNoteSection');
+  var fullCommentSection=document.getElementById('_supFullCommentSection');
+  var obsCommentSection=document.getElementById('_supObsCommentSection');
+  if(approvalNoteSection) approvalNoteSection.style.display='block';
+  if(fullCommentSection) fullCommentSection.style.display='none';
+  if(obsCommentSection) obsCommentSection.style.display='none';
 }
 
 function _supDecisionChange(){ /* legacy stub — replaced by _supSelectDecision */ }
