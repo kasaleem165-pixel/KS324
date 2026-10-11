@@ -17325,17 +17325,18 @@ function _supJumpToObs(anchorId, obsId){
       toast('Obs. '+obsId+' is not selected in your checklist. Tick it first, then click Generate / Refresh Report.');
       return;
     }
-    // Regenerate silently via the safe path, then retry
+    // Regenerate directly (renderRpt is synchronous — safe to call directly here)
     toast('Refreshing report...');
-    try{ confirmAndGenerate(); }catch(e){}
+    try{ renderRpt(); }catch(e){}
+    // Retry after a tick to let the DOM update
     setTimeout(function(){
       var retryTarget=document.getElementById(anchorId);
       if(retryTarget){
         _supJumpToObs(anchorId, obsId);
       } else {
-        toast('Observation not found in report. Ensure it is selected in the checklist and click Generate / Refresh Report.');
+        toast('Observation not in report. Select it from the checklist and click Generate / Refresh Report.');
       }
-    }, 1800);
+    }, 200);
     return;
   }
 
