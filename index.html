@@ -24702,9 +24702,34 @@ function _supShowSessionViewer(sess, reviewKey){
   var auditor=meta.auditor||'Unknown';
   var savedAt=_supFmtDate(meta.savedAt||'');
 
-  var selIds=sess.selIds||[];
-  var observations=sess.observations||[];
-  var selected=observations.filter(function(o){ return selIds.indexOf(o.id)>=0; });
+  // selIds is an object {id: true} in the session format
+  var selIdsObj=sess.selIds||{};
+  var selectedIds=Object.keys(selIdsObj);
+
+  // Build a lookup map from DB.observations + session customs
+  var obsLookup={};
+  if(DB&&DB.observations){
+    for(var _oi=0;_oi<DB.observations.length;_oi++){
+      obsLookup[DB.observations[_oi].id]=DB.observations[_oi];
+    }
+  }
+  // Customs from the session override/supplement DB
+  var sessionCustoms=sess.customs||[];
+  for(var _ci=0;_ci<sessionCustoms.length;_ci++){
+    obsLookup[sessionCustoms[_ci].id]=sessionCustoms[_ci];
+  }
+
+  // Build ordered list using obsOrder if available
+  var orderedIds=[];
+  if(sess.obsOrder){
+    orderedIds=orderedIds.concat(sess.obsOrder.repeated||[]).concat(sess.obsOrder.new||[]);
+  }
+  // Add any selected IDs not already in the ordered list
+  for(var _si=0;_si<selectedIds.length;_si++){
+    if(orderedIds.indexOf(selectedIds[_si])<0) orderedIds.push(selectedIds[_si]);
+  }
+  // Filter to only selected
+  orderedIds=orderedIds.filter(function(id){ return selIdsObj[id]; });
 
   // Header
   var h='<div style="background:#1a3a5c;color:#fff;padding:0 20px;display:flex;align-items:center;gap:12px;height:48px;flex-shrink:0">';
@@ -24718,26 +24743,29 @@ function _supShowSessionViewer(sess, reviewKey){
 
   // Branch info summary
   h+='<div style="background:#f0f4f8;border-bottom:1px solid #e0e8f0;padding:10px 20px;display:flex;gap:20px;flex-shrink:0;flex-wrap:wrap">';
-  var hdr=sess.hdr||{};
-  if(hdr.brcode) h+='<div style="font-size:11px"><span style="color:#888;font-weight:600">Branch Code: </span><span style="color:#1a3a5c;font-weight:700">'+esc(hdr.brcode)+'</span></div>';
-  if(hdr.brname) h+='<div style="font-size:11px"><span style="color:#888;font-weight:600">Branch Name: </span><span style="color:#1a3a5c;font-weight:700">'+esc(hdr.brname)+'</span></div>';
-  if(hdr.region) h+='<div style="font-size:11px"><span style="color:#888;font-weight:600">Region: </span><span style="color:#1a3a5c;font-weight:700">'+esc(hdr.region)+'</span></div>';
-  h+='<div style="font-size:11px"><span style="color:#888;font-weight:600">Observations in Report: </span><span style="color:#1a3a5c;font-weight:700">'+selected.length+'</span></div>';
+  var fd=sess.formData||{};
+  if(fd.brcode) h+='<div style="font-size:11px"><span style="color:#888;font-weight:600">Branch Code: </span><span style="color:#1a3a5c;font-weight:700">'+esc(fd.brcode)+'</span></div>';
+  if(fd.brname) h+='<div style="font-size:11px"><span style="color:#888;font-weight:600">Branch Name: </span><span style="color:#1a3a5c;font-weight:700">'+esc(fd.brname)+'</span></div>';
+  if(fd.brregion) h+='<div style="font-size:11px"><span style="color:#888;font-weight:600">Region: </span><span style="color:#1a3a5c;font-weight:700">'+esc(fd.brregion)+'</span></div>';
+  if(fd.rpt_stage) h+='<div style="font-size:11px"><span style="color:#888;font-weight:600">Stage: </span><span style="color:#1a3a5c;font-weight:700">'+esc(fd.rpt_stage)+'</span></div>';
+  h+='<div style="font-size:11px"><span style="color:#888;font-weight:600">Observations: </span><span style="color:#1a3a5c;font-weight:700">'+orderedIds.length+'</span></div>';
   h+='</div>';
 
   // Observations list
   h+='<div style="flex:1;overflow-y:auto;padding:20px">';
-  if(!selected.length){
+  if(!orderedIds.length){
     h+='<div style="text-align:center;padding:40px;color:#888;font-size:13px">No observations selected in this report.</div>';
   } else {
-    selected.forEach(function(o,i){
-      var obsText=(sess.obsEdits&&sess.obsEdits[o.id])||o.observation||'';
-      var recText=(sess.recEdits&&sess.recEdits[o.id])||o.recommendation||'';
-      var typeLabel=(sess.obsTypeMap&&sess.obsTypeMap[o.id])||o.type||'';
+    orderedIds.forEach(function(id,i){
+      var o=obsLookup[id]||{id:id,title:id};
+      var editObj=(sess.obsEdits&&sess.obsEdits[id])||{};
+      var obsText=editObj.observation||o.observation||'';
+      var recText=editObj.recommendation||o.recommendation||'';
+      var typeLabel=(sess.obsTypeMap&&sess.obsTypeMap[id])||o.type||'';
       h+='<div style="background:#fff;border:1px solid #e0e8f0;border-radius:6px;margin-bottom:12px;overflow:hidden">';
       h+='<div style="background:#f0f4f8;padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #e0e8f0">';
       h+='<span style="font-size:11px;font-weight:800;color:#1a3a5c;background:#e8f0fb;padding:2px 8px;border-radius:10px">'+(i+1)+'</span>';
-      h+='<div style="font-size:12.5px;font-weight:700;color:#1a3a5c;flex:1">'+esc(o.title||o.id)+'</div>';
+      h+='<div style="font-size:12.5px;font-weight:700;color:#1a3a5c;flex:1">'+esc(o.title||id)+'</div>';
       if(typeLabel) h+='<span style="font-size:10px;font-weight:700;color:#1a6030;background:#e8f8ee;padding:2px 8px;border-radius:10px">'+esc(typeLabel)+'</span>';
       h+='</div>';
       h+='<div style="padding:12px 14px">';
