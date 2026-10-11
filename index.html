@@ -17305,54 +17305,13 @@ function _supShowReviewCommentPanel(rv, role, sha){
 }
 
 function _supJumpToObs(anchorId, obsId){
-  // Highlight the clicked card as active
   document.querySelectorAll('[id^="_supObsCard_"]').forEach(function(c){
     c.style.border='1px solid #f5c842';
     c.style.background='';
   });
   var activeCard=document.getElementById('_supObsCard_'+obsId);
   if(activeCard){ activeCard.style.border='2px solid #c9962a'; activeCard.style.background='#fffef5'; }
-
-  // Use _cgGoTo which correctly scrolls to oc-{id} in the draft report
-  if(!target){
-    _cgGoTo(obsId);
-    return;
-  }
-
-  // Small delay to let any pending layout settle before measuring
-  setTimeout(function(){
-    // Try to scroll the nearest overflow container, then fall back to window
-    var scrollContainer=null;
-    var p=target.parentElement;
-    while(p&&p!==document.body){
-      var cs=window.getComputedStyle(p);
-      if(cs.overflowY==='auto'||cs.overflowY==='scroll'){
-        scrollContainer=p;
-        break;
-      }
-      p=p.parentElement;
-    }
-
-    if(scrollContainer){
-      var containerRect=scrollContainer.getBoundingClientRect();
-      var targetRect=target.getBoundingClientRect();
-      if(targetRect.top===0&&targetRect.height===0){
-        target.scrollIntoView({behavior:'smooth',block:'start'});
-      } else {
-        var offset=targetRect.top - containerRect.top + scrollContainer.scrollTop - 20;
-        scrollContainer.scrollTo({top:offset,behavior:'smooth'});
-      }
-    } else {
-      target.scrollIntoView({behavior:'smooth',block:'start'});
-    }
-
-    // Flash amber outline so the auditor sees which observation to correct
-    var orig=target.style.outline||'';
-    var origRadius=target.style.borderRadius||'';
-    target.style.outline='3px solid #c9962a';
-    target.style.borderRadius='6px';
-    setTimeout(function(){ target.style.outline=orig; target.style.borderRadius=origRadius; },2500);
-  }, 60);
+  _cgGoTo(obsId);
 }
 
 function _supAcknowledgeReview(rv, sha){
