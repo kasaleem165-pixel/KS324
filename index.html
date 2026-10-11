@@ -742,10 +742,10 @@ function _pwGrantAccess(userObj){
     _umShowLoginBadge(userObj);
     _applyRoleUI();
     // Supervisors and admins never need to resume an audit session
-    var isSupervisorOrAdmin=(userObj.role==='ro_supervisor'||userObj.role==='ho_supervisor'||userObj.role==='administrator');
+    var isSupervisorOrAdmin=(userObj.role==='ro_supervisor'||userObj.role==='ho_supervisor'||userObj.role==='supervisor'||userObj.role==='administrator');
     if(!isSupervisorOrAdmin){ _startRestore(); }
     // Auto-launch supervisor dashboard for supervisor roles
-    if(userObj.role==='ro_supervisor'||userObj.role==='ho_supervisor'){
+    if(userObj.role==='ro_supervisor'||userObj.role==='ho_supervisor'||userObj.role==='supervisor'){
       setTimeout(_supShowDashboard, 400);
     }
     // Auto-launch admin panel for any administrator login
@@ -2390,7 +2390,7 @@ function _doAutoRestore(sessions, autoSaved){
   // Supervisors and admins never restore an audit session
   try{
     var _cu=JSON.parse(sessionStorage.getItem('sa_current_user')||'{}');
-    if(_cu.role==='ro_supervisor'||_cu.role==='ho_supervisor'||_cu.role==='administrator'){ updateStageBadge(); showPrompt(); return; }
+    if(_cu.role==='ro_supervisor'||_cu.role==='ho_supervisor'||_cu.role==='supervisor'||_cu.role==='administrator'){ updateStageBadge(); showPrompt(); return; }
   }catch(e){}
   var manualLatest = null;
   if(sessions && sessions.length){
