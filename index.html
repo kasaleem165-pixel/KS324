@@ -24889,12 +24889,12 @@ function _supBuildReviewModal(reviewKey, rvData, obsList){
   h+='</div>';
   h+='<div style="overflow-y:auto;padding:20px;flex:1">';
   // Decision
+  h+='<input type="hidden" id="_supDecisionVal" value="">';
   h+='<div style="margin-bottom:16px"><div style="font-size:11.5px;font-weight:700;color:#2a4060;margin-bottom:8px">Overall Decision</div>';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
-  var decisions=[['approved','&#10003; Approve','#1a6030','#e8f8ee'],['changes_requested','&#9998; Request Changes','#1a3a5c','#e8f0fb'],['rejected','&#10007; Reject','#c0392b','#fdf0f0']];
-  decisions.forEach(function(d){
-    h+='<label style="cursor:pointer;border:2px solid #e0e8f0;border-radius:6px;padding:9px 8px;text-align:center;font-size:11.5px;font-weight:700;color:'+d[2]+'" id="_supDecLbl_'+d[0]+'">';
-    h+='<input type="radio" name="_supDecision" value="'+d[0]+'" onchange="_supDecisionChange()" style="display:none">'+d[1]+'</label>';
+  var decBtns=[['approved','&#10003; Approve','#1a6030','#e8f8ee','#b2dfcd'],['changes_requested','&#9998; Request Changes','#1a3a5c','#e8f0fb','#b2c8e8'],['rejected','&#10007; Reject','#c0392b','#fdf0f0','#f5b8b8']];
+  decBtns.forEach(function(d){
+    h+='<button type="button" id="_supDecBtn_'+d[0]+'" onclick="_supSelectDecision(\''+d[0]+'\')" style="cursor:pointer;border:2px solid #e0e8f0;border-radius:6px;padding:11px 8px;text-align:center;font-size:11.5px;font-weight:700;color:'+d[2]+';background:#fff;font-family:Inter,sans-serif;transition:all .15s">'+d[1]+'</button>';
   });
   h+='</div></div>';
   // Overall comment
@@ -24921,23 +24921,28 @@ function _supBuildReviewModal(reviewKey, rvData, obsList){
   document.body.appendChild(el);
 }
 
-function _supDecisionChange(){
-  var decisions=['approved','changes_requested','rejected'];
+function _supSelectDecision(val){
   var colors={'approved':'#1a6030','changes_requested':'#1a3a5c','rejected':'#c0392b'};
   var bgs={'approved':'#e8f8ee','changes_requested':'#e8f0fb','rejected':'#fdf0f0'};
-  decisions.forEach(function(d){
-    var inp=document.querySelector('input[name="_supDecision"][value="'+d+'"]');
-    var lbl=document.getElementById('_supDecLbl_'+d);
-    if(!inp||!lbl) return;
-    if(inp.checked){
-      lbl.style.border='2px solid '+colors[d];
-      lbl.style.background=bgs[d];
+  var borders={'approved':'#1a6030','changes_requested':'#1a3a5c','rejected':'#c0392b'};
+  var hidden=document.getElementById('_supDecisionVal');
+  if(hidden) hidden.value=val;
+  ['approved','changes_requested','rejected'].forEach(function(d){
+    var btn=document.getElementById('_supDecBtn_'+d);
+    if(!btn) return;
+    if(d===val){
+      btn.style.border='2px solid '+borders[d];
+      btn.style.background=bgs[d];
+      btn.style.boxShadow='0 0 0 2px '+borders[d]+'44';
     } else {
-      lbl.style.border='2px solid #e0e8f0';
-      lbl.style.background='#fff';
+      btn.style.border='2px solid #e0e8f0';
+      btn.style.background='#fff';
+      btn.style.boxShadow='none';
     }
   });
 }
+
+function _supDecisionChange(){ /* legacy stub — replaced by _supSelectDecision */ }
 
 function _supSubmitReviewFromModal(){
   var a=window._supReviewArgs||{};
@@ -24945,9 +24950,9 @@ function _supSubmitReviewFromModal(){
 }
 
 function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origSubmittedAt){
-  var inp=document.querySelector('input[name="_supDecision"]:checked');
-  if(!inp){ toast('Please select a decision (Approve / Request Changes / Reject).'); return; }
-  var decision=inp.value;
+  var hiddenDec=document.getElementById('_supDecisionVal');
+  var decision=hiddenDec?hiddenDec.value:'';
+  if(!decision){ toast('Please select a decision (Approve / Request Changes / Reject).'); return; }
   var comment=(document.getElementById('_supReviewComment')||{}).value||'';
   var userObj=_umGetCurrentUser();
   var cfg=_csGetCfg();
