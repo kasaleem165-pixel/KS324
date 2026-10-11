@@ -24342,6 +24342,7 @@ var _SUP_REVIEW_PATH = '_reviews/'; // _reviews/{branch_slug}.json
 var _supActiveTab = 'progress';     // 'progress' | 'pending' | 'reviewed'
 var _supSessionCache = null;
 var _supRegionFilter = '';          // supervisor's own region ('' = show all)
+var _supReviewShaCache = {};        // reviewKey -> GitHub blob SHA, avoids a GET before each PUT
 
 function _supShowDashboard(){
   var ex=document.getElementById('_supDashboard');
@@ -24473,7 +24474,9 @@ function _supFetchAllReviews(cfg, cb){
         if(apiResp&&apiResp.content){
           try{
             var d=JSON.parse(_csB64Dec(apiResp.content.replace(/\s/g,'')));
-            reviews[f.name.replace('.json','')]=d;
+            var rk=f.name.replace('.json','');
+            reviews[rk]=d;
+            if(apiResp.sha) _supReviewShaCache[rk]=apiResp.sha;
           }catch(e){}
         }
         left--; if(!left) cb(reviews);
@@ -25131,28 +25134,21 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
   var hdrs=_csHdrs(cfg);
 
   toast('Submitting review...');
-  // Fetch existing record first — to get SHA and preserve history
-  fetch(url,{headers:hdrs})
-  .then(function(r){ return r.ok?r.json():{sha:null}; })
-  .then(function(existing){
-    var prevData={};
-    var history=[];
-    if(existing&&existing.content){
-      try{
-        prevData=JSON.parse(_csB64Dec(existing.content.replace(/\s/g,'')));
-        history=(prevData.reviewHistory||[]).slice();
-        // If there was a real previous review, archive it into history
-        if(prevData.status&&prevData.status!=='pending'){
-          history.push({
-            status: prevData.status,
-            supervisorComment: prevData.supervisorComment||'',
-            obsComments: prevData.obsComments||{},
-            supervisorName: prevData.supervisorName||'',
-            reviewedAt: prevData.reviewedAt||'',
-            archivedAt: new Date().toISOString()
-          });
-        }
-      }catch(e){}
+  // Use cached data (already loaded from dashboard) to skip a GET round-trip
+  var cachedReview=(_supSessionCache&&_supSessionCache.reviews&&_supSessionCache.reviews[reviewKey])||null;
+  var cachedSha=_supReviewShaCache[reviewKey]||null;
+
+  function _doSubmit(prevData, sha){
+    var history=(prevData.reviewHistory||[]).slice();
+    if(prevData.status&&prevData.status!=='pending'){
+      history.push({
+        status: prevData.status,
+        supervisorComment: prevData.supervisorComment||'',
+        obsComments: prevData.obsComments||{},
+        supervisorName: prevData.supervisorName||'',
+        reviewedAt: prevData.reviewedAt||'',
+        archivedAt: new Date().toISOString()
+      });
     }
     var reviewData={
       reviewKey: reviewKey,
@@ -25170,13 +25166,36 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
     };
     var isUpdate=history.length>0;
     var body={message:'[BRAINS] '+(isUpdate?'Review updated':'Review')+': '+reviewKey,content:_csB64Enc(JSON.stringify(reviewData,null,2))};
-    if(existing&&existing.sha) body.sha=existing.sha;
+    if(sha) body.sha=sha;
     return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)})
     .then(function(r){ return {r:r,reviewData:reviewData,isUpdate:isUpdate}; });
-  })
+  }
+
+  var submitPromise;
+  if(cachedReview&&cachedSha){
+    // Fast path: skip GET, use cached data + SHA
+    submitPromise=_doSubmit(cachedReview, cachedSha);
+  } else {
+    // Fallback: fetch file first to get SHA and latest content
+    submitPromise=fetch(url,{headers:hdrs})
+    .then(function(r){ return r.ok?r.json():{sha:null}; })
+    .then(function(existing){
+      var prevData={};
+      if(existing&&existing.content){
+        try{ prevData=JSON.parse(_csB64Dec(existing.content.replace(/\s/g,''))); }catch(e){}
+      }
+      return _doSubmit(prevData, existing&&existing.sha?existing.sha:null);
+    });
+  }
+
+  submitPromise
   .then(function(obj){
     var r=obj.r; var reviewData=obj.reviewData; var isUpdate=obj.isUpdate;
     if(r&&(r.status===200||r.status===201)){
+      // Update SHA cache from response so the next submit can also skip a GET
+      r.clone().json().then(function(resp){
+        if(resp&&resp.content&&resp.content.sha) _supReviewShaCache[reviewKey]=resp.content.sha;
+      }).catch(function(){});
       // Notify auditor — amended message if this is an update
       if(isUpdate) _supNotifyAuditorAmended(reviewData);
       else _supNotifyAuditor(reviewData);
