@@ -25019,6 +25019,38 @@ function _supSelectDecision(val){
     return; // wait for user to confirm
   }
 
+  // Confirm if changing an already-selected decision to a different one
+  var hidden2=document.getElementById('_supDecisionVal');
+  var currentVal=hidden2?hidden2.value:'';
+  if(currentVal&&currentVal!==val){
+    var ex2=document.getElementById('_supDecisionConfirm');
+    if(ex2) ex2.remove();
+    var labels={'approved':'Approved ✓','changes_requested':'Changes Requested','rejected':'Rejected ✗'};
+    var fromLabel=labels[currentVal]||currentVal;
+    var toLabel=labels[val]||val;
+    var toColor=val==='rejected'?'#c0392b':val==='approved'?'#1a6030':'#1a3a5c';
+    var ov2=document.createElement('div');
+    ov2.id='_supDecisionConfirm';
+    ov2.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10500;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+    ov2.innerHTML='<div style="background:#fff;border-radius:8px;width:92%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,.3);overflow:hidden">'
+      +'<div style="background:#1a3a5c;color:#fff;padding:14px 18px;font-size:14px;font-weight:700">&#9888; Change Decision?</div>'
+      +'<div style="padding:18px 20px;font-size:13px;color:#333;line-height:1.7">'
+      +'You are changing your decision from<br>'
+      +'<strong style="color:#888">'+fromLabel+'</strong> &rarr; <strong style="color:'+toColor+'">'+toLabel+'</strong><br><br>'
+      +'Are you sure you want to change your decision?'
+      +'</div>'
+      +'<div style="padding:12px 20px;border-top:1px solid #e0e8f0;display:flex;gap:10px;justify-content:flex-end">'
+      +'<button onclick="document.getElementById(\'_supDecisionConfirm\').remove()" style="padding:8px 18px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:13px;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>'
+      +'<button onclick="document.getElementById(\'_supDecisionConfirm\').remove();_supApplyDecision(\''+val+'\')" style="padding:8px 22px;background:'+toColor+';color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Yes, Change</button>'
+      +'</div></div>';
+    document.body.appendChild(ov2);
+    return;
+  }
+
+  _supApplyDecision(val);
+}
+
+function _supApplyDecision(val){
   var borders={'approved':'#1a6030','changes_requested':'#1a3a5c','rejected':'#c0392b'};
   var bgs={'approved':'#e8f8ee','changes_requested':'#e8f0fb','rejected':'#fdf0f0'};
   var hidden=document.getElementById('_supDecisionVal');
@@ -25038,7 +25070,6 @@ function _supSelectDecision(val){
     }
   });
 
-  // Toggle comment sections based on decision
   var approvalNoteSection=document.getElementById('_supApprovalNoteSection');
   var fullCommentSection=document.getElementById('_supFullCommentSection');
   var obsCommentSection=document.getElementById('_supObsCommentSection');
@@ -25053,38 +25084,13 @@ function _supSelectDecision(val){
     if(fullCommentSection) fullCommentSection.style.display='block';
     if(obsCommentSection) obsCommentSection.style.display='block';
     if(commentLabel){
-      commentLabel.innerHTML=val==='rejected'
-        ?'Overall Comments / Remarks <span style="color:#c0392b">*</span>'
-        :'Overall Comments / Remarks <span style="color:#c0392b">*</span>';
+      commentLabel.innerHTML='Overall Comments / Remarks <span style="color:#c0392b">*</span>';
     }
   }
 }
 
 function _supConfirmApproval(){
-  var val='approved';
-  var borders={'approved':'#1a6030','changes_requested':'#1a3a5c','rejected':'#c0392b'};
-  var bgs={'approved':'#e8f8ee','changes_requested':'#e8f0fb','rejected':'#fdf0f0'};
-  var hidden=document.getElementById('_supDecisionVal');
-  if(hidden) hidden.value=val;
-  ['approved','changes_requested','rejected'].forEach(function(d){
-    var btn=document.getElementById('_supDecBtn_'+d);
-    if(!btn) return;
-    if(d===val){
-      btn.style.border='2px solid '+borders[d];
-      btn.style.background=bgs[d];
-      btn.style.boxShadow='0 0 0 2px '+borders[d]+'44';
-    } else {
-      btn.style.border='2px solid #e0e8f0';
-      btn.style.background='#fff';
-      btn.style.boxShadow='none';
-    }
-  });
-  var approvalNoteSection=document.getElementById('_supApprovalNoteSection');
-  var fullCommentSection=document.getElementById('_supFullCommentSection');
-  var obsCommentSection=document.getElementById('_supObsCommentSection');
-  if(approvalNoteSection) approvalNoteSection.style.display='block';
-  if(fullCommentSection) fullCommentSection.style.display='none';
-  if(obsCommentSection) obsCommentSection.style.display='none';
+  _supApplyDecision('approved');
 }
 
 function _supDecisionChange(){ /* legacy stub — replaced by _supSelectDecision */ }
