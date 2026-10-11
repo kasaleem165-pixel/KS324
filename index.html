@@ -24947,8 +24947,8 @@ function _supBuildReviewModal(reviewKey, rvData, obsList){
   // Full comments (shown for Changes Requested / Rejected)
   var showFull=(existingDecision!=='approved');
   h+='<div id="_supFullCommentSection" style="margin-bottom:16px;display:'+(showFull?'block':'none')+'">';
-  h+='<div style="font-size:11.5px;font-weight:700;color:#2a4060;margin-bottom:6px" id="_supCommentLabel">Overall Comments / Remarks <span style="color:#c0392b">*</span></div>';
-  h+='<textarea id="_supReviewComment" rows="3" placeholder="Describe required changes or reason for rejection..." style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#1a3a5c">'+esc(existingDecision!=='approved'?existingComment:'')+'</textarea>';
+  h+='<div style="font-size:11.5px;font-weight:700;color:#2a4060;margin-bottom:6px" id="_supCommentLabel">Overall Comments / Remarks <span id="_supCommentRequired" style="color:#c0392b">*</span> <span id="_supCommentOptHint" style="font-size:10.5px;font-weight:400;color:#888;display:none">(optional if per-observation comments are provided)</span></div>';
+  h+='<textarea id="_supReviewComment" rows="3" placeholder="For rejection: state the overall reason. For changes: add a summary here or use the per-observation boxes below." style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#1a3a5c">'+esc(existingDecision!=='approved'?existingComment:'')+'</textarea>';
   h+='</div>';
   // Per-observation comments (shown for Changes Requested / Rejected only)
   if(obsList.length){
@@ -25087,7 +25087,10 @@ function _supApplyDecision(val){
     if(fullCommentSection) fullCommentSection.style.display='block';
     if(obsCommentSection) obsCommentSection.style.display='block';
     if(commentLabel){
-      commentLabel.innerHTML='Overall Comments / Remarks <span style="color:#c0392b">*</span>';
+      commentLabel.innerHTML='Overall Comments / Remarks '
+        +(val==='changes_requested'
+          ?'<span style="color:#c0392b">*</span> <span style="font-size:10.5px;font-weight:400;color:#888">(optional if per-observation comments are provided)</span>'
+          :'<span style="color:#c0392b">*</span> <span style="font-size:10.5px;font-weight:400;color:#888">(required for rejection)</span>');
     }
   }
 }
@@ -25107,18 +25110,17 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
   var hiddenDec=document.getElementById('_supDecisionVal');
   var decision=hiddenDec?hiddenDec.value:'';
   if(!decision){ toast('Please select a decision (Approve / Request Changes / Reject).'); return; }
-  // For approved: use approval note; for others: use full comment (mandatory)
+  // For approved: use approval note; for others: overall comment rules vary
   var comment='';
   if(decision==='approved'){
     comment=(document.getElementById('_supApprovalNote')||{}).value||'';
   } else {
     comment=(document.getElementById('_supReviewComment')||{}).value||'';
-    if(!comment.trim()){ toast('Please enter comments explaining the required changes or reason for rejection.'); return; }
   }
   var userObj=_umGetCurrentUser();
   var cfg=_csGetCfg();
 
-  // Per-obs comments only collected for non-approval decisions
+  // Per-obs comments collected first (needed for validation below)
   var obsComments={};
   if(decision!=='approved'&&obsIds&&obsIds.length){
     obsIds.forEach(function(id){
@@ -25127,6 +25129,15 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
       var val=(fromModal&&fromModal.value.trim())||(fromViewer&&fromViewer.value.trim())||'';
       if(val) obsComments[id]=val;
     });
+  }
+
+  // Validation: rejected always needs overall comment; changes_requested only needs
+  // overall comment if no per-obs comments have been written
+  if(decision==='rejected'&&!comment.trim()){
+    toast('Please enter an overall reason for rejection.'); return;
+  }
+  if(decision==='changes_requested'&&!comment.trim()&&!Object.keys(obsComments).length){
+    toast('Please enter an overall comment or add comments on individual observations above.'); return;
   }
 
   var path=_SUP_REVIEW_PATH+reviewKey+'.json';
