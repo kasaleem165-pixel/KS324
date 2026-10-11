@@ -17222,25 +17222,42 @@ function _supJumpToObs(anchorId, obsId){
   if(activeCard){ activeCard.style.border='2px solid #c9962a'; activeCard.style.background='#fffef5'; }
 
   var target=document.getElementById(anchorId);
-  if(!target) return;
-
-  // Report lives inside #ra-RP (overflow-y:auto) — must scroll that container
-  var scrollContainer=document.getElementById('ra-RP');
-  if(scrollContainer){
-    var containerTop=scrollContainer.getBoundingClientRect().top;
-    var targetTop=target.getBoundingClientRect().top;
-    var offset=targetTop-containerTop+scrollContainer.scrollTop-20;
-    scrollContainer.scrollTo({top:offset,behavior:'smooth'});
-  } else {
-    target.scrollIntoView({behavior:'smooth',block:'start'});
+  if(!target){
+    toast('Observation not found. Please generate the report first.');
+    return;
   }
 
-  // Flash amber outline so the auditor sees which observation to correct
-  var orig=target.style.outline||'';
-  var origRadius=target.style.borderRadius||'';
-  target.style.outline='3px solid #c9962a';
-  target.style.borderRadius='6px';
-  setTimeout(function(){ target.style.outline=orig; target.style.borderRadius=origRadius; },2500);
+  // Ensure Stage 2/3 panel is visible (observations live there)
+  var rp23=document.getElementById('ra-s23-rp');
+  if(rp23&&rp23.style.display==='none'){
+    // Switch to stage 2/3 tab so the target becomes visible
+    if(typeof ra_switchStage==='function') ra_switchStage(2);
+  }
+
+  // Small delay to let display:none → block take effect before measuring
+  setTimeout(function(){
+    var scrollContainer=document.getElementById('ra-RP');
+    if(scrollContainer){
+      var containerRect=scrollContainer.getBoundingClientRect();
+      var targetRect=target.getBoundingClientRect();
+      // If target rect is zero, target may still be hidden — try scrollIntoView as fallback
+      if(targetRect.top===0&&targetRect.height===0){
+        target.scrollIntoView({behavior:'smooth',block:'start'});
+      } else {
+        var offset=targetRect.top - containerRect.top + scrollContainer.scrollTop - 20;
+        scrollContainer.scrollTo({top:offset,behavior:'smooth'});
+      }
+    } else {
+      target.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+
+    // Flash amber outline so the auditor sees which observation to correct
+    var orig=target.style.outline||'';
+    var origRadius=target.style.borderRadius||'';
+    target.style.outline='3px solid #c9962a';
+    target.style.borderRadius='6px';
+    setTimeout(function(){ target.style.outline=orig; target.style.borderRadius=origRadius; },2500);
+  }, 80);
 }
 
 function _supAcknowledgeReview(rv, sha){
