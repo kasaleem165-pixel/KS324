@@ -17325,19 +17325,31 @@ function _supJumpToObs(anchorId, obsId){
       toast('Obs. '+obsId+' is not selected in your checklist. Tick it first, then click Generate / Refresh Report.');
       return;
     }
-    // Regenerate directly (renderRpt is synchronous — safe to call directly here)
-    toast('Refreshing report...');
-    try{ renderRpt(); }catch(e){}
-    // Retry after a tick to let the DOM update
-    setTimeout(function(){
-      var retryTarget=document.getElementById(anchorId);
-      if(retryTarget){
-        _supJumpToObs(anchorId, obsId);
-      } else {
-        toast('Observation not in report. Select it from the checklist and click Generate / Refresh Report.');
-      }
-    }, 200);
-    return;
+    // Try to find by title text as fallback (works even if ID format differs)
+    var allObsDivs=document.querySelectorAll('[id^="obs-sc-"]');
+    var dbTitle2='';
+    if(DB&&DB.observations){ for(var _fx=0;_fx<DB.observations.length;_fx++){ if(DB.observations[_fx].id===obsId){ dbTitle2=DB.observations[_fx].title||''; break; } } }
+    if(!dbTitle2&&DB&&DB.customs){ for(var _cx=0;_cx<DB.customs.length;_cx++){ if(DB.customs[_cx].id===obsId){ dbTitle2=DB.customs[_cx].title||''; break; } } }
+    var foundByTitle=null;
+    if(dbTitle2){ allObsDivs.forEach(function(el){ if(!foundByTitle&&el.textContent.indexOf(dbTitle2)!==-1) foundByTitle=el; }); }
+    if(foundByTitle){
+      // Found by title — use it directly
+      anchorId=foundByTitle.id;
+      target=foundByTitle;
+    } else {
+      // Title search also failed — regenerate then retry
+      toast('Refreshing report...');
+      try{ renderRpt(); }catch(e){}
+      setTimeout(function(){
+        var retryTarget=document.getElementById(anchorId);
+        if(!retryTarget&&dbTitle2){
+          document.querySelectorAll('[id^="obs-sc-"]').forEach(function(el){ if(!retryTarget&&el.textContent.indexOf(dbTitle2)!==-1) retryTarget=el; });
+        }
+        if(retryTarget){ _supJumpToObs(retryTarget.id, obsId); }
+        else{ toast('Observation not in report. Select it from the checklist and click Generate / Refresh Report.'); }
+      }, 300);
+      return;
+    }
   }
 
   // Small delay to let any pending layout settle before measuring
