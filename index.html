@@ -24592,7 +24592,12 @@ function _supRenderPending(sessions,reviews){
     h+='<div style="font-size:11px;color:#666;margin-top:2px">Submitted by <strong>'+esc(rv.submittedBy||'Unknown')+'</strong> on '+_supFmtDate(rv.submittedAt||'')+'</div>';
     if(rv.note) h+='<div style="font-size:11px;color:#444;margin-top:4px;font-style:italic">"'+esc(rv.note)+'"</div>';
     h+='</div>';
-    h+='<button onclick="_supOpenReview(\''+esc(p.key)+'\')" style="padding:7px 18px;background:#c9962a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#9998; Review Now</button>';
+    h+='<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">';
+    if(rv.sessionPath){
+      h+='<button onclick="_supViewSessionByPath(\''+esc(rv.sessionPath)+'\',\''+esc(p.key)+'\')" style="padding:6px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#128065; View Report</button>';
+    }
+    h+='<button onclick="_supOpenReview(\''+esc(p.key)+'\')" style="padding:6px 14px;background:#c9962a;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#9998; Write Review</button>';
+    h+='</div>';
     h+='</div>';
   });
   h+='</div>';
@@ -24664,6 +24669,22 @@ function _supViewSession(path, sha, reviewKey){
     var raw=file.content.replace(/\s/g,'');
     var sess=JSON.parse(_csB64Dec(raw));
     if(!sess||!sess.ts){ toast('Invalid session file.'); return; }
+    _supShowSessionViewer(sess, reviewKey);
+  })
+  .catch(function(e){ toast('Load error: '+(e&&e.message?e.message:e)); });
+}
+
+function _supViewSessionByPath(path, reviewKey){
+  var cfg=_csGetCfg();
+  var url=_csRepoBase(cfg)+'/contents/'+path;
+  toast('Loading report...');
+  fetch(url,{headers:_csHdrs(cfg)})
+  .then(function(r){ return r.json(); })
+  .then(function(file){
+    if(!file||!file.content){ toast('Could not load session file.'); return; }
+    var raw=file.content.replace(/\s/g,'');
+    var sess=JSON.parse(_csB64Dec(raw));
+    if(!sess||!sess.ts){ toast('Invalid session data.'); return; }
     _supShowSessionViewer(sess, reviewKey);
   })
   .catch(function(e){ toast('Load error: '+(e&&e.message?e.message:e)); });
