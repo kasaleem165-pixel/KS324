@@ -24574,9 +24574,20 @@ function _supRenderProgress(sessions,reviews){
 
 function _supRenderPending(sessions,reviews){
   var pending=[];
+  var seenKeys={};
   Object.keys(reviews).forEach(function(k){
     var rv=reviews[k];
-    if(rv&&rv.status==='pending'&&_supInRegion(k,reviews)) pending.push({key:k,rv:rv});
+    if(rv&&rv.status==='pending'&&_supInRegion(k,reviews)){ pending.push({key:k,rv:rv}); seenKeys[k]=1; }
+  });
+  // Fallback: sessions with _reviewStatus set but no review record yet
+  (sessions||[]).forEach(function(s){
+    var reviewKey=s.year+'_'+s.branchRaw;
+    if(seenKeys[reviewKey]) return;
+    if(s._reviewStatus&&s._reviewStatus.indexOf('pending')===0){
+      var rv={status:'pending',branchDisplay:(s.branchRaw||reviewKey).replace(/_/g,' '),submittedBy:s.auditor,submittedAt:s._reviewRequestedAt||s._savedAt||'',sessionPath:s.path||''};
+      if(_supInRegion(reviewKey,reviews)) pending.push({key:reviewKey,rv:rv});
+      seenKeys[reviewKey]=1;
+    }
   });
   if(!pending.length){
     _supSetContent('<div style="text-align:center;padding:60px;color:#888;font-size:13px">&#10003; No pending reviews. All caught up!</div>');
@@ -24781,25 +24792,63 @@ function _supShowSessionViewer(sess, reviewKey){
 }
 
 function _supOpenReview(reviewKey){
+  // Try to get sessionPath from the review record, then load session for per-obs comments
   var cfg=_csGetCfg();
-  var userObj=_umGetCurrentUser();
+  var reviewUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'.json';
+  toast('Loading review form...');
+  fetch(reviewUrl,{headers:_csHdrs(cfg)})
+  .then(function(r){ return r.ok?r.json():{sha:null}; })
+  .then(function(reviewFile){
+    var rvData={};
+    if(reviewFile&&reviewFile.content){
+      try{ rvData=JSON.parse(_csB64Dec(reviewFile.content.replace(/\s/g,''))); }catch(e){}
+    }
+    var sessionPath=rvData.sessionPath||'';
+    if(!sessionPath){ _supBuildReviewModal(reviewKey,rvData,[]); return; }
+    fetch(_csRepoBase(cfg)+'/contents/'+sessionPath,{headers:_csHdrs(cfg)})
+    .then(function(r){ return r.ok?r.json():null; })
+    .then(function(sessFile){
+      var obsIds=[];
+      var obsLookup={};
+      if(sessFile&&sessFile.content){
+        try{
+          var sess=JSON.parse(_csB64Dec(sessFile.content.replace(/\s/g,'')));
+          var selIdsObj=sess.selIds||{};
+          if(DB&&DB.observations){ for(var _oi=0;_oi<DB.observations.length;_oi++){ obsLookup[DB.observations[_oi].id]=DB.observations[_oi]; } }
+          var sessionCustoms=sess.customs||[];
+          for(var _ci=0;_ci<sessionCustoms.length;_ci++){ obsLookup[sessionCustoms[_ci].id]=sessionCustoms[_ci]; }
+          var ordered=[];
+          if(sess.obsOrder){ ordered=ordered.concat(sess.obsOrder.repeated||[]).concat(sess.obsOrder.new||[]); }
+          for(var _si=0;_si<Object.keys(selIdsObj).length;_si++){ var _id=Object.keys(selIdsObj)[_si]; if(ordered.indexOf(_id)<0) ordered.push(_id); }
+          obsIds=ordered.filter(function(id){ return selIdsObj[id]; });
+        }catch(e){}
+      }
+      var obsList=obsIds.map(function(id){ return obsLookup[id]||{id:id,title:id}; });
+      _supBuildReviewModal(reviewKey,rvData,obsList);
+    })
+    .catch(function(){ _supBuildReviewModal(reviewKey,rvData,[]); });
+  })
+  .catch(function(){ _supBuildReviewModal(reviewKey,{},[]); });
+}
+
+function _supBuildReviewModal(reviewKey, rvData, obsList){
   var ex=document.getElementById('_supReviewModal');
   if(ex) ex.remove();
   var el=document.createElement('div');
   el.id='_supReviewModal';
   el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
 
-  var brDisplay=reviewKey.replace(/_/g,' ');
-  var h='<div style="background:#fff;border-radius:8px;width:94%;max-width:560px;box-shadow:0 8px 32px rgba(0,0,0,.3)">';
-  h+='<div style="padding:14px 20px;border-bottom:1px solid #e0e8f0;display:flex;align-items:center;gap:10px">';
+  var brDisplay=(rvData.branchDisplay||reviewKey).replace(/_/g,' ');
+  var h='<div style="background:#fff;border-radius:8px;width:96%;max-width:680px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.3)">';
+  h+='<div style="padding:14px 20px;border-bottom:1px solid #e0e8f0;display:flex;align-items:center;gap:10px;flex-shrink:0">';
   h+='<span style="font-size:20px">&#9998;</span>';
   h+='<div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1a3a5c">Supervisor Review</div>';
   h+='<div style="font-size:11px;color:#888">'+esc(brDisplay)+'</div></div>';
   h+='<button onclick="document.getElementById(\'_supReviewModal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#999">&#x2715;</button>';
   h+='</div>';
-  h+='<div style="padding:20px">';
+  h+='<div style="overflow-y:auto;padding:20px;flex:1">';
   // Decision
-  h+='<div style="margin-bottom:14px"><div style="font-size:11.5px;font-weight:700;color:#2a4060;margin-bottom:8px">Decision</div>';
+  h+='<div style="margin-bottom:16px"><div style="font-size:11.5px;font-weight:700;color:#2a4060;margin-bottom:8px">Overall Decision</div>';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
   var decisions=[['approved','&#10003; Approve','#1a6030','#e8f8ee'],['changes_requested','&#9998; Request Changes','#1a3a5c','#e8f0fb'],['rejected','&#10007; Reject','#c0392b','#fdf0f0']];
   decisions.forEach(function(d){
@@ -24807,12 +24856,22 @@ function _supOpenReview(reviewKey){
     h+='<input type="radio" name="_supDecision" value="'+d[0]+'" onchange="_supDecisionChange()" style="display:none">'+d[1]+'</label>';
   });
   h+='</div></div>';
-  // Comment
-  h+='<div style="margin-bottom:16px"><div style="font-size:11.5px;font-weight:700;color:#2a4060;margin-bottom:6px">Comments / Remarks</div>';
-  h+='<textarea id="_supReviewComment" rows="5" placeholder="Enter your review comments, specific amendments required, or approval remarks..." style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#1a3a5c"></textarea></div>';
+  // Overall comment
+  h+='<div style="margin-bottom:16px"><div style="font-size:11.5px;font-weight:700;color:#2a4060;margin-bottom:6px">Overall Comments / Remarks</div>';
+  h+='<textarea id="_supReviewComment" rows="3" placeholder="Overall remarks, general direction, approval notes..." style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#1a3a5c"></textarea></div>';
+  // Per-observation comments
+  if(obsList.length){
+    h+='<div style="font-size:11.5px;font-weight:700;color:#2a4060;margin-bottom:10px">Comments Per Observation ('+obsList.length+')</div>';
+    obsList.forEach(function(o,i){
+      h+='<div style="background:#f8fafc;border:1px solid #e0e8f0;border-radius:6px;padding:12px 14px;margin-bottom:10px">';
+      h+='<div style="font-size:12px;font-weight:700;color:#1a3a5c;margin-bottom:7px"><span style="background:#e8f0fb;color:#1a3a5c;font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:10px;margin-right:7px">'+(i+1)+'</span>'+esc(o.title||o.id)+'</div>';
+      h+='<textarea id="_supObsComment_'+esc(o.id)+'" rows="2" placeholder="Comment on this observation (leave blank if no specific remark)..." style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #c8d8ec;border-radius:4px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#333"></textarea>';
+      h+='</div>';
+    });
+  }
   h+='</div>';
-  h+='<div style="padding:12px 20px;border-top:1px solid #e0e8f0;display:flex;gap:10px;justify-content:flex-end">';
-  h+='<button id="_supSubmitReviewBtn" onclick="_supSubmitReview(\''+esc(reviewKey)+'\')" style="padding:8px 22px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Submit Review</button>';
+  h+='<div style="padding:12px 20px;border-top:1px solid #e0e8f0;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0">';
+  h+='<button id="_supSubmitReviewBtn" onclick="_supSubmitReview(\''+esc(reviewKey)+'\','+JSON.stringify(obsList.map(function(o){return o.id;}))+',\''+esc(rvData.sessionPath||'')+'\',\''+esc(rvData.submittedBy||'')+'\',\''+esc(rvData.submittedAt||'')+'\')" style="padding:8px 22px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Submit Review</button>';
   h+='<button onclick="document.getElementById(\'_supReviewModal\').remove()" style="padding:8px 14px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>';
   h+='</div></div>';
 
@@ -24838,7 +24897,7 @@ function _supDecisionChange(){
   });
 }
 
-function _supSubmitReview(reviewKey){
+function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origSubmittedAt){
   var inp=document.querySelector('input[name="_supDecision"]:checked');
   if(!inp){ toast('Please select a decision (Approve / Request Changes / Reject).'); return; }
   var decision=inp.value;
@@ -24846,14 +24905,27 @@ function _supSubmitReview(reviewKey){
   var userObj=_umGetCurrentUser();
   var cfg=_csGetCfg();
 
+  // Collect per-observation comments
+  var obsComments={};
+  if(obsIds&&obsIds.length){
+    obsIds.forEach(function(id){
+      var el=document.getElementById('_supObsComment_'+id);
+      if(el&&el.value.trim()) obsComments[id]=el.value.trim();
+    });
+  }
+
   var reviewData={
     reviewKey: reviewKey,
     branchDisplay: reviewKey.replace(/_/g,' '),
     status: decision,
     supervisorComment: comment,
+    obsComments: obsComments,
     supervisorName: userObj.name||userObj.username||'Supervisor',
     supervisorRole: userObj.role||'ro_supervisor',
-    reviewedAt: new Date().toISOString()
+    reviewedAt: new Date().toISOString(),
+    sessionPath: sessionPath||'',
+    submittedBy: origSubmittedBy||'',
+    submittedAt: origSubmittedAt||''
   };
 
   var path=_SUP_REVIEW_PATH+reviewKey+'.json';
@@ -24861,14 +24933,10 @@ function _supSubmitReview(reviewKey){
   var hdrs=_csHdrs(cfg);
 
   toast('Submitting review...');
+  // Get current SHA (needed for GitHub PUT to update existing file)
   fetch(url,{headers:hdrs})
   .then(function(r){ return r.ok?r.json():{sha:null}; })
   .then(function(existing){
-    // Preserve original submission data
-    var orig=existing&&existing.content?JSON.parse(_csB64Dec(existing.content.replace(/\s/g,''))):({});
-    reviewData.submittedBy=orig.submittedBy||reviewData.supervisorName;
-    reviewData.submittedAt=orig.submittedAt||reviewData.reviewedAt;
-    reviewData.sessionPath=orig.sessionPath||'';
     var body={message:'[BRAINS] Supervisor review: '+reviewKey,content:_csB64Enc(JSON.stringify(reviewData,null,2))};
     if(existing&&existing.sha) body.sha=existing.sha;
     return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
