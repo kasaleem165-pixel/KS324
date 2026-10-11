@@ -741,7 +741,9 @@ function _pwGrantAccess(userObj){
   setTimeout(function(){
     _umShowLoginBadge(userObj);
     _applyRoleUI();
-    _startRestore();
+    // Supervisors and admins never need to resume an audit session
+    var isSupervisorOrAdmin=(userObj.role==='ro_supervisor'||userObj.role==='ho_supervisor'||userObj.role==='administrator');
+    if(!isSupervisorOrAdmin){ _startRestore(); }
     // Auto-launch supervisor dashboard for supervisor roles
     if(userObj.role==='ro_supervisor'||userObj.role==='ho_supervisor'){
       setTimeout(_supShowDashboard, 400);
