@@ -17169,12 +17169,9 @@ function _csLoadReviewByFile(fileInfo, role){
     try{ rv=JSON.parse(_csB64Dec(file.content.replace(/\s/g,''))); }catch(e){ toast('Review file is corrupted.'); return; }
     if(!rv||!rv.status){ toast('No review data in this file.'); return; }
 
-    // Show the comments panel
+    // Render the report first so obs anchors exist when the panel builds obsInfoMap
+    try{ renderRpt(); }catch(e){}
     _supShowReviewCommentPanel(rv, role, file.sha);
-    // Prompt to generate if not yet done (calling renderRpt() directly is unsafe here)
-    if(!_reportEverGenerated){
-      setTimeout(function(){ toast('Review loaded. Click "Generate / Refresh Report" so the Go buttons work.'); },600);
-    }
   })
   .catch(function(){ toast('Failed to load review. Check connection.'); });
 }
@@ -17199,10 +17196,8 @@ function _supFetchAndShowReviewComments(role){
     var rv;
     try{ rv=JSON.parse(_csB64Dec(file.content.replace(/\s/g,''))); }catch(e){ return; }
     if(!rv||!rv.status) return;
+    try{ renderRpt(); }catch(e){}
     _supShowReviewCommentPanel(rv, role, file.sha);
-    if(!_reportEverGenerated){
-      setTimeout(function(){ toast('Review loaded. Click "Generate / Refresh Report" so the Go buttons work.'); },600);
-    }
   })
   .catch(function(){});
 }
