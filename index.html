@@ -17184,8 +17184,13 @@ function _supShowReviewCommentPanel(rv, role, sha){
   if(hasObs){
     h+='<div style="font-size:10px;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">&#128204; Click an observation to jump to it in the report</div>';
     obsKeys.forEach(function(id,idx){
-      var info=obsInfoMap[id]||{title:id,num:'',anchorId:'obs-sc-'+id};
-      var numBadge=info.num?'<span style="background:#c9962a;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:8px;margin-right:6px;flex-shrink:0">Obs. '+esc(info.num)+'</span>':'<span style="background:#c9962a;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:8px;margin-right:6px;flex-shrink:0">'+(idx+1)+'</span>';
+      // Look up title from DB directly (works even if report not yet generated)
+      var dbTitle=id;
+      if(DB&&DB.observations){ for(var _di=0;_di<DB.observations.length;_di++){ if(DB.observations[_di].id===id){ dbTitle=DB.observations[_di].title||id; break; } } }
+      if(dbTitle===id&&DB&&DB.customs){ for(var _ci=0;_ci<DB.customs.length;_ci++){ if(DB.customs[_ci].id===id){ dbTitle=DB.customs[_ci].title||id; break; } } }
+      var info=obsInfoMap[id]||{title:dbTitle,num:'',anchorId:'obs-sc-'+id};
+      if(info.title===id) info.title=dbTitle; // upgrade raw-id fallback with real title
+      var numBadge=info.num?'<span style="background:#c9962a;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:8px;margin-right:6px;flex-shrink:0">Obs. '+esc(info.num)+'</span>':'<span style="background:#888;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:8px;margin-right:6px;flex-shrink:0">'+esc(id)+'</span>';
       h+='<div id="_supObsCard_'+esc(id)+'" onclick="_supJumpToObs(\''+esc(info.anchorId)+'\',\''+esc(id)+'\')" style="cursor:pointer;border:1px solid #f5c842;border-radius:6px;margin-bottom:8px;overflow:hidden;transition:box-shadow .15s" onmouseover="this.style.boxShadow=\'0 2px 10px rgba(201,150,42,.35)\'" onmouseout="this.style.boxShadow=\'none\'">';
       h+='<div style="background:#fffbe6;padding:6px 10px;display:flex;align-items:center;border-bottom:1px solid #f5e090">';
       h+=numBadge;
