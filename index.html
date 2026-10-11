@@ -25221,27 +25221,26 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
   .catch(function(e){ toast('Error: '+(e&&e.message?e.message:e)); });
 }
 
-function _supNotifyAuditor(reviewData){
-  // Find auditor slug from reviewKey to write notification
+function _supWriteReviewNotif(reviewData, amended){
   var cfg=_csGetCfg();
-  var parts=reviewData.reviewKey.split('_');
-  // reviewKey format: year_branchslug — auditor slug comes from session path
   if(!reviewData.sessionPath) return;
   var audSlug=reviewData.sessionPath.split('/').pop().replace('.json','');
   var decisionLabel={'approved':'Approved','changes_requested':'Changes Requested','rejected':'Rejected'};
+  var decisionIcon={'approved':'✓','changes_requested':'✎','rejected':'✗'};
   var entry={
     from: _csAuditorSlug(cfg),
     fromName: reviewData.supervisorName,
     at: new Date().toISOString(),
     branch: reviewData.branchDisplay,
-    type: 'supervisor_review',
+    reviewKey: reviewData.reviewKey,
+    type: amended?'supervisor_review_amended':'supervisor_review',
     decision: reviewData.status,
-    msg: 'Your report for "'+reviewData.branchDisplay+'" has been reviewed by '+reviewData.supervisorName+' — '+
-         (decisionLabel[reviewData.status]||reviewData.status)+
-         (reviewData.supervisorComment?'. Comment: '+reviewData.supervisorComment:'')+'.'
+    amended: !!amended,
+    msg: (amended?'Review updated by ':'Reviewed by ')+reviewData.supervisorName+
+         ' — <strong>'+(decisionIcon[reviewData.status]||'')+' '+(decisionLabel[reviewData.status]||reviewData.status)+'</strong>'+
+         (reviewData.supervisorComment&&!amended?' — '+reviewData.supervisorComment:'')+
+         (amended?' — please re-read the updated comments.':'.')
   };
-  _csWriteNotification(cfg, audSlug, {_loadedFrom:audSlug,_cloudMeta:{branchFolder:reviewData.branchDisplay}});
-  // Write directly to auditor notification file
   var path='_notifications/'+audSlug+'.json';
   var url=_csRepoBase(cfg)+'/contents/'+path;
   var hdrs=_csHdrs(cfg);
@@ -25251,6 +25250,8 @@ function _supNotifyAuditor(reviewData){
     var arr;
     try{ arr=JSON.parse(_csB64Dec((existing.content||'W10=').replace(/\s/g,''))); }catch(e){ arr=[]; }
     if(!Array.isArray(arr)) arr=[];
+    // Replace any existing entry for the same reviewKey — avoids duplicate clutter
+    arr=arr.filter(function(e){ return e.reviewKey!==reviewData.reviewKey; });
     arr.push(entry);
     var body={message:'[BRAINS] Review notification for '+audSlug,content:_csB64Enc(JSON.stringify(arr,null,2))};
     if(existing&&existing.sha) body.sha=existing.sha;
@@ -25259,38 +25260,8 @@ function _supNotifyAuditor(reviewData){
   .catch(function(){});
 }
 
-function _supNotifyAuditorAmended(reviewData){
-  var cfg=_csGetCfg();
-  if(!reviewData.sessionPath) return;
-  var audSlug=reviewData.sessionPath.split('/').pop().replace('.json','');
-  var decisionLabel={'approved':'Approved','changes_requested':'Changes Requested','rejected':'Rejected'};
-  var entry={
-    from: _csAuditorSlug(cfg),
-    fromName: reviewData.supervisorName,
-    at: new Date().toISOString(),
-    branch: reviewData.branchDisplay,
-    type: 'supervisor_review_amended',
-    decision: reviewData.status,
-    msg: '&#9888;&#65039; Supervisor '+reviewData.supervisorName+' has AMENDED the review comments for "'+reviewData.branchDisplay+'" — '+
-         (decisionLabel[reviewData.status]||reviewData.status)+
-         '. Please re-read the updated comments before continuing your work.'
-  };
-  var path='_notifications/'+audSlug+'.json';
-  var url=_csRepoBase(cfg)+'/contents/'+path;
-  var hdrs=_csHdrs(cfg);
-  fetch(url,{headers:hdrs})
-  .then(function(r){ return r.ok?r.json():{content:'W10=',sha:null}; })
-  .then(function(existing){
-    var arr;
-    try{ arr=JSON.parse(_csB64Dec((existing.content||'W10=').replace(/\s/g,''))); }catch(e){ arr=[]; }
-    if(!Array.isArray(arr)) arr=[];
-    arr.push(entry);
-    var body={message:'[BRAINS] Amended review notification for '+audSlug,content:_csB64Enc(JSON.stringify(arr,null,2))};
-    if(existing&&existing.sha) body.sha=existing.sha;
-    return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
-  })
-  .catch(function(){});
-}
+function _supNotifyAuditor(reviewData){ _supWriteReviewNotif(reviewData, false); }
+function _supNotifyAuditorAmended(reviewData){ _supWriteReviewNotif(reviewData, true); }
 
 // Supervisor Dashboard button in toolbar — locked for non-supervisors
 function _supToolbarBtn(){
@@ -25958,10 +25929,7 @@ function _csCheckNotifications(cfg){
     var arr;
     try{ arr=JSON.parse(_csB64Dec(raw)); }catch(e){ return; }
     if(!Array.isArray(arr)||!arr.length) return;
-    // Show notification banner
-    var msgs=arr.map(function(e){ return e.msg||((e.fromName||e.from)+' modified a session for '+e.branch); });
-    _csShowNotifBanner(msgs, function(){
-      // Clear notifications file after user has seen them
+    _csShowNotifBanner(arr, function(){
       var body={message:'[BRAINS] clear notifications for '+mySlug,content:_csB64Enc('[]'),sha:file.sha};
       fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)}).catch(function(){});
     });
@@ -25969,16 +25937,56 @@ function _csCheckNotifications(cfg){
   .catch(function(){});
 }
 
-function _csShowNotifBanner(msgs, onDismiss){
-  var el=document.getElementById('_csNotifBanner');
-  if(!el){ el=document.createElement('div'); el.id='_csNotifBanner'; document.body.prepend(el); }
-  el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#1a3a5c;color:#fff;font-size:12px;font-weight:600;padding:9px 18px;display:flex;align-items:flex-start;gap:10px;font-family:Inter,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.25)';
-  var listHtml=msgs.map(function(m){ return '<div style="margin-bottom:3px">&#8226; '+esc(m)+'</div>'; }).join('');
-  el.innerHTML='<span style="font-size:16px;flex-shrink:0">&#128276;</span>'
-    +'<div style="flex:1"><div style="margin-bottom:4px;font-size:12.5px">Session Activity Notifications:</div>'+listHtml+'</div>'
-    +'<button id="_csNotifDismissBtn" style="padding:4px 12px;background:#fff;color:#1a3a5c;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;font-family:Inter,sans-serif">Dismiss</button>';
+function _csShowNotifBanner(entries, onDismiss){
+  var ex=document.getElementById('_csNotifBanner');
+  if(ex) ex.remove();
+
+  // Deduplicate: keep only the latest entry per reviewKey (or per branch for legacy entries)
+  var seen={};
+  var unique=[];
+  var copy=entries.slice().reverse(); // newest first
+  copy.forEach(function(e){
+    var key=e.reviewKey||e.branch||e.msg;
+    if(!seen[key]){ seen[key]=true; unique.push(e); }
+  });
+  unique.reverse(); // restore chronological order
+
+  var decisionColor={'approved':'#1a6030','changes_requested':'#c9962a','rejected':'#c0392b'};
+  var decisionBg={'approved':'#e8f8ee','changes_requested':'#fff8e6','rejected':'#fdf0f0'};
+
+  var overlay=document.createElement('div');
+  overlay.id='_csNotifBanner';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99998;display:flex;align-items:flex-start;justify-content:center;padding-top:60px;font-family:Inter,sans-serif';
+
+  var boxStyle='background:#fff;border-radius:8px;width:94%;max-width:520px;box-shadow:0 8px 32px rgba(0,0,0,.3);overflow:hidden';
+  var h='<div style="'+boxStyle+'">';
+  h+='<div style="background:#1a3a5c;color:#fff;padding:12px 18px;display:flex;align-items:center;gap:10px">';
+  h+='<span style="font-size:18px">&#128276;</span>';
+  h+='<div style="flex:1;font-size:13px;font-weight:700">'+unique.length+' Supervisor Notification'+(unique.length>1?'s':'')+'</div>';
+  h+='</div>';
+  h+='<div style="padding:14px 18px;max-height:50vh;overflow-y:auto">';
+  unique.forEach(function(e){
+    var dec=e.decision||'';
+    var bg=decisionBg[dec]||'#f8fafc';
+    var col=decisionColor[dec]||'#1a3a5c';
+    var msg=e.msg||((e.fromName||e.from||'Supervisor')+' updated the review for "'+esc(e.branch||'')+'".');
+    var branchLabel=e.branch?'<div style="font-size:10.5px;font-weight:700;color:'+col+';margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">'+esc(e.branch)+'</div>':'';
+    h+='<div style="background:'+bg+';border:1px solid #e0e8f0;border-left:3px solid '+col+';border-radius:6px;padding:10px 13px;margin-bottom:10px;font-size:12px;color:#333;line-height:1.6">';
+    h+=branchLabel;
+    h+='<div>'+msg+'</div>';
+    if(e.at){ h+='<div style="font-size:10.5px;color:#aaa;margin-top:4px">'+_supFmtDate(e.at)+'</div>'; }
+    h+='</div>';
+  });
+  h+='</div>';
+  h+='<div style="padding:12px 18px;border-top:1px solid #e0e8f0;display:flex;justify-content:flex-end">';
+  h+='<button id="_csNotifDismissBtn" style="padding:7px 22px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">OK, Got it</button>';
+  h+='</div>';
+  h+='</div>';
+
+  overlay.innerHTML=h;
+  document.body.appendChild(overlay);
   document.getElementById('_csNotifDismissBtn').onclick=function(){
-    el.remove();
+    overlay.remove();
     if(onDismiss) onDismiss();
   };
 }
