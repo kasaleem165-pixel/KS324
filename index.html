@@ -24794,7 +24794,7 @@ function _supShowSessionViewer(sess, reviewKey){
   // Store session context for Write Review button
   _supViewerSession={sess:sess,reviewKey:reviewKey,orderedIds:orderedIds,obsLookup:obsLookup,rvData:{}};
   // Try to enrich rvData from review record (async — not critical)
-  (function(rk){ var cfg2=_csGetCfg(); fetch(_csRepoBase(cfg2)+'/contents/'+_SUP_REVIEW_PATH+rk+'.json',{headers:_csHdrs(cfg2)}).then(function(r){ return r.ok?r.json():null; }).then(function(f){ if(f&&f.content){ try{ _supViewerSession.rvData=JSON.parse(_csB64Dec(f.content.replace(/\s/g,''))); }catch(e){} } }).catch(function(){}); })(reviewKey);
+  (function(rk){ var cfg2=_csGetCfg(); fetch(_csRepoBase(cfg2)+'/contents/'+_SUP_REVIEW_PATH+rk+'.json',{headers:_csHdrs(cfg2)}).then(function(r){ return r.ok?r.json():null; }).then(function(f){ if(f&&f.content){ try{ _supViewerSession.rvData=JSON.parse(_csB64Dec(f.content.replace(/\s/g,''))); var obsC=_supViewerSession.rvData.obsComments||{}; Object.keys(obsC).forEach(function(id){ if(!obsC[id]) return; var ta=document.getElementById('_supObsComment_'+id); if(ta) ta.value=obsC[id]; var safeId=id.replace(/[^a-zA-Z0-9_]/g,'_'); var box=document.getElementById('_supObsCommentBox_'+safeId); var btn=document.getElementById('_supObsFlag_'+safeId); if(box){ box.style.display='block'; } if(btn){ btn.style.background='#c9962a'; btn.style.color='#fff'; } }); }catch(e){} } }).catch(function(){}); })(reviewKey);
 
   // Header
   var h='<div style="background:#1a3a5c;color:#fff;padding:0 20px;display:flex;align-items:center;gap:12px;height:48px;flex-shrink:0">';
@@ -25185,9 +25185,16 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
       var viewer=document.getElementById('_supViewer');
       if(viewer) viewer.remove();
       toast(isUpdate?'Review updated ✓':'Review submitted ✓');
-      // Refresh dashboard
-      _supSessionCache=null;
-      setTimeout(_supShowDashboard,600);
+      // Immediately update local cache so dashboard shows new status without waiting for GitHub API
+      if(_supSessionCache&&_supSessionCache.reviews){
+        _supSessionCache.reviews[reviewKey]=reviewData;
+        _supRender(_supSessionCache.sessions,_supSessionCache.reviews);
+      }
+      // Full background refresh from GitHub after delay
+      setTimeout(function(){
+        var dashEl=document.getElementById('_supDashboard');
+        if(dashEl){ _supSessionCache=null; _supLoadData(); }
+      },3000);
     } else {
       toast('Failed to save review.');
     }
