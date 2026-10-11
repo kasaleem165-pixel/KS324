@@ -17319,16 +17319,23 @@ function _supJumpToObs(anchorId, obsId){
 
   var target=document.getElementById(anchorId);
   if(!target){
-    // Determine why: obs not selected vs report not generated
+    // Obs not in DOM — auto-regenerate then retry once
     var obsSelected=(typeof selIds!=='undefined')&&selIds[obsId];
-    var reportGenerated=!!(document.getElementById('rpcont')&&document.getElementById('rpcont').children.length);
     if(!obsSelected){
-      toast('Obs. '+obsId+' is not in your current report. Select it from the observation checklist first, then regenerate the report.');
-    } else if(!reportGenerated){
-      toast('Please click "Generate / Refresh Report" first, then click here again.');
-    } else {
-      toast('Please click "Generate / Refresh Report" to refresh the report, then try again.');
+      toast('Obs. '+obsId+' is not selected in your checklist. Tick it first, then click Generate / Refresh Report.');
+      return;
     }
+    // Regenerate silently via the safe path, then retry
+    toast('Refreshing report...');
+    try{ confirmAndGenerate(); }catch(e){}
+    setTimeout(function(){
+      var retryTarget=document.getElementById(anchorId);
+      if(retryTarget){
+        _supJumpToObs(anchorId, obsId);
+      } else {
+        toast('Observation not found in report. Ensure it is selected in the checklist and click Generate / Refresh Report.');
+      }
+    }, 1800);
     return;
   }
 
