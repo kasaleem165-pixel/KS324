@@ -25249,11 +25249,12 @@ function _adminHandleSetupUrl(){
   try{ window.history.replaceState({},'',window.location.pathname); }catch(e){}
   if(changed){
     setTimeout(function(){
-      var msg='&#9989; Cloud Settings configured automatically!\n\n'
-        +'Repository: '+owner+'/'+repo+(auditor?'\nName: '+auditor:'')+'\n\n'
-        +'You can now log in with your username and password.';
-      alert(msg.replace(/&#9989; /,''));
-    },600);
+      var banner=document.createElement('div');
+      banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#1a6030;color:#fff;font-family:Inter,sans-serif;font-size:13.5px;font-weight:600;padding:16px 24px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.25)';
+      banner.innerHTML='&#9989; Cloud Settings configured automatically! &nbsp; Repository: <strong>'+esc(owner)+'/'+esc(repo)+'</strong>'+(auditor?' &nbsp;&bull;&nbsp; Name: <strong>'+esc(auditor)+'</strong>':'')+' &nbsp;&mdash;&nbsp; You can now log in with your username and password. &nbsp;<span onclick="this.parentNode.parentNode.removeChild(this.parentNode)" style="cursor:pointer;opacity:.7;font-size:16px;vertical-align:middle">&times;</span>';
+      document.body.appendChild(banner);
+      setTimeout(function(){ if(banner.parentNode) banner.parentNode.removeChild(banner); }, 8000);
+    },800);
   }
 }
 
