@@ -17076,22 +17076,113 @@ function _csSubmitReviewRequest(role){
 function _csLoadReviewCloud(role){
   var cfg=_csGetCfg();
   var isCloud=!!(cfg.token&&cfg.owner&&cfg.repo);
-  if(isCloud){
-    _supFetchAndShowReviewComments(role);
-    // Also offer file import as secondary option via toast
-    setTimeout(function(){
-      var t=document.createElement('div');
-      t.innerHTML='Not showing? <span onclick="_csLoadReviewFile(\''+role+'\')" style="text-decoration:underline;cursor:pointer;font-weight:700">Import file instead</span>';
-      t.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#1a3a5c;color:#fff;padding:9px 18px;border-radius:6px;font-size:12px;z-index:9999;white-space:nowrap';
-      document.body.appendChild(t);
-      setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); },5000);
-    },800);
-  } else {
-    _csLoadReviewFile(role);
+  if(!isCloud){ _csLoadReviewFile(role); return; }
+
+  // List all files in _reviews/ folder to find available reviews
+  var listUrl=_csRepoBase(cfg)+'/contents/_reviews';
+  toast('Loading review list...');
+  fetch(listUrl,{headers:_csHdrs(cfg)})
+  .then(function(r){ return r.ok?r.json():[]; })
+  .then(function(files){
+    if(!Array.isArray(files)||!files.length){
+      toast('No supervisor reviews found in cloud.');
+      return;
+    }
+    // Filter JSON files only
+    var reviews=[];
+    for(var i=0;i<files.length;i++){
+      if(files[i].name&&files[i].name.match(/\.json$/i)) reviews.push(files[i]);
+    }
+    if(!reviews.length){ toast('No supervisor reviews found in cloud.'); return; }
+
+    if(reviews.length===1){
+      // Only one review — load it directly
+      _csLoadReviewByFile(reviews[0], role);
+    } else {
+      // Multiple reviews — show branch picker
+      _csShowReviewPicker(reviews, role);
+    }
+  })
+  .catch(function(){ toast('Could not reach cloud. Check connection.'); });
+}
+
+function _csShowReviewPicker(files, role){
+  var ex=document.getElementById('_csReviewPickerModal');
+  if(ex) ex.remove();
+
+  var modal=document.createElement('div');
+  modal.id='_csReviewPickerModal';
+  modal.style.cssText='position:fixed;inset:0;z-index:19999;background:rgba(10,20,40,.55);display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+
+  var h='<div style="background:#fff;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.35);width:460px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">';
+  h+='<div style="background:#1a3a5c;color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0">';
+  h+='<span style="font-size:18px">&#128204;</span>';
+  h+='<div style="flex:1;font-size:13.5px;font-weight:800">Select Branch — Supervisor Reviews</div>';
+  h+='<button onclick="document.getElementById(\'_csReviewPickerModal\').remove()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0;line-height:1">&#x2715;</button>';
+  h+='</div>';
+  h+='<div style="padding:12px 16px;font-size:11.5px;color:#4a5a70;border-bottom:1px solid #eaeff6;flex-shrink:0">'+files.length+' supervisor reviews found. Click a branch to load it.</div>';
+  h+='<div style="overflow-y:auto;padding:12px 16px;flex:1">';
+
+  for(var i=0;i<files.length;i++){
+    var fname=files[i].name.replace('.json','');
+    // fname format: {year}_{brcode}_{brname}
+    var parts=fname.split('_');
+    var yr=parts[0]||'';
+    var brcode=parts[1]||'';
+    var brname=parts.slice(2).join(' ')||fname;
+
+    h+='<div onclick="_csPickReview(\''+esc(files[i].name)+'\',\''+esc(role)+'\')" style="cursor:pointer;border:1px solid #dde2ea;border-radius:7px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;transition:background .12s" onmouseover="this.style.background=\'#f0f6ff\';this.style.borderColor=\'#1a3a5c\'" onmouseout="this.style.background=\'\';this.style.borderColor=\'#dde2ea\'">';
+    h+='<div style="background:#1a3a5c;color:#fff;font-size:12px;font-weight:800;padding:4px 10px;border-radius:6px;flex-shrink:0">'+esc(brcode||yr)+'</div>';
+    h+='<div style="flex:1">';
+    h+='<div style="font-size:13px;font-weight:700;color:#1a3a5c">'+esc(brname.replace(/_/g,' '))+'</div>';
+    h+='<div style="font-size:10.5px;color:#888;margin-top:2px">Audit Year: '+esc(yr)+'</div>';
+    h+='</div>';
+    h+='<span style="font-size:12px;color:#c9962a;font-weight:700">Load &#8594;</span>';
+    h+='</div>';
+  }
+
+  h+='</div></div>';
+  modal.innerHTML=h;
+  document.body.appendChild(modal);
+
+  // Store file list for picker callback
+  window._csReviewPickerFiles=files;
+}
+
+function _csPickReview(fname, role){
+  var modal=document.getElementById('_csReviewPickerModal');
+  if(modal) modal.remove();
+  var files=window._csReviewPickerFiles||[];
+  for(var i=0;i<files.length;i++){
+    if(files[i].name===fname){ _csLoadReviewByFile(files[i], role); return; }
   }
 }
+
+function _csLoadReviewByFile(fileInfo, role){
+  var cfg=_csGetCfg();
+  toast('Loading review...');
+  fetch(fileInfo.url,{headers:_csHdrs(cfg)})
+  .then(function(r){ return r.ok?r.json():null; })
+  .then(function(file){
+    if(!file||!file.content){ toast('Could not read review file.'); return; }
+    var rv;
+    try{ rv=JSON.parse(_csB64Dec(file.content.replace(/\s/g,''))); }catch(e){ toast('Review file is corrupted.'); return; }
+    if(!rv||!rv.status){ toast('No review data in this file.'); return; }
+
+    // Auto-generate report if not yet done
+    if(!_reportEverGenerated){
+      toast('Generating report...');
+      try{ renderRpt(); }catch(e){}
+    }
+
+    // Show the comments panel
+    _supShowReviewCommentPanel(rv, role, file.sha);
+  })
+  .catch(function(){ toast('Failed to load review. Check connection.'); });
+}
+
 function _csLoadReviewFile(role){
-  alert('⚠️ You are using the OFFLINE file method.\nSelect the reviewed file sent back by your '+(role==='ro'?'RO':'HO')+' Supervisor.');
+  alert('You are using the OFFLINE file method.\nSelect the reviewed file sent back by your '+(role==='ro'?'RO':'HO')+' Supervisor.');
   triggerLoadReviewerHtml(role);
 }
 
@@ -17110,7 +17201,8 @@ function _supFetchAndShowReviewComments(role){
     var rv;
     try{ rv=JSON.parse(_csB64Dec(file.content.replace(/\s/g,''))); }catch(e){ return; }
     if(!rv||!rv.status) return;
-    // Show the supervisor comments panel
+    // Auto-generate report if not yet done so Go button works immediately
+    if(!_reportEverGenerated){ try{ renderRpt(); }catch(e){} }
     _supShowReviewCommentPanel(rv, role, file.sha);
   })
   .catch(function(){});
