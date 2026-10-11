@@ -17222,14 +17222,25 @@ function _supJumpToObs(anchorId, obsId){
   if(activeCard){ activeCard.style.border='2px solid #c9962a'; activeCard.style.background='#fffef5'; }
 
   var target=document.getElementById(anchorId);
-  if(target){
+  if(!target) return;
+
+  // Report lives inside #ra-RP (overflow-y:auto) — must scroll that container
+  var scrollContainer=document.getElementById('ra-RP');
+  if(scrollContainer){
+    var containerTop=scrollContainer.getBoundingClientRect().top;
+    var targetTop=target.getBoundingClientRect().top;
+    var offset=targetTop-containerTop+scrollContainer.scrollTop-20;
+    scrollContainer.scrollTo({top:offset,behavior:'smooth'});
+  } else {
     target.scrollIntoView({behavior:'smooth',block:'start'});
-    // Flash highlight on the observation
-    var orig=target.style.outline||'';
-    target.style.outline='3px solid #c9962a';
-    target.style.borderRadius='6px';
-    setTimeout(function(){ target.style.outline=orig; },2000);
   }
+
+  // Flash amber outline so the auditor sees which observation to correct
+  var orig=target.style.outline||'';
+  var origRadius=target.style.borderRadius||'';
+  target.style.outline='3px solid #c9962a';
+  target.style.borderRadius='6px';
+  setTimeout(function(){ target.style.outline=orig; target.style.borderRadius=origRadius; },2500);
 }
 
 function _supAcknowledgeReview(rv, sha){
