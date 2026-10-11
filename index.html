@@ -17119,61 +17119,117 @@ function _supFetchAndShowReviewComments(role){
 function _supShowReviewCommentPanel(rv, role, sha){
   var ex=document.getElementById('_supCommentPanel');
   if(ex) ex.remove();
-  var el=document.createElement('div');
-  el.id='_supCommentPanel';
-  el.style.cssText='position:fixed;bottom:20px;right:20px;z-index:9990;width:380px;max-width:94vw;background:#fff;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,.22);border:2px solid #c9962a;font-family:Inter,sans-serif;overflow:hidden';
+
+  // Build a map: obsId -> {title, num, anchorId} by scanning rendered report DOM
+  var obsInfoMap={};
+  document.querySelectorAll('[id^="obs-sc-"]').forEach(function(el){
+    var anchorId=el.id;
+    var obsId=anchorId.replace('obs-sc-','');
+    // Number from first cell of summary row OR from the obs heading
+    var numEl=el.querySelector('[data-obsnum]');
+    var numStr='';
+    if(numEl){ numStr=numEl.getAttribute('data-obsnum'); }
+    else {
+      // Fallback: find the "Obs. X.Y" text inside this element
+      var txt=el.textContent||'';
+      var m=txt.match(/Obs\.\s*([\d.]+)/);
+      if(m) numStr=m[1];
+    }
+    var titleEl=el.querySelector('h3,h4,[data-obstitle]');
+    var title=obsId;
+    if(DB&&DB.observations){ for(var _i=0;_i<DB.observations.length;_i++){ if(DB.observations[_i].id===obsId){ title=DB.observations[_i].title||obsId; break; } } }
+    obsInfoMap[obsId]={title:title,num:numStr,anchorId:anchorId};
+  });
+  // Also fill titles for obs not yet in DOM (custom obs in session)
+  if(sess&&sess.customs){ sess.customs.forEach(function(c){ if(!obsInfoMap[c.id]) obsInfoMap[c.id]={title:c.title||c.id,num:'',anchorId:'obs-sc-'+c.id}; }); }
 
   var roleLabel=(rv.supervisorRole==='ro_supervisor'?'RO':'HO')+' Supervisor';
   var decMap={
-    'approved':       ['&#10003; Approved',       '#1a6030','#e8f8ee'],
-    'changes_requested':['&#9998; Changes Requested','#1a3a5c','#e8f0fb'],
-    'rejected':       ['&#10007; Rejected',       '#c0392b','#fdf0f0']
+    'approved':         ['&#10003; Approved',        '#1a6030','#e8f8ee','#1a6030'],
+    'changes_requested':['&#9998; Changes Requested', '#7a5500','#fff8e6','#c9962a'],
+    'rejected':         ['&#10007; Rejected',         '#c0392b','#fdf0f0','#c0392b']
   };
-  var dec=decMap[rv.status]||['Reviewed','#555','#f8f8f8'];
+  var dec=decMap[rv.status]||['Reviewed','#555','#f8f8f8','#888'];
+  var obsKeys=Object.keys(rv.obsComments||{});
+  var hasObs=obsKeys.length>0;
 
-  var h='<div style="background:#c9962a;color:#fff;padding:10px 14px;display:flex;align-items:center;gap:8px">';
-  h+='<span style="font-size:16px">&#128276;</span>';
+  var el=document.createElement('div');
+  el.id='_supCommentPanel';
+  el.style.cssText='position:fixed;top:60px;right:0;bottom:0;z-index:9990;width:360px;max-width:96vw;background:#fff;box-shadow:-4px 0 24px rgba(0,0,0,.18);border-left:3px solid '+dec[3]+';font-family:Inter,sans-serif;display:flex;flex-direction:column;overflow:hidden';
+
+  var h='';
+  // Header
+  h+='<div style="background:'+dec[3]+';color:#fff;padding:10px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0">';
+  h+='<span style="font-size:16px">&#9998;</span>';
   h+='<div style="flex:1;font-size:12.5px;font-weight:700">'+roleLabel+' Review Comments</div>';
-  h+='<button onclick="document.getElementById(\'_supCommentPanel\').remove()" style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer;line-height:1;padding:0">&#x2715;</button>';
+  h+='<button onclick="document.getElementById(\'_supCommentPanel\').remove()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0;line-height:1">&#x2715;</button>';
   h+='</div>';
 
-  h+='<div style="padding:14px">';
-  // Decision badge
-  h+='<div style="display:inline-block;font-size:11.5px;font-weight:700;color:'+dec[1]+';background:'+dec[2]+';padding:4px 12px;border-radius:10px;margin-bottom:10px">'+dec[0]+'</div>';
-  // Reviewer info
-  h+='<div style="font-size:11px;color:#888;margin-bottom:8px">By <strong style="color:#1a3a5c">'+esc(rv.supervisorName||roleLabel)+'</strong> on '+_supFmtDate(rv.reviewedAt||'')+'</div>';
+  // Scrollable body
+  h+='<div style="overflow-y:auto;flex:1;padding:14px">';
+
+  // Decision badge + reviewer info
+  h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+  h+='<span style="font-size:12px;font-weight:700;color:'+dec[1]+';background:'+dec[2]+';padding:3px 12px;border-radius:10px">'+dec[0]+'</span>';
+  h+='</div>';
+  h+='<div style="font-size:11px;color:#888;margin-bottom:12px">By <strong style="color:#1a3a5c">'+esc(rv.supervisorName||roleLabel)+'</strong> &nbsp;·&nbsp; '+_supFmtDate(rv.reviewedAt||'')+'</div>';
+
   // Overall comment
   if(rv.supervisorComment){
-    h+='<div style="font-size:10.5px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Overall Comment</div>';
-    h+='<div style="background:#f8f9fa;border-left:3px solid #c9962a;border-radius:4px;padding:10px 12px;font-size:12.5px;color:#1a3a5c;line-height:1.6;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px">'+esc(rv.supervisorComment)+'</div>';
+    h+='<div style="font-size:10px;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Overall Comment</div>';
+    h+='<div style="background:#f8f9fa;border-left:3px solid '+dec[3]+';border-radius:4px;padding:9px 12px;font-size:12px;color:#1a3a5c;line-height:1.6;white-space:pre-wrap;margin-bottom:14px">'+esc(rv.supervisorComment)+'</div>';
   }
-  // Per-observation comments
-  var obsKeys=Object.keys(rv.obsComments||{});
-  if(obsKeys.length){
-    h+='<div style="font-size:10.5px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Comments Per Observation</div>';
-    obsKeys.forEach(function(id){
-      var obsTitle=id;
-      if(DB&&DB.observations){ for(var _i=0;_i<DB.observations.length;_i++){ if(DB.observations[_i].id===id){ obsTitle=DB.observations[_i].title||id; break; } } }
-      h+='<div style="margin-bottom:7px;border:1px solid #f5c842;border-radius:4px;overflow:hidden">';
-      h+='<div style="background:#fffbe6;padding:5px 10px;font-size:11px;font-weight:700;color:#7a5500;border-bottom:1px solid #f5e090">'+esc(obsTitle)+'</div>';
+
+  // Per-observation comments — clickable, scroll to obs
+  if(hasObs){
+    h+='<div style="font-size:10px;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">&#128204; Click an observation to jump to it in the report</div>';
+    obsKeys.forEach(function(id,idx){
+      var info=obsInfoMap[id]||{title:id,num:'',anchorId:'obs-sc-'+id};
+      var numBadge=info.num?'<span style="background:#c9962a;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:8px;margin-right:6px;flex-shrink:0">Obs. '+esc(info.num)+'</span>':'<span style="background:#c9962a;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:8px;margin-right:6px;flex-shrink:0">'+(idx+1)+'</span>';
+      h+='<div id="_supObsCard_'+esc(id)+'" onclick="_supJumpToObs(\''+esc(info.anchorId)+'\',\''+esc(id)+'\')" style="cursor:pointer;border:1px solid #f5c842;border-radius:6px;margin-bottom:8px;overflow:hidden;transition:box-shadow .15s" onmouseover="this.style.boxShadow=\'0 2px 10px rgba(201,150,42,.35)\'" onmouseout="this.style.boxShadow=\'none\'">';
+      h+='<div style="background:#fffbe6;padding:6px 10px;display:flex;align-items:center;border-bottom:1px solid #f5e090">';
+      h+=numBadge;
+      h+='<span style="font-size:11px;font-weight:700;color:#7a5500;flex:1">'+esc(info.title)+'</span>';
+      h+='<span style="font-size:10px;color:#c9962a;font-weight:700;flex-shrink:0">&#8594; Go</span>';
+      h+='</div>';
       h+='<div style="padding:7px 10px;font-size:12px;color:#333;line-height:1.5;white-space:pre-wrap">'+esc(rv.obsComments[id])+'</div>';
       h+='</div>';
     });
   }
-  if(!rv.supervisorComment&&!obsKeys.length){
+
+  if(!rv.supervisorComment&&!hasObs){
     h+='<div style="font-size:12px;color:#888;font-style:italic">No written comments — decision only.</div>';
   }
   h+='</div>';
 
-  h+='<div style="padding:10px 14px;border-top:1px solid #e0e8f0;display:flex;gap:8px;justify-content:flex-end">';
-  h+='<button onclick="document.getElementById(\'_supCommentPanel\').remove()" style="padding:6px 16px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Got it</button>';
+  // Footer
+  h+='<div style="padding:10px 14px;border-top:1px solid #e0e8f0;display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">';
+  h+='<button onclick="document.getElementById(\'_supCommentPanel\').remove()" style="padding:6px 16px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Done</button>';
   h+='</div>';
 
   el.innerHTML=h;
   document.body.appendChild(el);
-
-  // Mark review as acknowledged in cloud (update status to 'acknowledged')
   _supAcknowledgeReview(rv, sha);
+}
+
+function _supJumpToObs(anchorId, obsId){
+  // Highlight the clicked card as active
+  document.querySelectorAll('[id^="_supObsCard_"]').forEach(function(c){
+    c.style.border='1px solid #f5c842';
+    c.style.background='';
+  });
+  var activeCard=document.getElementById('_supObsCard_'+obsId);
+  if(activeCard){ activeCard.style.border='2px solid #c9962a'; activeCard.style.background='#fffef5'; }
+
+  var target=document.getElementById(anchorId);
+  if(target){
+    target.scrollIntoView({behavior:'smooth',block:'start'});
+    // Flash highlight on the observation
+    var orig=target.style.outline||'';
+    target.style.outline='3px solid #c9962a';
+    target.style.borderRadius='6px';
+    setTimeout(function(){ target.style.outline=orig; },2000);
+  }
 }
 
 function _supAcknowledgeReview(rv, sha){
