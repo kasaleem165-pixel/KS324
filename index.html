@@ -24912,7 +24912,8 @@ function _supBuildReviewModal(reviewKey, rvData, obsList){
   }
   h+='</div>';
   h+='<div style="padding:12px 20px;border-top:1px solid #e0e8f0;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0">';
-  h+='<button id="_supSubmitReviewBtn" onclick="_supSubmitReview(\''+esc(reviewKey)+'\','+JSON.stringify(obsList.map(function(o){return o.id;}))+',\''+esc(rvData.sessionPath||'')+'\',\''+esc(rvData.submittedBy||'')+'\',\''+esc(rvData.submittedAt||'')+'\')" style="padding:8px 22px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Submit Review</button>';
+  window._supReviewArgs={reviewKey:reviewKey,obsIds:obsList.map(function(o){return o.id;}),sessionPath:rvData.sessionPath||'',submittedBy:rvData.submittedBy||'',submittedAt:rvData.submittedAt||''};
+  h+='<button id="_supSubmitReviewBtn" onclick="_supSubmitReviewFromModal()" style="padding:8px 22px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Submit Review</button>';
   h+='<button onclick="document.getElementById(\'_supReviewModal\').remove()" style="padding:8px 14px;background:#eee;border:1px solid #ccc;border-radius:5px;font-size:12px;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>';
   h+='</div></div>';
 
@@ -24936,6 +24937,11 @@ function _supDecisionChange(){
       lbl.style.background='#fff';
     }
   });
+}
+
+function _supSubmitReviewFromModal(){
+  var a=window._supReviewArgs||{};
+  _supSubmitReview(a.reviewKey,a.obsIds,a.sessionPath,a.submittedBy,a.submittedAt);
 }
 
 function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origSubmittedAt){
