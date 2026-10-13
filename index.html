@@ -17170,6 +17170,10 @@ function _csLoadReviewByFile(fileInfo, role){
     try{ rv=JSON.parse(_csB64Dec(file.content.replace(/\s/g,''))); }catch(e){ toast('Review file is corrupted.'); return; }
     if(!rv||!rv.status){ toast('No review data in this file.'); return; }
 
+    // Store supervisor info so _cgResend can notify supervisor on re-submission
+    window._cgReviewKey = rv.reviewKey||'';
+    window._cgSupervisorName = rv.supervisorName||'';
+
     // Render the report first so obs anchors exist when the panel builds obsInfoMap
     try{ renderRpt(); }catch(e){}
     _supShowReviewCommentPanel(rv, role, file.sha);
@@ -17505,12 +17509,47 @@ function _cgResend(){
   };
   generateReviewerHtml(role);
   window._pendingCorrections=null;
+  
+  // Save corrected session to cloud and notify supervisor
+  var cfg=_csGetCfg();
+  if(cfg.token&&cfg.owner&&cfg.repo&&cfg.auditor){
+    cloudSave({silent:true});
+    var supName=window._cgSupervisorName||'';
+    var supSlug=supName?supName.replace(/[^a-zA-Z0-9\-_]/g,'_').replace(/_+/g,'_').toLowerCase():'';
+    if(supSlug){
+      var notifPath='_notifications/'+supSlug+'.json';
+      var notifUrl=_csRepoBase(cfg)+'/contents/'+notifPath;
+      var hdrs=_csHdrs(cfg);
+      var brFolder=(window._cgReviewKey||_csBranchFolder()||'').replace(/_/g,' ');
+      var entry={
+        from:_csAuditorSlug(cfg),
+        fromName:cfg.auditor,
+        at:new Date().toISOString(),
+        branch:brFolder,
+        reviewKey:window._cgReviewKey||'',
+        type:'auditor_resubmission',
+        msg:'<strong>'+cfg.auditor+'</strong> has addressed the requested changes and resubmitted the report for "'+brFolder+'".'
+      };
+      fetch(notifUrl,{headers:hdrs})
+      .then(function(r){ return r.ok?r.json():{content:'W10=',sha:null}; })
+      .then(function(existing){
+        var arr;
+        try{ arr=JSON.parse(_csB64Dec((existing.content||'W10=').replace(/\s/g,''))); }catch(e){ arr=[]; }
+        if(!Array.isArray(arr)) arr=[];
+        arr=arr.filter(function(e){ return e.reviewKey!==entry.reviewKey||e.type!=='auditor_resubmission'; });
+        arr.push(entry);
+        var body={message:'[BRAINS] Resubmission notification for '+supSlug,content:_csB64Enc(JSON.stringify(arr,null,2))};
+        if(existing&&existing.sha) body.sha=existing.sha;
+        return fetch(notifUrl,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+      }).catch(function(){});
+    }
+  }
   setTimeout(function(){
     var panel=document.getElementById('correction-guide-panel');
     if(panel) panel.remove();
     var btn=document.getElementById('cg-restore-btn');
     if(btn) btn.remove();
-    showToast('Corrected file generated. Send it back to the '+window._cgFromRole+' Manager.', 4000);
+    showToast('Corrections saved to cloud. Supervisor has been notified.', 4000);
   }, 500);
 }
 
@@ -26111,8 +26150,11 @@ function _csShowNotifBanner(entries, onDismiss){
   var boxStyle='background:#fff;border-radius:8px;width:94%;max-width:520px;box-shadow:0 8px 32px rgba(0,0,0,.3);overflow:hidden';
   var h='<div style="'+boxStyle+'">';
   h+='<div style="background:#1a3a5c;color:#fff;padding:12px 18px;display:flex;align-items:center;gap:10px">';
+  var hasResub=unique.some(function(e){return e.type==='auditor_resubmission';});
+  var hasSup=unique.some(function(e){return e.type==='supervisor_review'||e.type==='supervisor_review_amended';});
+  var bannerTitle=hasResub&&!hasSup?'Auditor Resubmission':(hasSup&&!hasResub?'Supervisor Review':' BRAINS')+' Notification'+(unique.length>1?'s':'');
   h+='<span style="font-size:18px">&#128276;</span>';
-  h+='<div style="flex:1;font-size:13px;font-weight:700">'+unique.length+' Supervisor Notification'+(unique.length>1?'s':'')+'</div>';
+  h+='<div style="flex:1;font-size:13px;font-weight:700">'+unique.length+' '+bannerTitle+'</div>';
   h+='</div>';
   h+='<div style="padding:14px 18px;max-height:50vh;overflow-y:auto">';
   unique.forEach(function(e){
@@ -26158,6 +26200,7 @@ function _csShowNotifBanner(entries, onDismiss){
     }
     // Check for cross-auditor notifications (6s delay to stagger from merge check)
     setTimeout(function(){ _csCheckNotifications(cfg); }, 1000);
+setInterval(function(){ _csCheckNotifications(_csGetCfg()); }, 300000);
   },5000);
 })();
 
