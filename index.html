@@ -25422,6 +25422,31 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
         var dashEl=document.getElementById('_supDashboard');
         if(dashEl){ _supSessionCache=null; _supLoadData(); }
       },3000);
+    } else if(cachedSha&&(r.status===409||r.status===422)){
+      // Stale SHA — clear cache and retry with fresh GET
+      _supReviewShaCache[reviewKey]=null;
+      toast('Retrying...');
+      fetch(url,{headers:hdrs})
+      .then(function(r2){ return r2.ok?r2.json():{sha:null}; })
+      .then(function(existing){
+        var prevData={};
+        if(existing&&existing.content){
+          try{ prevData=JSON.parse(_csB64Dec(existing.content.replace(/\s/g,''))); }catch(e){}
+        }
+        return _doSubmit(prevData, existing&&existing.sha?existing.sha:null);
+      })
+      .then(function(obj2){
+        var r2=obj2.r; var reviewData2=obj2.reviewData; var isUpdate2=obj2.isUpdate;
+        if(r2&&(r2.status===200||r2.status===201)){
+          r2.clone().json().then(function(resp){ if(resp&&resp.content&&resp.content.sha) _supReviewShaCache[reviewKey]=resp.content.sha; }).catch(function(){});
+          if(isUpdate2) _supNotifyAuditorAmended(reviewData2); else _supNotifyAuditor(reviewData2);
+          var modal=document.getElementById('_supReviewModal'); if(modal) modal.remove();
+          var viewer=document.getElementById('_supViewer'); if(viewer) viewer.remove();
+          toast(isUpdate2?'Review updated ✓':'Review submitted ✓');
+          if(_supSessionCache&&_supSessionCache.reviews){ _supSessionCache.reviews[reviewKey]=reviewData2; _supRender(_supSessionCache.sessions,_supSessionCache.reviews); }
+          setTimeout(function(){ var dashEl=document.getElementById('_supDashboard'); if(dashEl){ _supSessionCache=null; _supLoadData(); } },3000);
+        } else { toast('Failed to save review. Please try again.'); }
+      }).catch(function(e){ toast('Error: '+(e&&e.message?e.message:e)); });
     } else {
       toast('Failed to save review.');
     }
