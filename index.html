@@ -25137,7 +25137,7 @@ function _supBuildReviewModal(reviewKey, rvData, obsList){
       var prevObs=existingObsComments[o.id]||'';
       h+='<div style="background:#f8fafc;border:1px solid '+(prevObs?'#c9962a':'#e0e8f0')+';border-radius:6px;padding:12px 14px;margin-bottom:10px">';
       h+='<div style="font-size:12px;font-weight:700;color:#1a3a5c;margin-bottom:7px"><span style="background:#e8f0fb;color:#1a3a5c;font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:10px;margin-right:7px">'+(i+1)+'</span>'+esc(o.title||o.id)+'</div>';
-      h+='<textarea id="_supObsComment_modal_'+esc(o.id)+'" rows="2" placeholder="Comment on this observation (leave blank if no specific remark)..." style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #c8d8ec;border-radius:4px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#333">'+esc(prevObs)+'</textarea>';
+      h+='<textarea id="_supObsComment_modal_'+esc(o.id)+'" rows="2" placeholder="Comment on this observation (leave blank if no specific remark)..." oninput="_supSyncOverallComment()" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #c8d8ec;border-radius:4px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#333">'+esc(prevObs)+'</textarea>';
       h+='</div>';
     });
     h+='</div>';
@@ -25279,6 +25279,24 @@ function _supConfirmApproval(){
 }
 
 function _supDecisionChange(){ /* legacy stub — replaced by _supSelectDecision */ }
+
+function _supSyncOverallComment(){
+  var overall=document.getElementById('_supReviewComment');
+  if(!overall) return;
+  var obsTextareas=document.querySelectorAll('[id^="_supObsComment_modal_"]');
+  var anyFilled=false;
+  for(var i=0;i<obsTextareas.length;i++){
+    if(obsTextareas[i].value.trim()){ anyFilled=true; break; }
+  }
+  overall.disabled=anyFilled;
+  overall.style.background=anyFilled?'#f0f3f8':'';
+  overall.style.color=anyFilled?'#aaa':'#1a3a5c';
+  overall.style.cursor=anyFilled?'not-allowed':'';
+  var hint=document.getElementById('_supCommentRequired');
+  if(hint) hint.style.display=anyFilled?'none':'inline';
+  var optHint=document.getElementById('_supCommentOptHint');
+  if(optHint) optHint.style.display=anyFilled?'inline':'none';
+}
 
 function _supSubmitReviewFromModal(){
   var a=window._supReviewArgs||{};
