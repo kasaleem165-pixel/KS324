@@ -17318,14 +17318,36 @@ function _supShowReviewCommentPanel(rv, role, sha){
   // Footer — reply button + done
   h+='<div style="padding:10px 14px;border-top:1px solid #e0e8f0;display:flex;flex-direction:column;gap:6px;flex-shrink:0">';
   if(hasObs||rv.supervisorComment){
-    h+='<button onclick="_supSendAuditorReply('+JSON.stringify(rv)+')" style="padding:8px 14px;background:linear-gradient(135deg,#1a6030,#27ae60);color:#fff;border:none;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;width:100%">&#128228; Submit Reply to Supervisor</button>';
+    h+='<button onclick="_supSendAuditorReply()" style="padding:8px 14px;background:linear-gradient(135deg,#1a6030,#27ae60);color:#fff;border:none;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;width:100%">&#128228; Submit Reply to Supervisor</button>';
   }
   h+='<button onclick="document.getElementById(\'_supCommentPanel\').remove()" style="padding:6px 16px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;width:100%">Close</button>';
   h+='</div>';
 
   el.innerHTML=h;
   document.body.appendChild(el);
+  // Store rv in global so _supSendAuditorReply can access it safely (avoids JSON-in-HTML quoting bugs)
+  window._supCurrentReviewData = rv;
   _supAcknowledgeReview(rv, sha);
+
+  // Async: pre-load any previously submitted replies so textareas are pre-filled
+  (function(){
+    var cfg2=_csGetCfg();
+    if(!cfg2.token||!cfg2.owner||!cfg2.repo) return;
+    var replyUrl=_csRepoBase(cfg2)+'/contents/'+_SUP_REVIEW_PATH+rv.reviewKey+'_reply.json';
+    fetch(replyUrl,{headers:_csHdrs(cfg2)})
+    .then(function(r){ return r.ok?r.json():null; })
+    .then(function(f){
+      if(!f||!f.content) return;
+      var rd; try{ rd=JSON.parse(_csB64Dec(f.content.replace(/\s/g,''))); }catch(e){ return; }
+      var reps=rd.replies||{};
+      Object.keys(reps).forEach(function(id){
+        var ta;
+        if(id==='_overall'){ ta=document.getElementById('_audReply__overall'); }
+        else { ta=document.getElementById('_audReply_'+id); }
+        if(ta&&reps[id]) ta.value=reps[id];
+      });
+    }).catch(function(){});
+  })();
 }
 
 function _supJumpToObs(anchorId, obsId){
@@ -25075,7 +25097,16 @@ function _supShowSessionViewer(sess, reviewKey){
       var rh='';
       keys.forEach(function(id){
         if(!replies[id]) return;
-        var label=id==='_overall'?'Overall Reply':'Reply for Obs '+esc(id);
+        var label;
+        if(id==='_overall'){
+          label='Overall Reply';
+        } else {
+          // Look up title from obsLookup (available via closure) or DB
+          var obsTitle=id;
+          if(obsLookup&&obsLookup[id]) obsTitle=obsLookup[id].title||id;
+          else if(DB&&DB.observations){ for(var _lt=0;_lt<DB.observations.length;_lt++){ if(DB.observations[_lt].id===id){ obsTitle=DB.observations[_lt].title||id; break; } } }
+          label='Reply: '+esc(obsTitle);
+        }
         rh+='<div style="margin-bottom:8px;border:1px solid #90c0a0;border-radius:5px;overflow:hidden">';
         rh+='<div style="background:#d4edda;padding:4px 10px;font-size:10.5px;font-weight:700;color:#1a6030">'+label+'</div>';
         rh+='<div style="padding:7px 10px;font-size:12px;color:#1a3a5c;white-space:pre-wrap">'+esc(replies[id])+'</div>';
@@ -25356,18 +25387,21 @@ function _supSyncOverallComment(){
   if(optHint) optHint.style.display=anyFilled?'inline':'none';
 }
 
-function _supSendAuditorReply(rv){
+function _supSendAuditorReply(){
+  var rv=window._supCurrentReviewData;
+  if(!rv||!rv.reviewKey){ toast('Review data not found. Please reload the review panel.'); return; }
   var cfg=_csGetCfg();
   if(!cfg.token||!cfg.owner||!cfg.repo||!cfg.auditor){ toast('Cloud settings not configured.'); return; }
-  // Collect replies from textareas
+  // Collect replies from ALL reply textareas in the panel
   var replies={};
-  var obsKeys=Object.keys(rv.obsComments||{});
-  obsKeys.forEach(function(id){
-    var ta=document.getElementById('_audReply_'+id);
-    if(ta&&ta.value.trim()) replies[id]=ta.value.trim();
-  });
-  var taOverall=document.getElementById('_audReply__overall');
-  if(taOverall&&taOverall.value.trim()) replies['_overall']=taOverall.value.trim();
+  // Per-observation replies
+  var allReplyTas=document.querySelectorAll('[id^="_audReply_"]');
+  for(var _ri=0;_ri<allReplyTas.length;_ri++){
+    var ta=allReplyTas[_ri];
+    if(!ta.value.trim()) continue;
+    var taId=ta.id.replace('_audReply_','');
+    replies[taId]=ta.value.trim();
+  }
   if(!Object.keys(replies).length){ toast('Please type at least one reply before submitting.'); return; }
   // Save reply to _reviews/{reviewKey}_reply.json
   var replyKey=rv.reviewKey+'_reply';
