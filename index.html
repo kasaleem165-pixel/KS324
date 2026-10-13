@@ -17236,7 +17236,7 @@ function _supShowReviewCommentPanel(rv, role, sha){
   // Also fill titles from DB customs if loaded
   if(DB&&DB.customs){ DB.customs.forEach(function(c){ if(c&&c.id&&!obsInfoMap[c.id]) obsInfoMap[c.id]={title:c.title||c.id,num:'',anchorId:'oc-'+c.id}; }); }
 
-  var roleLabel=(rv.supervisorRole==='ro_supervisor'?'HO':'RO')+' Supervisor';
+  var roleLabel=(rv.supervisorRole==='ho_supervisor'?'HO':'RO')+' Supervisor';
   var decMap={
     'approved':         ['&#10003; Approved',        '#1a6030','#e8f8ee','#1a6030'],
     'changes_requested':['&#9998; Changes Requested', '#7a5500','#fff8e6','#c9962a'],
@@ -17290,9 +17290,24 @@ function _supShowReviewCommentPanel(rv, role, sha){
       h+='<span style="font-size:11px;font-weight:700;color:#7a5500;flex:1">'+esc(info.title)+'</span>';
       h+='<span style="font-size:10px;color:#c9962a;font-weight:700;flex-shrink:0">&#8594; Go</span>';
       h+='</div>';
-      h+='<div style="padding:7px 10px;font-size:12px;color:#333;line-height:1.5;white-space:pre-wrap">'+esc(rv.obsComments[id])+'</div>';
+      h+='<div style="padding:7px 10px;font-size:12px;color:#333;line-height:1.5;white-space:pre-wrap;border-bottom:1px solid #f5e090">'+esc(rv.obsComments[id])+'</div>';
+      // Auditor reply box for this observation
+      var prevReply=(rv.auditorReplies&&rv.auditorReplies[id])||'';
+      h+='<div style="padding:7px 10px;background:#f0f8ff">';
+      h+='<div style="font-size:10px;font-weight:700;color:#1a6030;margin-bottom:4px">&#9998; Your Reply:</div>';
+      h+='<textarea id="_audReply_'+esc(id)+'" rows="2" placeholder="Type your reply to this comment..." style="width:100%;box-sizing:border-box;padding:5px 8px;border:1px solid #90c0e0;border-radius:4px;font-size:11.5px;font-family:Inter,sans-serif;resize:vertical;color:#1a3a5c">'+esc(prevReply)+'</textarea>';
+      h+='</div>';
       h+='</div>';
     });
+  }
+
+  // Overall auditor reply (shown when there is an overall supervisor comment)
+  if(rv.supervisorComment){
+    var prevOverall=(rv.auditorReplies&&rv.auditorReplies['_overall'])||'';
+    h+='<div style="margin-top:8px">';
+    h+='<div style="font-size:10px;font-weight:800;color:#1a6030;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">&#9998; Your Overall Reply</div>';
+    h+='<textarea id="_audReply__overall" rows="2" placeholder="Reply to the overall comment..." style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #90c0e0;border-radius:4px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#1a3a5c">'+esc(prevOverall)+'</textarea>';
+    h+='</div>';
   }
 
   if(!rv.supervisorComment&&!hasObs){
@@ -17300,9 +17315,12 @@ function _supShowReviewCommentPanel(rv, role, sha){
   }
   h+='</div>';
 
-  // Footer
-  h+='<div style="padding:10px 14px;border-top:1px solid #e0e8f0;display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">';
-  h+='<button onclick="document.getElementById(\'_supCommentPanel\').remove()" style="padding:6px 16px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Done</button>';
+  // Footer — reply button + done
+  h+='<div style="padding:10px 14px;border-top:1px solid #e0e8f0;display:flex;flex-direction:column;gap:6px;flex-shrink:0">';
+  if(hasObs||rv.supervisorComment){
+    h+='<button onclick="_supSendAuditorReply('+JSON.stringify(rv)+')" style="padding:8px 14px;background:linear-gradient(135deg,#1a6030,#27ae60);color:#fff;border:none;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;width:100%">&#128228; Submit Reply to Supervisor</button>';
+  }
+  h+='<button onclick="document.getElementById(\'_supCommentPanel\').remove()" style="padding:6px 16px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;width:100%">Close</button>';
   h+='</div>';
 
   el.innerHTML=h;
@@ -24831,7 +24849,11 @@ function _supRenderReviewed(sessions,reviews){
     h+='<div style="font-size:13px;font-weight:700;color:#1a3a5c">'+esc(rv.branchDisplay||p.key)+'</div>';
     h+='<div style="font-size:11px;color:#666;margin-top:2px">Auditor: <strong>'+esc(rv.submittedBy||'-')+'</strong> &nbsp;|&nbsp; Reviewed: '+_supFmtDate(rv.reviewedAt||'')+'</div>';
     if(rv.supervisorComment) h+='<div style="font-size:11px;color:#444;margin-top:4px;background:#f8f9fa;padding:6px 10px;border-radius:4px;border-left:3px solid #1a3a5c">'+esc(rv.supervisorComment)+'</div>';
+    if(rv.auditorRepliedAt) h+='<div style="font-size:11px;color:#1a6030;margin-top:5px;font-weight:700">&#128172; Auditor replied on '+_supFmtDate(rv.auditorRepliedAt)+'</div>';
     h+='</div>'+badge;
+    h+='<div style="display:flex;flex-direction:column;gap:5px;margin-left:8px">';
+    if(rv.sessionPath) h+='<button onclick="_supViewSessionByPath(\''+esc(rv.sessionPath)+'\',\''+esc(p.key)+'\')" style="padding:5px 12px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap">&#128065; View Report</button>';
+    h+='</div>';
     h+='</div>';
   });
   h+='</div>';
@@ -25028,9 +25050,45 @@ function _supShowSessionViewer(sess, reviewKey){
     });
   }
   h+='</div>';
+  // Auditor replies panel (injected async after load)
+  h+='<div id="_supAuditorReplies" style="display:none;border-top:3px solid #1a6030;padding:16px 20px;background:#f0fff4;flex-shrink:0;max-height:260px;overflow-y:auto">';
+  h+='<div style="font-size:11px;font-weight:800;color:#1a6030;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">&#128172; Auditor Replies</div>';
+  h+='<div id="_supAuditorRepliesBody"></div>';
+  h+='</div>';
 
   el.innerHTML=h;
   document.body.appendChild(el);
+
+  // Load auditor reply file and inject into reply panel
+  (function(rk2){
+    var cfg3=_csGetCfg();
+    var rUrl=_csRepoBase(cfg3)+'/contents/'+_SUP_REVIEW_PATH+rk2+'_reply.json';
+    fetch(rUrl,{headers:_csHdrs(cfg3)})
+    .then(function(r){ return r.ok?r.json():null; })
+    .then(function(f){
+      if(!f||!f.content) return;
+      var rd; try{ rd=JSON.parse(_csB64Dec(f.content.replace(/\s/g,''))); }catch(e){ return; }
+      if(!rd||!rd.replies) return;
+      var replies=rd.replies;
+      var keys=Object.keys(replies);
+      if(!keys.length) return;
+      var rh='';
+      keys.forEach(function(id){
+        if(!replies[id]) return;
+        var label=id==='_overall'?'Overall Reply':'Reply for Obs '+esc(id);
+        rh+='<div style="margin-bottom:8px;border:1px solid #90c0a0;border-radius:5px;overflow:hidden">';
+        rh+='<div style="background:#d4edda;padding:4px 10px;font-size:10.5px;font-weight:700;color:#1a6030">'+label+'</div>';
+        rh+='<div style="padding:7px 10px;font-size:12px;color:#1a3a5c;white-space:pre-wrap">'+esc(replies[id])+'</div>';
+        rh+='</div>';
+      });
+      rh+='<div style="font-size:10px;color:#888;margin-top:4px">Replied by '+esc(rd.repliedBy||'Auditor')+' on '+_supFmtDate(rd.repliedAt||'')+'</div>';
+      var panel=document.getElementById('_supAuditorReplies');
+      var body=document.getElementById('_supAuditorRepliesBody');
+      if(panel) panel.style.display='block';
+      if(body) body.innerHTML=rh;
+    })
+    .catch(function(){});
+  })(reviewKey);
 }
 
 function _supOpenReview(reviewKey){
@@ -25296,6 +25354,90 @@ function _supSyncOverallComment(){
   if(hint) hint.style.display=anyFilled?'none':'inline';
   var optHint=document.getElementById('_supCommentOptHint');
   if(optHint) optHint.style.display=anyFilled?'inline':'none';
+}
+
+function _supSendAuditorReply(rv){
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo||!cfg.auditor){ toast('Cloud settings not configured.'); return; }
+  // Collect replies from textareas
+  var replies={};
+  var obsKeys=Object.keys(rv.obsComments||{});
+  obsKeys.forEach(function(id){
+    var ta=document.getElementById('_audReply_'+id);
+    if(ta&&ta.value.trim()) replies[id]=ta.value.trim();
+  });
+  var taOverall=document.getElementById('_audReply__overall');
+  if(taOverall&&taOverall.value.trim()) replies['_overall']=taOverall.value.trim();
+  if(!Object.keys(replies).length){ toast('Please type at least one reply before submitting.'); return; }
+  // Save reply to _reviews/{reviewKey}_reply.json
+  var replyKey=rv.reviewKey+'_reply';
+  var replyPath=_SUP_REVIEW_PATH+replyKey+'.json';
+  var replyUrl=_csRepoBase(cfg)+'/contents/'+replyPath;
+  var hdrs=_csHdrs(cfg);
+  var replyData={
+    reviewKey:rv.reviewKey,
+    repliedBy:cfg.auditor,
+    repliedBySlug:_csAuditorSlug(cfg),
+    repliedAt:new Date().toISOString(),
+    replies:replies,
+    branchDisplay:rv.branchDisplay||''
+  };
+  toast('Sending reply...');
+  fetch(replyUrl,{headers:hdrs})
+  .then(function(r){ return r.ok?r.json():{content:null,sha:null}; })
+  .then(function(existing){
+    var body={message:'[BRAINS] Auditor reply for '+rv.reviewKey,content:_csB64Enc(JSON.stringify(replyData,null,2))};
+    if(existing&&existing.sha) body.sha=existing.sha;
+    return fetch(replyUrl,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+  })
+  .then(function(r){
+    if(!r||!(r.status===200||r.status===201)){ toast('Failed to send reply. Try again.'); return; }
+    // Update review file with auditorRepliedAt timestamp so supervisor dashboard shows reply indicator
+    var rvPath=_SUP_REVIEW_PATH+rv.reviewKey+'.json';
+    var rvUrl=_csRepoBase(cfg)+'/contents/'+rvPath;
+    fetch(rvUrl,{headers:hdrs})
+    .then(function(r3){ return r3.ok?r3.json():null; })
+    .then(function(rvFile){
+      if(!rvFile||!rvFile.content) return;
+      var rvUpd; try{ rvUpd=JSON.parse(_csB64Dec(rvFile.content.replace(/\s/g,''))); }catch(e){ return; }
+      rvUpd.auditorRepliedAt=new Date().toISOString();
+      var rvBody={message:'[BRAINS] Auditor replied: '+rv.reviewKey,content:_csB64Enc(JSON.stringify(rvUpd,null,2)),sha:rvFile.sha};
+      return fetch(rvUrl,{method:'PUT',headers:hdrs,body:JSON.stringify(rvBody)});
+    }).catch(function(){});
+    // Notify supervisor
+    var supName=rv.supervisorName||window._cgSupervisorName||'';
+    var supSlug=supName?supName.replace(/[^a-zA-Z0-9\-_]/g,'_').replace(/_+/g,'_').toLowerCase():'';
+    if(supSlug){
+      var notifPath='_notifications/'+supSlug+'.json';
+      var notifUrl=_csRepoBase(cfg)+'/contents/'+notifPath;
+      var brDisp=rv.branchDisplay||(rv.reviewKey||'').replace(/_/g,' ');
+      var entry={
+        from:_csAuditorSlug(cfg),
+        fromName:cfg.auditor,
+        at:new Date().toISOString(),
+        branch:brDisp,
+        reviewKey:rv.reviewKey,
+        replyKey:replyKey,
+        type:'auditor_reply',
+        msg:'<strong>'+cfg.auditor+'</strong> has replied to your review comments for "'+brDisp+'".'
+      };
+      fetch(notifUrl,{headers:hdrs})
+      .then(function(r2){ return r2.ok?r2.json():{content:'W10=',sha:null}; })
+      .then(function(ex){
+        var arr; try{ arr=JSON.parse(_csB64Dec((ex.content||'W10=').replace(/\s/g,''))); }catch(e){ arr=[]; }
+        if(!Array.isArray(arr)) arr=[];
+        arr=arr.filter(function(e){ return e.reviewKey!==entry.reviewKey||e.type!=='auditor_reply'; });
+        arr.push(entry);
+        var nb={message:'[BRAINS] Reply notification for '+supSlug,content:_csB64Enc(JSON.stringify(arr,null,2))};
+        if(ex&&ex.sha) nb.sha=ex.sha;
+        return fetch(notifUrl,{method:'PUT',headers:hdrs,body:JSON.stringify(nb)});
+      }).catch(function(){});
+    }
+    toast('Reply sent to supervisor ✓');
+    var panel=document.getElementById('_supCommentPanel');
+    if(panel) panel.remove();
+  })
+  .catch(function(e){ toast('Error: '+(e&&e.message?e.message:e)); });
 }
 
 function _supSubmitReviewFromModal(){
