@@ -753,20 +753,22 @@ function _pwGrantAccess(userObj){
       // 3. userObj.username (role slug, e.g. 'ro_supervisor')
       // This is needed because the slug written to the notification file
       // depends on what the supervisor's userObj.name was when the review was submitted.
-      setTimeout(function(){
+      function _supRunNotifCheck(){
         var cfg2=_csGetCfg();
+        if(!cfg2.token||!cfg2.owner||!cfg2.repo) return;
         var slugsToCheck={};
         if(cfg2.auditor) slugsToCheck[_csAuditorSlug(cfg2)]=true;
         if(userObj.name) slugsToCheck[_csAuditorSlug({auditor:userObj.name})]=true;
         if(userObj.username) slugsToCheck[_csAuditorSlug({auditor:userObj.username})]=true;
-        // Always check generic role slugs — used when supervisor submitted review via shared password
         slugsToCheck['ro_supervisor']=true;
         slugsToCheck['ho_supervisor']=true;
         Object.keys(slugsToCheck).forEach(function(slug){
           var cfgCopy={token:cfg2.token,owner:cfg2.owner,repo:cfg2.repo,auditor:slug};
           _csCheckNotifications(cfgCopy);
         });
-      }, 2000);
+      }
+      setTimeout(_supRunNotifCheck, 3000);
+      setTimeout(_supRunNotifCheck, 10000);
     }
     // Auto-launch admin panel for any administrator login
     if(userObj.role==='administrator'){
@@ -26603,7 +26605,7 @@ setInterval(function(){
       _csCheckNotifications(cfg3);
     }
   }catch(e){ _csCheckNotifications(cfg3); }
-}, 300000);
+}, 60000);
   },5000);
 })();
 
