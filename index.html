@@ -25511,7 +25511,7 @@ function _supBuildReviewModal(reviewKey, rvData, obsList){
   var showFull=(existingDecision!=='approved');
   h+='<div id="_supFullCommentSection" style="margin-bottom:16px;display:'+(showFull?'block':'none')+'">';
   h+='<div style="font-size:11.5px;font-weight:700;color:#2a4060;margin-bottom:6px" id="_supCommentLabel">Overall Comments / Remarks <span id="_supCommentRequired" style="color:#c0392b">*</span> <span id="_supCommentOptHint" style="font-size:10.5px;font-weight:400;color:#888;display:none">(optional if per-observation comments are provided)</span></div>';
-  h+='<textarea id="_supReviewComment" rows="3" placeholder="For rejection: state the overall reason. For changes: add a summary here or use the per-observation boxes below." style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#1a3a5c">'+esc(existingDecision!=='approved'?existingComment:'')+'</textarea>';
+  h+='<textarea id="_supReviewComment" rows="3" placeholder="For rejection: state the overall reason. For changes: add a summary here or use the per-observation boxes below." oninput="_supAutoSelectChanges()" style="width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #c8d8ec;border-radius:5px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#1a3a5c">'+esc(existingDecision!=='approved'?existingComment:'')+'</textarea>';
   h+='</div>';
   // Per-observation comments (shown for Changes Requested / Rejected only)
   if(obsList.length){
@@ -25664,6 +25664,13 @@ function _supConfirmApproval(){
 
 function _supDecisionChange(){ /* legacy stub — replaced by _supSelectDecision */ }
 
+function _supAutoSelectChanges(){
+  var dec=document.getElementById('_supDecisionVal');
+  if(!dec||dec.value==='approved'||dec.value==='rejected') return;
+  // Only auto-select if no decision chosen yet
+  if(dec.value!=='changes_requested') _supSelectDecision('changes_requested');
+}
+
 function _supSyncOverallComment(){
   var overall=document.getElementById('_supReviewComment');
   if(!overall) return;
@@ -25680,6 +25687,8 @@ function _supSyncOverallComment(){
   if(hint) hint.style.display=anyFilled?'none':'inline';
   var optHint=document.getElementById('_supCommentOptHint');
   if(optHint) optHint.style.display=anyFilled?'inline':'none';
+  // Auto-select "Request Changes" when per-obs comments are typed
+  if(anyFilled) _supAutoSelectChanges();
 }
 
 function _supSendAuditorReply(){
