@@ -25293,8 +25293,8 @@ function _supShowSessionViewer(sess, reviewKey){
   h+='<div style="font-size:11px;font-weight:800;color:#1a3a5c;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">&#9998; Supervisor Follow-up Response</div>';
   h+='<textarea id="_supFollowupText" rows="3" placeholder="Type your follow-up response to the auditor..." style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #1a3a5c;border-radius:5px;font-size:12.5px;font-family:Inter,sans-serif;resize:vertical;color:#333;background:#fff"></textarea>';
   h+='<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
-  h+='<button onclick="_supSendFollowupResponse(\''+esc(reviewKey)+'\',\''+esc(rv&&rv.submittedBy?rv.submittedBy:'')+'\')" style="padding:6px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#128228; Send Response to Auditor</button>';
-  h+='<button onclick="_supApproveFromViewer(\''+esc(reviewKey)+'\',\''+esc(rv&&rv.submittedBy?rv.submittedBy:'')+'\',\''+esc(rv&&rv.branchDisplay?rv.branchDisplay:reviewKey)+'\')" style="padding:6px 18px;background:#1a6030;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#10003; Approve Report</button>';
+  h+='<button onclick="_supSendFollowupResponse(\''+esc(reviewKey)+'\',\'\')" style="padding:6px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#128228; Send Response to Auditor</button>';
+  h+='<button onclick="_supApproveFromViewerByKey(\''+esc(reviewKey)+'\')" style="padding:6px 18px;background:#1a6030;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#10003; Approve Report</button>';
   h+='<div id="_supFollowupStatus" style="font-size:11px;color:#888"></div>';
   h+='</div></div>';
   h+='</div>';
@@ -25357,6 +25357,30 @@ function _supShowSessionViewer(sess, reviewKey){
   })(reviewKey);
 }
 
+function _supApproveFromViewerByKey(reviewKey){
+  // Look up auditorName and branchDisplay from cached rvData, falling back to GitHub fetch
+  var rvd=(_supViewerSession&&_supViewerSession.rvData)||{};
+  var auditorName=rvd.submittedBy||'';
+  var branchDisplay=rvd.branchDisplay||(reviewKey||'').replace(/_/g,' ');
+  if(auditorName&&branchDisplay){
+    _supApproveFromViewer(reviewKey,auditorName,branchDisplay);
+    return;
+  }
+  // rvData not yet loaded — fetch review file first
+  var cfg=_csGetCfg();
+  fetch(_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'.json',{headers:_csHdrs(cfg)})
+  .then(function(r){ return r.ok?r.json():null; })
+  .then(function(f){
+    if(f&&f.content){
+      var rv2; try{ rv2=JSON.parse(_csB64Dec(f.content.replace(/\s/g,''))); }catch(e){ rv2={}; }
+      _supApproveFromViewer(reviewKey,rv2.submittedBy||'',rv2.branchDisplay||(reviewKey||'').replace(/_/g,' '));
+    } else {
+      _supApproveFromViewer(reviewKey,'',branchDisplay);
+    }
+  })
+  .catch(function(){ _supApproveFromViewer(reviewKey,'',branchDisplay); });
+}
+
 function _supApproveFromViewer(reviewKey, auditorName, branchDisplay){
   if(!confirm('Approve this report?\n\nBranch: '+branchDisplay+'\nAuditor: '+auditorName+'\n\nThis will mark the report as Approved and notify the auditor.')) return;
   var cfg=_csGetCfg();
@@ -25417,6 +25441,11 @@ function _supApproveFromViewer(reviewKey, auditorName, branchDisplay){
 }
 
 function _supSendFollowupResponse(reviewKey, auditorName){
+  // Supplement auditorName from cached rvData if not passed
+  if(!auditorName){
+    var rvd2=(_supViewerSession&&_supViewerSession.rvData)||{};
+    auditorName=rvd2.submittedBy||'';
+  }
   var ta=document.getElementById('_supFollowupText');
   var st=document.getElementById('_supFollowupStatus');
   if(!ta||!ta.value.trim()){ toast('Please type a response before sending.'); return; }
