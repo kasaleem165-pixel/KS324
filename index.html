@@ -24612,6 +24612,47 @@ var _supSessionCache = null;
 var _supRegionFilter = '';          // supervisor's own region ('' = show all)
 var _supReviewShaCache = {};        // reviewKey -> GitHub blob SHA, avoids a GET before each PUT
 
+function _supViewAuditorReply(reviewKey, branchLabel){
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo){ toast('Cloud Settings not configured.'); return; }
+  var rUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'_reply.json';
+  toast('Loading auditor reply…');
+  fetch(rUrl,{headers:_csHdrs(cfg)})
+  .then(function(r){ return r.ok?r.json():null; })
+  .then(function(f){
+    if(!f||!f.content){ toast('No reply found for this branch.'); return; }
+    var rd; try{ rd=JSON.parse(_csB64Dec(f.content.replace(/\s/g,''))); }catch(e){ toast('Error reading reply file.'); return; }
+    if(!rd||!rd.replies||!Object.keys(rd.replies).length){ toast('Reply file is empty.'); return; }
+    var ex=document.getElementById('_supReplyViewOverlay');
+    if(ex) ex.remove();
+    var el=document.createElement('div');
+    el.id='_supReplyViewOverlay';
+    el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99995;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+    var h='<div style="background:#fff;border-radius:8px;width:94%;max-width:560px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.35);overflow:hidden">';
+    h+='<div style="background:#1a6030;color:#fff;padding:12px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0">';
+    h+='<span style="font-size:18px">&#128172;</span>';
+    h+='<div style="flex:1"><div style="font-size:13px;font-weight:700">Auditor Reply</div><div style="font-size:11px;opacity:.8">'+esc(branchLabel||reviewKey)+'</div></div>';
+    h+='<button onclick="document.getElementById(\'_supReplyViewOverlay\').remove()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:4px;padding:3px 11px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#10005; Close</button>';
+    h+='</div>';
+    h+='<div style="padding:16px 18px;overflow-y:auto;flex:1">';
+    var replies=rd.replies;
+    Object.keys(replies).forEach(function(id){
+      if(!replies[id]) return;
+      var label=id==='_overall'?'Overall Reply':'Reply for Observation: '+esc(id);
+      h+='<div style="margin-bottom:10px;border:1px solid #90c0a0;border-radius:5px;overflow:hidden">';
+      h+='<div style="background:#d4edda;padding:5px 11px;font-size:10.5px;font-weight:700;color:#1a6030">'+label+'</div>';
+      h+='<div style="padding:9px 11px;font-size:12.5px;color:#1a3a5c;white-space:pre-wrap;line-height:1.6">'+esc(replies[id])+'</div>';
+      h+='</div>';
+    });
+    h+='<div style="font-size:10.5px;color:#888;margin-top:6px;border-top:1px solid #eee;padding-top:8px">Replied by <strong>'+esc(rd.repliedBy||'Auditor')+'</strong> on '+_supFmtDate(rd.repliedAt||'')+'</div>';
+    h+='</div></div>';
+    el.innerHTML=h;
+    document.body.appendChild(el);
+    el.addEventListener('click',function(ev){ if(ev.target===el) el.remove(); });
+  })
+  .catch(function(e){ toast('Error loading reply: '+(e&&e.message?e.message:'')); });
+}
+
 function _supCheckNotificationsNow(){
   var cfg=_csGetCfg();
   if(!cfg.token||!cfg.owner||!cfg.repo){
@@ -24912,6 +24953,9 @@ function _supRenderProgress(sessions,reviews){
       if(rv.status==='pending'){
         h+='<button onclick="_supOpenReview(\''+esc(yr+'_'+brRaw)+'\')" style="padding:4px 12px;background:#c9962a;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#9998; Review</button>';
       }
+      if(rv.auditorRepliedAt){
+        h+='<button onclick="_supViewAuditorReply(\''+esc(yr+'_'+brRaw)+'\',\''+esc(rv.branchDisplay||brDisplay)+'\')" style="padding:4px 12px;background:#1a6030;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;margin-left:4px">&#128172; Reply</button>';
+      }
       h+='</td></tr>';
     });
     h+='</tbody></table></div></div>';
@@ -24974,6 +25018,7 @@ function _supRenderReviewed(sessions,reviews){
     h+='</div>'+badge;
     h+='<div style="display:flex;flex-direction:column;gap:5px;margin-left:8px">';
     if(rv.sessionPath) h+='<button onclick="_supViewSessionByPath(\''+esc(rv.sessionPath)+'\',\''+esc(p.key)+'\')" style="padding:5px 12px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap">&#128065; View Report</button>';
+    if(rv.auditorRepliedAt) h+='<button onclick="_supViewAuditorReply(\''+esc(p.key)+'\',\''+esc(rv.branchDisplay||p.key)+'\')" style="padding:5px 12px;background:#1a6030;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap">&#128172; View Reply</button>';
     h+='</div>';
     h+='</div>';
   });
@@ -26498,10 +26543,14 @@ function _csShowNotifBanner(entries, onDismiss){
     h+=branchLabel;
     h+='<div>'+msg+'</div>';
     if(e.at){ h+='<div style="font-size:10.5px;color:#aaa;margin-top:4px">'+_supFmtDate(e.at)+'</div>'; }
+    if(e.type==='auditor_reply'&&e.reviewKey){
+      h+='<div style="margin-top:8px"><button onclick="_supViewAuditorReply(\''+esc(e.reviewKey)+'\',\''+esc(e.branch||'')+'\');document.getElementById(\'_csNotifBanner\').remove();" style="background:#1a6030;color:#fff;border:none;border-radius:4px;padding:5px 13px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#128065; View Auditor Reply</button></div>';
+    }
     h+='</div>';
   });
   h+='</div>';
-  h+='<div style="padding:12px 18px;border-top:1px solid #e0e8f0;display:flex;justify-content:flex-end">';
+  h+='<div style="padding:12px 18px;border-top:1px solid #e0e8f0;display:flex;justify-content:space-between;align-items:center">';
+  h+='<div style="font-size:10.5px;color:#aaa">Replies remain viewable via Supervisor Dashboard → View</div>';
   h+='<button id="_csNotifDismissBtn" style="padding:7px 22px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">OK, Got it</button>';
   h+='</div>';
   h+='</div>';
@@ -26543,6 +26592,8 @@ setInterval(function(){
       if(cfg3.auditor) slugs3[_csAuditorSlug(cfg3)]=true;
       if(_su3.name) slugs3[_csAuditorSlug({auditor:_su3.name})]=true;
       if(_su3.username) slugs3[_csAuditorSlug({auditor:_su3.username})]=true;
+      slugs3['ro_supervisor']=true;
+      slugs3['ho_supervisor']=true;
       Object.keys(slugs3).forEach(function(slug){
         var cc={token:cfg3.token,owner:cfg3.owner,repo:cfg3.repo,auditor:slug};
         _csCheckNotifications(cc);
