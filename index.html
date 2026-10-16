@@ -25444,9 +25444,12 @@ function _supSendAuditorReply(){
       var rvBody={message:'[BRAINS] Auditor replied: '+rv.reviewKey,content:_csB64Enc(JSON.stringify(rvUpd,null,2)),sha:rvFile.sha};
       return fetch(rvUrl,{method:'PUT',headers:hdrs,body:JSON.stringify(rvBody)});
     }).catch(function(){});
-    // Notify supervisor
-    var supName=rv.supervisorName||window._cgSupervisorName||'';
-    var supSlug=supName?supName.replace(/[^a-zA-Z0-9\-_]/g,'_').replace(/_+/g,'_').toLowerCase():'';
+    // Notify supervisor — use stored supervisorNotifSlug (exact match to what supervisor checks)
+    var supSlug=rv.supervisorNotifSlug||'';
+    if(!supSlug){
+      var supName=rv.supervisorName||window._cgSupervisorName||'';
+      supSlug=supName?supName.replace(/[^a-zA-Z0-9\-_]/g,'_').replace(/_+/g,'_').toLowerCase():'';
+    }
     if(supSlug){
       var notifPath='_notifications/'+supSlug+'.json';
       var notifUrl=_csRepoBase(cfg)+'/contents/'+notifPath;
@@ -25540,6 +25543,10 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
         archivedAt: new Date().toISOString()
       });
     }
+    // supervisorNotifSlug: the exact slug used to READ the supervisor's notification file.
+    // Must match _csAuditorSlug(cfg) on the supervisor's browser. We store it here so the
+    // auditor can write the reply notification to the correct path without guessing.
+    var supNotifSlug=_csAuditorSlug(cfg)||_csAuditorSlug({auditor:userObj.name||userObj.username||'supervisor'});
     var reviewData={
       reviewKey: reviewKey,
       branchDisplay: (prevData.branchDisplay||reviewKey).replace(/_/g,' '),
@@ -25547,6 +25554,7 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
       supervisorComment: comment,
       obsComments: obsComments,
       supervisorName: userObj.name||userObj.username||'Supervisor',
+      supervisorNotifSlug: supNotifSlug,
       supervisorRole: userObj.role||'ro_supervisor',
       reviewedAt: new Date().toISOString(),
       sessionPath: prevData.sessionPath||sessionPath||'',
@@ -26331,6 +26339,10 @@ function _csWriteNotification(cfg, targetSlug, sess){
 }
 
 function _csCheckNotifications(cfg){
+  // Supplement missing cfg fields from session user if possible
+  if(!cfg.auditor){
+    try{ var _su=JSON.parse(sessionStorage.getItem('sa_current_user')||'{}'); if(_su.name) cfg.auditor=_su.name; }catch(e){}
+  }
   if(!cfg.token||!cfg.owner||!cfg.repo||!cfg.auditor) return;
   var mySlug=_csAuditorSlug(cfg);
   var path=_csNotifPath(mySlug);
