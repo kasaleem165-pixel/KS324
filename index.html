@@ -24609,6 +24609,50 @@ var _supSessionCache = null;
 var _supRegionFilter = '';          // supervisor's own region ('' = show all)
 var _supReviewShaCache = {};        // reviewKey -> GitHub blob SHA, avoids a GET before each PUT
 
+function _supCheckNotificationsNow(){
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo){
+    toast('⚠️ Cloud Settings missing. Go to Cloud → Cloud Settings and save your GitHub token, owner, and repo first.');
+    return;
+  }
+  toast('Checking for notifications…');
+  var slugsToCheck={};
+  if(cfg.auditor) slugsToCheck[_csAuditorSlug(cfg)]=true;
+  try{
+    var _su=JSON.parse(sessionStorage.getItem('sa_current_user')||'{}');
+    if(_su.name) slugsToCheck[_csAuditorSlug({auditor:_su.name})]=true;
+    if(_su.username) slugsToCheck[_csAuditorSlug({auditor:_su.username})]=true;
+  }catch(e){}
+  var slugList=Object.keys(slugsToCheck);
+  if(!slugList.length){ toast('No username found. Please log out and log in again.'); return; }
+  var found=0;
+  var checked=0;
+  slugList.forEach(function(slug){
+    var cfgCopy={token:cfg.token,owner:cfg.owner,repo:cfg.repo,auditor:slug};
+    var path=_csNotifPath(slug);
+    var url=_csRepoBase(cfgCopy)+'/contents/'+path;
+    fetch(url,{headers:_csHdrs(cfgCopy)})
+    .then(function(r){ return r.ok?r.json():null; })
+    .then(function(file){
+      checked++;
+      if(file&&file.content){
+        var arr; try{ arr=JSON.parse(_csB64Dec(file.content.replace(/\s/g,''))); }catch(e){ arr=[]; }
+        if(Array.isArray(arr)&&arr.length){
+          found+=arr.length;
+          _csShowNotifBanner(arr,function(){
+            var body={message:'[BRAINS] clear notifications for '+slug,content:_csB64Enc('[]'),sha:file.sha};
+            fetch(url,{method:'PUT',headers:_csHdrs(cfgCopy),body:JSON.stringify(body)}).catch(function(){});
+          });
+        }
+      }
+      if(checked===slugList.length&&!found){
+        toast('No pending notifications found for: '+slugList.join(', '));
+      }
+    })
+    .catch(function(){ checked++; });
+  });
+}
+
 function _supShowDashboard(){
   var ex=document.getElementById('_supDashboard');
   if(ex) ex.remove();
@@ -24629,6 +24673,7 @@ function _supShowDashboard(){
   h+='<div id="_supChips" style="display:flex;gap:8px"></div>';
   h+='<div style="width:1px;height:24px;background:rgba(255,255,255,.2)"></div>';
   h+='<button onclick="_supShowDashboard()" title="Refresh" style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer;padding:4px 8px;opacity:.8">&#8635;</button>';
+  h+='<button onclick="_supCheckNotificationsNow()" title="Check for new notifications now" style="background:rgba(201,150,42,.25);border:1px solid rgba(201,150,42,.5);color:#f5d98b;font-size:12px;font-weight:700;cursor:pointer;padding:5px 14px;border-radius:4px;font-family:Inter,sans-serif">&#128276; Check Alerts</button>';
   h+='<button onclick="document.getElementById(\'_supDashboard\').remove()" title="Close Dashboard" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:12px;font-weight:700;cursor:pointer;padding:5px 14px;border-radius:4px;font-family:Inter,sans-serif">&#10005; Close</button>';
   h+='</div>';
 
