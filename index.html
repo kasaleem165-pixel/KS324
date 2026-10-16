@@ -25316,6 +25316,7 @@ function _supShowSessionViewer(sess, reviewKey){
   h+='<div style="font-size:11px;font-weight:800;color:#1a6030;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">&#128172; Auditor Replies</div>';
   h+='<div id="_supAuditorRepliesBody"></div>';
   h+='<div style="border-top:2px dashed #90c0a0;margin-top:12px;padding-top:12px">';
+  h+='<div id="_supPrevCommentsPanel" style="display:none;margin-bottom:10px"></div>';
   h+='<div style="font-size:11px;font-weight:800;color:#1a3a5c;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">&#9998; Supervisor Follow-up Response</div>';
   h+='<textarea id="_supFollowupText" rows="3" placeholder="Type your follow-up response to the auditor..." style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #1a3a5c;border-radius:5px;font-size:12.5px;font-family:Inter,sans-serif;resize:vertical;color:#333;background:#fff"></textarea>';
   h+='<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
@@ -25371,6 +25372,36 @@ function _supShowSessionViewer(sess, reviewKey){
       .then(function(rvf){
         if(!rvf||!rvf.content) return;
         var rvd; try{ rvd=JSON.parse(_csB64Dec(rvf.content.replace(/\s/g,''))); }catch(e){ return; }
+        // Show supervisor's previous comments above the follow-up textarea
+        var prevPanel=document.getElementById('_supPrevCommentsPanel');
+        if(prevPanel){
+          var ph='';
+          var hasSupPrev=false;
+          if(rvd.supervisorComment){
+            hasSupPrev=true;
+            ph+='<div style="margin-bottom:6px;border:1px solid #c9962a;border-radius:5px;overflow:hidden">';
+            ph+='<div style="background:#fff3cd;padding:4px 10px;font-size:10.5px;font-weight:700;color:#7a5500">&#128204; Your Overall Comment</div>';
+            ph+='<div style="padding:7px 10px;font-size:12px;color:#5a3a00;white-space:pre-wrap">'+esc(rvd.supervisorComment)+'</div>';
+            ph+='</div>';
+          }
+          var obsC=rvd.obsComments||{};
+          var obsKeys=Object.keys(obsC);
+          obsKeys.forEach(function(oid){
+            if(!obsC[oid]) return;
+            hasSupPrev=true;
+            var obsLabel=oid;
+            if(obsLookup&&obsLookup[oid]) obsLabel=obsLookup[oid].title||oid;
+            ph+='<div style="margin-bottom:6px;border:1px solid #c9962a;border-radius:5px;overflow:hidden">';
+            ph+='<div style="background:#fff3cd;padding:4px 10px;font-size:10.5px;font-weight:700;color:#7a5500">&#128204; Comment: '+esc(obsLabel)+'</div>';
+            ph+='<div style="padding:7px 10px;font-size:12px;color:#5a3a00;white-space:pre-wrap">'+esc(obsC[oid])+'</div>';
+            ph+='</div>';
+          });
+          if(hasSupPrev){
+            ph='<div style="font-size:10.5px;font-weight:800;color:#7a5500;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">&#128204; Your Previous Comments</div>'+ph;
+            prevPanel.innerHTML=ph;
+            prevPanel.style.display='block';
+          }
+        }
         if(rvd&&rvd.supervisorFollowup){
           var ta=document.getElementById('_supFollowupText');
           var st=document.getElementById('_supFollowupStatus');
