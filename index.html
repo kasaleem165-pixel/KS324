@@ -17027,11 +17027,40 @@ function _csSubmitReviewRequest(role){
     generateReviewerHtml(role);
     return;
   }
-  var sess=captureSession();
-  var path=_csSessionPath(cfg);
+  // Block re-submission when supervisor has already reviewed and comments are being exchanged.
+  // Allowing a new "Send to Supervisor" during a changes_requested cycle would overwrite the
+  // review record and create confusion. Auditor must use "Submit Reply" instead.
   var year=_csAuditYear(cfg)||new Date().getFullYear()+'';
   var brFolder=_csBranchFolder();
   var reviewKey=year+'_'+brFolder;
+  var reviewUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'.json';
+  fetch(reviewUrl,{headers:_csHdrs(cfg)})
+  .then(function(r){ return r.ok?r.json():null; })
+  .then(function(f){
+    var activeStatus='';
+    if(f&&f.content){
+      try{
+        var rv=JSON.parse(_csB64Dec(f.content.replace(/\s/g,'')));
+        if(rv&&rv.status&&rv.status!=='pending') activeStatus=rv.status;
+      }catch(e){}
+    }
+    if(activeStatus==='changes_requested'||activeStatus==='rejected'){
+      var label=activeStatus==='rejected'?'Rejected':'Changes Requested';
+      showToast('&#9888; Cannot re-send: '+roleLabel+' Supervisor review is in progress ('+label+'). Open the Review tab → Load '+roleLabel+' Supervisor Review → use the reply textareas to respond to supervisor comments instead.', 7000);
+      return;
+    }
+    // No active review or already approved — proceed
+    _csDoSubmitReviewRequest(role, cfg, roleLabel, year, brFolder, reviewKey);
+  })
+  .catch(function(){
+    // If we can't check (network), allow the submission anyway
+    _csDoSubmitReviewRequest(role, cfg, roleLabel, year, brFolder, reviewKey);
+  });
+}
+
+function _csDoSubmitReviewRequest(role, cfg, roleLabel, year, brFolder, reviewKey){
+  var sess=captureSession();
+  var path=_csSessionPath(cfg);
   sess._reviewStatus='pending_'+role;
   sess._reviewRequestedAt=new Date().toISOString();
   sess._reviewRequestedBy=cfg.auditor;
