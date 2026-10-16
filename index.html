@@ -747,11 +747,17 @@ function _pwGrantAccess(userObj){
     // Auto-launch supervisor dashboard for supervisor roles
     if(userObj.role==='ro_supervisor'||userObj.role==='ho_supervisor'||userObj.role==='supervisor'){
       setTimeout(_supShowDashboard, 400);
+      // Check notifications for supervisors — use userObj.name as auditor slug if cfg.auditor is blank
+      setTimeout(function(){
+        var cfg2=_csGetCfg();
+        if(!cfg2.auditor&&userObj.name) cfg2.auditor=userObj.name;
+        _csCheckNotifications(cfg2);
+      }, 2000);
     }
     // Auto-launch admin panel for any administrator login
     if(userObj.role==='administrator'){
       setTimeout(showAdminPanel, 400);
-          setTimeout(function(){ _csCheckNotifications(_csGetCfg()); }, 2000);
+      setTimeout(function(){ _csCheckNotifications(_csGetCfg()); }, 2000);
     }
   },0);
 }
@@ -26420,7 +26426,14 @@ function _csShowNotifBanner(entries, onDismiss){
     }
     // Check for cross-auditor notifications (6s delay to stagger from merge check)
     setTimeout(function(){ _csCheckNotifications(cfg); }, 1000);
-setInterval(function(){ _csCheckNotifications(_csGetCfg()); }, 300000);
+setInterval(function(){
+  var cfg3=_csGetCfg();
+  // For supervisors logged in via named user, supplement cfg.auditor from session
+  if(!cfg3.auditor){
+    try{ var su=JSON.parse(sessionStorage.getItem('sa_current_user')||'{}'); if(su.name) cfg3.auditor=su.name; }catch(e){}
+  }
+  _csCheckNotifications(cfg3);
+}, 300000);
   },5000);
 })();
 
