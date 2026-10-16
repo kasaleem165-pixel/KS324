@@ -17369,12 +17369,19 @@ function _supShowReviewCommentPanel(rv, role, sha){
     });
   }
 
-  // Overall auditor reply (shown when there is an overall supervisor comment)
-  if(rv.supervisorComment){
+  // Overall auditor reply — only when supervisor used overall comment AND no per-obs comments
+  var hasPerObsComments=!!(rv.obsComments&&Object.keys(rv.obsComments).length);
+  if(rv.supervisorComment&&!hasPerObsComments){
     var prevOverall=(rv.auditorReplies&&rv.auditorReplies['_overall'])||'';
     h+='<div style="margin-top:8px">';
     h+='<div style="font-size:10px;font-weight:800;color:#1a6030;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">&#9998; Your Overall Reply</div>';
     h+='<textarea id="_audReply__overall" rows="2" placeholder="Reply to the overall comment..." style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #90c0e0;border-radius:4px;font-size:12px;font-family:Inter,sans-serif;resize:vertical;color:#1a3a5c">'+esc(prevOverall)+'</textarea>';
+    h+='</div>';
+  } else if(rv.supervisorComment&&hasPerObsComments){
+    h+='<div style="margin-top:8px;background:#f0f4f8;border-left:3px solid #c9962a;border-radius:4px;padding:8px 12px">';
+    h+='<div style="font-size:10px;font-weight:700;color:#7a5500">&#128204; Overall Comment from Supervisor:</div>';
+    h+='<div style="font-size:11.5px;color:#5a3a00;margin-top:4px;white-space:pre-wrap">'+esc(rv.supervisorComment)+'</div>';
+    h+='<div style="font-size:10px;color:#888;margin-top:6px;font-style:italic">Reply on each observation above — no separate overall reply needed.</div>';
     h+='</div>';
   }
 
@@ -24664,9 +24671,20 @@ function _supViewAuditorReply(reviewKey, branchLabel){
     h+='</div>';
     h+='<div style="padding:16px 18px;overflow-y:auto;flex:1">';
     var replies=rd.replies;
-    Object.keys(replies).forEach(function(id){
+    // Ordered: per-obs keys first (in object order), _overall last
+    var rKeys=Object.keys(replies).filter(function(k){return k!=='_overall';});
+    if(replies['_overall']) rKeys.push('_overall');
+    var obsCounter=0;
+    rKeys.forEach(function(id){
       if(!replies[id]) return;
-      var label=id==='_overall'?'Overall Reply':'Reply for Observation: '+esc(id);
+      var label;
+      if(id==='_overall'){
+        label='Overall Reply';
+      } else {
+        obsCounter++;
+        // Try to resolve title from brains-sessions data isn't available here, use id as fallback
+        label='Obs. '+obsCounter+': '+esc(id);
+      }
       h+='<div style="margin-bottom:10px;border:1px solid #90c0a0;border-radius:5px;overflow:hidden">';
       h+='<div style="background:#d4edda;padding:5px 11px;font-size:10.5px;font-weight:700;color:#1a6030">'+label+'</div>';
       h+='<div style="padding:9px 11px;font-size:12.5px;color:#1a3a5c;white-space:pre-wrap;line-height:1.6">'+esc(replies[id])+'</div>';
@@ -25342,18 +25360,26 @@ function _supShowSessionViewer(sess, reviewKey){
       var replies=rd.replies;
       var keys=Object.keys(replies);
       if(!keys.length) return;
+      // Build ordered list: per-obs in orderedIds order, then _overall last
+      var orderedKeys=[];
+      if(orderedIds&&orderedIds.length){
+        orderedIds.forEach(function(oid){ if(replies[oid]) orderedKeys.push(oid); });
+      } else {
+        keys.forEach(function(k){ if(k!=='_overall') orderedKeys.push(k); });
+      }
+      if(replies['_overall']) orderedKeys.push('_overall');
       var rh='';
-      keys.forEach(function(id){
+      orderedKeys.forEach(function(id,idx){
         if(!replies[id]) return;
         var label;
         if(id==='_overall'){
           label='Overall Reply';
         } else {
-          // Look up title from obsLookup (available via closure) or DB
           var obsTitle=id;
           if(obsLookup&&obsLookup[id]) obsTitle=obsLookup[id].title||id;
           else if(DB&&DB.observations){ for(var _lt=0;_lt<DB.observations.length;_lt++){ if(DB.observations[_lt].id===id){ obsTitle=DB.observations[_lt].title||id; break; } } }
-          label='Reply: '+esc(obsTitle);
+          var obsNum=idx+1;
+          label='Obs. '+obsNum+': '+esc(obsTitle);
         }
         rh+='<div style="margin-bottom:8px;border:1px solid #90c0a0;border-radius:5px;overflow:hidden">';
         rh+='<div style="background:#d4edda;padding:4px 10px;font-size:10.5px;font-weight:700;color:#1a6030">'+label+'</div>';
@@ -25385,14 +25411,16 @@ function _supShowSessionViewer(sess, reviewKey){
             ph+='</div>';
           }
           var obsC=rvd.obsComments||{};
-          var obsKeys=Object.keys(obsC);
+          var obsKeys=orderedIds&&orderedIds.length?orderedIds.filter(function(k){return obsC[k];}):Object.keys(obsC);
+          var obsNumCounter=0;
           obsKeys.forEach(function(oid){
             if(!obsC[oid]) return;
             hasSupPrev=true;
+            obsNumCounter++;
             var obsLabel=oid;
             if(obsLookup&&obsLookup[oid]) obsLabel=obsLookup[oid].title||oid;
             ph+='<div style="margin-bottom:6px;border:1px solid #c9962a;border-radius:5px;overflow:hidden">';
-            ph+='<div style="background:#fff3cd;padding:4px 10px;font-size:10.5px;font-weight:700;color:#7a5500">&#128204; Comment: '+esc(obsLabel)+'</div>';
+            ph+='<div style="background:#fff3cd;padding:4px 10px;font-size:10.5px;font-weight:700;color:#7a5500">&#128204; Obs. '+obsNumCounter+': '+esc(obsLabel)+'</div>';
             ph+='<div style="padding:7px 10px;font-size:12px;color:#5a3a00;white-space:pre-wrap">'+esc(obsC[oid])+'</div>';
             ph+='</div>';
           });
