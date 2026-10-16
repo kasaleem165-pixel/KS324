@@ -24964,6 +24964,9 @@ function _supRenderProgress(sessions,reviews){
       if(rv.status==='pending'){
         h+='<button onclick="_supOpenReview(\''+esc(yr+'_'+brRaw)+'\')" style="padding:4px 12px;background:#c9962a;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#9998; Review</button>';
       }
+      if(rv.status==='changes_requested'||rv.status==='rejected'){
+        h+='<button onclick="_supOpenReview(\''+esc(yr+'_'+brRaw)+'\')" style="padding:4px 12px;background:#1a6030;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#10003; Re-Review</button>';
+      }
       if(rv.auditorRepliedAt){
         h+='<button onclick="_supViewAuditorReply(\''+esc(yr+'_'+brRaw)+'\',\''+esc(rv.branchDisplay||brDisplay)+'\')" style="padding:4px 12px;background:#1a6030;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;margin-left:4px">&#128172; Reply</button>';
       }
@@ -25234,8 +25237,9 @@ function _supShowSessionViewer(sess, reviewKey){
   h+='<div style="border-top:2px dashed #90c0a0;margin-top:12px;padding-top:12px">';
   h+='<div style="font-size:11px;font-weight:800;color:#1a3a5c;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">&#9998; Supervisor Follow-up Response</div>';
   h+='<textarea id="_supFollowupText" rows="3" placeholder="Type your follow-up response to the auditor..." style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #1a3a5c;border-radius:5px;font-size:12.5px;font-family:Inter,sans-serif;resize:vertical;color:#333;background:#fff"></textarea>';
-  h+='<div style="margin-top:6px;display:flex;align-items:center;gap:8px">';
+  h+='<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
   h+='<button onclick="_supSendFollowupResponse(\''+esc(reviewKey)+'\',\''+esc(rv&&rv.submittedBy?rv.submittedBy:'')+'\')" style="padding:6px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#128228; Send Response to Auditor</button>';
+  h+='<button onclick="_supApproveFromViewer(\''+esc(reviewKey)+'\',\''+esc(rv&&rv.submittedBy?rv.submittedBy:'')+'\',\''+esc(rv&&rv.branchDisplay?rv.branchDisplay:reviewKey)+'\')" style="padding:6px 18px;background:#1a6030;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#10003; Approve Report</button>';
   h+='<div id="_supFollowupStatus" style="font-size:11px;color:#888"></div>';
   h+='</div></div>';
   h+='</div>';
@@ -25296,6 +25300,65 @@ function _supShowSessionViewer(sess, reviewKey){
     })
     .catch(function(){});
   })(reviewKey);
+}
+
+function _supApproveFromViewer(reviewKey, auditorName, branchDisplay){
+  if(!confirm('Approve this report?\n\nBranch: '+branchDisplay+'\nAuditor: '+auditorName+'\n\nThis will mark the report as Approved and notify the auditor.')) return;
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo){ toast('Cloud Settings not configured.'); return; }
+  var rvUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'.json';
+  toast('Approving report…');
+  fetch(rvUrl,{headers:_csHdrs(cfg)})
+  .then(function(r){ return r.ok?r.json():null; })
+  .then(function(rvf){
+    if(!rvf||!rvf.content){ toast('Review file not found.'); return; }
+    var rvd; try{ rvd=JSON.parse(_csB64Dec(rvf.content.replace(/\s/g,''))); }catch(e){ toast('Error reading review file.'); return; }
+    rvd.status='approved';
+    rvd.reviewedAt=new Date().toISOString();
+    rvd.supervisorName=rvd.supervisorName||(cfg.auditor||'Supervisor');
+    var body={message:'[BRAINS] Approved: '+reviewKey,content:_csB64Enc(JSON.stringify(rvd,null,2)),sha:rvf.sha};
+    return fetch(rvUrl,{method:'PUT',headers:_csHdrs(cfg),body:JSON.stringify(body)})
+    .then(function(r2){
+      if(!r2||!(r2.status===200||r2.status===201)){ toast('Failed to approve. Try again.'); return; }
+      // Notify auditor
+      var audSlug='';
+      if(rvd.auditorSlug) audSlug=rvd.auditorSlug;
+      else if(auditorName) audSlug=auditorName.replace(/[^a-zA-Z0-9\-_]/g,'_').replace(/_+/g,'_').toLowerCase();
+      if(audSlug){
+        var notifPath='_notifications/'+audSlug+'.json';
+        var notifUrl=_csRepoBase(cfg)+'/contents/'+notifPath;
+        var brDisp=branchDisplay||(reviewKey||'').replace(/_/g,' ');
+        var entry={
+          from:_csAuditorSlug(cfg),
+          fromName:cfg.auditor||'Supervisor',
+          at:new Date().toISOString(),
+          branch:brDisp,
+          reviewKey:reviewKey,
+          decision:'approved',
+          type:'supervisor_review',
+          msg:'<strong>Supervisor</strong> has <span style="color:#1a6030;font-weight:700">Approved</span> your report for "'+esc(brDisp)+'".'
+        };
+        fetch(notifUrl,{headers:_csHdrs(cfg)})
+        .then(function(r3){ return r3.ok?r3.json():{content:'W10=',sha:null}; })
+        .then(function(ex){
+          var arr; try{ arr=JSON.parse(_csB64Dec((ex.content||'W10=').replace(/\s/g,''))); }catch(e){ arr=[]; }
+          if(!Array.isArray(arr)) arr=[];
+          arr=arr.filter(function(e){ return e.reviewKey!==entry.reviewKey; });
+          arr.push(entry);
+          var nb={message:'[BRAINS] Approved notification for '+audSlug,content:_csB64Enc(JSON.stringify(arr,null,2))};
+          if(ex&&ex.sha) nb.sha=ex.sha;
+          return fetch(notifUrl,{method:'PUT',headers:_csHdrs(cfg),body:JSON.stringify(nb)});
+        }).catch(function(){});
+      }
+      toast('Report approved ✓ Auditor has been notified.');
+      // Close viewer and refresh dashboard
+      var viewer=document.getElementById('_supSessionViewer');
+      if(viewer) viewer.remove();
+      _supSessionCache=null;
+      _supShowDashboard();
+    });
+  })
+  .catch(function(e){ toast('Error: '+(e&&e.message?e.message:e)); });
 }
 
 function _supSendFollowupResponse(reviewKey, auditorName){
