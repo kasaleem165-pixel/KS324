@@ -24680,7 +24680,6 @@ function _supCheckNotificationsNow(){
     if(_su.role==='ro_supervisor'||_su.role==='supervisor') slugsToCheck['ro_supervisor']=true;
     if(_su.role==='ho_supervisor') slugsToCheck['ho_supervisor']=true;
   }catch(e){}
-  // Always include generic role slugs in case review was submitted with shared password
   slugsToCheck['ro_supervisor']=true;
   slugsToCheck['ho_supervisor']=true;
   var slugList=Object.keys(slugsToCheck);
@@ -24705,12 +24704,68 @@ function _supCheckNotificationsNow(){
           });
         }
       }
+      // After all slug checks done and nothing found in notification files:
+      // scan review files for any auditor reply that the supervisor has not yet responded to
       if(checked===slugList.length&&!found){
-        toast('No pending notifications found for: '+slugList.join(', '));
+        _supScanPendingReplies(cfg,function(pendingEntries){
+          if(pendingEntries&&pendingEntries.length){
+            _csShowNotifBanner(pendingEntries,function(){});
+          } else {
+            toast('No pending notifications. All replies have been addressed.');
+          }
+        });
       }
     })
     .catch(function(){ checked++; });
   });
+}
+
+function _supScanPendingReplies(cfg,cb){
+  // Scan _reviews/ folder for branches where auditor replied but supervisor has not yet responded
+  var folderUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH;
+  fetch(folderUrl,{headers:_csHdrs(cfg)})
+  .then(function(r){ return r.ok?r.json():null; })
+  .then(function(files){
+    if(!Array.isArray(files)){ cb([]); return; }
+    // Only look at base review files (not _reply.json)
+    var reviewFiles=files.filter(function(f){
+      return f.name&&f.name.slice(-5)==='.json'&&f.name.indexOf('_reply.json')<0;
+    });
+    if(!reviewFiles.length){ cb([]); return; }
+    var pending=[];
+    var done=0;
+    reviewFiles.forEach(function(f){
+      fetch(f.download_url||(_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+f.name),{headers:_csHdrs(cfg)})
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(rf){
+        done++;
+        if(rf&&rf.content){
+          var rv; try{ rv=JSON.parse(_csB64Dec(rf.content.replace(/\s/g,''))); }catch(e){ rv=null; }
+          if(rv&&rv.auditorRepliedAt){
+            var repliedTs=new Date(rv.auditorRepliedAt).getTime();
+            var followupTs=rv.supervisorFollowupAt?new Date(rv.supervisorFollowupAt).getTime():0;
+            var approvedTs=rv.reviewedAt&&rv.status==='approved'?new Date(rv.reviewedAt).getTime():0;
+            // Pending if: auditor replied AND supervisor hasn't followed-up or approved AFTER the reply
+            var actionedAfterReply=(followupTs>repliedTs)||(approvedTs>repliedTs);
+            if(!actionedAfterReply){
+              var brDisp=rv.branchDisplay||(rv.reviewKey||f.name).replace(/_/g,' ').replace(/\.json$/,'');
+              pending.push({
+                type:'auditor_reply',
+                reviewKey:rv.reviewKey||f.name.replace('.json',''),
+                branch:brDisp,
+                fromName:rv.submittedBy||'Auditor',
+                at:rv.auditorRepliedAt,
+                msg:'<strong>'+(rv.submittedBy||'Auditor')+'</strong> has replied to your review comments for "'+esc(brDisp)+'". <em style="color:#888">(Awaiting your response)</em>'
+              });
+            }
+          }
+        }
+        if(done===reviewFiles.length) cb(pending);
+      })
+      .catch(function(){ done++; if(done===reviewFiles.length) cb(pending); });
+    });
+  })
+  .catch(function(){ cb([]); });
 }
 
 function _supShowDashboard(){
