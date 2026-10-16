@@ -747,11 +747,22 @@ function _pwGrantAccess(userObj){
     // Auto-launch supervisor dashboard for supervisor roles
     if(userObj.role==='ro_supervisor'||userObj.role==='ho_supervisor'||userObj.role==='supervisor'){
       setTimeout(_supShowDashboard, 400);
-      // Check notifications for supervisors — use userObj.name as auditor slug if cfg.auditor is blank
+      // Check notifications for supervisors across ALL possible slugs:
+      // 1. cfg.auditor (Cloud Settings name, e.g. 'kamran_saleem')
+      // 2. userObj.name (login session name, may differ if shared login used)
+      // 3. userObj.username (role slug, e.g. 'ro_supervisor')
+      // This is needed because the slug written to the notification file
+      // depends on what the supervisor's userObj.name was when the review was submitted.
       setTimeout(function(){
         var cfg2=_csGetCfg();
-        if(!cfg2.auditor&&userObj.name) cfg2.auditor=userObj.name;
-        _csCheckNotifications(cfg2);
+        var slugsToCheck={};
+        if(cfg2.auditor) slugsToCheck[_csAuditorSlug(cfg2)]=true;
+        if(userObj.name) slugsToCheck[_csAuditorSlug({auditor:userObj.name})]=true;
+        if(userObj.username) slugsToCheck[_csAuditorSlug({auditor:userObj.username})]=true;
+        Object.keys(slugsToCheck).forEach(function(slug){
+          var cfgCopy={token:cfg2.token,owner:cfg2.owner,repo:cfg2.repo,auditor:slug};
+          _csCheckNotifications(cfgCopy);
+        });
       }, 2000);
     }
     // Auto-launch admin panel for any administrator login
@@ -26469,11 +26480,25 @@ function _csShowNotifBanner(entries, onDismiss){
     setTimeout(function(){ _csCheckNotifications(cfg); }, 1000);
 setInterval(function(){
   var cfg3=_csGetCfg();
-  // For supervisors logged in via named user, supplement cfg.auditor from session
-  if(!cfg3.auditor){
-    try{ var su=JSON.parse(sessionStorage.getItem('sa_current_user')||'{}'); if(su.name) cfg3.auditor=su.name; }catch(e){}
-  }
-  _csCheckNotifications(cfg3);
+  try{
+    var _su3=JSON.parse(sessionStorage.getItem('sa_current_user')||'{}');
+    var role3=_su3.role||'';
+    var isSup3=(role3==='ro_supervisor'||role3==='ho_supervisor'||role3==='supervisor');
+    if(isSup3){
+      // Supervisors: check all possible slugs (Cloud Settings name, session name, username)
+      var slugs3={};
+      if(cfg3.auditor) slugs3[_csAuditorSlug(cfg3)]=true;
+      if(_su3.name) slugs3[_csAuditorSlug({auditor:_su3.name})]=true;
+      if(_su3.username) slugs3[_csAuditorSlug({auditor:_su3.username})]=true;
+      Object.keys(slugs3).forEach(function(slug){
+        var cc={token:cfg3.token,owner:cfg3.owner,repo:cfg3.repo,auditor:slug};
+        _csCheckNotifications(cc);
+      });
+    } else {
+      if(!cfg3.auditor&&_su3.name) cfg3.auditor=_su3.name;
+      _csCheckNotifications(cfg3);
+    }
+  }catch(e){ _csCheckNotifications(cfg3); }
 }, 300000);
   },5000);
 })();
