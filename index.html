@@ -759,6 +759,9 @@ function _pwGrantAccess(userObj){
         if(cfg2.auditor) slugsToCheck[_csAuditorSlug(cfg2)]=true;
         if(userObj.name) slugsToCheck[_csAuditorSlug({auditor:userObj.name})]=true;
         if(userObj.username) slugsToCheck[_csAuditorSlug({auditor:userObj.username})]=true;
+        // Always check generic role slugs — used when supervisor submitted review via shared password
+        slugsToCheck['ro_supervisor']=true;
+        slugsToCheck['ho_supervisor']=true;
         Object.keys(slugsToCheck).forEach(function(slug){
           var cfgCopy={token:cfg2.token,owner:cfg2.owner,repo:cfg2.repo,auditor:slug};
           _csCheckNotifications(cfgCopy);
@@ -24622,7 +24625,12 @@ function _supCheckNotificationsNow(){
     var _su=JSON.parse(sessionStorage.getItem('sa_current_user')||'{}');
     if(_su.name) slugsToCheck[_csAuditorSlug({auditor:_su.name})]=true;
     if(_su.username) slugsToCheck[_csAuditorSlug({auditor:_su.username})]=true;
+    if(_su.role==='ro_supervisor'||_su.role==='supervisor') slugsToCheck['ro_supervisor']=true;
+    if(_su.role==='ho_supervisor') slugsToCheck['ho_supervisor']=true;
   }catch(e){}
+  // Always include generic role slugs in case review was submitted with shared password
+  slugsToCheck['ro_supervisor']=true;
+  slugsToCheck['ho_supervisor']=true;
   var slugList=Object.keys(slugsToCheck);
   if(!slugList.length){ toast('No username found. Please log out and log in again.'); return; }
   var found=0;
