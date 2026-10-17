@@ -24750,10 +24750,25 @@ function _supViewAuditorReply(reviewKey, branchLabel){
         var obsLk={}; var ordIds=[];
         if(sf&&sf.content){
           var sd; try{ sd=JSON.parse(_csB64Dec(sf.content.replace(/\s/g,''))); }catch(e){ sd=null; }
-          if(sd&&sd.orderedObsIds){
-            ordIds=sd.orderedObsIds;
+          if(sd){
+            // Build obs lookup from observations + customs
             var allObs=(sd.observations||[]).concat(sd.customs||[]);
-            allObs.forEach(function(o){ if(o&&o.id) obsLk[o.id]={title:o.title||o.id,observation:o.observation||'',recommendation:o.recommendation||''}; });
+            allObs.forEach(function(o){
+              if(!o||!o.id) return;
+              var editObj=(sd.obsEdits&&sd.obsEdits[o.id])||{};
+              obsLk[o.id]={
+                title:o.title||o.id,
+                observation:editObj.observation||o.observation||'',
+                recommendation:editObj.recommendation||o.recommendation||''
+              };
+            });
+            // Build ordered ID list via obsOrder + selIds
+            var selIdsObj=sd.selIds||{};
+            var ordered=[];
+            if(sd.obsOrder){ ordered=ordered.concat(sd.obsOrder.repeated||[]).concat(sd.obsOrder.new||[]); }
+            var allSelIds=Object.keys(selIdsObj);
+            for(var _xi=0;_xi<allSelIds.length;_xi++){ if(ordered.indexOf(allSelIds[_xi])<0) ordered.push(allSelIds[_xi]); }
+            ordIds=ordered.filter(function(id){ return selIdsObj[id]; });
           }
         }
         _buildReplyOverlay(obsLk,ordIds);
