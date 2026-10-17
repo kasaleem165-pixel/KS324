@@ -19250,33 +19250,35 @@ function AT_loadReviewTrail(){
     listEl.innerHTML='<div style="padding:24px;text-align:center;color:#c0392b;font-size:12px">&#9888; Cloud Settings not configured. Go to Cloud → Cloud Settings.</div>';
     return;
   }
-  // Build reviewKey the same way the submit/send functions do
+  // Build reviewKey — first check DOM, then fall back to IDB autosave
   var year=(_csAuditYear ? _csAuditYear(cfg) : '')||(new Date().getFullYear()+'');
   var brFolder=_csBranchFolder ? _csBranchFolder() : '';
   var H=getHdrVals ? getHdrVals() : {};
-  // If DOM fields are empty/default, try to get branch from last saved session in localStorage
-  if(!brFolder||brFolder==='000_branch'){
-    try{
-      var _asSess=localStorage.getItem('bss_autosave_v1');
-      if(_asSess){
-        var _asParsed=JSON.parse(_asSess);
-        if(_asParsed&&_asParsed._cloudMeta&&_asParsed._cloudMeta.branchFolder){
-          brFolder=_asParsed._cloudMeta.branchFolder;
-          if(_asParsed._cloudMeta.auditYear) year=_asParsed._cloudMeta.auditYear;
-          // Also extract display name from formData if available
-          if(_asParsed.formData&&_asParsed.formData.brname) H.brname=_asParsed.formData.brname;
-          if(_asParsed.formData&&_asParsed.formData.brcode) H.brcode=_asParsed.formData.brcode;
-        }
+  // Check if DOM has a real branch loaded (brcode not default)
+  var domHasBranch=(H.brcode&&H.brcode!=='000'&&H.brname);
+  if(domHasBranch){
+    _AT_doLoadTrail(cfg,year,brFolder,H,listEl,branchEl);
+  } else {
+    // DOM empty — try IDB autosave
+    idbGet('bss_autosave_v1',null,function(saved){
+      if(saved&&saved._cloudMeta&&saved._cloudMeta.branchFolder&&saved._cloudMeta.branchFolder!=='000_branch'){
+        var bf=saved._cloudMeta.branchFolder;
+        var yr=saved._cloudMeta.auditYear||year;
+        var hh={brcode:(saved.formData&&saved.formData.brcode)||'',brname:(saved.formData&&saved.formData.brname)||''};
+        _AT_doLoadTrail(cfg,yr,bf,hh,listEl,branchEl);
+      } else {
+        listEl.innerHTML='<div style="padding:24px;text-align:center;color:#888;font-size:12px">No branch loaded. Please open a session first, then re-open Audit Trail.</div>';
+        if(branchEl) branchEl.textContent='—';
       }
-    }catch(e){}
+    });
+    return;
   }
+}
+
+function _AT_doLoadTrail(cfg,year,brFolder,H,listEl,branchEl){
   var reviewKey=year+'_'+brFolder;
   var branchDisplay=(H.brcode&&H.brname ? H.brcode+' — '+H.brname : (H.brname||brFolder.replace(/_/g,' ')))||reviewKey;
   if(branchEl) branchEl.textContent=branchDisplay;
-  if(!brFolder||brFolder==='000_branch'){
-    listEl.innerHTML='<div style="padding:24px;text-align:center;color:#888;font-size:12px">No branch loaded. Please open a session first then re-open Audit Trail.</div>';
-    return;
-  }
 
   var rvUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'.json';
   var rpUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'_reply.json';
