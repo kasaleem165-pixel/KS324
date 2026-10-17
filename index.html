@@ -17167,19 +17167,43 @@ function _csLoadReviewCloud(role){
       toast('No supervisor reviews found in cloud.');
       return;
     }
-    // Filter JSON files only — exclude _reply.json files (those are auditor reply records, not reviews)
+    // Filter JSON files only — exclude _reply.json and _trail.json files
     var reviews=[];
     for(var i=0;i<files.length;i++){
-      if(files[i].name&&files[i].name.match(/\.json$/i)&&files[i].name.indexOf('_reply.json')<0) reviews.push(files[i]);
+      var fn=files[i].name||'';
+      if(fn.match(/\.json$/i)&&fn.indexOf('_reply.json')<0&&fn.indexOf('_trail.json')<0) reviews.push(files[i]);
     }
     if(!reviews.length){ toast('No supervisor reviews found in cloud.'); return; }
 
-    if(reviews.length===1){
-      // Only one review — load it directly
-      _csLoadReviewByFile(reviews[0], role);
-    } else {
-      // Multiple reviews — show branch picker
-      _csShowReviewPicker(reviews, role);
+    // Fetch each review's content to check status — only show those under discussion (not approved)
+    toast('Checking review status…');
+    var pending=[];
+    var fetched=0;
+    function onFetched(){
+      fetched++;
+      if(fetched<reviews.length) return;
+      // All done
+      if(!pending.length){ toast('No pending supervisor reviews found.'); return; }
+      if(pending.length===1){
+        _csLoadReviewByFile(pending[0], role);
+      } else {
+        _csShowReviewPicker(pending, role);
+      }
+    }
+    for(var j=0;j<reviews.length;j++){
+      (function(f){
+        fetch(_csRepoBase(cfg)+'/contents/_reviews/'+f.name,{headers:_csHdrs(cfg)})
+        .then(function(r){ return r.ok?r.json():null; })
+        .then(function(data){
+          if(data&&data.content){
+            var rv=null;
+            try{ rv=JSON.parse(_csB64Dec(data.content.replace(/\s/g,''))); }catch(e){}
+            // Include only if status is pending or changes_requested (not approved/rejected)
+            if(rv&&(rv.status==='pending'||rv.status==='changes_requested')){ pending.push(f); }
+          }
+          onFetched();
+        }).catch(function(){ onFetched(); });
+      })(reviews[j]);
     }
   })
   .catch(function(){ toast('Could not reach cloud. Check connection.'); });
