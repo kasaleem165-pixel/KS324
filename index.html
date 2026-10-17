@@ -19270,10 +19270,12 @@ function AT_loadReviewTrail(){
     fetch(rpUrl,{headers:_csHdrs(cfg)}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
   ]).then(function(res){
     var rvf=res[0]; var rpf=res[1];
-    var rv=null; if(rvf&&rvf.content){ try{ rv=JSON.parse(_csB64Dec(rvf.content.replace(/\s/g,''))); }catch(e){} }
-    var rp=null; if(rpf&&rpf.content){ try{ rp=JSON.parse(_csB64Dec(rpf.content.replace(/\s/g,''))); }catch(e){} }
+    var rv=null; if(rvf&&rvf.content){ try{ rv=JSON.parse(_csB64Dec(rvf.content.replace(/\s/g,''))); }catch(e){ console.error('BRAINS AT: rv parse error',e); } }
+    var rp=null; if(rpf&&rpf.content){ try{ rp=JSON.parse(_csB64Dec(rpf.content.replace(/\s/g,''))); }catch(e){ console.error('BRAINS AT: rp parse error',e); } }
+    console.log('BRAINS AT rv=',JSON.stringify(rv));
+    console.log('BRAINS AT rp=',JSON.stringify(rp));
     if(!rv){
-      listEl.innerHTML='<div style="padding:24px;text-align:center;color:#888;font-size:12px">No review on record for this branch yet.</div>';
+      listEl.innerHTML='<div style="padding:24px;text-align:center;color:#888;font-size:12px">No review on record for this branch yet. (reviewKey: '+_AT_esc(reviewKey)+')</div>';
       return;
     }
     // Update branch label from stored data (more reliable than DOM)
