@@ -1571,10 +1571,18 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
   </div>
   <!-- Review Trail tab -->
   <div id="at-tab-review-content" style="display:none;flex-direction:column;flex:1;overflow:hidden">
-    <div style="padding:10px 14px;background:#f0f4f8;border-bottom:1px solid #d0dce8;display:flex;align-items:center;gap:8px;flex-shrink:0">
-      <span style="font-size:11px;color:#1a3a5c;font-weight:600">&#128270; Branch:</span>
-      <span id="at-review-branch-label" style="font-size:11px;color:#1a3a5c;font-weight:700;flex:1">Loading…</span>
-      <button onclick="AT_loadReviewTrail()" style="font-size:10.5px;padding:3px 9px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:600">&#8635; Refresh</button>
+    <div style="padding:10px 14px;background:#f0f4f8;border-bottom:1px solid #d0dce8;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:11px;color:#1a3a5c;font-weight:700;white-space:nowrap">&#128203; Select Branch:</span>
+        <select id="at-review-branch-select" style="flex:1;font-size:11.5px;padding:4px 8px;border:1px solid #b0c4d8;border-radius:4px;background:#fff;color:#1a3a5c;font-family:inherit" onchange="AT_onBranchSelect()">
+          <option value="">— loading branches… —</option>
+        </select>
+        <button onclick="AT_loadBranchList()" style="font-size:10.5px;padding:4px 9px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap">&#8635; Refresh</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="at-review-branch-label" style="font-size:11px;color:#555;flex:1;font-style:italic">Select a branch above to view its review trail.</span>
+        <button onclick="AT_loadReviewTrail()" id="at-review-load-btn" style="font-size:10.5px;padding:4px 12px;background:#3a6030;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:700;display:none">&#128203; Load Trail</button>
+      </div>
     </div>
     <div id="at-review-list" style="flex:1;overflow-y:auto;font-size:12px;padding:0"></div>
   </div>
@@ -19236,49 +19244,98 @@ function AT_switchTab(tab){
     if(exportBtn) exportBtn.style.display='none';
     if(printBtn) printBtn.style.display='';
     if(clearBtn) clearBtn.style.display='none';
-    AT_loadReviewTrail();
+    AT_loadBranchList();
   }
 }
 
+function AT_loadBranchList(){
+  var sel=document.getElementById('at-review-branch-select');
+  var lbl=document.getElementById('at-review-branch-label');
+  var loadBtn=document.getElementById('at-review-load-btn');
+  var listEl=document.getElementById('at-review-list');
+  if(!sel) return;
+  sel.innerHTML='<option value="">— loading… —</option>';
+  if(loadBtn) loadBtn.style.display='none';
+  if(lbl) lbl.textContent='Select a branch above to view its review trail.';
+  if(listEl) listEl.innerHTML='';
+  var cfg=_csGetCfg();
+  if(!cfg||!cfg.token||!cfg.owner||!cfg.repo){
+    sel.innerHTML='<option value="">— Cloud Settings not configured —</option>';
+    return;
+  }
+  var dirUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH;
+  fetch(dirUrl,{headers:_csHdrs(cfg)}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}).then(function(files){
+    if(!files||!Array.isArray(files)||!files.length){
+      sel.innerHTML='<option value="">— No reviews found —</option>';
+      return;
+    }
+    // Filter to review files only (exclude _reply.json)
+    var reviews=[];
+    for(var i=0;i<files.length;i++){
+      var fn=files[i].name||'';
+      if(fn.slice(-5)==='.json'&&fn.indexOf('_reply')===-1){
+        var key=fn.replace(/\.json$/,'');
+        // key format: year_brcode_brname
+        var parts=key.split('_');
+        var yr=parts[0]||'';
+        var displayName=key.replace(yr+'_','').replace(/_/g,' ');
+        reviews.push({key:key,display:yr+' — '+displayName});
+      }
+    }
+    if(!reviews.length){
+      sel.innerHTML='<option value="">— No reviews found —</option>';
+      return;
+    }
+    reviews.sort(function(a,b){return a.display.localeCompare(b.display);});
+    var html='<option value="">— Select a branch —</option>';
+    for(var j=0;j<reviews.length;j++){
+      html+='<option value="'+_AT_esc(reviews[j].key)+'">'+_AT_esc(reviews[j].display)+'</option>';
+    }
+    sel.innerHTML=html;
+  });
+}
+
+function AT_onBranchSelect(){
+  var sel=document.getElementById('at-review-branch-select');
+  var lbl=document.getElementById('at-review-branch-label');
+  var loadBtn=document.getElementById('at-review-load-btn');
+  var listEl=document.getElementById('at-review-list');
+  var key=sel?sel.value:'';
+  if(!key){
+    if(lbl) lbl.textContent='Select a branch above to view its review trail.';
+    if(loadBtn) loadBtn.style.display='none';
+    if(listEl) listEl.innerHTML='';
+    return;
+  }
+  var parts=key.split('_');
+  var yr=parts[0]||'';
+  var brDisplay=key.replace(yr+'_','').replace(/_/g,' ');
+  if(lbl) lbl.textContent=yr+' — '+brDisplay;
+  if(loadBtn) loadBtn.style.display='';
+  if(listEl) listEl.innerHTML='';
+}
+
 function AT_loadReviewTrail(){
+  var sel=document.getElementById('at-review-branch-select');
   var listEl=document.getElementById('at-review-list');
   var branchEl=document.getElementById('at-review-branch-label');
   if(!listEl) return;
+  var reviewKey=sel?sel.value:'';
+  if(!reviewKey){
+    listEl.innerHTML='<div style="padding:24px;text-align:center;color:#888;font-size:12px">Please select a branch from the dropdown above.</div>';
+    return;
+  }
   listEl.innerHTML='<div style="padding:24px;text-align:center;color:#888;font-size:12px">Loading review trail…</div>';
   var cfg=_csGetCfg();
   if(!cfg||!cfg.token||!cfg.owner||!cfg.repo){
     listEl.innerHTML='<div style="padding:24px;text-align:center;color:#c0392b;font-size:12px">&#9888; Cloud Settings not configured. Go to Cloud → Cloud Settings.</div>';
     return;
   }
-  // Build reviewKey — first check DOM, then fall back to IDB autosave
-  var year=(_csAuditYear ? _csAuditYear(cfg) : '')||(new Date().getFullYear()+'');
-  var brFolder=_csBranchFolder ? _csBranchFolder() : '';
-  var H=getHdrVals ? getHdrVals() : {};
-  // Check if DOM has a real branch loaded (brcode not default)
-  var domHasBranch=(H.brcode&&H.brcode!=='000'&&H.brname);
-  if(domHasBranch){
-    _AT_doLoadTrail(cfg,year,brFolder,H,listEl,branchEl);
-  } else {
-    // DOM empty — try IDB autosave
-    idbGet('bss_autosave_v1',null,function(saved){
-      if(saved&&saved._cloudMeta&&saved._cloudMeta.branchFolder&&saved._cloudMeta.branchFolder!=='000_branch'){
-        var bf=saved._cloudMeta.branchFolder;
-        var yr=saved._cloudMeta.auditYear||year;
-        var hh={brcode:(saved.formData&&saved.formData.brcode)||'',brname:(saved.formData&&saved.formData.brname)||''};
-        _AT_doLoadTrail(cfg,yr,bf,hh,listEl,branchEl);
-      } else {
-        listEl.innerHTML='<div style="padding:24px;text-align:center;color:#888;font-size:12px">No branch loaded. Please open a session first, then re-open Audit Trail.</div>';
-        if(branchEl) branchEl.textContent='—';
-      }
-    });
-    return;
-  }
+  _AT_doLoadTrail(cfg,reviewKey,listEl,branchEl);
 }
 
-function _AT_doLoadTrail(cfg,year,brFolder,H,listEl,branchEl){
-  var reviewKey=year+'_'+brFolder;
-  var branchDisplay=(H.brcode&&H.brname ? H.brcode+' — '+H.brname : (H.brname||brFolder.replace(/_/g,' ')))||reviewKey;
-  if(branchEl) branchEl.textContent=branchDisplay;
+function _AT_doLoadTrail(cfg,reviewKey,listEl,branchEl){
+  var branchDisplay=reviewKey;
 
   var rvUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'.json';
   var rpUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'_reply.json';
@@ -19294,8 +19351,8 @@ function _AT_doLoadTrail(cfg,year,brFolder,H,listEl,branchEl){
       listEl.innerHTML='<div style="padding:24px;text-align:center;color:#888;font-size:12px">No review on record for this branch yet. (reviewKey: '+_AT_esc(reviewKey)+')</div>';
       return;
     }
-    // Update branch label from stored data (more reliable than DOM)
-    if(branchEl) branchEl.textContent=rv.branchDisplay||branchDisplay;
+    // Update branch label from stored review data
+    if(branchEl) branchEl.textContent=rv.branchDisplay||reviewKey;
     var h='<div style="padding:14px 16px">';
     var events=[];
 
