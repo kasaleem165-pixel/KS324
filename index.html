@@ -19334,8 +19334,9 @@ function AT_loadReviewTrail(){
   _AT_doLoadTrail(cfg,reviewKey,listEl,branchEl);
 }
 
-function _AT_saveTrailSnapshot(cfg,reviewKey,reviewData,_unused,replyData){
+function _AT_saveTrailSnapshot(cfg,reviewKey,reviewData,replyData){
   var hdrs=_csHdrs(cfg);
+  toast('Saving trail snapshot…');
 
   // Build title map from session file (most reliable source for custom obs titles)
   function _buildAndSave(titleMap){
@@ -26729,14 +26730,12 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
       }).catch(function(){});
       // Save trail snapshot on approval (fire-and-forget)
       if(decision==='approved'){
-        var _sv=_supViewerSession&&_supViewerSession.reviewKey===reviewKey?_supViewerSession:null;
-        var _obsLk=_sv?_sv.obsLookup:{};
-        // Fetch reply file then save snapshot
+        toast('Building review trail…');
         var _rpUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'_reply.json';
         fetch(_rpUrl,{headers:hdrs}).then(function(rr){return rr.ok?rr.json():null;}).catch(function(){return null;}).then(function(rpf){
           var _rp=null;
           if(rpf&&rpf.content){try{_rp=JSON.parse(_csB64Dec(rpf.content.replace(/\s/g,'')));}catch(e){}}
-          _AT_saveTrailSnapshot(cfg,reviewKey,reviewData,_obsLk,_rp);
+          _AT_saveTrailSnapshot(cfg,reviewKey,reviewData,_rp);
         });
       }
       // Notify auditor — amended message if this is an update
