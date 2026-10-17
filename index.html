@@ -19336,7 +19336,6 @@ function AT_loadReviewTrail(){
 
 function _AT_saveTrailSnapshot(cfg,reviewKey,reviewData,replyData){
   var hdrs=_csHdrs(cfg);
-  toast('Saving trail snapshot…');
 
   // Build title map from session file (most reliable source for custom obs titles)
   function _buildAndSave(titleMap){
@@ -19394,7 +19393,7 @@ function _AT_saveTrailSnapshot(cfg,reviewKey,reviewData,replyData){
     var _rkYear=_rkParts[0]||'';
     var _rkBrFolder=reviewKey.replace(_rkYear+'_','');
     var _audSlug=(reviewData.submittedBy).replace(/[^a-zA-Z0-9\-_]/g,'_').replace(/_+/g,'_').toLowerCase();
-    sessPath='sessions/'+_rkYear+'/'+_rkBrFolder+'/'+_audSlug+'.json';
+    sessPath='sessions/'+_audSlug+'/'+_rkBrFolder+'.json';
   }
 
   // First: pull titles from in-memory viewer session (already has full obsLookup with customs)
@@ -26730,7 +26729,6 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
       }).catch(function(){});
       // Save trail snapshot on approval (fire-and-forget)
       if(decision==='approved'){
-        toast('Building review trail…');
         var _rpUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'_reply.json';
         fetch(_rpUrl,{headers:hdrs}).then(function(rr){return rr.ok?rr.json():null;}).catch(function(){return null;}).then(function(rpf){
           var _rp=null;
@@ -26774,7 +26772,6 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
         if(r2&&(r2.status===200||r2.status===201)){
           r2.clone().json().then(function(resp){ if(resp&&resp.content&&resp.content.sha) _supReviewShaCache[reviewKey]=resp.content.sha; }).catch(function(){});
           if(decision==='approved'){
-            toast('Building review trail…');
             var _rpUrl2=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'_reply.json';
             fetch(_rpUrl2,{headers:hdrs}).then(function(rr){return rr.ok?rr.json():null;}).catch(function(){return null;}).then(function(rpf){
               var _rp=null;
