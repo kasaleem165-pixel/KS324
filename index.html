@@ -19250,14 +19250,17 @@ function AT_loadReviewTrail(){
     listEl.innerHTML='<div style="padding:24px;text-align:center;color:#c0392b;font-size:12px">&#9888; Cloud Settings not configured. Go to Cloud → Cloud Settings.</div>';
     return;
   }
-  // Get current branch review key from session
-  var fd=_getFormData ? _getFormData() : {};
-  var brCode=(fd.brcode||'').replace(/\s/g,'_');
-  var brName=(fd.brname||'').replace(/\s/g,'_');
-  var yr=new Date().getFullYear();
-  var reviewKey=yr+'_'+brCode+(brName?'_'+brName:'');
-  var branchDisplay=(fd.brcode||'')+(fd.brname?' '+fd.brname:'');
-  if(branchEl) branchEl.textContent=branchDisplay||reviewKey;
+  // Build reviewKey the same way the submit/send functions do
+  var brFolder=_csBranchFolder ? _csBranchFolder() : '';
+  var year=(_csAuditYear ? _csAuditYear(cfg) : '')||(new Date().getFullYear()+'');
+  var reviewKey=year+'_'+brFolder;
+  var H=getHdrVals ? getHdrVals() : {};
+  var branchDisplay=(H.brname||brFolder.replace(/_/g,' '))||reviewKey;
+  if(branchEl) branchEl.textContent=branchDisplay;
+  if(!brFolder){
+    listEl.innerHTML='<div style="padding:24px;text-align:center;color:#888;font-size:12px">No branch loaded. Open a session first.</div>';
+    return;
+  }
 
   var rvUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'.json';
   var rpUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'_reply.json';
