@@ -19340,6 +19340,7 @@ function _AT_doLoadTrail(cfg,reviewKey,listEl,branchEl){
   var rvUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'.json';
   var rpUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'_reply.json';
 
+  // Step 1: fetch review + reply files first, then fetch session for obs titles
   Promise.all([
     fetch(rvUrl,{headers:_csHdrs(cfg)}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
     fetch(rpUrl,{headers:_csHdrs(cfg)}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
@@ -19353,6 +19354,39 @@ function _AT_doLoadTrail(cfg,reviewKey,listEl,branchEl){
     }
     // Update branch label from stored review data
     if(branchEl) branchEl.textContent=rv.branchDisplay||reviewKey;
+
+    // Step 2: also fetch the session file to build obs title lookup
+    var sessPath=rv.sessionPath||'';
+    var sessProm=sessPath
+      ? fetch(_csRepoBase(cfg)+'/contents/'+sessPath,{headers:_csHdrs(cfg)}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
+      : Promise.resolve(null);
+
+    sessProm.then(function(sf){
+      // Build obs title lookup: id -> title
+      var obsTitleMap={};
+      var sd=null;
+      if(sf&&sf.content){ try{ sd=JSON.parse(_csB64Dec(sf.content.replace(/\s/g,''))); }catch(e){} }
+      if(sd){
+        // From standard DB.observations list in session (selIds keys map to observation ids)
+        var localObs=DB&&DB.observations?DB.observations:[];
+        // Prefer DB.observations for title lookup (standard obs), then session customs
+        for(var _li=0;_li<localObs.length;_li++){ if(localObs[_li].id) obsTitleMap[localObs[_li].id]=localObs[_li].title||localObs[_li].id; }
+        // Custom obs titles from session
+        var customs=sd.customs||[];
+        for(var _ci=0;_ci<customs.length;_ci++){ if(customs[_ci].id) obsTitleMap[customs[_ci].id]=customs[_ci].title||customs[_ci].id; }
+        // obsEdits may have overridden titles (not typical but cover it)
+      }
+      // Also check current DB.observations as fallback
+      if(DB&&DB.observations){ for(var _di=0;_di<DB.observations.length;_di++){ var _o=DB.observations[_di]; if(_o.id&&!obsTitleMap[_o.id]) obsTitleMap[_o.id]=_o.title||_o.id; } }
+
+      _AT_renderTrail(rv,rp,obsTitleMap,reviewKey,listEl);
+    });
+  }).catch(function(){
+    listEl.innerHTML='<div style="padding:24px;text-align:center;color:#c0392b;font-size:12px">Error loading review trail. Check cloud connection.</div>';
+  });
+}
+
+function _AT_renderTrail(rv,rp,obsTitleMap,reviewKey,listEl){
     var h='<div style="padding:14px 16px">';
     var events=[];
 
@@ -19365,8 +19399,7 @@ function _AT_doLoadTrail(cfg,reviewKey,listEl,branchEl){
       Object.keys(obsC).forEach(function(oid){
         if(!obsC[oid]) return;
         obsNum++;
-        var obsTitle=oid;
-        if(DB&&DB.observations){for(var _i=0;_i<DB.observations.length;_i++){if(DB.observations[_i].id===oid){obsTitle=DB.observations[_i].title||oid;break;}}}
+        var obsTitle=obsTitleMap[oid]||oid;
         d+='<div style="margin-top:5px;background:#fffbe6;border-left:3px solid #f5c842;padding:5px 10px;border-radius:0 4px 4px 0;font-size:11px;color:#5a3a00"><div style="font-size:9px;font-weight:700;color:#7a5500;margin-bottom:1px">&#128204; Obs.'+obsNum+': '+_AT_esc(obsTitle)+'</div>'+_AT_esc(obsC[oid])+'</div>';
       });
       return d;
@@ -19408,8 +19441,7 @@ function _AT_doLoadTrail(cfg,reviewKey,listEl,branchEl){
         if(id==='_overall'){ lbl='Overall Reply'; }
         else {
           repNum++;
-          lbl='Obs.'+repNum+': ';
-          if(DB&&DB.observations){for(var _j=0;_j<DB.observations.length;_j++){if(DB.observations[_j].id===id){lbl+=DB.observations[_j].title||id;break;}}}
+          lbl='Obs.'+repNum+': '+(obsTitleMap[id]||id);
         }
         replyDetail+='<div style="margin-top:5px;background:#e8f8ee;border-left:3px solid #1a6030;padding:5px 10px;border-radius:0 4px 4px 0;font-size:11px;color:#1a3a5c"><div style="font-size:9px;font-weight:700;color:#1a6030;margin-bottom:1px">'+_AT_esc(lbl)+'</div>'+_AT_esc(replies[id])+'</div>';
       });
@@ -19440,9 +19472,6 @@ function _AT_doLoadTrail(cfg,reviewKey,listEl,branchEl){
     });
     h+='</div>';
     listEl.innerHTML=h;
-  }).catch(function(){
-    listEl.innerHTML='<div style="padding:24px;text-align:center;color:#c0392b;font-size:12px">Error loading review trail. Check cloud connection.</div>';
-  });
 }
 
 function AT_printReviewTrail(){
