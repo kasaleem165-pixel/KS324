@@ -19379,7 +19379,7 @@ function _AT_saveTrailSnapshot(cfg,reviewKey,reviewData,replyData){
     fetch(snapUrl,{headers:hdrs}).then(function(r){return r.ok?r.json():{};}).catch(function(){return {};}).then(function(ex){
       if(ex&&ex.sha) body.sha=ex.sha;
       return fetch(snapUrl,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
-    }).then(function(r){ if(r&&(r.status===200||r.status===201)) toast('Review trail saved ✓'); }).catch(function(){});
+    }).then(function(r){ if(r&&(r.status===200||r.status===201)) toast('Review trail saved ✓'); else toast('Trail save failed: '+(r?r.status:'no response')); }).catch(function(e){ toast('Trail error: '+(e&&e.message?e.message:String(e))); });
   }
 
   // Start with DB.observations (standard obs)
@@ -26733,7 +26733,7 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
         fetch(_rpUrl,{headers:hdrs}).then(function(rr){return rr.ok?rr.json():null;}).catch(function(){return null;}).then(function(rpf){
           var _rp=null;
           if(rpf&&rpf.content){try{_rp=JSON.parse(_csB64Dec(rpf.content.replace(/\s/g,'')));}catch(e){}}
-          _AT_saveTrailSnapshot(cfg,reviewKey,reviewData,_rp);
+          try{ _AT_saveTrailSnapshot(cfg,reviewKey,reviewData,_rp); }catch(e){ toast('Trail init error: '+(e&&e.message?e.message:String(e))); }
         });
       }
       // Notify auditor — amended message if this is an update
@@ -26776,7 +26776,7 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
             fetch(_rpUrl2,{headers:hdrs}).then(function(rr){return rr.ok?rr.json():null;}).catch(function(){return null;}).then(function(rpf){
               var _rp=null;
               if(rpf&&rpf.content){try{_rp=JSON.parse(_csB64Dec(rpf.content.replace(/\s/g,'')));}catch(e){}}
-              _AT_saveTrailSnapshot(cfg,reviewKey,reviewData2,_rp);
+              try{ _AT_saveTrailSnapshot(cfg,reviewKey,reviewData2,_rp); }catch(e){ toast('Trail init error: '+(e&&e.message?e.message:String(e))); }
             });
           }
           if(isUpdate2) _supNotifyAuditorAmended(reviewData2); else _supNotifyAuditor(reviewData2);
