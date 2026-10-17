@@ -1539,26 +1539,44 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
 <!-- ══════════════════════════════════════════════════════════
      AUDIT TRAIL PANEL
      ══════════════════════════════════════════════════════════ -->
-<div id="at-panel" style="display:none;position:fixed;top:0;right:0;width:560px;height:100vh;background:#fff;border-left:2px solid #c8d8ec;flex-direction:column;z-index:9000;box-shadow:-4px 0 18px rgba(0,0,0,.18)">
+<div id="at-panel" style="display:none;position:fixed;top:0;right:0;width:580px;height:100vh;background:#fff;border-left:2px solid #c8d8ec;flex-direction:column;z-index:9000;box-shadow:-4px 0 18px rgba(0,0,0,.18)">
   <div style="background:#3a1060;color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0">
     <div style="font-size:15px;font-weight:800;flex:1">&#128203; Audit Trail</div>
-    <button onclick="AT_export()" style="font-size:11px;padding:4px 10px;background:#5a2a80;color:#fff;border:1px solid #8a5ab0;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:600">&#11123; Export CSV</button>
-    <button onclick="AT_clear()" style="font-size:11px;padding:4px 10px;background:#6a1a1a;color:#fff;border:1px solid #a04040;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:600">&#128465; Clear</button>
+    <button onclick="AT_export()" id="at-export-btn" style="font-size:11px;padding:4px 10px;background:#5a2a80;color:#fff;border:1px solid #8a5ab0;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:600">&#11123; Export CSV</button>
+    <button onclick="AT_printReviewTrail()" id="at-print-btn" style="display:none;font-size:11px;padding:4px 10px;background:#1a6030;color:#fff;border:1px solid #3a8050;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:600">&#128424; Print</button>
+    <button onclick="AT_clear()" id="at-clear-btn" style="font-size:11px;padding:4px 10px;background:#6a1a1a;color:#fff;border:1px solid #a04040;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:600">&#128465; Clear</button>
     <button onclick="toggleAuditTrail()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:14px;width:26px;height:26px;border-radius:4px;cursor:pointer;line-height:1">&#10005;</button>
   </div>
-  <div style="padding:10px 14px;background:#f5f0fa;border-bottom:1px solid #d8c8ec;display:flex;align-items:center;gap:8px;flex-shrink:0">
-    <span style="font-size:11px;color:#5a3080;font-weight:600">Filter:</span>
-    <select id="at-type-filter" onchange="AT_render()" style="font-size:11px;padding:3px 8px;border:1px solid #c8b0e0;border-radius:4px;background:#fff;font-family:inherit">
-      <option value="">All Events</option>
-      <option value="sensitivity">Sensitivity Overrides</option>
-      <option value="coso">COSO Changes</option>
-      <option value="srr">Risk Mapping Changes</option>
-    </select>
-    <span style="font-size:10px;color:#888;flex:1" id="at-summary-lbl"></span>
+  <!-- Tabs -->
+  <div style="display:flex;background:#f5f0fa;border-bottom:2px solid #d8c8ec;flex-shrink:0">
+    <button id="at-tab-local" onclick="AT_switchTab('local')" style="flex:1;padding:9px 0;font-size:12px;font-weight:700;border:none;border-bottom:3px solid #3a1060;background:transparent;color:#3a1060;cursor:pointer;font-family:inherit">&#9998; Override Events</button>
+    <button id="at-tab-review" onclick="AT_switchTab('review')" style="flex:1;padding:9px 0;font-size:12px;font-weight:700;border:none;border-bottom:3px solid transparent;background:transparent;color:#888;cursor:pointer;font-family:inherit">&#128172; Review Trail</button>
   </div>
-  <div id="at-list" style="flex:1;overflow-y:auto;font-size:12px"></div>
-  <div style="padding:8px 14px;background:#f5f0fa;border-top:1px solid #d8c8ec;font-size:10px;color:#888;flex-shrink:0">
-    Entries are saved in browser localStorage and persist across sessions. Export CSV for permanent record.
+  <!-- Override Events tab -->
+  <div id="at-tab-local-content" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+    <div style="padding:10px 14px;background:#f5f0fa;border-bottom:1px solid #d8c8ec;display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <span style="font-size:11px;color:#5a3080;font-weight:600">Filter:</span>
+      <select id="at-type-filter" onchange="AT_render()" style="font-size:11px;padding:3px 8px;border:1px solid #c8b0e0;border-radius:4px;background:#fff;font-family:inherit">
+        <option value="">All Events</option>
+        <option value="sensitivity">Sensitivity Overrides</option>
+        <option value="coso">COSO Changes</option>
+        <option value="srr">Risk Mapping Changes</option>
+      </select>
+      <span style="font-size:10px;color:#888;flex:1" id="at-summary-lbl"></span>
+    </div>
+    <div id="at-list" style="flex:1;overflow-y:auto;font-size:12px"></div>
+    <div style="padding:8px 14px;background:#f5f0fa;border-top:1px solid #d8c8ec;font-size:10px;color:#888;flex-shrink:0">
+      Entries saved in browser localStorage. Export CSV for permanent record.
+    </div>
+  </div>
+  <!-- Review Trail tab -->
+  <div id="at-tab-review-content" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+    <div style="padding:10px 14px;background:#f0f4f8;border-bottom:1px solid #d0dce8;display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <span style="font-size:11px;color:#1a3a5c;font-weight:600">&#128270; Branch:</span>
+      <span id="at-review-branch-label" style="font-size:11px;color:#1a3a5c;font-weight:700;flex:1">Loading…</span>
+      <button onclick="AT_loadReviewTrail()" style="font-size:10.5px;padding:3px 9px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-weight:600">&#8635; Refresh</button>
+    </div>
+    <div id="at-review-list" style="flex:1;overflow-y:auto;font-size:12px;padding:0"></div>
   </div>
 </div>
 
@@ -19192,6 +19210,145 @@ function toggleAuditTrail(){
   var open = panel.style.display !== 'none';
   panel.style.display = open ? 'none' : 'flex';
   if(!open){ AT_render(); }
+}
+
+function AT_switchTab(tab){
+  var localContent=document.getElementById('at-tab-local-content');
+  var reviewContent=document.getElementById('at-tab-review-content');
+  var localBtn=document.getElementById('at-tab-local');
+  var reviewBtn=document.getElementById('at-tab-review');
+  var exportBtn=document.getElementById('at-export-btn');
+  var printBtn=document.getElementById('at-print-btn');
+  var clearBtn=document.getElementById('at-clear-btn');
+  if(tab==='local'){
+    if(localContent) localContent.style.display='flex';
+    if(reviewContent) reviewContent.style.display='none';
+    if(localBtn){ localBtn.style.borderBottomColor='#3a1060'; localBtn.style.color='#3a1060'; }
+    if(reviewBtn){ reviewBtn.style.borderBottomColor='transparent'; reviewBtn.style.color='#888'; }
+    if(exportBtn) exportBtn.style.display='';
+    if(printBtn) printBtn.style.display='none';
+    if(clearBtn) clearBtn.style.display='';
+  } else {
+    if(localContent) localContent.style.display='none';
+    if(reviewContent) reviewContent.style.display='flex';
+    if(reviewBtn){ reviewBtn.style.borderBottomColor='#3a1060'; reviewBtn.style.color='#3a1060'; }
+    if(localBtn){ localBtn.style.borderBottomColor='transparent'; localBtn.style.color='#888'; }
+    if(exportBtn) exportBtn.style.display='none';
+    if(printBtn) printBtn.style.display='';
+    if(clearBtn) clearBtn.style.display='none';
+    AT_loadReviewTrail();
+  }
+}
+
+function AT_loadReviewTrail(){
+  var listEl=document.getElementById('at-review-list');
+  var branchEl=document.getElementById('at-review-branch-label');
+  if(!listEl) return;
+  listEl.innerHTML='<div style="padding:24px;text-align:center;color:#888;font-size:12px">Loading review trail…</div>';
+  var cfg=_csGetCfg();
+  if(!cfg||!cfg.token||!cfg.owner||!cfg.repo){
+    listEl.innerHTML='<div style="padding:24px;text-align:center;color:#c0392b;font-size:12px">&#9888; Cloud Settings not configured. Go to Cloud → Cloud Settings.</div>';
+    return;
+  }
+  // Get current branch review key from session
+  var fd=_getFormData ? _getFormData() : {};
+  var brCode=(fd.brcode||'').replace(/\s/g,'_');
+  var brName=(fd.brname||'').replace(/\s/g,'_');
+  var yr=new Date().getFullYear();
+  var reviewKey=yr+'_'+brCode+(brName?'_'+brName:'');
+  var branchDisplay=(fd.brcode||'')+(fd.brname?' '+fd.brname:'');
+  if(branchEl) branchEl.textContent=branchDisplay||reviewKey;
+
+  var rvUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'.json';
+  var rpUrl=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'_reply.json';
+
+  Promise.all([
+    fetch(rvUrl,{headers:_csHdrs(cfg)}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+    fetch(rpUrl,{headers:_csHdrs(cfg)}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
+  ]).then(function(res){
+    var rvf=res[0]; var rpf=res[1];
+    var rv=null; if(rvf&&rvf.content){ try{ rv=JSON.parse(_csB64Dec(rvf.content.replace(/\s/g,''))); }catch(e){} }
+    var rp=null; if(rpf&&rpf.content){ try{ rp=JSON.parse(_csB64Dec(rpf.content.replace(/\s/g,''))); }catch(e){} }
+    if(!rv){
+      listEl.innerHTML='<div style="padding:24px;text-align:center;color:#888;font-size:12px">No review on record for this branch yet.</div>';
+      return;
+    }
+    var h='<div style="padding:14px 16px">';
+    // Timeline
+    var events=[];
+    // 1. Report submitted
+    events.push({icon:'&#128228;',color:'#1a3a5c',label:'Report Submitted',by:rv.submittedBy||'Auditor',at:rv.submittedAt||'',detail:rv.note?'"'+rv.note+'"':''});
+    // 2. Supervisor review
+    var decLabel={approved:'Approved',changes_requested:'Changes Requested',rejected:'Rejected'}[rv.status]||rv.status||'Reviewed';
+    var decColor={approved:'#1a6030',changes_requested:'#c9962a',rejected:'#c0392b'}[rv.status]||'#555';
+    var reviewDetail='';
+    if(rv.supervisorComment) reviewDetail+='<div style="margin-top:6px;background:#fff3cd;border-left:3px solid #c9962a;padding:6px 10px;border-radius:0 4px 4px 0;font-size:11.5px;color:#5a3a00"><div style="font-size:9.5px;font-weight:700;color:#7a5500;margin-bottom:2px">OVERALL COMMENT</div>'+_AT_esc(rv.supervisorComment)+'</div>';
+    var obsC=rv.obsComments||{};
+    Object.keys(obsC).forEach(function(oid){
+      if(!obsC[oid]) return;
+      var obsTitle=oid;
+      if(DB&&DB.observations){for(var _i=0;_i<DB.observations.length;_i++){if(DB.observations[_i].id===oid){obsTitle=DB.observations[_i].title||oid;break;}}}
+      reviewDetail+='<div style="margin-top:5px;background:#fffbe6;border-left:3px solid #f5c842;padding:5px 10px;border-radius:0 4px 4px 0;font-size:11px;color:#5a3a00"><div style="font-size:9px;font-weight:700;color:#7a5500;margin-bottom:1px">&#128204; '+_AT_esc(obsTitle)+'</div>'+_AT_esc(obsC[oid])+'</div>';
+    });
+    events.push({icon:'&#128221;',color:decColor,label:'Supervisor Review — '+decLabel,by:rv.supervisorName||'Supervisor',at:rv.reviewedAt||'',detail:reviewDetail,badge:decLabel,badgeColor:decColor});
+    // 3. Auditor reply
+    if(rp&&rp.replies){
+      var replies=rp.replies;
+      var replyDetail='';
+      Object.keys(replies).forEach(function(id){
+        if(!replies[id]) return;
+        var lbl=id==='_overall'?'Overall Reply':id;
+        if(id!=='_overall'&&DB&&DB.observations){for(var _j=0;_j<DB.observations.length;_j++){if(DB.observations[_j].id===id){lbl=DB.observations[_j].title||id;break;}}}
+        replyDetail+='<div style="margin-top:5px;background:#e8f8ee;border-left:3px solid #1a6030;padding:5px 10px;border-radius:0 4px 4px 0;font-size:11px;color:#1a3a5c"><div style="font-size:9px;font-weight:700;color:#1a6030;margin-bottom:1px">'+_AT_esc(lbl)+'</div>'+_AT_esc(replies[id])+'</div>';
+      });
+      events.push({icon:'&#128172;',color:'#1a6030',label:'Auditor Reply',by:rp.repliedBy||'Auditor',at:rp.repliedAt||rp.repliedAtIso||'',detail:replyDetail});
+    }
+    // 4. Supervisor follow-up
+    if(rv.supervisorFollowup){
+      events.push({icon:'&#128226;',color:'#1a3a5c',label:'Supervisor Follow-up Response',by:rv.supervisorName||'Supervisor',at:rv.supervisorFollowupAt||'',detail:'<div style="margin-top:6px;background:#e8f0fb;border-left:3px solid #1a3a5c;padding:6px 10px;border-radius:0 4px 4px 0;font-size:11.5px;color:#1a3a5c">'+_AT_esc(rv.supervisorFollowup)+'</div>'});
+    }
+    // 5. Final approval (if status changed to approved after a reply)
+    if(rv.status==='approved'&&rv.auditorRepliedAt){
+      events.push({icon:'&#10003;',color:'#1a6030',label:'Report Approved',by:rv.supervisorName||'Supervisor',at:rv.reviewedAt||'',detail:rv.supervisorComment?'<div style="margin-top:5px;font-size:11px;color:#1a6030;font-style:italic">'+_AT_esc(rv.supervisorComment)+'</div>':''});
+    }
+    // Render timeline
+    events.forEach(function(ev,idx){
+      h+='<div style="display:flex;gap:12px;margin-bottom:0">';
+      // Left: icon + line
+      h+='<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:36px">';
+      h+='<div style="width:34px;height:34px;border-radius:50%;background:'+ev.color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">'+ev.icon+'</div>';
+      if(idx<events.length-1) h+='<div style="width:2px;flex:1;background:#d0dce8;min-height:16px;margin:3px 0"></div>';
+      h+='</div>';
+      // Right: content
+      h+='<div style="flex:1;padding-bottom:18px">';
+      h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+      h+='<span style="font-size:12.5px;font-weight:700;color:#1a3a5c">'+_AT_esc(ev.label)+'</span>';
+      if(ev.badge) h+='<span style="background:'+ev.badgeColor+';color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px">'+_AT_esc(ev.badge)+'</span>';
+      h+='</div>';
+      h+='<div style="font-size:10.5px;color:#888;margin-top:2px">By <strong style="color:#1a3a5c">'+_AT_esc(ev.by)+'</strong>'+(ev.at?' &nbsp;·&nbsp; '+_supFmtDate(ev.at):'')+'</div>';
+      if(ev.detail) h+=ev.detail;
+      h+='</div></div>';
+    });
+    h+='</div>';
+    listEl.innerHTML=h;
+  }).catch(function(){
+    listEl.innerHTML='<div style="padding:24px;text-align:center;color:#c0392b;font-size:12px">Error loading review trail. Check cloud connection.</div>';
+  });
+}
+
+function AT_printReviewTrail(){
+  var content=document.getElementById('at-review-list');
+  var branch=(document.getElementById('at-review-branch-label')||{}).textContent||'Branch';
+  if(!content) return;
+  var w=window.open('','_blank');
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Review Trail — '+branch+'</title>');
+  w.document.write('<style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px;color:#1a3a5c}h2{font-size:16px;margin-bottom:4px}p{font-size:11px;color:#888;margin-bottom:20px}</style>');
+  w.document.write('</head><body>');
+  w.document.write('<h2>&#128203; Review Trail</h2><p>Branch: '+branch+'</p>');
+  w.document.write(content.innerHTML);
+  w.document.write('</body></html>');
+  w.document.close();
+  w.print();
 }
 
 function ra_scoreToLevel(score){ return score>=75?'critical':score>=50?'high':score>=25?'medium':'low'; }
