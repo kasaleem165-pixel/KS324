@@ -19334,16 +19334,13 @@ function AT_loadReviewTrail(){
   _AT_doLoadTrail(cfg,reviewKey,listEl,branchEl);
 }
 
-function _AT_saveTrailSnapshot(cfg,reviewKey,reviewData,obsLookup,replyData){
-  // Build a complete obs title map from obsLookup (which has all resolved titles)
-  var titleMap={};
-  if(obsLookup){
-    Object.keys(obsLookup).forEach(function(id){ titleMap[id]=(obsLookup[id]&&(obsLookup[id].title||obsLookup[id].customTitle))||id; });
-  }
-  if(DB&&DB.observations){ for(var _i=0;_i<DB.observations.length;_i++){ var _o=DB.observations[_i]; if(_o.id&&!titleMap[_o.id]) titleMap[_o.id]=_o.title||_o.id; } }
+function _AT_saveTrailSnapshot(cfg,reviewKey,reviewData,_unused,replyData){
+  var hdrs=_csHdrs(cfg);
 
-  // Build serialisable events list (with titles already resolved)
-  function _buildEvents(){
+  // Build title map from session file (most reliable source for custom obs titles)
+  function _buildAndSave(titleMap){
+    // Build serialisable events list (with titles already resolved)
+    function _buildEvents(){
     var events=[];
     events.push({type:'submitted',label:'Report Submitted',by:reviewData.submittedBy||'Auditor',at:reviewData.submittedAt||''});
     var history=reviewData.reviewHistory||[];
@@ -19365,26 +19362,59 @@ function _AT_saveTrailSnapshot(cfg,reviewKey,reviewData,obsLookup,replyData){
       events.push({type:'reply',by:replyData.repliedBy||'Auditor',at:replyData.repliedAt||'',replies:repArr});
     }
     // Final approval
-    events.push({type:'approved',by:reviewData.supervisorName||'Supervisor',at:reviewData.reviewedAt||'',note:reviewData.supervisorComment||''});
-    return events;
+      events.push({type:'approved',by:reviewData.supervisorName||'Supervisor',at:reviewData.reviewedAt||'',note:reviewData.supervisorComment||''});
+      return events;
+    }
+
+    var snapshot={
+      reviewKey: reviewKey,
+      branchDisplay: reviewData.branchDisplay||reviewKey,
+      compiledAt: new Date().toISOString(),
+      compiledBy: reviewData.supervisorName||'Supervisor',
+      events: _buildEvents()
+    };
+    var snapPath=_SUP_REVIEW_PATH+reviewKey+'_trail.json';
+    var snapUrl=_csRepoBase(cfg)+'/contents/'+snapPath;
+    var body={message:'[BRAINS] Review trail snapshot: '+reviewKey,content:_csB64Enc(JSON.stringify(snapshot,null,2))};
+    fetch(snapUrl,{headers:hdrs}).then(function(r){return r.ok?r.json():{};}).catch(function(){return {};}).then(function(ex){
+      if(ex&&ex.sha) body.sha=ex.sha;
+      return fetch(snapUrl,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+    }).catch(function(){});
   }
 
-  var snapshot={
-    reviewKey: reviewKey,
-    branchDisplay: reviewData.branchDisplay||reviewKey,
-    compiledAt: new Date().toISOString(),
-    compiledBy: reviewData.supervisorName||'Supervisor',
-    events: _buildEvents()
-  };
-  var snapPath=_SUP_REVIEW_PATH+reviewKey+'_trail.json';
-  var snapUrl=_csRepoBase(cfg)+'/contents/'+snapPath;
-  var hdrs=_csHdrs(cfg);
-  var body={message:'[BRAINS] Review trail snapshot: '+reviewKey,content:_csB64Enc(JSON.stringify(snapshot,null,2))};
-  // Check for existing SHA first
-  fetch(snapUrl,{headers:hdrs}).then(function(r){return r.ok?r.json():{};}).catch(function(){return {};}).then(function(ex){
-    if(ex&&ex.sha) body.sha=ex.sha;
-    return fetch(snapUrl,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
-  }).catch(function(){});
+  // Start with DB.observations (standard obs)
+  var titleMap={};
+  if(DB&&DB.observations){ for(var _i=0;_i<DB.observations.length;_i++){ var _o2=DB.observations[_i]; if(_o2.id) titleMap[_o2.id]=_o2.title||_o2.id; } }
+
+  // Determine session path — use stored value or reconstruct
+  var sessPath=reviewData.sessionPath||'';
+  if(!sessPath&&reviewData.submittedBy){
+    var _rkParts=reviewKey.split('_');
+    var _rkYear=_rkParts[0]||'';
+    var _rkBrFolder=reviewKey.replace(_rkYear+'_','');
+    var _audSlug=(reviewData.submittedBy).replace(/[^a-zA-Z0-9\-_]/g,'_').replace(/_+/g,'_').toLowerCase();
+    sessPath='sessions/'+_rkYear+'/'+_rkBrFolder+'/'+_audSlug+'.json';
+  }
+
+  if(sessPath){
+    // Fetch session to get custom obs titles, then also check _supViewerSession in memory
+    var sessUrl=_csRepoBase(cfg)+'/contents/'+sessPath;
+    fetch(sessUrl,{headers:hdrs}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}).then(function(sf){
+      if(sf&&sf.content){
+        var sd=null; try{ sd=JSON.parse(_csB64Dec(sf.content.replace(/\s/g,''))); }catch(e){}
+        if(sd){ var customs=sd.customs||[]; for(var _ci=0;_ci<customs.length;_ci++){ if(customs[_ci].id) titleMap[customs[_ci].id]=customs[_ci].title||customs[_ci].id; } }
+      }
+      // Also supplement from in-memory viewer session if available
+      var _sv=_supViewerSession&&_supViewerSession.reviewKey===reviewKey?_supViewerSession:null;
+      if(_sv&&_sv.obsLookup){ Object.keys(_sv.obsLookup).forEach(function(id){ if(!titleMap[id]||titleMap[id]===id) titleMap[id]=(_sv.obsLookup[id]&&(_sv.obsLookup[id].title||_sv.obsLookup[id].customTitle))||titleMap[id]||id; }); }
+      _buildAndSave(titleMap);
+    });
+  } else {
+    // No session path — use what we have
+    var _sv2=_supViewerSession&&_supViewerSession.reviewKey===reviewKey?_supViewerSession:null;
+    if(_sv2&&_sv2.obsLookup){ Object.keys(_sv2.obsLookup).forEach(function(id){ titleMap[id]=(_sv2.obsLookup[id]&&(_sv2.obsLookup[id].title||_sv2.obsLookup[id].customTitle))||id; }); }
+    _buildAndSave(titleMap);
+  }
 }
 
 function _AT_doLoadTrail(cfg,reviewKey,listEl,branchEl){
