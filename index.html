@@ -19355,8 +19355,16 @@ function _AT_doLoadTrail(cfg,reviewKey,listEl,branchEl){
     // Update branch label from stored review data
     if(branchEl) branchEl.textContent=rv.branchDisplay||reviewKey;
 
-    // Step 2: also fetch the session file to build obs title lookup
+    // Step 2: fetch the session file to build obs title lookup (custom obs IDs need titles from session)
     var sessPath=rv.sessionPath||'';
+    // If sessionPath wasn't saved, reconstruct it from reviewKey + submittedBy
+    if(!sessPath&&rv.submittedBy){
+      var _rkParts=reviewKey.split('_');
+      var _rkYear=_rkParts[0]||'';
+      var _rkBrFolder=reviewKey.replace(_rkYear+'_','');
+      var _audSlug=(rv.submittedBy).replace(/[^a-zA-Z0-9\-_]/g,'_').replace(/_+/g,'_').toLowerCase();
+      sessPath='sessions/'+_rkYear+'/'+_rkBrFolder+'/'+_audSlug+'.json';
+    }
     var sessProm=sessPath
       ? fetch(_csRepoBase(cfg)+'/contents/'+sessPath,{headers:_csHdrs(cfg)}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
       : Promise.resolve(null);
@@ -19364,20 +19372,15 @@ function _AT_doLoadTrail(cfg,reviewKey,listEl,branchEl){
     sessProm.then(function(sf){
       // Build obs title lookup: id -> title
       var obsTitleMap={};
+      // First: standard obs from DB.observations (master list)
+      if(DB&&DB.observations){ for(var _di=0;_di<DB.observations.length;_di++){ var _o=DB.observations[_di]; if(_o.id) obsTitleMap[_o.id]=_o.title||_o.id; } }
+      // Then: custom obs from the fetched session file (override/supplement)
       var sd=null;
       if(sf&&sf.content){ try{ sd=JSON.parse(_csB64Dec(sf.content.replace(/\s/g,''))); }catch(e){} }
       if(sd){
-        // From standard DB.observations list in session (selIds keys map to observation ids)
-        var localObs=DB&&DB.observations?DB.observations:[];
-        // Prefer DB.observations for title lookup (standard obs), then session customs
-        for(var _li=0;_li<localObs.length;_li++){ if(localObs[_li].id) obsTitleMap[localObs[_li].id]=localObs[_li].title||localObs[_li].id; }
-        // Custom obs titles from session
         var customs=sd.customs||[];
         for(var _ci=0;_ci<customs.length;_ci++){ if(customs[_ci].id) obsTitleMap[customs[_ci].id]=customs[_ci].title||customs[_ci].id; }
-        // obsEdits may have overridden titles (not typical but cover it)
       }
-      // Also check current DB.observations as fallback
-      if(DB&&DB.observations){ for(var _di=0;_di<DB.observations.length;_di++){ var _o=DB.observations[_di]; if(_o.id&&!obsTitleMap[_o.id]) obsTitleMap[_o.id]=_o.title||_o.id; } }
 
       _AT_renderTrail(rv,rp,obsTitleMap,reviewKey,listEl);
     });
