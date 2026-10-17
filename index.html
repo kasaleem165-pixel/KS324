@@ -26749,11 +26749,13 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
         _supSessionCache.reviews[reviewKey]=reviewData;
         _supRender(_supSessionCache.sessions,_supSessionCache.reviews);
       }
-      // Full background refresh from GitHub after delay (longer for approvals to allow GitHub propagation)
-      setTimeout(function(){
-        var dashEl=document.getElementById('_supDashboard');
-        if(dashEl){ _supSessionCache=null; _supLoadData(); }
-      },decision==='approved'?8000:3000);
+      // Background refresh — skip for approvals (local cache already correct; GitHub may lag)
+      if(decision!=='approved'){
+        setTimeout(function(){
+          var dashEl=document.getElementById('_supDashboard');
+          if(dashEl){ _supSessionCache=null; _supLoadData(); }
+        },3000);
+      }
     } else if(cachedSha&&(r.status===409||r.status===422)){
       // Stale SHA — clear cache and retry with fresh GET
       _supReviewShaCache[reviewKey]=null;
@@ -26784,7 +26786,7 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
           var viewer=document.getElementById('_supViewer'); if(viewer) viewer.remove();
           toast(decision==='approved'?'Report Approved ✓ — Review Trail Saved':(isUpdate2?'Review updated ✓':'Review submitted ✓'));
           if(_supSessionCache&&_supSessionCache.reviews){ _supSessionCache.reviews[reviewKey]=reviewData2; _supRender(_supSessionCache.sessions,_supSessionCache.reviews); }
-          setTimeout(function(){ var dashEl=document.getElementById('_supDashboard'); if(dashEl){ _supSessionCache=null; _supLoadData(); } },decision==='approved'?8000:3000);
+          if(decision!=='approved'){ setTimeout(function(){ var dashEl=document.getElementById('_supDashboard'); if(dashEl){ _supSessionCache=null; _supLoadData(); } },3000); }
         } else { toast('Failed to save review. Please try again.'); }
       }).catch(function(e){ toast('Error: '+(e&&e.message?e.message:e)); });
     } else {
