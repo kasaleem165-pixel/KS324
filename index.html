@@ -24678,8 +24678,10 @@ function _supViewAuditorReply(reviewKey, branchLabel){
     el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99995;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
     function _buildReplyOverlay(obsLk, ordIds){
       var replies=rd.replies;
+      var hasPerObsReplies=Object.keys(replies).some(function(k){return k!=='_overall'&&replies[k];});
       var rKeys=ordIds.length?ordIds.filter(function(k){return replies[k];}):Object.keys(replies).filter(function(k){return k!=='_overall';});
-      if(replies['_overall']) rKeys.push('_overall');
+      // Only include overall reply when there are no per-obs replies
+      if(replies['_overall']&&!hasPerObsReplies) rKeys.push('_overall');
       var obsCounter=0;
       var h='<div style="background:#fff;border-radius:8px;width:96%;max-width:620px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.35);overflow:hidden">';
       h+='<div style="background:#1a6030;color:#fff;padding:12px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0">';
