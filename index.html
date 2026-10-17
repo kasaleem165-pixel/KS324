@@ -26773,6 +26773,15 @@ function _supSubmitReview(reviewKey, obsIds, sessionPath, origSubmittedBy, origS
         var r2=obj2.r; var reviewData2=obj2.reviewData; var isUpdate2=obj2.isUpdate;
         if(r2&&(r2.status===200||r2.status===201)){
           r2.clone().json().then(function(resp){ if(resp&&resp.content&&resp.content.sha) _supReviewShaCache[reviewKey]=resp.content.sha; }).catch(function(){});
+          if(decision==='approved'){
+            toast('Building review trail…');
+            var _rpUrl2=_csRepoBase(cfg)+'/contents/'+_SUP_REVIEW_PATH+reviewKey+'_reply.json';
+            fetch(_rpUrl2,{headers:hdrs}).then(function(rr){return rr.ok?rr.json():null;}).catch(function(){return null;}).then(function(rpf){
+              var _rp=null;
+              if(rpf&&rpf.content){try{_rp=JSON.parse(_csB64Dec(rpf.content.replace(/\s/g,'')));}catch(e){}}
+              _AT_saveTrailSnapshot(cfg,reviewKey,reviewData2,_rp);
+            });
+          }
           if(isUpdate2) _supNotifyAuditorAmended(reviewData2); else _supNotifyAuditor(reviewData2);
           var modal=document.getElementById('_supReviewModal'); if(modal) modal.remove();
           var viewer=document.getElementById('_supViewer'); if(viewer) viewer.remove();
