@@ -19379,7 +19379,15 @@ function _AT_saveTrailSnapshot(cfg,reviewKey,reviewData,replyData){
     fetch(snapUrl,{headers:hdrs}).then(function(r){return r.ok?r.json():{};}).catch(function(){return {};}).then(function(ex){
       if(ex&&ex.sha) body.sha=ex.sha;
       return fetch(snapUrl,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
-    }).then(function(r){ if(r&&(r.status===200||r.status===201)) toast('Review trail saved ✓'); else toast('Trail save failed: '+(r?r.status:'no response')); }).catch(function(e){ toast('Trail error: '+(e&&e.message?e.message:String(e))); });
+    }).then(function(r){
+      if(r&&(r.status===200||r.status===201)){
+        var b=document.createElement('div');
+        b.style.cssText='position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:99999;background:#1a6030;color:#fff;padding:12px 28px;border-radius:7px;font-size:14px;font-weight:700;font-family:Inter,sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.35);text-align:center;pointer-events:none';
+        b.innerHTML='&#10003; Review Trail Saved';
+        document.body.appendChild(b);
+        setTimeout(function(){ if(b.parentNode) b.parentNode.removeChild(b); },4500);
+      } else { toast('Trail save failed: '+(r?r.status:'no response')); }
+    }).catch(function(e){ toast('Trail error: '+(e&&e.message?e.message:String(e))); });
   }
 
   // Start with DB.observations (standard obs)
