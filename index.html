@@ -26118,11 +26118,16 @@ function _supApproveFromViewer(reviewKey, auditorName, branchDisplay){
         }).catch(function(){});
       }
       toast('Report approved ✓ Auditor has been notified.');
-      // Close viewer and refresh dashboard
+      // Close viewer and update local cache so dashboard shows Approved immediately
       var viewer=document.getElementById('_supSessionViewer');
       if(viewer) viewer.remove();
-      _supSessionCache=null;
-      _supShowDashboard();
+      if(_supSessionCache&&_supSessionCache.reviews){
+        _supSessionCache.reviews[reviewKey]=rvd;
+        _supShowDashboard();
+      } else {
+        _supSessionCache=null;
+        _supShowDashboard();
+      }
     });
   })
   .catch(function(e){ toast('Error: '+(e&&e.message?e.message:e)); });
