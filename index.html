@@ -19251,14 +19251,30 @@ function AT_loadReviewTrail(){
     return;
   }
   // Build reviewKey the same way the submit/send functions do
-  var brFolder=_csBranchFolder ? _csBranchFolder() : '';
   var year=(_csAuditYear ? _csAuditYear(cfg) : '')||(new Date().getFullYear()+'');
-  var reviewKey=year+'_'+brFolder;
+  var brFolder=_csBranchFolder ? _csBranchFolder() : '';
   var H=getHdrVals ? getHdrVals() : {};
-  var branchDisplay=(H.brname||brFolder.replace(/_/g,' '))||reviewKey;
+  // If DOM fields are empty/default, try to get branch from last saved session in localStorage
+  if(!brFolder||brFolder==='000_branch'){
+    try{
+      var _asSess=localStorage.getItem('bss_autosave_v1');
+      if(_asSess){
+        var _asParsed=JSON.parse(_asSess);
+        if(_asParsed&&_asParsed._cloudMeta&&_asParsed._cloudMeta.branchFolder){
+          brFolder=_asParsed._cloudMeta.branchFolder;
+          if(_asParsed._cloudMeta.auditYear) year=_asParsed._cloudMeta.auditYear;
+          // Also extract display name from formData if available
+          if(_asParsed.formData&&_asParsed.formData.brname) H.brname=_asParsed.formData.brname;
+          if(_asParsed.formData&&_asParsed.formData.brcode) H.brcode=_asParsed.formData.brcode;
+        }
+      }
+    }catch(e){}
+  }
+  var reviewKey=year+'_'+brFolder;
+  var branchDisplay=(H.brcode&&H.brname ? H.brcode+' — '+H.brname : (H.brname||brFolder.replace(/_/g,' ')))||reviewKey;
   if(branchEl) branchEl.textContent=branchDisplay;
-  if(!brFolder){
-    listEl.innerHTML='<div style="padding:24px;text-align:center;color:#888;font-size:12px">No branch loaded. Open a session first.</div>';
+  if(!brFolder||brFolder==='000_branch'){
+    listEl.innerHTML='<div style="padding:24px;text-align:center;color:#888;font-size:12px">No branch loaded. Please open a session first then re-open Audit Trail.</div>';
     return;
   }
 
@@ -19272,8 +19288,6 @@ function AT_loadReviewTrail(){
     var rvf=res[0]; var rpf=res[1];
     var rv=null; if(rvf&&rvf.content){ try{ rv=JSON.parse(_csB64Dec(rvf.content.replace(/\s/g,''))); }catch(e){ console.error('BRAINS AT: rv parse error',e); } }
     var rp=null; if(rpf&&rpf.content){ try{ rp=JSON.parse(_csB64Dec(rpf.content.replace(/\s/g,''))); }catch(e){ console.error('BRAINS AT: rp parse error',e); } }
-    console.log('BRAINS AT rv=',JSON.stringify(rv));
-    console.log('BRAINS AT rp=',JSON.stringify(rp));
     if(!rv){
       listEl.innerHTML='<div style="padding:24px;text-align:center;color:#888;font-size:12px">No review on record for this branch yet. (reviewKey: '+_AT_esc(reviewKey)+')</div>';
       return;
