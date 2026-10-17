@@ -24699,13 +24699,15 @@ function _supViewAuditorReply(reviewKey, branchLabel){
         if(!replies[id]) return;
         var isOverall=(id==='_overall');
         var obsInfo=obsLk[id]||{};
-        var obsTitle=obsInfo.title||id;
+        var obsTitle=obsInfo.title||'';
+        // If title is empty or same as raw ID, leave title part blank to avoid showing raw IDs
+        var showTitle=(obsTitle&&obsTitle!==id)?obsTitle:'';
         var obsText=obsInfo.observation||'';
         var recText=obsInfo.recommendation||'';
         var supComment=isOverall?supOverall:(obsComments[id]||'');
         var safeId='_aro_'+idx;
         if(!isOverall) obsCounter++;
-        var label=isOverall?'Overall Reply':('Obs. '+obsCounter+': '+esc(obsTitle));
+        var label=isOverall?'Overall Reply':('Obs. '+obsCounter+(showTitle?' : '+esc(showTitle):''));
         h+='<div style="margin-bottom:12px;border:1px solid '+(isOverall?'#90c0a0':'#1a6030')+';border-radius:6px;overflow:hidden">';
         // Header with obs number + expand toggle
         h+='<div style="background:'+(isOverall?'#e8f8ee':'#1a6030')+';padding:6px 12px;display:flex;align-items:center;gap:8px">';
@@ -24741,7 +24743,7 @@ function _supViewAuditorReply(reviewKey, branchLabel){
       document.body.appendChild(el);
       el.addEventListener('click',function(ev){ if(ev.target===el) el.remove(); });
     }
-    // Try to load session file for obs titles + text
+    // Load session file for ordered IDs + obs text (same approach as session viewer)
     if(rvd.sessionPath){
       var sUrl=_csRepoBase(cfg)+'/contents/'+rvd.sessionPath;
       fetch(sUrl,{headers:_csHdrs(cfg)})
@@ -24751,18 +24753,26 @@ function _supViewAuditorReply(reviewKey, branchLabel){
         if(sf&&sf.content){
           var sd; try{ sd=JSON.parse(_csB64Dec(sf.content.replace(/\s/g,''))); }catch(e){ sd=null; }
           if(sd){
-            // Build obs lookup from observations + customs
-            var allObs=(sd.observations||[]).concat(sd.customs||[]);
-            allObs.forEach(function(o){
-              if(!o||!o.id) return;
-              var editObj=(sd.obsEdits&&sd.obsEdits[o.id])||{};
-              obsLk[o.id]={
-                title:o.title||o.id,
-                observation:editObj.observation||o.observation||'',
-                recommendation:editObj.recommendation||o.recommendation||''
-              };
+            // Build lookup: DB.observations first, then session customs override
+            if(DB&&DB.observations){
+              for(var _di=0;_di<DB.observations.length;_di++){
+                var _o=DB.observations[_di];
+                obsLk[_o.id]={title:_o.title||_o.id,observation:_o.observation||'',recommendation:_o.recommendation||''};
+              }
+            }
+            var sessionCustoms=sd.customs||[];
+            for(var _ci=0;_ci<sessionCustoms.length;_ci++){
+              var _sc=sessionCustoms[_ci];
+              if(_sc&&_sc.id) obsLk[_sc.id]={title:_sc.title||_sc.id,observation:_sc.observation||'',recommendation:_sc.recommendation||''};
+            }
+            // Apply obsEdits (amended text) on top
+            var obsEdits=sd.obsEdits||{};
+            Object.keys(obsEdits).forEach(function(eid){
+              if(!obsLk[eid]) obsLk[eid]={title:eid,observation:'',recommendation:''};
+              if(obsEdits[eid].observation) obsLk[eid].observation=obsEdits[eid].observation;
+              if(obsEdits[eid].recommendation) obsLk[eid].recommendation=obsEdits[eid].recommendation;
             });
-            // Build ordered ID list via obsOrder + selIds
+            // Build ordered ID list via obsOrder + selIds (same as session viewer)
             var selIdsObj=sd.selIds||{};
             var ordered=[];
             if(sd.obsOrder){ ordered=ordered.concat(sd.obsOrder.repeated||[]).concat(sd.obsOrder.new||[]); }
