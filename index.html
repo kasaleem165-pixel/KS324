@@ -8722,7 +8722,11 @@ function downloadDraft(individual){
       '});'+
     '}'+
     'function saveDraftResponses(){'+
-      'if(!confirm("FINAL SAVE — Are you sure all responses are complete?\\n\\nClick OK to choose where to save the file, then email it to the auditor.\\nClick Cancel to go back and review.")){return;}'+
+      'var allTas=document.querySelectorAll("textarea[name^=\\"sectresp_\\"]");'+
+      'var blank=[];'+
+      'for(var i=0;i<allTas.length;i++){if(!allTas[i].value.trim())blank.push(i+1);}'+
+      'if(blank.length>0){alert("Cannot save final response — the following observation(s) have no response entered:\\n\\nObservation(s): "+blank.join(", ")+"\\n\\nPlease complete all responses before saving the final file.");return;}'+
+      'if(!confirm("FINAL SAVE — All "+allTas.length+" response(s) are filled.\\n\\nClick OK to choose where to save the file, then email it to the auditor.\\nClick Cancel to go back and review.")){return;}'+
       'var data=_roCollect();'+
       'var json=JSON.stringify(data).replace(/<\\/script>/gi,"<\\\\/script>");'+
       'var fname=document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_"+(_sectRole==="ho"?"HO":"RO")+"_Responded.html";'+
