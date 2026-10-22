@@ -8699,6 +8699,7 @@ function downloadDraft(individual){
       'setTimeout(function(){URL.revokeObjectURL(url);},2000);'+
     '}'+
     'function saveDraftResponses(){'+
+      'if(!confirm("Click OK to save your responses as a file.")){return;}'+
       'var data=_roCollect();'+
       'var json=JSON.stringify(data).replace(/<\\/script>/gi,"<\\\\/script>");'+
       'var respCount=Object.keys(data).filter(function(k){return k.indexOf("sectresp_")===0&&data[k];}).length;'+
@@ -8738,8 +8739,15 @@ function downloadDraft(individual){
       'try{localStorage.removeItem(_roAutoKey);}catch(e){}'+
       '_roUnsaved=false;'+
       'var lbl=document.getElementById("_roAutolbl");'+
-      'if(lbl){lbl.style.color="#1a4a1a";lbl.style.fontWeight="bold";lbl.textContent="&#10003; File saved — check your Downloads folder and send it to the auditor";}'+
-      'try{_roLegacySave(blob,fname);}catch(err){alert("Save failed: "+(err&&err.message?err.message:err)+". Please try a different browser.");}'+
+      'if(lbl){lbl.style.color="#1a4a1a";lbl.style.fontWeight="bold";lbl.textContent="&#10003; Response file opened in new tab — press Ctrl+S in that tab to save it, then send to auditor";}'+
+      'var _url=URL.createObjectURL(blob);'+
+      'var _w=window.open(_url,"_blank");'+
+      'if(!_w){'+
+        'try{_roLegacySave(blob,fname);}catch(e){}'+
+        'alert("If no file downloaded, please allow popups for this page and try again.");'+
+      '}else{'+
+        'setTimeout(function(){URL.revokeObjectURL(_url);},60000);'+
+      '}'+
     '}'+
     '<\/script>';
 
