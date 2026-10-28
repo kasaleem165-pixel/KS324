@@ -1003,6 +1003,11 @@ function _applyRoleUI(){
     // HO hides: Issue Report (admin-only), Send to RO, Load RO Review, sep1, Send to HO, sep2
     ['rev-send-ro','rev-load-ro','rev-sep-1','rev-send-ho','rev-sep-2','rev-issue'].forEach(hide);
   }
+  // Show Review Custom Observations button for all supervisors
+  var custBtn=document.getElementById('rev-custobs-btn');
+  var custSep=document.getElementById('rev-sep-custobs');
+  if(custBtn){ custBtn.style.display=''; }
+  if(custSep){ custSep.style.display=''; }
   // Enable supervisor toolbar button for supervisor roles
   setTimeout(_supToolbarBtn, 100);
 }
@@ -1438,6 +1443,8 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <div class="tb-dd-sep"></div>
         <button class="tb-dd-item" id="admin-pending-btn" onclick="showPendingDatabankModal();tbDDClose()" data-tip="Review and approve new observations proposed by auditors for the databank"><span class="di">&#128196;</span> Pending Databank Additions <span id="admin-pending-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
         <button class="tb-dd-item" id="admin-amend-btn" onclick="showPendingAmendmentsModal();tbDDClose()" data-tip="Review and approve edits or corrections to existing databank observations"><span class="di">&#9999;</span> Pending Databank Amendments <span id="admin-amend-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
+        <div id="rev-sep-custobs" class="tb-dd-sep" style="display:none"></div>
+        <button class="tb-dd-item" id="rev-custobs-btn" onclick="showCustomObsReviewModal();tbDDClose()" style="display:none" data-tip="Approve, suggest changes, or reject custom observations for inclusion in the databank"><span class="di">&#128203;</span> Review Custom Observations <span id="rev-custobs-badge" style="display:none;background:#c9962a;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
       </div>
     </div>
 
@@ -6419,6 +6426,146 @@ function _updatePendingDatabankBadge(){
   for(var id in hoCustomApprovals){ if(hoCustomApprovals[id]&&hoCustomApprovals[id].decision==='approved') count++; }
   var badge=document.getElementById('admin-pending-badge');
   if(badge){ badge.textContent=count; badge.style.display=count?'inline':'none'; }
+}
+
+function _updateCustomObsBadge(){
+  var r=_userRole();
+  var isSup=(r==='ro_supervisor'||r==='ho_supervisor');
+  var badge=document.getElementById('rev-custobs-badge');
+  if(!badge||!isSup) return;
+  var isHO=(r==='ho_supervisor');
+  var count=0;
+  for(var ci=0;ci<customs.length;ci++){
+    var co=customs[ci];
+    if(!selIds[co.id]) continue;
+    if(isHO){
+      if(roCustomApprovals[co.id]&&roCustomApprovals[co.id].decision==='approved'&&!(hoCustomApprovals[co.id]&&hoCustomApprovals[co.id].decision)) count++;
+    } else {
+      if(!(roCustomApprovals[co.id]&&roCustomApprovals[co.id].decision)) count++;
+    }
+  }
+  badge.textContent=count;
+  badge.style.display=count?'inline':'none';
+}
+
+function showCustomObsReviewModal(){
+  var r=_userRole();
+  var isRO=(r==='ro_supervisor');
+  var isHO=(r==='ho_supervisor');
+  if(!isRO&&!isHO){ toast('Supervisor access required.'); return; }
+  var roleLabel=isRO?'RO Supervisor':'HO Supervisor';
+  var approvals=isRO?roCustomApprovals:hoCustomApprovals;
+
+  var pending=[];
+  for(var ci=0;ci<customs.length;ci++){
+    var co=customs[ci];
+    if(!selIds[co.id]) continue;
+    if(isHO&&!(roCustomApprovals[co.id]&&roCustomApprovals[co.id].decision==='approved')) continue;
+    pending.push(co);
+  }
+  if(!pending.length){
+    alert(isHO
+      ? 'No custom observations are pending HO review. (The RO Supervisor must approve them first.)'
+      : 'No custom observations require review in the currently loaded session.');
+    return;
+  }
+
+  var ex=document.getElementById('_custObsReviewModal');
+  if(ex) ex.remove();
+  var mo=document.createElement('div');
+  mo.id='_custObsReviewModal';
+  mo.style.cssText='position:fixed;inset:0;background:rgba(10,20,40,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;font-family:Inter,Arial,sans-serif';
+
+  var rows='';
+  for(var pi=0;pi<pending.length;pi++){
+    var obs=pending[pi];
+    var prev=approvals[obs.id]||{};
+    var prevDec=prev.decision||'';
+    var prevCmt=prev.comment||'';
+    var obsText=(obsEdits[obs.id]&&obsEdits[obs.id].observation!=null)?obsEdits[obs.id].observation:(obs.observation||'');
+    var recText=(obsEdits[obs.id]&&obsEdits[obs.id].recommendation!=null)?obsEdits[obs.id].recommendation:(obs.recommendation||'');
+    var oid=obs.id;
+    rows+='<div style="border:1px solid '+(prevDec?'#1a6030':'#c8d8ec')+';border-left:4px solid '+(prevDec==='approved'?'#27ae60':prevDec==='rejected'?'#c0392b':prevDec==='changes'?'#e67e22':'#1a3a5c')+';border-radius:5px;margin-bottom:16px;overflow:hidden" id="_cr_card_'+esc(oid)+'">';
+    rows+='<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:#f0f4f8;border-bottom:1px solid #e0e8f0">';
+    rows+='<span style="background:#1a6030;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">Custom</span>';
+    rows+='<span style="flex:1;font-size:13px;font-weight:700;color:#1e2d40">'+esc(obs.title)+'</span>';
+    rows+='<span style="font-size:10px;color:#666;background:#e8f0f8;border-radius:4px;padding:2px 7px">'+esc(obs.category||'Others')+'</span>';
+    rows+='</div>';
+    rows+='<div style="padding:10px 12px">';
+    rows+='<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a3a5c;margin-bottom:3px">Observation</div>';
+    rows+='<div style="font-size:12px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:7px 9px;margin-bottom:7px;white-space:pre-wrap">'+esc(obsText)+'</div>';
+    rows+='<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a3a5c;margin-bottom:3px">Recommendation</div>';
+    rows+='<div style="font-size:12px;line-height:1.6;color:#2a3a50;background:#f8f9fb;border-radius:4px;padding:7px 9px;margin-bottom:10px;white-space:pre-wrap">'+esc(recText)+'</div>';
+    rows+='<div style="font-size:10px;font-weight:700;color:#1a3a5c;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Decision</div>';
+    rows+='<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">';
+    rows+='<button onclick="_crSetDec(\''+esc(oid)+'\',\'approved\')" id="_crb_appr_'+esc(oid)+'" style="flex:1;padding:8px;border:2px solid #27ae60;border-radius:6px;background:'+(prevDec==='approved'?'#27ae60':'#fff')+';color:'+(prevDec==='approved'?'#fff':'#27ae60')+';font-weight:700;font-size:12px;cursor:pointer;font-family:Inter,Arial,sans-serif">&#10003; Approve</button>';
+    rows+='<button onclick="_crSetDec(\''+esc(oid)+'\',\'changes\')" id="_crb_chng_'+esc(oid)+'" style="flex:1;padding:8px;border:2px solid #e67e22;border-radius:6px;background:'+(prevDec==='changes'?'#e67e22':'#fff')+';color:'+(prevDec==='changes'?'#fff':'#e67e22')+';font-weight:700;font-size:12px;cursor:pointer;font-family:Inter,Arial,sans-serif">&#9999; Suggest Changes</button>';
+    rows+='<button onclick="_crSetDec(\''+esc(oid)+'\',\'rejected\')" id="_crb_rejt_'+esc(oid)+'" style="flex:1;padding:8px;border:2px solid #c0392b;border-radius:6px;background:'+(prevDec==='rejected'?'#c0392b':'#fff')+';color:'+(prevDec==='rejected'?'#fff':'#c0392b')+';font-weight:700;font-size:12px;cursor:pointer;font-family:Inter,Arial,sans-serif">&#10007; Reject</button>';
+    rows+='</div>';
+    rows+='<textarea id="_crcmt_'+esc(oid)+'" style="width:100%;padding:7px 9px;border:1px solid #dde2ea;border-radius:4px;font-family:Inter,Arial,sans-serif;font-size:12px;color:#2a3a50;resize:vertical;min-height:50px;box-sizing:border-box;display:'+(prevDec==='changes'||prevDec==='rejected'?'block':'none')+'" placeholder="Comment (required for Suggest Changes or Reject)...">'+esc(prevCmt)+'</textarea>';
+    rows+='</div></div>';
+  }
+
+  mo.innerHTML=
+    '<div style="background:#fff;border-radius:10px;max-width:660px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.4);overflow:hidden">'
+    +'<div style="background:linear-gradient(90deg,#1a6030,#2a8050);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0">'
+      +'<span style="font-size:20px">&#128203;</span>'
+      +'<div><div style="font-size:14px;font-weight:800">Review Custom Observations</div>'
+        +'<div style="font-size:11px;opacity:.8;margin-top:2px">'+esc(roleLabel)+' &mdash; Approve, suggest changes, or reject each custom observation</div></div>'
+      +'<button onclick="document.getElementById(\'_custObsReviewModal\').remove()" style="margin-left:auto;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;width:28px;height:28px;font-size:16px;cursor:pointer;font-family:inherit">&#10005;</button>'
+    +'</div>'
+    +'<div style="padding:16px;overflow-y:auto;flex:1">'+rows+'</div>'
+    +'<div style="padding:12px 18px;border-top:1px solid #e0e8f0;background:#f8fafc;display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">'
+      +'<button onclick="document.getElementById(\'_custObsReviewModal\').remove()" style="padding:8px 18px;background:#eef1f5;color:#555;border:1px solid #c0ccd8;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,Arial,sans-serif">Cancel</button>'
+      +'<button onclick="_crSaveDecisions()" style="padding:8px 20px;background:#1a6030;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,Arial,sans-serif">&#10003; Save Decisions</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(mo);
+}
+
+function _crSetDec(obsId, dec){
+  var r=_userRole();
+  var approvals=r==='ho_supervisor'?hoCustomApprovals:roCustomApprovals;
+  if(!approvals[obsId]) approvals[obsId]={};
+  approvals[obsId].decision=dec;
+  var cmt=document.getElementById('_crcmt_'+obsId);
+  if(cmt) cmt.style.display=(dec==='changes'||dec==='rejected')?'block':'none';
+  var card=document.getElementById('_cr_card_'+obsId);
+  if(card){ card.style.borderLeftColor=dec==='approved'?'#27ae60':dec==='rejected'?'#c0392b':'#e67e22'; }
+  var ba=document.getElementById('_crb_appr_'+obsId);
+  var bc=document.getElementById('_crb_chng_'+obsId);
+  var br=document.getElementById('_crb_rejt_'+obsId);
+  if(ba){ ba.style.background=dec==='approved'?'#27ae60':'#fff'; ba.style.color=dec==='approved'?'#fff':'#27ae60'; }
+  if(bc){ bc.style.background=dec==='changes'?'#e67e22':'#fff'; bc.style.color=dec==='changes'?'#fff':'#e67e22'; }
+  if(br){ br.style.background=dec==='rejected'?'#c0392b':'#fff'; br.style.color=dec==='rejected'?'#fff':'#c0392b'; }
+}
+
+function _crSaveDecisions(){
+  var r=_userRole();
+  var isHO=(r==='ho_supervisor');
+  var approvals=isHO?hoCustomApprovals:roCustomApprovals;
+  var missing=[];
+  for(var ci=0;ci<customs.length;ci++){
+    var co=customs[ci];
+    if(!selIds[co.id]) continue;
+    if(isHO&&!(roCustomApprovals[co.id]&&roCustomApprovals[co.id].decision==='approved')) continue;
+    var dec=approvals[co.id]&&approvals[co.id].decision;
+    if(!dec){ missing.push(co.title); continue; }
+    var cmtEl=document.getElementById('_crcmt_'+co.id);
+    if(cmtEl) approvals[co.id].comment=cmtEl.value.trim();
+    if((dec==='changes'||dec==='rejected')&&cmtEl&&!cmtEl.value.trim()){
+      missing.push(co.title+' (comment required for Suggest Changes / Reject)');
+    }
+  }
+  if(missing.length){
+    alert('Please complete all decisions before saving:\n\n- '+missing.join('\n- '));
+    return;
+  }
+  save();
+  _updatePendingDatabankBadge();
+  _updateCustomObsBadge();
+  document.getElementById('_custObsReviewModal').remove();
+  toast('Custom observation decisions saved.');
 }
 
 function showPendingDatabankModal(){
@@ -17033,6 +17180,7 @@ function loadReviewerHtml(evt, role){
       var am=dec.amendments||{};
       Object.keys(am).forEach(function(id){ if(am[id]&&am[id].amended) respAmendments[id]=am[id]; });
       AT_log({type:'review_loaded',role:'RO',reviewer:dec.reviewerName||'',action:action,date:dec.reviewDate||''});
+      _updateCustomObsBadge();
       if(action==='send_back'){
         showToast('⚠ Report sent back by RO Manager.\nRO: '+(dec.reviewerName||''), 5000);
         _showReviewSendBackModal(dec,'RO');
@@ -17052,6 +17200,7 @@ function loadReviewerHtml(evt, role){
       AT_log({type:'review_loaded',role:'HO',reviewer:dec.reviewerName||'',action:action,date:dec.reviewDate||''});
       _detectPendingAmendments();
       _updatePendingDatabankBadge();
+      _updateCustomObsBadge();
       if(action==='send_back_to_ro'){
         showToast('⚠ Report sent back by HO to RO.\nHO: '+(dec.reviewerName||''), 5000);
         _showReviewSendBackModal(dec,'HO');
