@@ -2628,25 +2628,34 @@ function _lo32(n){return n&0xff;} function _b2(n){return (n>>8)&0xff;}
 function _b3(n){return (n>>16)&0xff;} function _hi32(n){return (n>>>24)&0xff;}
 // ── Download choice popup — HTML or ZIP ───────────────────────
 // Shows a small modal letting the user pick HTML (normal) or ZIP (for Gmail).
-function _showDownloadChoice(blob, fname, label){
+function _showDownloadChoice(blob, fname, label, jsonBlob, jsonFname){
   // Remove any existing
   var old=document.getElementById('_dlChoiceOv'); if(old) old.remove();
   var ov=document.createElement('div');
   ov.id='_dlChoiceOv';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center';
-  var zipName=fname.replace(/\.html?$/i,'')+'.zip';
+  var secondBtn='';
+  if(jsonBlob&&jsonFname){
+    secondBtn='<button id="_dlJsonBtn" style="padding:10px 14px;background:#1a6030;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;text-align:left">'
+      +'&#128196; Download JSON file &nbsp;<span style="font-size:10.5px;font-weight:400;opacity:.8">— '+esc(jsonFname)+' &nbsp;(safe for Gmail)</span>'
+      +'</button>';
+  } else {
+    var zipName=fname.replace(/\.html?$/i,'')+'.zip';
+    secondBtn='<button id="_dlZipBtn" style="padding:10px 14px;background:#1a6030;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;text-align:left">'
+      +'&#128230; Download as ZIP &nbsp;<span style="font-size:10.5px;font-weight:400;opacity:.8">— '+esc(zipName)+' &nbsp;(use for Gmail)</span>'
+      +'</button>';
+  }
+  var desc=jsonBlob
+    ?'Choose the format. Use <strong>Download as HTML</strong> for a standalone browser-based review file. Use <strong>Download JSON file</strong> to send via Gmail (JSON is not blocked) — the supervisor loads it into BRAINS via Cloud &rsaquo; Load Session.'
+    :'Choose the format. If you are sending via <strong>Gmail</strong>, use <strong>Download as ZIP</strong> — Gmail blocks HTML files. The recipient simply extracts the ZIP and opens the HTML file inside.';
   ov.innerHTML='<div style="background:#fff;border-radius:10px;padding:24px 28px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.28);font-family:Inter,Arial,sans-serif">'
     +'<div style="font-size:14px;font-weight:800;color:#1a3a5c;margin-bottom:6px">&#128190; Download '+esc(label)+'</div>'
-    +'<div style="font-size:11.5px;color:#5a6a80;line-height:1.6;margin-bottom:18px">'
-    +'Choose the format. If you are sending via <strong>Gmail</strong>, use <strong>Download as ZIP</strong> — Gmail blocks HTML files. The recipient simply extracts the ZIP and opens the HTML file inside.'
-    +'</div>'
+    +'<div style="font-size:11.5px;color:#5a6a80;line-height:1.6;margin-bottom:18px">'+desc+'</div>'
     +'<div style="display:flex;flex-direction:column;gap:10px">'
     +'<button id="_dlHtmlBtn" style="padding:10px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;text-align:left">'
     +'&#128196; Download as HTML &nbsp;<span style="font-size:10.5px;font-weight:400;opacity:.8">— '+esc(fname)+'</span>'
     +'</button>'
-    +'<button id="_dlZipBtn" style="padding:10px 14px;background:#1a6030;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;text-align:left">'
-    +'&#128230; Download as ZIP &nbsp;<span style="font-size:10.5px;font-weight:400;opacity:.8">— '+esc(zipName)+' &nbsp;(use for Gmail)</span>'
-    +'</button>'
+    +secondBtn
     +'<button id="_dlCancelBtn" style="padding:7px 14px;background:#f0f3f8;color:#5a6a80;border:1px solid #c8d8ec;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer">'
     +'Cancel'
     +'</button>'
@@ -2654,7 +2663,11 @@ function _showDownloadChoice(blob, fname, label){
     +'</div>';
   document.body.appendChild(ov);
   document.getElementById('_dlHtmlBtn').onclick=function(){ ov.remove(); saveFileAs(blob,fname); };
-  document.getElementById('_dlZipBtn').onclick=function(){ ov.remove(); saveFileAsZip(blob,fname); };
+  if(jsonBlob&&jsonFname){
+    document.getElementById('_dlJsonBtn').onclick=function(){ ov.remove(); saveFileAs(jsonBlob,jsonFname); };
+  } else {
+    document.getElementById('_dlZipBtn').onclick=function(){ ov.remove(); saveFileAsZip(blob,fname); };
+  }
   document.getElementById('_dlCancelBtn').onclick=function(){ ov.remove(); };
   ov.addEventListener('click',function(e){ if(e.target===ov) ov.remove(); });
 }
@@ -16623,7 +16636,9 @@ function generateReviewerHtml(role){
 
   var fname='BSS_Review_'+role.toUpperCase()+'_'+branch.replace(/[^a-zA-Z0-9]/g,'_').slice(0,20)+'_'+dt+'.html';
   var blob=new Blob([rv],{type:'text/html'});
-  _showDownloadChoice(blob, fname, (role==='ro'?'RO':'HO')+' Reviewer File');
+  var jfname='BSS_Review_'+role.toUpperCase()+'_'+branch.replace(/[^a-zA-Z0-9]/g,'_').slice(0,20)+'_'+dt+'.json';
+  var jblob=new Blob([JSON.stringify(sess)],{type:'application/json'});
+  _showDownloadChoice(blob, fname, (role==='ro'?'RO':'HO')+' Reviewer File', jblob, jfname);
 }
 
 function triggerLoadSectResponse(role){
