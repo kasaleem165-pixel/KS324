@@ -6254,7 +6254,35 @@ function _crSaveDecisions(){
   _updatePendingDatabankBadge();
   _updateCustomObsBadge();
   document.getElementById('_custObsReviewModal').remove();
-  toast('Custom observation decisions saved.');
+  // Build response file for auditor
+  var fd={}; var fields=['brcode','brname','rno']; for(var fi=0;fi<fields.length;fi++){ var fel=document.getElementById(fields[fi]); if(fel) fd[fields[fi]]=fel.value; }
+  var brcode=fd.brcode||''; var brname=fd.brname||''; var dt=new Date().toISOString().slice(0,10).replace(/-/g,'');
+  var reviewerName=(_loggedInUser&&_loggedInUser.name)?_loggedInUser.name:(isHO?'HO Supervisor':'RO Supervisor');
+  var decObj={
+    action:'send_back',
+    reviewerName:reviewerName,
+    reviewDate:new Date().toISOString().slice(0,10),
+    flags:isHO?hoFlags:roFlags,
+    comments:isHO?hoComments:roComments,
+    wordingDecisions:isHO?hoAccepted:roAccepted,
+    amendments:respAmendments||{},
+    sendBackComment:'',
+    customApprovals:isHO?hoCustomApprovals:roCustomApprovals
+  };
+  var jstr=JSON.stringify(decObj);
+  var jblob=new Blob([jstr],{type:'application/json'});
+  var role=isHO?'HO':'RO';
+  var jfname=(role)+'_Review_'+(brcode||'BR')+'_'+(brname.replace(/[^a-zA-Z0-9]/g,'_').slice(0,20)||'Branch')+'_'+dt+'.json';
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(10,20,40,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML='<div style="background:#fff;border-radius:10px;padding:28px 32px;max-width:440px;width:100%;font-family:Inter,Arial,sans-serif;box-shadow:0 8px 32px rgba(0,0,0,.22)">'
+    +'<div style="font-size:16px;font-weight:700;color:#1e2d40;margin-bottom:8px">&#10003; Decisions Saved</div>'
+    +'<div style="font-size:13px;color:#444;margin-bottom:18px">Download the response file and send it to the auditor via email or WhatsApp. The auditor loads it via <strong>Review &rsaquo; Load '+role+' Supervisor Review</strong>.</div>'
+    +'<button id="_crDlBtn" style="width:100%;padding:11px 0;background:#1a6030;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:10px">&#128229; Download Response File &nbsp;<span style="font-size:11px;font-weight:400;opacity:.8">'+jfname+'</span></button>'
+    +'<button onclick="this.closest(\'div\').parentNode.remove()" style="width:100%;padding:9px 0;background:#f0f0f0;color:#333;border:none;border-radius:7px;font-size:13px;cursor:pointer">Close</button>'
+    +'</div>';
+  document.body.appendChild(ov);
+  document.getElementById('_crDlBtn').onclick=function(){ saveFileAs(jblob,jfname); };
 }
 
 function showPendingDatabankModal(){
