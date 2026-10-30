@@ -16016,8 +16016,9 @@ function generateReviewerHtml(role){
   rv+='</div>\n';
 
   // ── Reviewer name ─────────────────────────────────────────────────────
+  var _rvNameVal=''; try{ var _rvU=JSON.parse(sessionStorage.getItem('sa_current_user')||'{}'); _rvNameVal=_rvU.name||''; }catch(e){}
   rv+='<div class="name-row"><label style="font-size:12px;font-weight:700;color:#1a3a5c;white-space:nowrap">Reviewer Name:</label>';
-  rv+='<input id="reviewer-name" class="name-inp" type="text" placeholder="Enter your full name..."></div>\n';
+  rv+='<input id="reviewer-name" class="name-inp" type="text" placeholder="Enter your full name..." value="'+esc(_rvNameVal)+'"></div>\n';
 
   // ── Stats bar ─────────────────────────────────────────────────────────
   var totalObs=allObs.length;
@@ -16314,12 +16315,17 @@ function generateReviewerHtml(role){
     rv+='<span id="evd-label-'+esc(o.id)+'" style="font-size:11px;color:#1a6030"></span>';
     rv+='</div></div>';
 
-    // Flag row
-    rv+='<div class="flag-row">';
-    rv+='<input type="checkbox" class="flag-cb" id="flag-'+esc(o.id)+'" onchange="onFlag(\''+esc(o.id)+'\',this)">';
-    rv+='<label class="flag-lbl" for="flag-'+esc(o.id)+'">&#9873; Flag this observation — requires correction</label>';
+    // Decision buttons for standard observations (replacing flag checkbox)
+    rv+='<div style="margin-top:10px">';
+    rv+='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#5a6a80;margin-bottom:6px">Decision</div>';
+    rv+='<div style="display:flex;gap:8px;margin-bottom:8px">';
+    rv+='<button type="button" id="dec-approve-'+esc(o.id)+'" onclick="setObsDec(\''+esc(o.id)+'\',\'approved\',this)" style="flex:1;padding:8px 4px;border:2px solid #1a6030;background:#fff;color:#1a6030;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer">&#10003; Approve</button>';
+    rv+='<button type="button" id="dec-changes-'+esc(o.id)+'" onclick="setObsDec(\''+esc(o.id)+'\',\'changes\',this)" style="flex:1;padding:8px 4px;border:2px solid #c9962a;background:#fff;color:#c9962a;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer">&#8722; Suggest Changes</button>';
+    rv+='<button type="button" id="dec-reject-'+esc(o.id)+'" onclick="setObsDec(\''+esc(o.id)+'\',\'rejected\',this)" style="flex:1;padding:8px 4px;border:2px solid #a02020;background:#fff;color:#a02020;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer">&#10007; Reject</button>';
     rv+='</div>';
     rv+='<textarea class="cmt-area" id="cmt-'+esc(o.id)+'" placeholder="Reviewer comment for this observation..."></textarea>';
+    rv+='<input type="hidden" id="flag-'+esc(o.id)+'" value="">';
+    rv+='</div>';
 
     rv+='</div></div>\n'; // obs-body, obs-card
   }
@@ -16500,9 +16506,20 @@ function generateReviewerHtml(role){
   rv+='function showSBComment(){\n';
   rv+='  var el=document.getElementById("sendback-comment"); if(el){ el.style.display="block"; el.scrollIntoView({behavior:"smooth"}); el.focus(); }\n';
   rv+='}\n';
+  rv+='var _obsDecisions={};\n';
+  rv+='function setObsDec(id,dec,btn){\n';
+  rv+='  _obsDecisions[id]=dec;\n';
+  rv+='  var btns=["dec-approve-"+id,"dec-changes-"+id,"dec-reject-"+id];\n';
+  rv+='  var colors={approved:"#1a6030",changes:"#c9962a",rejected:"#a02020"};\n';
+  rv+='  var bgs={approved:"#e8f5ee",changes:"#fff8e8",rejected:"#fdf0f0"};\n';
+  rv+='  btns.forEach(function(bid){ var b=document.getElementById(bid); if(!b) return; var d=bid.split("-")[1]; b.style.background=(d===dec)?bgs[dec]:"#fff"; b.style.fontWeight=(d===dec)?"800":"700"; });\n';
+  rv+='  var flagEl=document.getElementById("flag-"+id);\n';
+  rv+='  if(flagEl) flagEl.value=dec;\n';
+  rv+='}\n';
   rv+='function collectDecisions(action){\n';
   rv+='  var flags={},comments={},wordingDec={},amendments={};\n';
-  rv+='  document.querySelectorAll(".flag-cb").forEach(function(cb){ var id=cb.id.replace("flag-",""); if(cb.checked) flags[id]=true; });\n';
+  rv+='  // Read obs decisions from buttons (rejected = flagged, others = not flagged)\n';
+  rv+='  Object.keys(_obsDecisions).forEach(function(id){ if(_obsDecisions[id]==="rejected") flags[id]=true; });\n';
   rv+='  document.querySelectorAll(".cmt-area").forEach(function(ta){ var id=ta.id.replace("cmt-",""); if(ta.value.trim()) comments[id]=ta.value.trim(); });\n';
   rv+='  document.querySelectorAll("input[id^=wcdv-obs-]").forEach(function(inp){ var id=inp.id.replace("wcdv-obs-",""); if(inp.value!=="") { if(!wordingDec[id]) wordingDec[id]={}; wordingDec[id].obs=(inp.value==="1"); } });\n';
   rv+='  document.querySelectorAll("input[id^=wcdv-rec-]").forEach(function(inp){ var id=inp.id.replace("wcdv-rec-",""); if(inp.value!=="") { if(!wordingDec[id]) wordingDec[id]={}; wordingDec[id].rec=(inp.value==="1"); } });\n';
@@ -16516,7 +16533,7 @@ function generateReviewerHtml(role){
   rv+='  var sbCmt=(document.getElementById("sendback-comment")||{}).value||"";\n';
   rv+='  var customApprovals={};\n';
   rv+='  document.querySelectorAll("input[id^=capdec-]").forEach(function(inp){ var id=inp.getAttribute("data-obsid"); var dec=inp.value; if(dec){ var cmtEl=document.getElementById("cap-cmt-"+id); customApprovals[id]={decision:dec,comment:cmtEl?cmtEl.value.trim():""}; } });\n';
-  rv+='  return {action:action,reviewerName:name,reviewDate:new Date().toISOString().slice(0,10),flags:flags,comments:comments,wordingDecisions:wordingDec,amendments:amendments,sendBackComment:sbCmt,customApprovals:customApprovals};\n';
+  rv+='  return {action:action,reviewerName:name,reviewDate:new Date().toISOString().slice(0,10),flags:flags,comments:comments,wordingDecisions:wordingDec,amendments:amendments,sendBackComment:sbCmt,customApprovals:customApprovals,obsDecisions:_obsDecisions};\n';
   rv+='}\n';
   rv+='function doAction(action){\n';
   rv+='  var name=(document.getElementById("reviewer-name")||{}).value||"";\n';
