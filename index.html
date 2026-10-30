@@ -1008,6 +1008,11 @@ function _applyRoleUI(){
   var custSep=document.getElementById('rev-sep-custobs');
   if(custBtn){ custBtn.style.display=''; }
   if(custSep){ custSep.style.display=''; }
+  // Show Load Auditor Report button for all supervisors
+  var supLoadBtn=document.getElementById('rev-sup-load-btn');
+  var supLoadSep=document.getElementById('rev-sep-sup-load');
+  if(supLoadBtn){ supLoadBtn.style.display=''; }
+  if(supLoadSep){ supLoadSep.style.display=''; }
   // Enable supervisor toolbar button for supervisor roles
   setTimeout(_supToolbarBtn, 100);
 }
@@ -1445,6 +1450,9 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <button class="tb-dd-item" id="admin-amend-btn" onclick="showPendingAmendmentsModal();tbDDClose()" data-tip="Review and approve edits or corrections to existing databank observations"><span class="di">&#9999;</span> Pending Databank Amendments <span id="admin-amend-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
         <div id="rev-sep-custobs" class="tb-dd-sep" style="display:none"></div>
         <button class="tb-dd-item" id="rev-custobs-btn" onclick="showCustomObsReviewModal();tbDDClose()" style="display:none" data-tip="Approve, suggest changes, or reject custom observations for inclusion in the databank"><span class="di">&#128203;</span> Review Custom Observations <span id="rev-custobs-badge" style="display:none;background:#c9962a;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
+        <div id="rev-sep-sup-load" class="tb-dd-sep" style="display:none"></div>
+        <button class="tb-dd-item" id="rev-sup-load-btn" onclick="_supLoadAuditorReport();tbDDClose()" style="display:none" data-tip="Load the auditor's report JSON file sent to you for review — opens the report in review mode"><span class="di">&#128229;</span> Load Auditor Report for Review</button>
+        <input type="file" id="sup-auditor-report-fileinp" accept=".json" style="display:none" onchange="_supLoadAuditorReportRead(event)">
       </div>
     </div>
 
@@ -17183,6 +17191,31 @@ function loadSectResponseFile(evt, role){
 
 function triggerLoadReviewerHtml(role){
   document.getElementById(role+'-review-fileinp').click();
+}
+
+// ── Supervisor: Load Auditor Report JSON for Review ───────────────────────────
+function _supLoadAuditorReport(){
+  document.getElementById('sup-auditor-report-fileinp').click();
+}
+
+function _supLoadAuditorReportRead(evt){
+  var file=evt.target.files[0]; evt.target.value=''; if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var sess;
+    try{ sess=JSON.parse(e.target.result); }
+    catch(ex){ alert('Could not read the file. Please make sure you are selecting the correct JSON file sent by the auditor.'); return; }
+    if(!sess||!sess.formData){ alert('This file does not appear to be a valid BRAINS auditor report. Please check the file and try again.'); return; }
+    var brname=(sess.formData&&sess.formData.brname)||'';
+    var brcode=(sess.formData&&sess.formData.brcode)||'';
+    var msg='Load auditor report'+(brcode?' for '+brcode:'')+(brname?' - '+brname:'')+'?\n\nThis will replace the current report in view. Make sure you have saved any current work before proceeding.';
+    if(!confirm(msg)) return;
+    restoreSession(sess);
+    var role=_userRole();
+    var reviewRole=(role==='ho_supervisor')?'ho':'ro';
+    generateReviewerHtml(reviewRole);
+  };
+  reader.readAsText(file);
 }
 
 function loadReviewerHtml(evt, role){
