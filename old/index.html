@@ -2637,6 +2637,15 @@ function _b3(n){return (n>>16)&0xff;} function _hi32(n){return (n>>>24)&0xff;}
 // ── Download choice popup — HTML or ZIP ───────────────────────
 // Shows a small modal letting the user pick HTML (normal) or ZIP (for Gmail).
 function _showDownloadChoice(blob, fname, label, jsonBlob, jsonFname){
+  // Supervisor auto-open: open reviewer HTML directly in new tab instead of download dialog
+  if(window._supAutoOpenReview){
+    window._supAutoOpenReview=false;
+    var url=URL.createObjectURL(blob);
+    var tab=window.open(url,'_blank');
+    if(!tab){ alert('Popup blocked. Please allow popups for this page, then try again.'); URL.revokeObjectURL(url); return; }
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+    return;
+  }
   // Remove any existing
   var old=document.getElementById('_dlChoiceOv'); if(old) old.remove();
   var ov=document.createElement('div');
@@ -16744,7 +16753,9 @@ function _supLoadAuditorReportRead(evt){
     var msg='Load auditor report'+(brcode?' for '+brcode:'')+(brname?' - '+brname:'')+'?\n\nThis will replace the current report in view. Make sure you have saved any current work before proceeding.';
     if(!confirm(msg)) return;
     restoreSession(sess);
-    setTimeout(function(){ showCustomObsReviewModal(); }, 400);
+    var role=_userRole();
+    var reviewRole=(role==='ho_supervisor')?'ho':'ro';
+    setTimeout(function(){ window._supAutoOpenReview=true; generateReviewerHtml(reviewRole); }, 600);
   };
   reader.readAsText(file);
 }
