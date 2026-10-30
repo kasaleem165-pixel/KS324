@@ -2158,6 +2158,9 @@ function _doAutoRestore(sessions, autoSaved){
   showPrompt();
 }
 function _startRestore(){
+  // Supervisors and admins do not restore auditor sessions
+  var r=_userRole();
+  if(r==='ro_supervisor'||r==='ho_supervisor'||r==='supervisor'||r==='administrator') return;
   if(_idbReady){
     idbGet(VH_KEY, [], function(sessions){
       idbGet(AS_KEY, null, function(autoSaved){
