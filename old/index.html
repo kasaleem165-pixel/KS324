@@ -16512,7 +16512,8 @@ function generateReviewerHtml(role){
   rv+='  var btns=["dec-approve-"+id,"dec-changes-"+id,"dec-reject-"+id];\n';
   rv+='  var colors={approved:"#1a6030",changes:"#c9962a",rejected:"#a02020"};\n';
   rv+='  var bgs={approved:"#e8f5ee",changes:"#fff8e8",rejected:"#fdf0f0"};\n';
-  rv+='  btns.forEach(function(bid){ var b=document.getElementById(bid); if(!b) return; var d=bid.split("-")[1]; b.style.background=(d===dec)?bgs[dec]:"#fff"; b.style.fontWeight=(d===dec)?"800":"700"; });\n';
+  rv+='  var decMap={"dec-approve-"+id:"approved","dec-changes-"+id:"changes","dec-reject-"+id:"rejected"};\n';
+  rv+='  btns.forEach(function(bid){ var b=document.getElementById(bid); if(!b) return; var isActive=(decMap[bid]===dec); b.style.background=isActive?bgs[dec]:"#fff"; b.style.color=isActive?colors[dec]:(bid.indexOf("approve")>-1?"#1a6030":bid.indexOf("changes")>-1?"#c9962a":"#a02020"); b.style.fontWeight=isActive?"800":"700"; b.style.borderWidth=isActive?"3px":"2px"; });\n';
   rv+='  var flagEl=document.getElementById("flag-"+id);\n';
   rv+='  if(flagEl) flagEl.value=dec;\n';
   rv+='}\n';
@@ -16537,7 +16538,7 @@ function generateReviewerHtml(role){
   rv+='}\n';
   rv+='function doAction(action){\n';
   rv+='  var name=(document.getElementById("reviewer-name")||{}).value||"";\n';
-  rv+='  if(!name.trim()){ alert("Please enter your name before submitting."); return; }\n';
+  rv+='  if(!name.trim()){ var _ni=document.getElementById("reviewer-name"); name=(\''+esc(role==='ro'?'RO Supervisor':'HO Supervisor')+'\'); if(_ni) _ni.value=name; }\n';
   rv+='  if((action==="send_back"||action==="send_back_to_ro")){\n';
   rv+='    var sb=document.getElementById("sendback-comment");\n';
   rv+='    sb.style.display="block";\n';
