@@ -1991,6 +1991,33 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
 var DB = JSON.parse(document.getElementById('audit-data').textContent);
 var BSS_BRANCHES = JSON.parse(document.getElementById('branch-data').textContent);
 
+// ── Retired Observations Bank ────────────────────────────────────────────────
+var _retiredObs = [
+  {"id":"OBS_005","title":"Withholding Tax Deposited with Delay","category":"Branch Imprest, Payments & Accounts","type":"Repeated","observation":"Tax withheld from suppliers/vendors was not deposited within seven days from the date of payment as required. Delays were observed in the ledger for Withholding Tax U/s 50(4). This creates a risk of exposure to penalties and interest charges by tax authorities.","recommendation":"As per SMFO-HO letter dated 04 Jul 2014: 'Please follow the instructions at your end and also instruct the schools and other concerned staff to deduct the tax accordingly and deposit the same into Government Treasury within seven days from the deduction and payment.' Accounts Officer must monitor tax deduction and deposit deadlines."},
+  {"id":"OBS_021","title":"Outgoing/Departure Attendance not Marked by Staff","category":"Recruitment, Payroll & Employee Record","type":"Repeated","observation":"Outgoing/departure attendance was not marked by various staff members in multiple instances. This results in incomplete attendance records and makes it difficult to monitor actual working hours.","recommendation":"Head of School should monitor attendance record. Staff should raise application for attendance not marked or early leaving. As per policy: 'Employees shall mark their attendance on biometric devices (online attendance) installed in offices.'"},
+  {"id":"OBS_050","title":"Duplicate / Same Codes on Two Assets","category":"Fixed Assets","type":"New","observation":"Some assets were observed with duplicate/same fixed asset codes affixed to more than one asset. This creates confusion in the register and physical verification process.","recommendation":"As per policy, unique codes should be assigned and affixed within 15 days of receipt. Duplicate codes must be investigated and corrected immediately by coordinating with RO Fixed Assets department."},
+  {"id":"OBS_059","title":"Incomplete Barcode Labelling on Library Books","category":"Library","type":"Repeated","observation":"Barcode labels were not affixed on many library books. Barcode printer issues and worn-out plastic covers contributed to the problem.","recommendation":"Bar Codes (KOHA) should be pasted on all books on timely basis. As per email from Deputy Manager Libraries-South Nov 2018: 'KOHA will be implemented in all branches.' All books must have barcode labels before being placed on shelves."},
+  {"id":"OBS_135","title":"Recoverable Excess Payments to Left Employees","category":"Recruitment, Payroll & Employee Record","type":"New","observation":"Negative balances were appearing in final settlement claims of certain left employees indicating excess payments made to them. These excess payments need to be recovered.","recommendation":"Excess payments to employees appearing as negative balances in final settlement claims should be timely recovered. 'In case of failure to clear Company dues, the employee shall not be issued the experience certificate and shall not be eligible for re-hiring.'"},
+  {"id":"OBS_136","title":"Final Settlement Acknowledgement of Left Employees not Available","category":"Recruitment, Payroll & Employee Record","type":"New","observation":"A proper well-defined procedure should be devised for acknowledgement of final settlement of left employees so that employee record files can be completed with all required documentary evidences.","recommendation":"A proper well-defined procedure should be devised for acknowledgement of final settlement of left employees so that employee record files can be completed with all required documentary evidences."},
+  {"id":"OBS_142","title":"Fixed Assets Held in Branch for Disposal (Pending AIDN)","category":"Fixed Assets","type":"New","observation":"Fixed assets identified for disposal were still physically held in the branch as the Asset Identification and Disposal Note (AIDN) had not yet been processed by RO, causing unnecessary accumulation of assets pending disposal.","recommendation":"Branch should follow up with RO Fixed Assets department for timely processing of AIDNs. As per policy: 'The documentation regarding Additions, Disposals and Transfers of fixed assets shall be completed within 15 working days from occurrence of the transaction.'"},
+  {"id":"OBS_175","title":"Shortcomings in Sports Register","category":"Others","type":"New","observation":"Discrepancies were observed in the Sports Register: register not validated by Head of School; broken/lost items not signed/validated by HOS.","recommendation":"Sports items register should be maintained accurately. Head of School should regularly verify and sign the register. 'Receipts and issuance shall be recorded on timely basis. Remarks column may be used for recipients' acknowledgements.'"},
+  {"id":"OBS_194","title":"Insufficient Racks for Display of Library Books","category":"Library","type":"Repeated","observation":"Many books were placed in multiple rows in racks or stacked on the floor due to insufficient space in the library. Books should be displayed in single row per rack.","recommendation":"The Library should be expanded in accordance with the number of books. Branch should demand more racks in CAPEX for proper display of books. 'After allocating the class number, cataloguing and labelling etc., books should be arranged on the shelf.'"}
+];
+
+function _getSelObs(sIds){
+  var result=[];
+  var seen={};
+  var dbObs=DB&&DB.observations?DB.observations:[];
+  for(var _i=0;_i<dbObs.length;_i++){
+    seen[dbObs[_i].id]=true;
+    if(sIds[dbObs[_i].id]) result.push(dbObs[_i]);
+  }
+  for(var _j=0;_j<_retiredObs.length;_j++){
+    if(!seen[_retiredObs[_j].id]&&sIds[_retiredObs[_j].id]) result.push(_retiredObs[_j]);
+  }
+  return result;
+}
+
 // ============================================================
 // BRANCH AUTO-FILL
 // ============================================================
@@ -5487,7 +5514,7 @@ function renderRpt(){
       brvisit=H.brvisit, brprev=H.brprev, brfwk=H.brfwk,
       rno=H.rno, pb=(H.pbn&&H.pb)?H.pbn+' ('+H.pb+')':(H.pbn||H.pb||''), dt=H.dt, per=H.per;
 
-  var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
+  var dbObs=_getSelObs(selIds);
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
   var all=dbObs.concat(cuObs);
   _obsOrderSync(all);
@@ -8496,7 +8523,7 @@ function exportCmpReport(mode){
 function showDraftModal(role) {
   var roleLabel=role==='ro'?'Regional Office':'Head Office';
   var refValue=role==='ro'?'Referred to Regional Office':'Referred to Head Office';
-  var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
+  var dbObs=_getSelObs(selIds);
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
   var all=dbObs.concat(cuObs);
   if(!all.length){alert('No observations selected. Please select observations first.');return;}
@@ -9048,7 +9075,7 @@ function downloadSoftCopy(){
   var _scSeen={};
   for(var _sx=0;_sx<scSections.length;_sx++){for(var _sy=0;_sy<scSections[_sx].obs.length;_sy++) _scSeen[scSections[_sx].obs[_sy].id]=1;}
   var _scAll=[];
-  for(var j2=0;j2<DB.observations.length;j2++){if(selIds[DB.observations[j2].id])_scAll.push(DB.observations[j2]);}
+  var _scRetired=_getSelObs(selIds); for(var j2=0;j2<_scRetired.length;j2++) _scAll.push(_scRetired[j2]);
   for(var k2=0;k2<customs.length;k2++){if(selIds[customs[k2].id])_scAll.push(customs[k2]);}
   for(var _sz=0;_sz<_scAll.length;_sz++){
     var _scEx=_scAll[_sz];
@@ -9638,7 +9665,9 @@ function getObsReportLabels(){
   var labels={};
   // Build a lookup of all obs so we can read each obs's category
   var obsById={};
-  for(var j=0;j<DB.observations.length;j++) obsById[DB.observations[j].id]=DB.observations[j];
+  var _allBankObs=DB&&DB.observations?DB.observations:[];
+  for(var j=0;j<_allBankObs.length;j++) obsById[_allBankObs[j].id]=_allBankObs[j];
+  for(var _rk=0;_rk<_retiredObs.length;_rk++){if(!obsById[_retiredObs[_rk].id]) obsById[_retiredObs[_rk].id]=_retiredObs[_rk];}
   for(var k=0;k<customs.length;k++)          obsById[customs[k].id]=customs[k];
 
   var _rawSections=[
@@ -9682,7 +9711,7 @@ function buildCatGroupsFor(obsList){
 
 function buildAnalysisHtml(){
   var labels=getObsReportLabels();
-  var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
+  var dbObs=_getSelObs(selIds);
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
   var all=dbObs.concat(cuObs);
   var total=all.length;
@@ -9877,7 +9906,7 @@ function renderAnnexList(){
     h+='<div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--gbor)">';
     h+='<div style="font-size:10px;font-weight:700;color:var(--gtxt);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">&#128279; Link to Observations</div>';
     var selObs=[];
-    for(var si=0;si<DB.observations.length;si++){if(selIds[DB.observations[si].id])selObs.push(DB.observations[si]);}
+    var _soAll=_getSelObs(selIds); for(var si=0;si<_soAll.length;si++) selObs.push(_soAll[si]);
     for(var ci2=0;ci2<customs.length;ci2++){if(selIds[customs[ci2].id])selObs.push(customs[ci2]);}
     if(!selObs.length){
       h+='<div style="font-size:11px;color:var(--gtxt);font-style:italic">Select observations first to link them.</div>';
@@ -11179,7 +11208,7 @@ function obsReadinessBadge(o){
 function finalizeReport(){
   if(!_guardSaved()) return;
   var H=getHdrVals();
-  var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
+  var dbObs=_getSelObs(selIds);
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
   var all=dbObs.concat(cuObs);
   if(!all.length){toast('No observations selected.');return;}
@@ -11638,7 +11667,7 @@ function generateIssuedReport(forROCopy){
   var reviewRole=isReview?forROCopy.replace('_review',''):null;
   var stageLabel=reviewRole==='ro'?'RO Manager Review':reviewRole==='ho'?'HO Final Review':'';
   if(isReview) WC_detectAll();
-  var dbObs=[]; for(var j=0;j<DB.observations.length;j++){if(selIds[DB.observations[j].id])dbObs.push(DB.observations[j]);}
+  var dbObs=_getSelObs(selIds);
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
   var all=dbObs.concat(cuObs);
   if(!all.length){toast('No observations selected. Please select observations first.');return;}
@@ -13183,7 +13212,7 @@ window._pfRefreshFloat = function(){
   // Count remaining issues fresh
   var rem=0,blk=0;
   var _fAll=[];
-  for(var _fj=0;_fj<DB.observations.length;_fj++){if(selIds[DB.observations[_fj].id])_fAll.push(DB.observations[_fj]);}
+  var _fRet=_getSelObs(selIds); for(var _fj=0;_fj<_fRet.length;_fj++) _fAll.push(_fRet[_fj]);
   for(var _fk=0;_fk<customs.length;_fk++){if(selIds[customs[_fk].id])_fAll.push(customs[_fk]);}
   for(var _fi=0;_fi<_fAll.length;_fi++){var _fr=getObsReadiness(_fAll[_fi]);rem+=_fr.blocking.length+_fr.advisory.length;blk+=_fr.blocking.length;}
 
@@ -13227,7 +13256,7 @@ window._pfRefreshFloat = function(){
 function showSaveDialog(){
   // ── Comprehensive Pre-flight Readiness Check ─────────────────────────────
   if(!showSaveDialog._skipPreflight){
-    var _pfDbObs=[]; for(var _pfj=0;_pfj<DB.observations.length;_pfj++){if(selIds[DB.observations[_pfj].id])_pfDbObs.push(DB.observations[_pfj]);}
+    var _pfDbObs=_getSelObs(selIds);
     var _pfCu=[]; for(var _pfk=0;_pfk<customs.length;_pfk++){if(selIds[customs[_pfk].id])_pfCu.push(customs[_pfk]);}
     var _pfAll=_pfDbObs.concat(_pfCu);
     if(!_pfAll.length){toast('No observations selected.');return;}
@@ -16274,9 +16303,9 @@ function generateReviewerHtml(role){
   if(!_guardSaved()) return;
   // Collect current observation data with edits applied
   var allObs = [];
-  var dbObs  = DB&&DB.observations ? DB.observations : [];
+  var dbObs  = _getSelObs(selIds);
   for(var i=0;i<dbObs.length;i++){
-    var o=dbObs[i]; if(!selIds[o.id]) continue;
+    var o=dbObs[i];
     var ot=(obsEdits[o.id]&&obsEdits[o.id].observation!=null)?obsEdits[o.id].observation:o.observation||'';
     var rt=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
     var oeEl=document.getElementById('oe-'+o.id); if(oeEl) ot=oeEl.value;
