@@ -623,6 +623,12 @@ input:focus,select:focus,textarea:focus{outline:2px solid #c9962a;outline-offset
 </head>
 <body>
 
+<!-- MULTI-TAB WARNING BANNER -->
+<div id="multitab-warn" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999999;background:#b91c1c;color:#fff;padding:10px 16px;font-size:13px;text-align:center;font-family:Inter,Arial,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3)">
+  &#9888; Another BRAINS report is open in another browser tab. Working in both tabs simultaneously may cause data loss. Please close the other tab before continuing.
+  <button onclick="document.getElementById('multitab-warn').style.display='none'" style="margin-left:14px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.5);padding:2px 10px;cursor:pointer;border-radius:3px;font-size:12px">Dismiss</button>
+</div>
+
 <!-- PASSWORD PROTECTION SCREEN -->
 <div id="pw-screen" style="position:fixed;inset:0;z-index:999999;background:#1a3a5c;display:flex;align-items:center;justify-content:center;font-family:Inter,Arial,sans-serif">
   <div style="background:#fff;border-radius:10px;padding:36px 40px;max-width:440px;width:92%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.4)">
@@ -2411,6 +2417,25 @@ window.onload = function() {
   document.getElementById('qinp').addEventListener('keydown', function(e){
     if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();applyFilter();}
   });
+  // Multi-tab detection — warn if another BRAINS tab is already open
+  (function(){
+    var TAB_KEY = 'bss_tab_alive';
+    var TAB_TTL = 8000;
+    var _tabTimer = null;
+    function _tabBeat(){ try{ localStorage.setItem(TAB_KEY, Date.now().toString()); }catch(e){} }
+    function _tabShow(){ var el=document.getElementById('multitab-warn'); if(el) el.style.display='block'; }
+    var existing = 0;
+    try{ existing = parseInt(localStorage.getItem(TAB_KEY)||'0',10); }catch(e){}
+    if(existing && (Date.now()-existing) < TAB_TTL){ _tabShow(); }
+    _tabBeat();
+    _tabTimer = setInterval(_tabBeat, 3000);
+    window.addEventListener('storage', function(e){ if(e.key===TAB_KEY && e.newValue){ _tabShow(); } });
+    window.addEventListener('beforeunload', function(){
+      clearInterval(_tabTimer);
+      try{ localStorage.removeItem(TAB_KEY); }catch(e){}
+    });
+  })();
+
   // Apply persisted observation text overrides to in-memory DB
   var stored=sg('bss_obs_overrides',{});
   var okeys=Object.keys(stored);
