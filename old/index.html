@@ -1714,12 +1714,17 @@ function _getSelObs(sIds){
   var result=[];
   var seen={};
   var dbObs=DB&&DB.observations?DB.observations:[];
+  // Build retired lookup — retired entries always take priority over active bank
+  var retiredById={};
+  for(var _j=0;_j<_retiredObs.length;_j++) retiredById[_retiredObs[_j].id]=_retiredObs[_j];
   for(var _i=0;_i<dbObs.length;_i++){
     seen[dbObs[_i].id]=true;
-    if(sIds[dbObs[_i].id]) result.push(dbObs[_i]);
+    if(sIds[dbObs[_i].id]){
+      result.push(retiredById[dbObs[_i].id]||dbObs[_i]);
+    }
   }
-  for(var _j=0;_j<_retiredObs.length;_j++){
-    if(!seen[_retiredObs[_j].id]&&sIds[_retiredObs[_j].id]) result.push(_retiredObs[_j]);
+  for(var _k=0;_k<_retiredObs.length;_k++){
+    if(!seen[_retiredObs[_k].id]&&sIds[_retiredObs[_k].id]) result.push(_retiredObs[_k]);
   }
   return result;
 }
