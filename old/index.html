@@ -10214,6 +10214,12 @@ function applyRespLoad(){
   responseLoaded=true;
   renderStepGuide();
 
+  // ── Clean up retired obs that were previously added to customs as orphans ───
+  var _retiredIdsCln={};
+  for(var _rci=0;_rci<_retiredObs.length;_rci++) _retiredIdsCln[_retiredObs[_rci].id]=true;
+  customs=customs.filter(function(c){return !_retiredIdsCln[c.id];});
+  // ──────────────────────────────────────────────────────────────────────────
+
   // ── CRITICAL: replace selIds entirely with the loaded observation set ──────
   // Merely adding to selIds would merge observations from a previously-open
   // branch session into this one, causing cross-branch contamination.
