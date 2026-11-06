@@ -3313,7 +3313,7 @@ function _obsOrderSync(allObs){
   for(var i=0;i<allObs.length;i++){
     var o = allObs[i];
     if(!inOrder[o.id]){
-      var sec = (obsTypeMap[o.id]||o.type||'New').toLowerCase()==='repeated'?'repeated':'new';
+      var sec = (obsTypeMap[o.id]||'New').toLowerCase()==='repeated'?'repeated':'new';
       obsOrder[sec].push(o.id);
       inOrder[o.id]=true;
     }
@@ -4015,7 +4015,7 @@ function _getBranchHistory(obsId){
           total_sum++;
           if((o.category||'')===cat){
             obs_sum++;
-            if((ss.obsTypeMap&&ss.obsTypeMap[o.id])==='Repeated'||o.type==='Repeated') rep_sum++;
+            if((ss.obsTypeMap&&ss.obsTypeMap[o.id])==='Repeated') rep_sum++;
           }
         }
       }
@@ -5676,7 +5676,7 @@ function renderRpt(){
       for(var oi=0;oi<_aObs.length;oi++){
         num++;
         var o=_aObs[oi];
-      var effType=obsTypeMap[o.id]||o.type||'New';
+      var effType=obsTypeMap[o.id]||'New';
       var tc=effType.toLowerCase();
       var ax=annexMap[o.id]||o._annex||'';
       var resp=respMap[o.id]!=null?respMap[o.id]:'';
@@ -8725,7 +8725,7 @@ function downloadDraft(individual){
       var o=allObs[a];
       var oc=o.category||'Others';
       if(cats.indexOf(oc)<0) continue;
-      var effT=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
+      var effT=(obsTypeMap[o.id]||'New').toLowerCase();
       if(effT==='repeated') sections[0].obs.push(o); else sections[1].obs.push(o);
     }
     // If no repeated observations, use plain "Observations" heading for the New section
@@ -9116,7 +9116,7 @@ function downloadSoftCopy(){
   for(var _sz=0;_sz<_scAll.length;_sz++){
     var _scEx=_scAll[_sz];
     if(_scSeen[_scEx.id]) continue;
-    var _scEffT=(obsTypeMap[_scEx.id]||_scEx.type||'New').toLowerCase();
+    var _scEffT=(obsTypeMap[_scEx.id]||'New').toLowerCase();
     if(_scEffT==='repeated') scSections[0].obs.push(_scEx); else scSections[1].obs.push(_scEx);
   }
   if(!_scAll.length&&!scSections[0].obs.length&&!scSections[1].obs.length){toast('No observations selected.');return;}
@@ -9130,7 +9130,7 @@ function downloadSoftCopy(){
 
   // Build each observation block
   function obsHtml(o, num, anchorId){
-    var effType=obsTypeMap[o.id]||o.type||'New';
+    var effType=obsTypeMap[o.id]||'New';
     var tc=effType.toLowerCase();
     var ax=getObsAnnexRef(o.id)||(o._annex||'');
     var bdr=tc==='repeated'?'#d06020':'#2070b8';
@@ -9153,7 +9153,7 @@ function downloadSoftCopy(){
     if(scRecText){h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Recommendation</div>';h+=_renderText(scRecText,{fontSize:'12.5px',lineHeight:'1.65',color:'#2a3a50',marginBottom:'10px'});}
     h+=_obsAnnexBadges(o.id,false);
     var scLarr=lastRefMap[o.id]||'';
-    var scObsType=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
+    var scObsType=(obsTypeMap[o.id]||'New').toLowerCase();
     if(scObsType==='repeated'&&scLarr) h+='<div style="margin:0 0 10px;padding:6px 10px;background:#fff8f2;border:1px solid #f0c090;border-radius:6px;font-size:12px"><strong style="font-size:10px;font-weight:700;color:#8a3000;text-transform:uppercase;letter-spacing:.5px">&#128196; Last Audit Report Reference (LARR):</strong> <span style="color:#5a2000;font-weight:600;margin-left:6px">'+esc(scLarr)+'</span></div>';
     // Auditee Response — always blank in soft copy, with ETR as sub-section inside
     h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin:10px 0 4px">Auditee Response <span style="color:#c0392b;font-size:9px">(Required)</span></div>';
@@ -9203,7 +9203,7 @@ function downloadSoftCopy(){
         var _oRef=scPfx+'.'+num;
         var _oAnchor='obs-sc-'+obsList[oi].id;
         obsSection+=obsHtml(obsList[oi],_oRef,_oAnchor);
-        var _effT2=(obsTypeMap[obsList[oi].id]||obsList[oi].type||'New').toLowerCase();
+        var _effT2=(obsTypeMap[obsList[oi].id]||'New').toLowerCase();
         var _badge=_effT2==='repeated'
           ?'<span style="font-size:9px;font-weight:700;background:#fff3ee;color:#c05800;border:1px solid #f0b080;border-radius:8px;padding:1px 6px;white-space:nowrap">Repeated</span>'
           :'<span style="font-size:9px;font-weight:700;background:#eaf2fb;color:#1a5090;border:1px solid #a0c0e0;border-radius:8px;padding:1px 6px;white-space:nowrap">New</span>';
@@ -9952,7 +9952,7 @@ function renderAnnexList(){
       var repObs=[],newObs=[];
       for(var si2=0;si2<selObs.length;si2++){
         var so=selObs[si2];
-        var soT=(obsTypeMap[so.id]||so.type||'New').toLowerCase();
+        var soT=(obsTypeMap[so.id]||'New').toLowerCase();
         if(soT==='repeated') repObs.push(so); else newObs.push(so);
       }
       function _numLblSort(a,b){
@@ -10584,10 +10584,11 @@ function applyRespLoad(){
   // ── CRITICAL: replace selIds entirely with the loaded observation set ──────
   // Merely adding to selIds would merge observations from a previously-open
   // branch session into this one, causing cross-branch contamination.
+  var _savedTypeMap=obsTypeMap;
   selIds={};
   obsOrder={repeated:[],new:[]};
   obsTypeMap={};
-  for(var j=0;j<loadedObs.length;j++) selIds[loadedObs[j]]=true;
+  for(var j=0;j<loadedObs.length;j++){selIds[loadedObs[j]]=true;obsTypeMap[loadedObs[j]]=_savedTypeMap[loadedObs[j]]||'New';}
   // ──────────────────────────────────────────────────────────────────────────
 
   // ── Orphan recovery ───────────────────────────────────────────────────────
@@ -11170,7 +11171,7 @@ function _checkPriorRefs(all){
   var missing=[];
   for(var i=0;i<all.length;i++){
     var o=all[i];
-    var t=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
+    var t=(obsTypeMap[o.id]||'New').toLowerCase();
     if(t==='repeated'&&!lastRefMap[o.id]){missing.push(o);}
   }
   return missing;
@@ -11180,7 +11181,7 @@ function _checkPriorRefs(all){
 // Returns {score, total, blocking:[], advisory:[]}
 function getObsReadiness(o){
   var id=o.id;
-  var obsType=(obsTypeMap[id]||o.type||'New').toLowerCase();
+  var obsType=(obsTypeMap[id]||'New').toLowerCase();
   var obsText=(obsEdits[id]&&obsEdits[id].observation!=null)?obsEdits[id].observation:(o.observation||'');
   var recText=(obsEdits[id]&&obsEdits[id].recommendation!=null)?obsEdits[id].recommendation:(o.recommendation||'');
   var blocking=[], advisory=[];
@@ -11270,7 +11271,7 @@ function finalizeReport(){
   for(var _fsi=0;_fsi<_finIds.length;_fsi++){for(var _foi=0;_foi<_finIds[_fsi].length;_foi++){var _fO=_finObsById[_finIds[_fsi][_foi]];if(_fO&&selIds[_fO.id])finSections[_fsi].obs.push(_fO);}}
   // Safety net: catch any selected obs not yet in obsOrder
   var _finSeen={};for(var _fs2=0;_fs2<2;_fs2++){for(var _fs3=0;_fs3<finSections[_fs2].obs.length;_fs3++)_finSeen[finSections[_fs2].obs[_fs3].id]=1;}
-  for(var _fa=0;_fa<all.length;_fa++){var _fEx=all[_fa];if(_finSeen[_fEx.id])continue;var _fT=(obsTypeMap[_fEx.id]||_fEx.type||'New').toLowerCase();if(_fT==='repeated')finSections[0].obs.push(_fEx);else finSections[1].obs.push(_fEx);}
+  for(var _fa=0;_fa<all.length;_fa++){var _fEx=all[_fa];if(_finSeen[_fEx.id])continue;var _fT=(obsTypeMap[_fEx.id]||'New').toLowerCase();if(_fT==='repeated')finSections[0].obs.push(_fEx);else finSections[1].obs.push(_fEx);}
   // If no repeated observations, use plain "Observations" heading for the New section
   if(!finSections[0].obs.length){ finSections[1].label='Observations'; }
   function finCatGroups(ol){var cats={};for(var i=0;i<ol.length;i++){var c=ol[i].category||'Others';if(!cats[c])cats[c]=[];cats[c].push(ol[i]);}return{cats:cats,catOrder:catOrderByDef(cats)};}
@@ -11283,7 +11284,7 @@ function finalizeReport(){
   function st(text){return _renderText(text,{fontSize:'12.5px',lineHeight:'1.65',color:'#2a3a50'});}
 
   function obsHtmlFinal(o,num){
-    var effType=obsTypeMap[o.id]||o.type||'New';
+    var effType=obsTypeMap[o.id]||'New';
     var tc=effType.toLowerCase();
     var ax=getObsAnnexRef(o.id)||(o._annex||'');
     var avStored=avMap[o.id]||'';
@@ -11370,7 +11371,7 @@ function finalizeReport(){
     }
     // Last Audit Report Reference (LARR) (repeated observations only)
     var finLrRef=lastRefMap[o.id]||'';
-    var finObsType=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
+    var finObsType=(obsTypeMap[o.id]||'New').toLowerCase();
     if(finObsType==='repeated'&&finLrRef){
       h+='<div style="margin-top:9px;padding:6px 12px;background:#fff8f0;border:1px solid #e0a060;border-left:4px solid #c06020;border-radius:0 5px 5px 0;font-size:12px;color:#1e2d40">'
         +'<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#c06020">&#8635; Last Audit Report Reference (LARR):</span>'
@@ -11768,7 +11769,7 @@ function generateIssuedReport(forROCopy){
   for(var _irn=0;_irn<obsOrder.new.length;_irn++){var _irN=_irObsById[obsOrder.new[_irn]];if(_irN&&selIds[_irN.id])newObs.push(_irN);}
   // Safety net
   var _irSeen={};for(var _irs=0;_irs<repeated.length;_irs++)_irSeen[repeated[_irs].id]=1;for(var _irns=0;_irns<newObs.length;_irns++)_irSeen[newObs[_irns].id]=1;
-  for(var a=0;a<all.length;a++){var _irEx=all[a];if(_irSeen[_irEx.id])continue;var _irT=(obsTypeMap[_irEx.id]||_irEx.type||'New').toLowerCase();if(_irT==='repeated')repeated.push(_irEx);else newObs.push(_irEx);}
+  for(var a=0;a<all.length;a++){var _irEx=all[a];if(_irSeen[_irEx.id])continue;var _irT=(obsTypeMap[_irEx.id]||'New').toLowerCase();if(_irT==='repeated')repeated.push(_irEx);else newObs.push(_irEx);}
 
   // Assign numbered labels e.g. 1.1, 1.2, 2.1, 2.2 — dynamic prefix skips empty sections
   var labMap={};
@@ -11794,7 +11795,7 @@ function generateIssuedReport(forROCopy){
   for(var i=0;i<all.length;i++){
     var _rl=refLabel(all[i]); var isRO=(_rl==='RO'||_rl.toLowerCase().indexOf('regional')!==-1);
     var key=isRO?'ro':'bh';
-    var typ=(obsTypeMap[all[i].id]||all[i].type||'New').toLowerCase();
+    var typ=(obsTypeMap[all[i].id]||'New').toLowerCase();
     var st=assessMap[all[i].id]||'';
     if(typ==='repeated'){roBH[key].last++; if(st==='resolved'){roBH[key].res++;}else{roBH[key].unres++;roBH[key].totalUnres++;}}
     else{roBH[key].newO++; if(st==='resolved'){roBH[key].newRes++;}else{roBH[key].newUnres++;roBH[key].totalUnres++;}}
@@ -11844,7 +11845,7 @@ function generateIssuedReport(forROCopy){
       +'<button class="rep-btn" style="background:#2a4a6a" onclick="highlightSynRow(\'syn-row-'+id+'\')">&#8593; Back to Synopsis</button>'
       +'</div>';
     // Risk-Based Framework panel inside detail expansion
-    var finObsType=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
+    var finObsType=(obsTypeMap[o.id]||'New').toLowerCase();
     var wasUplifted=(adjInherent!==fw.mx.inherent);
     var instBadgeColor=inst.label==='Systemic / Pervasive'?'#c0392b':inst.label==='Significant'?'#e67e22':inst.label==='Isolated / Limited'?'#2980b9':'#95a5a6';
     var instBox='<div style="background:#f7f9fc;border:1px solid #dde2ea;border-radius:6px;padding:.45rem .65rem;margin-top:.45rem;font-size:.76rem">'
@@ -11911,7 +11912,7 @@ function generateIssuedReport(forROCopy){
     if(at) mBody+='<div class="modal-badge mb-action">Action Taken</div><div class="modal-section ms-action">'+e(at)+'</div>';
     vbData[id]={title:lbl+' — '+e(o.title),body:mBody};
     var priorRef=lastRefMap[o.id]||'';
-    var synType=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
+    var synType=(obsTypeMap[o.id]||'New').toLowerCase();
     return '<tr id="syn-row-'+id+'">'
       +'<td style="white-space:nowrap">'+lbl+'</td>'
       +'<td>'+e(o.title)+(o.category?'<br><span class="cat">'+e(o.category)+'</span>':'')+(synType==='repeated'&&priorRef?'<br><span style="display:inline-block;margin-top:2px;font-size:.67rem;font-weight:700;background:#fff0e6;color:#b04800;border:1px solid #f0b080;border-radius:4px;padding:0 5px">LARR: '+e(priorRef)+'</span>':'')+'</td>'
@@ -11948,7 +11949,7 @@ function generateIssuedReport(forROCopy){
     h+='<div class="obs-meta">';
     if(o.category) h+='<span class="tag">'+e(o.category)+'</span>';
     h+='<span class="tag">Referred to: '+e(ref)+'</span>';
-    var effType=obsTypeMap[o.id]||o.type||'New'; h+='<span class="tag">'+e(effType)+'</span>';
+    var effType=obsTypeMap[o.id]||'New'; h+='<span class="tag">'+e(effType)+'</span>';
     var issRefLabel=refMap[o.id]||'';
     if(issRefLabel) h+='<span class="tag" style="background:#fff0e0;color:#7a3000;border-color:#e0a060">'+e(issRefLabel)+'</span>';
     var issCoso=cosoMap[o.id]||'';
@@ -11975,7 +11976,7 @@ function generateIssuedReport(forROCopy){
       +'<a href="#syn-row-'+id+'" class="back-link" onclick="event.preventDefault();highlightSynRow(\'syn-row-'+id+'\')">&#8593; Back to Synopsis</a>'
       +'</div>';
     // Framework panel (hidden by default; shown when toggleFramework() is active)
-    var finObsType=(obsTypeMap[o.id]||o.type||'New').toLowerCase();
+    var finObsType=(obsTypeMap[o.id]||'New').toLowerCase();
     var fw=getFw(o);
     var inst=parseObsInstances(o.id, ot); // ot = obsText(o) already in scope
     var adjInherent=inst.uplift>0?upliftRisk(fw.mx.inherent,inst.uplift):fw.mx.inherent;
@@ -12712,7 +12713,7 @@ function generateIssuedReport(forROCopy){
         var minst=parseObsInstances(mo.id,mot);
         var msk=sensitivityMap[mo.id]||'—';
         var madjR=minst.uplift>0?upliftRisk(mfw.mx.residual,minst.uplift):mfw.mx.residual;
-        var mtype=(obsTypeMap[mo.id]||mo.type||'New');
+        var mtype=(obsTypeMap[mo.id]||'New');
         rcmData.push({
           lbl:mlbl, rid:mlbl.replace('.','-'), title:mo.title,
           cat:mo.category||'General', section:mtype,
@@ -13304,7 +13305,7 @@ function showSaveDialog(){
     (function(){
       var _rp=[],_nw=[];
       for(var _ni=0;_ni<_pfAll.length;_ni++){
-        var _t=(obsTypeMap[_pfAll[_ni].id]||_pfAll[_ni].type||'New').toLowerCase();
+        var _t=(obsTypeMap[_pfAll[_ni].id]||'New').toLowerCase();
         (_t==='repeated'?_rp:_nw).push(_pfAll[_ni]);
       }
       function _assign(list,secPfx){
@@ -14319,7 +14320,7 @@ function renderDraftPanel(){
       var o=list[oi];
       if(!selIds[o.id]) continue;
       if(!grouped[cat]) grouped[cat]=[];
-      var oType=obsTypeMap[o.id]||o.type||'New';
+      var oType=obsTypeMap[o.id]||'New';
       var entry={
         obs:o, type:oType,
         sens:sensitivityMap[o.id]||'',
@@ -14340,7 +14341,7 @@ function renderDraftPanel(){
   for(var k=0;k<customs.length;k++){
     var co=customs[k];
     if(!selIds[co.id]) continue;
-    var coType=obsTypeMap[co.id]||co.type||'New';
+    var coType=obsTypeMap[co.id]||'New';
     customRows.push({
       obs:co, type:coType,
       sens:sensitivityMap[co.id]||'',
@@ -16347,13 +16348,13 @@ function generateReviewerHtml(role){
     var rt=(obsEdits[o.id]&&obsEdits[o.id].recommendation!=null)?obsEdits[o.id].recommendation:o.recommendation||'';
     var oeEl=document.getElementById('oe-'+o.id); if(oeEl) ot=oeEl.value;
     var reEl=document.getElementById('re-'+o.id); if(reEl) rt=reEl.value;
-    allObs.push({id:o.id,title:o.title,category:o.category||'Others',type:obsTypeMap[o.id]||o.type||'New',observation:ot,recommendation:rt,response:respMap[o.id]||'',actMap:actMap[o.id]||'',annex:getObsAnnexRef(o.id)||(o._annex||'')});
+    allObs.push({id:o.id,title:o.title,category:o.category||'Others',type:obsTypeMap[o.id]||'New',observation:ot,recommendation:rt,response:respMap[o.id]||'',actMap:actMap[o.id]||'',annex:getObsAnnexRef(o.id)||(o._annex||'')});
   }
   for(var ci=0;ci<customs.length;ci++){
     var co=customs[ci]; if(!selIds[co.id]) continue;
     var cot=(obsEdits[co.id]&&obsEdits[co.id].observation!=null)?obsEdits[co.id].observation:co.observation||'';
     var crt=(obsEdits[co.id]&&obsEdits[co.id].recommendation!=null)?obsEdits[co.id].recommendation:co.recommendation||'';
-    allObs.push({id:co.id,title:co.title,category:co.category||'Others',type:obsTypeMap[co.id]||co.type||'New',observation:cot,recommendation:crt,response:respMap[co.id]||'',actMap:actMap[co.id]||'',annex:getObsAnnexRef(co.id)||(co._annex||'')});
+    allObs.push({id:co.id,title:co.title,category:co.category||'Others',type:obsTypeMap[co.id]||'New',observation:cot,recommendation:crt,response:respMap[co.id]||'',actMap:actMap[co.id]||'',annex:getObsAnnexRef(co.id)||(co._annex||'')});
   }
 
   if(!allObs.length){ alert('No observations selected. Please select at least one observation before generating the review file.'); return; }
