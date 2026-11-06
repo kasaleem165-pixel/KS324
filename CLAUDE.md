@@ -445,3 +445,9 @@ Data stored in `DB.budget[]` only — never touches sales, animals, or payments.
 - `custTotals()` returns `tc` (total carriage) and `ta` (total admin) aggregated from `DB.sales`, NOT from `c.admin_charges`
 - Customer header rows in Sale Ledger use `onclick="void(0)"` + `user-select:none` to prevent unreadable highlight on click
 - `bg-carriage-row` (budget carriage field) must stay in `bgToggleMode()` hide-list to avoid duplicate carriage in lump sum mode
+
+## Change Log
+
+| Date | File(s) | Change | Details |
+|---|---|---|---|
+| Nov 2026 | Both DEV + LIVE | Bug fix: `applyRespLoad()` — 3-part fix | (1) Removed `obsOrder={repeated:[],new:[]};` — was wiping auditor's custom observation order on every response import. (2) Added `_retiredObs` to orphan recovery `_dbIdx` check — retired obs were not found in `DB.observations` so were added as empty orphans to `customs`, causing duplicates in sensitivity matrix, missing branch notes/tables, and missing annexure references. (3) Added stale cleanup at top of `applyRespLoad()` to remove previously-added orphaned retired obs from `customs` in sessions saved before the fix. |
