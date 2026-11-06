@@ -221,6 +221,67 @@ sed -n '/<script>/,/<\/script>/p' /home/user/KS324/old/index.html | grep -v "<sc
 4. After any code change — run syntax validation on the changed file(s)
 5. Always push to both feature branch AND main with `--force`
 
+## Validation Protocol (MANDATORY — run after EVERY change before reporting done)
+
+This protocol was added after a session where I missed bugs in adjacent code during sanity checks. Follow it without exception.
+
+### Step 1 — Read the entire changed function
+- Do not check only the lines that were edited
+- Read the COMPLETE function from its opening `function` keyword to its closing `}`
+- Note every variable the function reads, sets, clears, or overwrites
+
+### Step 2 — Check all adjacent code (10–20 lines above and below the change)
+- If anything is being cleared or reset near the change, ask: is that correct? does it interact with the fix?
+- Look for arrays being set to `[]`, objects set to `{}`, or maps being rebuilt — these are high-risk
+
+### Step 3 — Trace downstream effects
+For any function that was changed, ask: what functions call this, and what do they do with the result?
+Key downstream functions to check for BRAINS:
+- `renderRpt()` — uses `obsOrder`, `obsById`, `obsTypeMap`, `selIds`, `obsNotesMap`, `obsEdits`
+- `buildAnalysisHtml()` — uses `all = _getSelObs(selIds).concat(cuObs)`, `sensitivityMap`, `cosoMap`
+- `getObsReportLabels()` — uses `obsOrder` exclusively for numbering
+- `_obsOrderSync()` — rebuilds `obsOrder` based on `selIds` and `obsTypeMap`
+- `captureSession()` / `restoreSession()` — saves/restores all in-memory maps
+- `_getSelObs()` — merges active bank + retired obs; retired always takes priority
+
+### Step 4 — Check all critical in-memory maps for unintended side effects
+Any change near these maps requires explicitly confirming each one is correct after the fix:
+
+| Map | Stores | Risk if wrong |
+|---|---|---|
+| `selIds` | `{obsId: true}` — which obs are selected | Wrong obs in report |
+| `obsOrder` | `{repeated:[], new:[]}` — user's custom sequence | Wrong order, duplicates |
+| `obsTypeMap` | `{obsId: 'New'/'Repeated'}` — per-report classification | Wrong New/Repeated labelling |
+| `obsNotesMap` | `{obsId: text}` — branch-specific notes/tables | Missing tables in report |
+| `obsEdits` | `{obsId: {observation, recommendation}}` — auditor's text edits | Text reverting to bank default |
+| `annexMap` | `{obsId: annexLetter}` — linked annexures | Missing annexure references |
+| `sensitivityMap` | `{obsId: level}` — sensitivity rating | Wrong sensitivity matrix |
+| `customs` | Array of custom/orphaned observations | Duplicate obs if retired obs added here |
+| `_retiredObs` | Hardcoded array of 15 deleted obs | Must be checked in orphan recovery |
+
+### Step 5 — Retired observations checklist
+Whenever a function touches `selIds`, `customs`, or iterates obs lists, verify:
+- Are retired obs (`_retiredObs`) handled correctly? They are NOT in `DB.observations`
+- Does any orphan recovery or fallback logic check `_retiredObs` before treating an ID as missing?
+- Does `_getSelObs()` correctly return retired obs without duplicating them?
+
+Retired obs IDs (15 total): `OBS_005, OBS_021, OBS_035, OBS_050, OBS_059, OBS_060, OBS_069, OBS_070, OBS_135, OBS_136, OBS_142, OBS_175, OBS_194, OBS_270, OBS_273`
+
+### Step 6 — Run syntax validation on both files (if bug fix)
+```bash
+sed -n '/<script>/,/<\/script>/p' /home/user/KS324/index.html | grep -v "<script>\|<\/script>" > /tmp/e.js && node --check /tmp/e.js && echo OK_DEV
+sed -n '/<script>/,/<\/script>/p' /home/user/KS324/old/index.html | grep -v "<script>\|<\/script>" > /tmp/e2.js && node --check /tmp/e2.js && echo OK_LIVE
+```
+
+### Step 7 — Report what was checked
+When telling Kamran "sanity check done", explicitly state:
+- Which function(s) were read in full
+- Which adjacent lines were reviewed
+- Which in-memory maps were confirmed unaffected
+- Result of syntax validation
+
+**If any step raises doubt — STOP and ask Kamran before proceeding.**
+
 ## Database Structure
 ```javascript
 DB = {
