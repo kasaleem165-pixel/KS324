@@ -4000,13 +4000,35 @@ function _getObsRecord(obsId){
 }
 
 // ── Sensitivity Settings — read from localStorage with defaults ───────────────
+function _getFormulaCfg(){
+  var d={wtSens:0.40,wtOutstanding:0.40,wtComplexity:0.20,
+    srHigh:1.00,srMtoH:0.64,srLtoM:0.40,srLow:0.20,
+    complexityDefault:50};
+  try{
+    var s=localStorage.getItem('_BRAINS_FORMULA_CFG');
+    if(s){
+      var p=JSON.parse(s);
+      if(p.wtSens!==undefined)          d.wtSens=parseFloat(p.wtSens)||d.wtSens;
+      if(p.wtOutstanding!==undefined)   d.wtOutstanding=parseFloat(p.wtOutstanding)||d.wtOutstanding;
+      if(p.wtComplexity!==undefined)    d.wtComplexity=parseFloat(p.wtComplexity)||d.wtComplexity;
+      if(p.srHigh!==undefined)          d.srHigh=parseFloat(p.srHigh)||d.srHigh;
+      if(p.srMtoH!==undefined)          d.srMtoH=parseFloat(p.srMtoH)||d.srMtoH;
+      if(p.srLtoM!==undefined)          d.srLtoM=parseFloat(p.srLtoM)||d.srLtoM;
+      if(p.srLow!==undefined)           d.srLow=parseFloat(p.srLow)||d.srLow;
+      if(p.complexityDefault!==undefined) d.complexityDefault=parseInt(p.complexityDefault)||d.complexityDefault;
+    }
+  }catch(e){}
+  return d;
+}
+
 function _getSensSettings(){
   var d={instHigh:20,instMid:10,instLow:5,amtHigh:100000,amtMid:50000,amtLow:10000,
     cosoWeights:{'Control Environment':10,'Risk Assessment':8,'Control Activities':6,'Monitoring':4,'Information & Communication':2}};
   try{
-    var s=localStorage.getItem('_BRAINS_SENS_CFG');
-    if(s){
-      var p=JSON.parse(s);
+    // Read from new unified key first, fall back to old key for backward compatibility
+    var raw=localStorage.getItem('_BRAINS_FORMULA_CFG')||localStorage.getItem('_BRAINS_SENS_CFG');
+    if(raw){
+      var p=JSON.parse(raw);
       if(p.instHigh) d.instHigh=parseInt(p.instHigh)||d.instHigh;
       if(p.instMid)  d.instMid=parseInt(p.instMid)||d.instMid;
       if(p.instLow)  d.instLow=parseInt(p.instLow)||d.instLow;
@@ -20158,7 +20180,8 @@ function ra_stage1CalcPlanningScore(){
       var catTotal=0, catContrib=0;
       var svs=Object.keys(sensMap);
       for(var s=0;s<svs.length;s++){
-        var sw=RA_SENS_WT[svs[s]]||0; var cnt=sensMap[svs[s]]||0;
+        var _srMap={'High':_fcfg.srHigh,'M to H':_fcfg.srMtoH,'L to M':_fcfg.srLtoM,'Low':_fcfg.srLow};
+        var sw=_srMap[svs[s]]!==undefined?_srMap[svs[s]]:(RA_SENS_WT[svs[s]]||0); var cnt=sensMap[svs[s]]||0;
         catTotal+=cnt; catContrib+=sw*aw2Norm*cnt;
       }
       sumContrib+=catContrib; totalObsSens+=catTotal;
@@ -20173,16 +20196,17 @@ function ra_stage1CalcPlanningScore(){
   var outstandingScore=docxOut&&docxOut.lastTotal>0?Math.round(docxOut.unresolved/docxOut.lastTotal*100):null;
 
   // ── Branch Complexity Score ───────────────────────────────────
+  var _fcfg=_getFormulaCfg();
   ra_loadComplexityMap();
   var matrixScore=ra_getComplexityScore(branchName);
-  var complexityScore=matrixScore!=null?matrixScore:50; // default 50 if not set
+  var complexityScore=matrixScore!=null?matrixScore:_fcfg.complexityDefault;
   var complexityFromMatrix=matrixScore!=null;
 
   // ── Planning Score ────────────────────────────────────────────
   var components={
-    sensArea:{score:sensAreaScore,wt:0.40,available:docxSens!=null},
-    outstanding:{score:outstandingScore!=null?outstandingScore:0,wt:0.40,available:outstandingScore!=null},
-    complexity:{score:complexityScore,wt:0.20,available:true,fromMatrix:complexityFromMatrix}
+    sensArea:{score:sensAreaScore,wt:_fcfg.wtSens,available:docxSens!=null},
+    outstanding:{score:outstandingScore!=null?outstandingScore:0,wt:_fcfg.wtOutstanding,available:outstandingScore!=null},
+    complexity:{score:complexityScore,wt:_fcfg.wtComplexity,available:true,fromMatrix:complexityFromMatrix}
   };
   var planningScore=Math.round(
     components.sensArea.score*components.sensArea.wt+
@@ -27210,7 +27234,7 @@ function showAdminPanel(){
     +'<button id="_apTab_cloud" onclick="_adminSetTab(\'cloud\')" style="padding:11px 18px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:Inter,sans-serif">&#9729; Cloud Setup</button>'
     +'<button id="_apTab_links" onclick="_adminSetTab(\'links\')" style="padding:11px 18px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:Inter,sans-serif">&#128279; Setup Links</button>'
     +'<button id="_apTab_system" onclick="_adminSetTab(\'system\')" style="padding:11px 18px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:Inter,sans-serif">&#9989; System</button>'
-    +'<button id="_apTab_audit" onclick="_adminSetTab(\'audit\')" style="padding:11px 18px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:Inter,sans-serif">&#9881; Audit Settings</button>'
+    +'<button id="_apTab_formula" onclick="_adminSetTab(\'formula\')" style="padding:11px 18px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:Inter,sans-serif">&#9881; Formula Settings</button>'
     +'</div>'
     +'<div id="_apContent" style="flex:1;overflow-y:auto;padding:20px"></div>';
   document.body.appendChild(el);
@@ -27220,7 +27244,7 @@ function showAdminPanel(){
 
 function _adminSetTab(tab){
   _adminTab=tab;
-  var tabs=['users','cloud','links','system','audit'];
+  var tabs=['users','cloud','links','system','formula'];
   for(var i=0;i<tabs.length;i++){
     var btn=document.getElementById('_apTab_'+tabs[i]);
     if(!btn) continue;
@@ -27238,7 +27262,7 @@ function _adminSetTab(tab){
   else if(tab==='cloud') _adminRenderCloud(c);
   else if(tab==='links') _adminRenderLinks(c);
   else if(tab==='system') _adminRenderSystem(c);
-  else if(tab==='audit') _adminRenderAuditSettings(c);
+  else if(tab==='formula') _adminRenderFormulaSettings(c);
 }
 
 // ── Admin Tab: Users ──────────────────────────────────────────────────────────
@@ -27545,65 +27569,147 @@ function _adminRenderSystem(c){
   _adminRunSystemChecks();
 }
 
-function _adminRenderAuditSettings(c){
-  var cfg=_getSensSettings();
-  c.innerHTML='<div style="max-width:640px;margin:0 auto">'
-    +'<div style="font-size:14px;font-weight:700;color:#1a3a5c;margin-bottom:4px">&#9881; Audit Settings</div>'
-    +'<div style="font-size:12px;color:#888;margin-bottom:18px">Configure sensitivity suggestion thresholds. Changes take effect immediately for all new suggestions.</div>'
-    +'<div style="background:#f4f6fa;border-radius:8px;padding:16px;margin-bottom:14px">'
-    +'<div style="font-size:12.5px;font-weight:700;color:#1a3a5c;margin-bottom:10px">Instance Count Thresholds</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">'
-    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">High (&#8805;)</label><input id="_sCfg_instHigh" type="number" value="'+cfg.instHigh+'" min="1" style="width:100%;padding:5px 7px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">Mid (&#8805;)</label><input id="_sCfg_instMid" type="number" value="'+cfg.instMid+'" min="1" style="width:100%;padding:5px 7px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">Low (&#8805;)</label><input id="_sCfg_instLow" type="number" value="'+cfg.instLow+'" min="1" style="width:100%;padding:5px 7px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box"></div>'
+function _adminRenderFormulaSettings(c){
+  var fc=_getFormulaCfg();
+  var sc=_getSensSettings();
+  var inp='width:100%;padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box';
+  var lbl='font-size:11px;font-weight:700;color:#444;display:block;margin-bottom:3px';
+  var sec='background:#fff;border:1px solid #dde3ec;border-radius:8px;padding:16px;margin-bottom:14px';
+  var hdr='font-size:13px;font-weight:800;padding:9px 14px;border-radius:6px;margin-bottom:12px;';
+  c.innerHTML='<div style="max-width:680px;margin:0 auto">'
+    +'<div style="font-size:14px;font-weight:800;color:#1a3a5c;margin-bottom:3px">&#9881; Formula Settings</div>'
+    +'<div style="font-size:11.5px;color:#888;margin-bottom:18px">All formula parameters used by BRAINS for planning and sensitivity calculations. Changes take effect immediately.</div>'
+
+    // ── Section 1: Planning Score Weights ──────────────────────
+    +'<div style="'+sec+'">'
+    +'<div style="'+hdr+'background:#e8f0fb;color:#1a3a5c;border-left:4px solid #1a3a5c">&#128203; Section 1 — Planning Score Weights</div>'
+    +'<div style="font-size:11.5px;color:#555;margin-bottom:12px;line-height:1.6">How much each component contributes to the final Branch Planning Score. <strong>The three weights must add up to 100%.</strong></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:8px">'
+    +'<div style="background:#f4f6fa;border-radius:6px;padding:10px">'
+    +'<label style="'+lbl+'">Sensitivity Area Score (%)</label>'
+    +'<input id="_fCfg_wtSens" type="number" value="'+Math.round(fc.wtSens*100)+'" min="0" max="100" style="'+inp+'">'
+    +'<div style="font-size:10px;color:#888;margin-top:3px">Default: 40%</div></div>'
+    +'<div style="background:#f4f6fa;border-radius:6px;padding:10px">'
+    +'<label style="'+lbl+'">Outstanding Risk Score (%)</label>'
+    +'<input id="_fCfg_wtOut" type="number" value="'+Math.round(fc.wtOutstanding*100)+'" min="0" max="100" style="'+inp+'">'
+    +'<div style="font-size:10px;color:#888;margin-top:3px">Default: 40%</div></div>'
+    +'<div style="background:#f4f6fa;border-radius:6px;padding:10px">'
+    +'<label style="'+lbl+'">Branch Complexity (%)</label>'
+    +'<input id="_fCfg_wtCpx" type="number" value="'+Math.round(fc.wtComplexity*100)+'" min="0" max="100" style="'+inp+'">'
+    +'<div style="font-size:10px;color:#888;margin-top:3px">Default: 20%</div></div>'
+    +'</div>'
+    +'<div id="_fCfgWtWarn" style="font-size:11.5px;color:#c0392b;font-weight:700;display:none">&#9888; Weights do not add up to 100% — please correct before saving.</div>'
+    +'</div>'
+
+    // ── Section 2: Sensitivity Rating Weights ──────────────────
+    +'<div style="'+sec+'">'
+    +'<div style="'+hdr+'background:#e8f8ee;color:#1a6020;border-left:4px solid #1a6020">&#127775; Section 2 — Sensitivity Rating Weights</div>'
+    +'<div style="font-size:11.5px;color:#555;margin-bottom:12px;line-height:1.6">The numeric value assigned to each sensitivity level when calculating the Sensitivity Area Score. Higher value = more serious. <strong>High should always be the largest.</strong></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">'
+    +'<div style="background:#fde8e8;border-radius:6px;padding:10px">'
+    +'<label style="'+lbl+'color:#9b1a1a">High</label>'
+    +'<input id="_fCfg_srHigh" type="number" value="'+fc.srHigh+'" min="0" max="2" step="0.01" style="'+inp+'">'
+    +'<div style="font-size:10px;color:#888;margin-top:3px">Default: 1.00</div></div>'
+    +'<div style="background:#fff0e0;border-radius:6px;padding:10px">'
+    +'<label style="'+lbl+'color:#b04400">M to H</label>'
+    +'<input id="_fCfg_srMtoH" type="number" value="'+fc.srMtoH+'" min="0" max="2" step="0.01" style="'+inp+'">'
+    +'<div style="font-size:10px;color:#888;margin-top:3px">Default: 0.64</div></div>'
+    +'<div style="background:#fffbe0;border-radius:6px;padding:10px">'
+    +'<label style="'+lbl+'color:#806000">L to M</label>'
+    +'<input id="_fCfg_srLtoM" type="number" value="'+fc.srLtoM+'" min="0" max="2" step="0.01" style="'+inp+'">'
+    +'<div style="font-size:10px;color:#888;margin-top:3px">Default: 0.40</div></div>'
+    +'<div style="background:#e8f8f8;border-radius:6px;padding:10px">'
+    +'<label style="'+lbl+'color:#1a6060">Low</label>'
+    +'<input id="_fCfg_srLow" type="number" value="'+fc.srLow+'" min="0" max="2" step="0.01" style="'+inp+'">'
+    +'<div style="font-size:10px;color:#888;margin-top:3px">Default: 0.20</div></div>'
     +'</div></div>'
-    +'<div style="background:#f4f6fa;border-radius:8px;padding:16px;margin-bottom:14px">'
-    +'<div style="font-size:12.5px;font-weight:700;color:#1a3a5c;margin-bottom:10px">Financial Amount Thresholds (Rs.)</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">'
-    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">High (&#8805;)</label><input id="_sCfg_amtHigh" type="number" value="'+cfg.amtHigh+'" min="0" style="width:100%;padding:5px 7px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">Mid (&#8805;)</label><input id="_sCfg_amtMid" type="number" value="'+cfg.amtMid+'" min="0" style="width:100%;padding:5px 7px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">Low (&#8805;)</label><input id="_sCfg_amtLow" type="number" value="'+cfg.amtLow+'" min="0" style="width:100%;padding:5px 7px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box"></div>'
+
+    // ── Section 3: Branch Complexity Default ───────────────────
+    +'<div style="'+sec+'">'
+    +'<div style="'+hdr+'background:#fff4e0;color:#7a4800;border-left:4px solid #c07000">&#9881; Section 3 — Branch Complexity Default Score</div>'
+    +'<div style="font-size:11.5px;color:#555;margin-bottom:12px;line-height:1.6">The complexity score (0–100) assumed for any branch that has not yet been scored in the Complexity Matrix. The Complexity Matrix itself is managed from the Risk Assessment panel (Stage 3).</div>'
+    +'<div style="max-width:200px">'
+    +'<div style="background:#f4f6fa;border-radius:6px;padding:10px">'
+    +'<label style="'+lbl+'">Default Score (0–100)</label>'
+    +'<input id="_fCfg_cpxDef" type="number" value="'+fc.complexityDefault+'" min="0" max="100" style="'+inp+'">'
+    +'<div style="font-size:10px;color:#888;margin-top:3px">Default: 50 (Medium)</div>'
+    +'</div></div></div>'
+
+    // ── Section 4: Sensitivity Suggestion Thresholds ───────────
+    +'<div style="'+sec+'">'
+    +'<div style="'+hdr+'background:#f0eaf8;color:#4a1a7a;border-left:4px solid #7a3ab0">&#128270; Section 4 — Sensitivity Suggestion Thresholds</div>'
+    +'<div style="font-size:11.5px;color:#555;margin-bottom:14px;line-height:1.6">Used by the system when suggesting a sensitivity rating for each observation during fieldwork. These control the Finding Gravity and COSO signal calculations.</div>'
+
+    +'<div style="font-size:12px;font-weight:700;color:#333;margin-bottom:8px">Instance Count Thresholds</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">'
+    +'<div style="background:#f4f6fa;border-radius:6px;padding:10px"><label style="'+lbl+'">High (&#8805;)</label><input id="_fCfg_instHigh" type="number" value="'+sc.instHigh+'" min="1" style="'+inp+'"><div style="font-size:10px;color:#888;margin-top:3px">Default: 20</div></div>'
+    +'<div style="background:#f4f6fa;border-radius:6px;padding:10px"><label style="'+lbl+'">Mid (&#8805;)</label><input id="_fCfg_instMid" type="number" value="'+sc.instMid+'" min="1" style="'+inp+'"><div style="font-size:10px;color:#888;margin-top:3px">Default: 10</div></div>'
+    +'<div style="background:#f4f6fa;border-radius:6px;padding:10px"><label style="'+lbl+'">Low (&#8805;)</label><input id="_fCfg_instLow" type="number" value="'+sc.instLow+'" min="1" style="'+inp+'"><div style="font-size:10px;color:#888;margin-top:3px">Default: 5</div></div>'
+    +'</div>'
+
+    +'<div style="font-size:12px;font-weight:700;color:#333;margin-bottom:8px">Financial Amount Thresholds (Rs.)</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">'
+    +'<div style="background:#f4f6fa;border-radius:6px;padding:10px"><label style="'+lbl+'">High (&#8805;)</label><input id="_fCfg_amtHigh" type="number" value="'+sc.amtHigh+'" min="0" style="'+inp+'"><div style="font-size:10px;color:#888;margin-top:3px">Default: 100,000</div></div>'
+    +'<div style="background:#f4f6fa;border-radius:6px;padding:10px"><label style="'+lbl+'">Mid (&#8805;)</label><input id="_fCfg_amtMid" type="number" value="'+sc.amtMid+'" min="0" style="'+inp+'"><div style="font-size:10px;color:#888;margin-top:3px">Default: 50,000</div></div>'
+    +'<div style="background:#f4f6fa;border-radius:6px;padding:10px"><label style="'+lbl+'">Low (&#8805;)</label><input id="_fCfg_amtLow" type="number" value="'+sc.amtLow+'" min="0" style="'+inp+'"><div style="font-size:10px;color:#888;margin-top:3px">Default: 10,000</div></div>'
+    +'</div>'
+
+    +'<div style="font-size:12px;font-weight:700;color:#333;margin-bottom:8px">COSO Component Weights (max points each, out of 10)</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:4px">'
+    +'<div style="background:#f4f6fa;border-radius:6px;padding:10px"><label style="'+lbl+'">Control Environment</label><input id="_fCfg_cosoCE" type="number" value="'+(sc.cosoWeights['Control Environment']||10)+'" min="0" max="20" style="'+inp+'"><div style="font-size:10px;color:#888;margin-top:3px">Default: 10</div></div>'
+    +'<div style="background:#f4f6fa;border-radius:6px;padding:10px"><label style="'+lbl+'">Risk Assessment</label><input id="_fCfg_cosoRA" type="number" value="'+(sc.cosoWeights['Risk Assessment']||8)+'" min="0" max="20" style="'+inp+'"><div style="font-size:10px;color:#888;margin-top:3px">Default: 8</div></div>'
+    +'<div style="background:#f4f6fa;border-radius:6px;padding:10px"><label style="'+lbl+'">Control Activities</label><input id="_fCfg_cosoCA" type="number" value="'+(sc.cosoWeights['Control Activities']||6)+'" min="0" max="20" style="'+inp+'"><div style="font-size:10px;color:#888;margin-top:3px">Default: 6</div></div>'
+    +'<div style="background:#f4f6fa;border-radius:6px;padding:10px"><label style="'+lbl+'">Monitoring</label><input id="_fCfg_cosoM" type="number" value="'+(sc.cosoWeights['Monitoring']||4)+'" min="0" max="20" style="'+inp+'"><div style="font-size:10px;color:#888;margin-top:3px">Default: 4</div></div>'
+    +'<div style="background:#f4f6fa;border-radius:6px;padding:10px"><label style="'+lbl+'">Info &amp; Communication</label><input id="_fCfg_cosoIC" type="number" value="'+(sc.cosoWeights['Information & Communication']||2)+'" min="0" max="20" style="'+inp+'"><div style="font-size:10px;color:#888;margin-top:3px">Default: 2</div></div>'
     +'</div></div>'
-    +'<div style="background:#f4f6fa;border-radius:8px;padding:16px;margin-bottom:18px">'
-    +'<div style="font-size:12.5px;font-weight:700;color:#1a3a5c;margin-bottom:10px">COSO Component Weights (max points each)</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
-    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">Control Environment</label><input id="_sCfg_cosoCE" type="number" value="'+(cfg.cosoWeights['Control Environment']||10)+'" min="0" max="20" style="width:100%;padding:5px 7px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">Risk Assessment</label><input id="_sCfg_cosoRA" type="number" value="'+(cfg.cosoWeights['Risk Assessment']||8)+'" min="0" max="20" style="width:100%;padding:5px 7px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">Control Activities</label><input id="_sCfg_cosoCA" type="number" value="'+(cfg.cosoWeights['Control Activities']||6)+'" min="0" max="20" style="width:100%;padding:5px 7px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">Monitoring</label><input id="_sCfg_cosoM" type="number" value="'+(cfg.cosoWeights['Monitoring']||4)+'" min="0" max="20" style="width:100%;padding:5px 7px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">Information &amp; Communication</label><input id="_sCfg_cosoIC" type="number" value="'+(cfg.cosoWeights['Information & Communication']||2)+'" min="0" max="20" style="width:100%;padding:5px 7px;border:1px solid #ccc;border-radius:4px;font-size:13px;box-sizing:border-box"></div>'
-    +'</div></div>'
-    +'<div style="display:flex;gap:10px;align-items:center">'
-    +'<button onclick="_adminSaveSensSettings()" style="padding:9px 22px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Save Settings</button>'
-    +'<button onclick="_adminResetSensSettings()" style="padding:9px 16px;background:#fff;color:#666;border:1px solid #ccc;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Reset to Defaults</button>'
-    +'<span id="_sCfgMsg" style="font-size:12px;color:#2e7d32;font-weight:700"></span>'
+
+    +'<div style="display:flex;gap:10px;align-items:center;padding-top:4px">'
+    +'<button onclick="_adminSaveFormulaSettings()" style="padding:9px 24px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#10003; Save All Settings</button>'
+    +'<button onclick="_adminResetFormulaSettings()" style="padding:9px 16px;background:#fff;color:#666;border:1px solid #ccc;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Reset to Defaults</button>'
+    +'<span id="_fCfgMsg" style="font-size:12px;color:#2e7d32;font-weight:700"></span>'
     +'</div>'
     +'</div>';
 }
 
-function _adminSaveSensSettings(){
+function _adminSaveFormulaSettings(){
+  var wtS=parseInt(document.getElementById('_fCfg_wtSens').value)||0;
+  var wtO=parseInt(document.getElementById('_fCfg_wtOut').value)||0;
+  var wtC=parseInt(document.getElementById('_fCfg_wtCpx').value)||0;
+  var warn=document.getElementById('_fCfgWtWarn');
+  if(wtS+wtO+wtC!==100){if(warn)warn.style.display='block';return;}
+  if(warn)warn.style.display='none';
   var d={};
-  d.instHigh=parseInt(document.getElementById('_sCfg_instHigh').value)||20;
-  d.instMid=parseInt(document.getElementById('_sCfg_instMid').value)||10;
-  d.instLow=parseInt(document.getElementById('_sCfg_instLow').value)||5;
-  d.amtHigh=parseFloat(document.getElementById('_sCfg_amtHigh').value)||100000;
-  d.amtMid=parseFloat(document.getElementById('_sCfg_amtMid').value)||50000;
-  d.amtLow=parseFloat(document.getElementById('_sCfg_amtLow').value)||10000;
+  d.wtSens=wtS/100;
+  d.wtOutstanding=wtO/100;
+  d.wtComplexity=wtC/100;
+  d.srHigh=parseFloat(document.getElementById('_fCfg_srHigh').value)||1.00;
+  d.srMtoH=parseFloat(document.getElementById('_fCfg_srMtoH').value)||0.64;
+  d.srLtoM=parseFloat(document.getElementById('_fCfg_srLtoM').value)||0.40;
+  d.srLow=parseFloat(document.getElementById('_fCfg_srLow').value)||0.20;
+  d.complexityDefault=parseInt(document.getElementById('_fCfg_cpxDef').value)||50;
+  d.instHigh=parseInt(document.getElementById('_fCfg_instHigh').value)||20;
+  d.instMid=parseInt(document.getElementById('_fCfg_instMid').value)||10;
+  d.instLow=parseInt(document.getElementById('_fCfg_instLow').value)||5;
+  d.amtHigh=parseFloat(document.getElementById('_fCfg_amtHigh').value)||100000;
+  d.amtMid=parseFloat(document.getElementById('_fCfg_amtMid').value)||50000;
+  d.amtLow=parseFloat(document.getElementById('_fCfg_amtLow').value)||10000;
   d.cosoWeights={};
-  d.cosoWeights['Control Environment']=parseInt(document.getElementById('_sCfg_cosoCE').value)||10;
-  d.cosoWeights['Risk Assessment']=parseInt(document.getElementById('_sCfg_cosoRA').value)||8;
-  d.cosoWeights['Control Activities']=parseInt(document.getElementById('_sCfg_cosoCA').value)||6;
-  d.cosoWeights['Monitoring']=parseInt(document.getElementById('_sCfg_cosoM').value)||4;
-  d.cosoWeights['Information & Communication']=parseInt(document.getElementById('_sCfg_cosoIC').value)||2;
-  localStorage.setItem('_BRAINS_SENS_CFG',JSON.stringify(d));
-  var msg=document.getElementById('_sCfgMsg');
-  if(msg){msg.textContent='Saved!';setTimeout(function(){msg.textContent='';},2500);}
+  d.cosoWeights['Control Environment']=parseInt(document.getElementById('_fCfg_cosoCE').value)||10;
+  d.cosoWeights['Risk Assessment']=parseInt(document.getElementById('_fCfg_cosoRA').value)||8;
+  d.cosoWeights['Control Activities']=parseInt(document.getElementById('_fCfg_cosoCA').value)||6;
+  d.cosoWeights['Monitoring']=parseInt(document.getElementById('_fCfg_cosoM').value)||4;
+  d.cosoWeights['Information & Communication']=parseInt(document.getElementById('_fCfg_cosoIC').value)||2;
+  localStorage.setItem('_BRAINS_FORMULA_CFG',JSON.stringify(d));
+  var msg=document.getElementById('_fCfgMsg');
+  if(msg){msg.textContent='All settings saved!';setTimeout(function(){msg.textContent='';},2500);}
 }
 
-function _adminResetSensSettings(){
+function _adminResetFormulaSettings(){
+  if(!confirm('Reset all Formula Settings to system defaults? This cannot be undone.')) return;
+  localStorage.removeItem('_BRAINS_FORMULA_CFG');
   localStorage.removeItem('_BRAINS_SENS_CFG');
   var c=document.getElementById('_apContent');
-  if(c) _adminRenderAuditSettings(c);
+  if(c) _adminRenderFormulaSettings(c);
 }
 
 function _adminRunSystemChecks(){
