@@ -27668,7 +27668,8 @@ function _adminRenderFormulaSettings(c){
     +'<button onclick="_adminResetFormulaSettings()" style="padding:9px 16px;background:#fff;color:#666;border:1px solid #ccc;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Reset to Defaults</button>'
     +'<span id="_fCfgMsg" style="font-size:12px;color:#2e7d32;font-weight:700"></span>'
     +'</div>'
-    +'</div>';
+    +'</div>'
+    +_adminFormulaExample(fc);
 }
 
 function _adminSaveFormulaSettings(){
@@ -27710,6 +27711,147 @@ function _adminResetFormulaSettings(){
   localStorage.removeItem('_BRAINS_SENS_CFG');
   var c=document.getElementById('_apContent');
   if(c) _adminRenderFormulaSettings(c);
+}
+
+function _adminFormulaExample(fc){
+  // ── Fixed scenario inputs ──────────────────────────────────────────────────
+  // 6 observations from a previous report across 4 categories
+  // Normalised area weights (illustrative, based on Diligent register):
+  //   Financial Management = 1.00 (highest risk — the benchmark)
+  //   Cash & Bank          = 0.80
+  //   HR & Staffing        = 0.60
+  //   Safety & Security    = 0.30
+  var obs=[
+    {cat:'Financial Management', rating:'High',    aW:1.00},
+    {cat:'Financial Management', rating:'M to H',  aW:1.00},
+    {cat:'Cash & Bank',          rating:'M to H',  aW:0.80},
+    {cat:'HR & Staffing',        rating:'L to M',  aW:0.60},
+    {cat:'HR & Staffing',        rating:'Low',     aW:0.60},
+    {cat:'Safety & Security',    rating:'Low',     aW:0.30}
+  ];
+  var srMap={'High':fc.srHigh,'M to H':fc.srMtoH,'L to M':fc.srLtoM,'Low':fc.srLow};
+  var ratingColor={'High':'#9b1a1a','M to H':'#b04400','L to M':'#806000','Low':'#1a6060'};
+  var ratingBg={'High':'#fde8e8','M to H':'#fff0e0','L to M':'#fffbe0','Low':'#e8f8f8'};
+
+  // Step 1 — Sensitivity Area Score
+  var totalContrib=0;
+  var obsRows='';
+  for(var i=0;i<obs.length;i++){
+    var o=obs[i];
+    var sw=srMap[o.rating]||0;
+    var contrib=sw*o.aW;
+    totalContrib+=contrib;
+    obsRows+='<tr>'
+      +'<td style="padding:5px 8px;border-bottom:1px solid #eee;font-size:11.5px">'+o.cat+'</td>'
+      +'<td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:center">'
+      +'<span style="background:'+ratingBg[o.rating]+';color:'+ratingColor[o.rating]+';padding:2px 7px;border-radius:3px;font-size:11px;font-weight:700">'+o.rating+'</span></td>'
+      +'<td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:center;font-size:11.5px;color:#555">'+sw.toFixed(2)+'</td>'
+      +'<td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:center;font-size:11.5px;color:#555">'+o.aW.toFixed(2)+'</td>'
+      +'<td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:center;font-size:11.5px;font-weight:700;color:#1a3a5c">'+contrib.toFixed(3)+'</td>'
+      +'</tr>';
+  }
+  var sensScore=Math.round(totalContrib/obs.length*100);
+
+  // Step 2 — Outstanding Risk Score (3 of 6 unresolved)
+  var outUnresolved=3, outTotal=6;
+  var outScore=Math.round(outUnresolved/outTotal*100);
+
+  // Step 3 — Branch Complexity Score (set in matrix for this branch)
+  var cpxScore=72;
+
+  // Step 4 — Planning Score
+  var planScore=Math.round(sensScore*fc.wtSens + outScore*fc.wtOutstanding + cpxScore*fc.wtComplexity);
+  var tierLabel=planScore>=70?'&#128308; Priority 1 — audit within 30 days':
+                planScore>=50?'&#128992; Priority 2 — audit within 60 days':
+                planScore>=30?'&#128993; Priority 3 — audit within 90 days':
+                              '&#128994; Priority 4 — audit within 6 months';
+  var tierCol=planScore>=70?'#c03030':planScore>=50?'#b04400':planScore>=30?'#806000':'#1a6020';
+  var tierBg=planScore>=70?'#fde8e8':planScore>=50?'#fff0e0':planScore>=30?'#fffbe0':'#e8f8e8';
+
+  var pct=function(v){return Math.round(v*100)+'%';};
+  var row=function(label,score,wt,contrib,note){
+    return '<tr>'
+      +'<td style="padding:7px 10px;border-bottom:1px solid #2e4a6a;font-size:12px;color:#c8dff0">'+label+'</td>'
+      +'<td style="padding:7px 10px;border-bottom:1px solid #2e4a6a;text-align:center;font-size:12px;color:#fff;font-weight:700">'+score+'</td>'
+      +'<td style="padding:7px 10px;border-bottom:1px solid #2e4a6a;text-align:center;font-size:12px;color:#c9962a;font-weight:700">'+pct(wt)+'</td>'
+      +'<td style="padding:7px 10px;border-bottom:1px solid #2e4a6a;text-align:center;font-size:12px;color:#80e8c0;font-weight:700">'+contrib.toFixed(1)+' pts</td>'
+      +'<td style="padding:7px 10px;border-bottom:1px solid #2e4a6a;font-size:11px;color:#8ab0cc">'+note+'</td>'
+      +'</tr>';
+  };
+
+  return '<div style="background:#fff;border:2px solid #1a3a5c;border-radius:8px;padding:0;margin-bottom:4px;overflow:hidden">'
+    +'<div style="background:#1a3a5c;padding:12px 16px;display:flex;align-items:center;gap:10px">'
+    +'<div style="font-size:16px">&#128218;</div>'
+    +'<div>'
+    +'<div style="font-size:13px;font-weight:800;color:#fff">Worked Example — Live Preview</div>'
+    +'<div style="font-size:11px;color:#8ab0cc;margin-top:1px">Calculated using your current saved settings. Numbers update when you save new settings.</div>'
+    +'</div></div>'
+
+    +'<div style="padding:16px">'
+
+    // Scenario box
+    +'<div style="background:#f0f4fa;border-radius:6px;padding:12px 14px;margin-bottom:16px">'
+    +'<div style="font-size:12px;font-weight:800;color:#1a3a5c;margin-bottom:6px">&#127968; Scenario — City Campus, Lahore</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11.5px;color:#2a3a50">'
+    +'<div><strong>Previous report:</strong><br>6 observations loaded</div>'
+    +'<div><strong>Unresolved findings:</strong><br>3 out of 6 (50%)</div>'
+    +'<div><strong>Complexity score:</strong><br>72 — set in Complexity Matrix</div>'
+    +'</div></div>'
+
+    // Step 1
+    +'<div style="font-size:12px;font-weight:800;color:#1a3a5c;margin-bottom:8px">&#9312; Sensitivity Area Score</div>'
+    +'<div style="font-size:11.5px;color:#555;margin-bottom:8px;line-height:1.6">'
+    +'For each observation: <strong>Sensitivity Weight &times; Area Weight = Contribution</strong>. '
+    +'Then: Total contributions &divide; Number of observations &times; 100.</div>'
+    +'<div style="overflow-x:auto;margin-bottom:8px"><table style="border-collapse:collapse;width:100%;font-size:12px">'
+    +'<thead><tr style="background:#1a3a5c;color:#fff">'
+    +'<th style="padding:7px 8px;text-align:left;font-size:11px">Category</th>'
+    +'<th style="padding:7px 8px;text-align:center;font-size:11px">Rating</th>'
+    +'<th style="padding:7px 8px;text-align:center;font-size:11px">Sens. Wt</th>'
+    +'<th style="padding:7px 8px;text-align:center;font-size:11px">Area Wt</th>'
+    +'<th style="padding:7px 8px;text-align:center;font-size:11px">Contribution</th>'
+    +'</tr></thead><tbody>'+obsRows+'</tbody>'
+    +'<tfoot><tr style="background:#e8f0fb">'
+    +'<td colspan="4" style="padding:7px 8px;font-size:12px;font-weight:800;color:#1a3a5c;text-align:right">Total contribution</td>'
+    +'<td style="padding:7px 8px;font-size:12px;font-weight:800;color:#1a3a5c;text-align:center">'+totalContrib.toFixed(3)+'</td>'
+    +'</tr></tfoot>'
+    +'</table></div>'
+    +'<div style="background:#e8f0fb;border-radius:5px;padding:8px 12px;font-size:12px;color:#1a3a5c;margin-bottom:16px">'
+    +'<strong>Sensitivity Area Score</strong> = '+totalContrib.toFixed(3)+' &divide; '+obs.length+' &times; 100 = <strong>'+sensScore+'</strong></div>'
+
+    // Step 2
+    +'<div style="font-size:12px;font-weight:800;color:#1a3a5c;margin-bottom:6px">&#9313; Outstanding Risk Score</div>'
+    +'<div style="background:#e8f8ee;border-radius:5px;padding:8px 12px;font-size:12px;color:#1a6020;margin-bottom:16px">'
+    +'<strong>Outstanding Risk Score</strong> = '+outUnresolved+' unresolved &divide; '+outTotal+' total &times; 100 = <strong>'+outScore+'</strong></div>'
+
+    // Step 3
+    +'<div style="font-size:12px;font-weight:800;color:#1a3a5c;margin-bottom:6px">&#9314; Branch Complexity Score</div>'
+    +'<div style="background:#fff4e0;border-radius:5px;padding:8px 12px;font-size:12px;color:#7a4800;margin-bottom:16px">'
+    +'<strong>Branch Complexity Score</strong> = <strong>'+cpxScore+'</strong> &nbsp;(set by Administrator in Complexity Matrix — 1,800 students, large imprest, city location)</div>'
+
+    // Step 4
+    +'<div style="font-size:12px;font-weight:800;color:#1a3a5c;margin-bottom:8px">&#9315; Final Planning Score</div>'
+    +'<div style="overflow-x:auto;margin-bottom:10px"><table style="border-collapse:collapse;width:100%;background:#0d1f35;border-radius:6px;overflow:hidden">'
+    +'<thead><tr>'
+    +'<th style="padding:8px 10px;text-align:left;font-size:11px;color:#a8d0f0;font-weight:700">Component</th>'
+    +'<th style="padding:8px 10px;text-align:center;font-size:11px;color:#a8d0f0;font-weight:700">Score</th>'
+    +'<th style="padding:8px 10px;text-align:center;font-size:11px;color:#a8d0f0;font-weight:700">Weight</th>'
+    +'<th style="padding:8px 10px;text-align:center;font-size:11px;color:#a8d0f0;font-weight:700">Contribution</th>'
+    +'<th style="padding:8px 10px;text-align:left;font-size:11px;color:#a8d0f0;font-weight:700">Formula</th>'
+    +'</tr></thead><tbody>'
+    +row('Sensitivity Area Score', sensScore, fc.wtSens,    sensScore*fc.wtSens,    sensScore+' × '+pct(fc.wtSens))
+    +row('Outstanding Risk Score', outScore,  fc.wtOutstanding, outScore*fc.wtOutstanding, outScore+' × '+pct(fc.wtOutstanding))
+    +row('Branch Complexity Score',cpxScore,  fc.wtComplexity,  cpxScore*fc.wtComplexity,  cpxScore+' × '+pct(fc.wtComplexity))
+    +'</tbody><tfoot><tr style="background:#1a3a5c">'
+    +'<td colspan="3" style="padding:9px 10px;font-size:13px;font-weight:800;color:#fff">Planning Score</td>'
+    +'<td style="padding:9px 10px;text-align:center;font-size:16px;font-weight:900;color:#f0c040">'+planScore+'</td>'
+    +'<td style="padding:9px 10px;font-size:11.5px;color:#a8d0f0">out of 100</td>'
+    +'</tr></tfoot></table></div>'
+
+    +'<div style="background:'+tierBg+';border-left:4px solid '+tierCol+';border-radius:5px;padding:10px 14px;font-size:13px;font-weight:800;color:'+tierCol+'">'
+    +tierLabel+'</div>'
+
+    +'</div></div>';
 }
 
 function _adminRunSystemChecks(){
