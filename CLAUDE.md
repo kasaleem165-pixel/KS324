@@ -8,11 +8,19 @@ Standalone single-file HTML app (`animal_sales/AnimalSales.html`) for managing a
 - **Always push to both**: `git push origin claude/animal-sales-receipts-pofPs` AND `git push origin claude/animal-sales-receipts-pofPs:main --force`
 
 ## Git — BRAINS (index.html)
-- **Feature branch**: `claude/optimistic-mccarthy-NPnuj`
-- **Always push to both** (feature branch first, then force-update main):
+- **Working feature branch**: `claude/optimistic-mccarthy-NPnuj` (session branch — keep pushing here)
+- **Named branches** (for visibility on GitHub):
+  - `brains-dev` — mirrors DEV (`index.html`) — update after each session
+  - `brains-old-live` — mirrors LIVE (`old/index.html`) — update only when releasing to intranet
+- **Always push to all three** (feature branch first, then sync named branches and main):
   ```
   git push origin claude/optimistic-mccarthy-NPnuj
   git push origin claude/optimistic-mccarthy-NPnuj:main --force
+  git push origin claude/optimistic-mccarthy-NPnuj:brains-dev --force
+  ```
+- **When releasing DEV → LIVE** (copy index.html → old/index.html, then):
+  ```
+  git push origin claude/optimistic-mccarthy-NPnuj:brains-old-live --force
   ```
 - **Why `--force` on main**: Multiple sessions push to `main`; it can diverge from the feature branch. The feature branch is always the canonical source of truth, so `--force` is correct and expected here. Never do a plain push to `main` — it will fail with "non-fast-forward".
 
