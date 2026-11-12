@@ -21414,6 +21414,7 @@ function ra_showMethodology(){
 }
 
 function ra_methodologyHtml(){
+  var _rfc=_getFormulaCfg();
   var cats=Object.keys(RA_DB_CATS);
   var totalDb=cats.reduce(function(s,c){return s+RA_DB_CATS[c].count;},0);
   var catRows='';
@@ -21584,10 +21585,10 @@ function ra_methodologyHtml(){
     +'<div style="font-size:11.5px;color:#4a5a70;line-height:1.6;margin-top:3px">How serious were the findings in the last report — across all areas of the branch? If most findings were rated High sensitivity, the branch scores higher here. This is an average of the sensitivity levels of all observations loaded from previous reports.</div>'
     +'<div style="margin-top:7px;background:#3a0a6a;border-radius:5px;padding:7px 12px;font-family:monospace;font-size:11px;color:#d0a8f8;line-height:1.8">'
     +'<span style="color:#c080ff;font-weight:700">Score</span> = Weighted average of sensitivity ratings across all areas &times; 100'
-    +'<div style="color:#a070d0;font-size:10.5px;margin-top:3px">Weights: High=1.00, M to H=0.64, L to M=0.40, Low=0.20 &nbsp;|&nbsp; Requires JSON session file</div>'
+    +'<div style="color:#a070d0;font-size:10.5px;margin-top:3px">Weights: High='+_rfc.srHigh.toFixed(2)+', M to H='+_rfc.srMtoH.toFixed(2)+', L to M='+_rfc.srLtoM.toFixed(2)+', Low='+_rfc.srLow.toFixed(2)+' &nbsp;|&nbsp; Configurable in Admin &rsaquo; Formula Settings</div>'
     +'<div style="color:#a070d0;font-size:10.5px;margin-top:2px">Example: Average sensitivity weight = 0.65 &rarr; Score = <strong style="color:#fff">65 out of 100</strong></div>'
     +'</div></div>'
-    +'<div style="text-align:center;font-weight:900;font-size:14px;color:#c9962a;white-space:nowrap">40%<div style="font-size:9px;font-weight:600;color:#888;margin-top:2px">weight</div></div>'
+    +'<div style="text-align:center;font-weight:900;font-size:14px;color:#c9962a;white-space:nowrap">'+Math.round(_rfc.wtSens*100)+'%<div style="font-size:9px;font-weight:600;color:#888;margin-top:2px">weight</div></div>'
     +'</div>'
 
     +'<div style="display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:start;background:#fff8f0;border-radius:7px;padding:10px 14px;border-left:4px solid #e67e22">'
@@ -21598,7 +21599,7 @@ function ra_methodologyHtml(){
     +'<span style="color:#ffa040;font-weight:700">Score</span> = (Unresolved findings &divide; Total findings in last report) &times; 100'
     +'<div style="color:#d09060;font-size:10.5px;margin-top:2px">Example: 28 unresolved out of 40 total &rarr; (28&divide;40) &times; 100 = <strong style="color:#fff">70 out of 100</strong></div>'
     +'</div></div>'
-    +'<div style="text-align:center;font-weight:900;font-size:14px;color:#c9962a;white-space:nowrap">40%<div style="font-size:9px;font-weight:600;color:#888;margin-top:2px">weight</div></div>'
+    +'<div style="text-align:center;font-weight:900;font-size:14px;color:#c9962a;white-space:nowrap">'+Math.round(_rfc.wtOutstanding*100)+'%<div style="font-size:9px;font-weight:600;color:#888;margin-top:2px">weight</div></div>'
     +'</div>'
 
     +'<div style="display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:start;background:#f0faf5;border-radius:7px;padding:10px 14px;border-left:4px solid #16a085">'
@@ -21606,17 +21607,17 @@ function ra_methodologyHtml(){
     +'<div><div style="font-weight:800;color:#0e6655;font-size:12px">3 — Branch Complexity Score</div>'
     +'<div style="font-size:11.5px;color:#4a5a70;line-height:1.6;margin-top:3px">How large and operationally active is the branch? A branch with 2,000 students, 80 staff and a high imprest limit carries far more audit work than a small branch. This score adjusts the overall planning priority to reflect the true workload of the branch.</div>'
     +'<div style="margin-top:7px;background:#083d2a;border-radius:5px;padding:7px 12px;font-family:monospace;font-size:11px;color:#80e8c0;line-height:1.8">'
-    +'<span style="color:#40e090;font-weight:700">Score</span> = 0–100 &nbsp; entered once per branch and saved permanently &nbsp;|&nbsp; Default: 50 if not yet set'
-    +'<div style="color:#50a878;font-size:10.5px;margin-top:2px">Factors: number of students, staff, imprest limit, location</div>'
+    +'<span style="color:#40e090;font-weight:700">Score</span> = 0–100 &nbsp; entered once per branch and saved permanently &nbsp;|&nbsp; Default: '+_rfc.complexityDefault+' if not yet set'
+    +'<div style="color:#50a878;font-size:10.5px;margin-top:2px">Factors: number of students, staff, imprest limit, location &nbsp;|&nbsp; Configurable in Admin &rsaquo; Formula Settings</div>'
     +'</div></div>'
-    +'<div style="text-align:center;font-weight:900;font-size:14px;color:#c9962a;white-space:nowrap">20%<div style="font-size:9px;font-weight:600;color:#888;margin-top:2px">weight</div></div>'
+    +'<div style="text-align:center;font-weight:900;font-size:14px;color:#c9962a;white-space:nowrap">'+Math.round(_rfc.wtComplexity*100)+'%<div style="font-size:9px;font-weight:600;color:#888;margin-top:2px">weight</div></div>'
     +'</div>'
 
     +'</div>'
 
     +'<div style="background:#1a3a5c;color:#fff;border-radius:7px;padding:12px 16px">'
     +'<div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#a8d0f0;margin-bottom:8px">&#128290; Planning Score Formula</div>'
-    +'<div style="font-family:monospace;font-size:12px;color:#e8f4ff;margin-bottom:6px">Planning Score = (Sensitivity &times; 40%) + (Outstanding &times; 40%) + (Complexity &times; 20%)</div>'
+    +'<div style="font-family:monospace;font-size:12px;color:#e8f4ff;margin-bottom:6px">Planning Score = (Sensitivity &times; '+Math.round(_rfc.wtSens*100)+'%) + (Outstanding &times; '+Math.round(_rfc.wtOutstanding*100)+'%) + (Complexity &times; '+Math.round(_rfc.wtComplexity*100)+'%)</div>'
     +'<div style="font-size:11px;color:#a0c8e8;margin-bottom:10px">Example: Sensitivity=65, Outstanding=70, Complexity=80 &rarr; (65&times;0.40)+(70&times;0.40)+(80&times;0.20) = <strong style="color:#fff">70 pts</strong></div>'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;font-weight:700">'
     +'<span style="background:#c0392b;padding:3px 10px;border-radius:4px">&#128308; Priority 1 — 70 or above (within 30 days)</span>'
@@ -21625,7 +21626,7 @@ function ra_methodologyHtml(){
     +'<span style="background:#1a7030;padding:3px 10px;border-radius:4px">&#128994; Priority 4 — below 30 (within 6 months)</span>'
     +'</div>'
     +'</div>'
-    +note('&#9432; Component 1 (Sensitivity) reads sensitivity ratings from the loaded previous report. Word (.docx) reports are fully supported — ratings are extracted from the Observation Summary table. Excel files and pasted text do not contain sensitivity data and fall back to zero; a BRAINS JSON session file gives the most precise reading. Component 2 (Outstanding) requires a loaded previous report. Component 3 (Complexity) always contributes — using the stored value, or 50 by default.')
+    +note('&#9432; Component 1 (Sensitivity) reads sensitivity ratings from the loaded previous report. Word (.docx) reports are fully supported — ratings are extracted from the Observation Summary table. Excel files and pasted text do not contain sensitivity data and fall back to zero; a BRAINS JSON session file gives the most precise reading. Component 2 (Outstanding) requires a loaded previous report. Component 3 (Complexity) always contributes — using the stored value, or '+_rfc.complexityDefault+' by default. All weights and rating values shown above are configurable in Admin &rsaquo; Formula Settings.')
   );
 
   // 5. Branch Complexity Score (detail for Component 3)
@@ -27668,6 +27669,10 @@ function _adminRenderFormulaSettings(c){
     +'<button onclick="_adminResetFormulaSettings()" style="padding:9px 16px;background:#fff;color:#666;border:1px solid #ccc;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Reset to Defaults</button>'
     +'<span id="_fCfgMsg" style="font-size:12px;color:#2e7d32;font-weight:700"></span>'
     +'</div>'
+    +'</div>'
+    +'<div style="margin:14px 0 4px;padding:11px 16px;background:#eaf4fb;border-radius:7px;border-left:4px solid #1a6ea8;display:flex;align-items:center;gap:14px">'
+    +'<div style="font-size:13px;color:#1a3a5c;flex:1"><strong>&#128270; RA Methodology Screen</strong> &mdash; See how these formula weights are applied in the full step-by-step Risk Assessment planning score guide, with component breakdowns and priority tiers.</div>'
+    +'<button onclick="var _ov=document.getElementById(\'_adminPanelOverlay\');if(_ov)_ov.parentNode.removeChild(_ov);ra_showMethodology();" style="padding:8px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:Inter,sans-serif">&#128196; Open RA Methodology</button>'
     +'</div>'
     +_adminFormulaExample(fc);
 }
