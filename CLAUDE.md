@@ -8,17 +8,15 @@ Standalone single-file HTML app (`animal_sales/AnimalSales.html`) for managing a
 - **Always push to both**: `git push origin claude/animal-sales-receipts-pofPs` AND `git push origin claude/animal-sales-receipts-pofPs:main --force`
 
 ## Git — BRAINS (index.html)
-- **Feature branch**: `brains-dev`
-- **Always push to both** (feature branch first, then force-update main):
+- **Always push to**: `main` (this IS the DEV branch — GitHub Pages serves from here)
   ```
-  git push origin brains-dev
-  git push origin brains-dev:main --force
+  git push origin HEAD:main --force
   ```
 - **When releasing DEV → LIVE** (copy index.html → old/index.html, commit, then also sync):
   ```
-  git push origin brains-dev:brains-old-live --force
+  git push origin HEAD:brains-old-live --force
   ```
-- **Why `--force` on main**: Multiple sessions push to `main`; it can diverge from the feature branch. The feature branch is always the canonical source of truth, so `--force` is correct and expected here. Never do a plain push to `main` — it will fail with "non-fast-forward".
+- **Why `--force` on main**: Multiple sessions push to `main`; it can diverge between sessions. `--force` is correct and expected here.
 
 ---
 
