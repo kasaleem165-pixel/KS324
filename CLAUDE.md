@@ -449,7 +449,10 @@ Data stored in `DB.budget[]` only — never touches sales, animals, or payments.
 - `bg-carriage-row` (budget carriage field) must stay in `bgToggleMode()` hide-list to avoid duplicate carriage in lump sum mode
 
 ## Branch Complexity Calculator (Excel)
-- **File**: `BRAINS_Branch_Complexity_Calculator.xlsx`
+- **File**: `BRAINS_Branch_Complexity_Calculator.xlsx` (in repo root)
+- **Repo path**: `/BRAINS_Branch_Complexity_Calculator.xlsx`
+- **Raw download URL**: `https://raw.githubusercontent.com/kasaleem165-pixel/KS324/main/BRAINS_Branch_Complexity_Calculator.xlsx`
+- **In-app download**: RA screen shows a download button linking to the raw URL above — auditors click it before starting an audit to get the latest copy
 - **Sheet protection password**: `brains2026`
 - **Unlocked cells**: Branch Name/Code/Region/Year (C5–C8), 4 score inputs (C12,C14,C16,C18), Signature rows, Comments box
 - **To unlock for editing**: Review → Unprotect Sheet → enter `brains2026`
