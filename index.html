@@ -9496,7 +9496,8 @@ function downloadSoftCopy(){
   // Layer 0: restore from embedded bhs-resp-data JSON (works on any machine — survives forwarding)
   softHtml+='function restoreEmbedded(){\n';
   softHtml+='  try{\n';
-  softHtml+='    var el=document.getElementById("bhs-resp-data");\n';
+  softHtml+='    var _allRD=document.querySelectorAll(\'script[id="bhs-resp-data"]\');\n';
+  softHtml+='    var el=_allRD.length?_allRD[_allRD.length-1]:null;\n';
   softHtml+='    if(!el) return false;\n';
   softHtml+='    var d=JSON.parse(el.textContent||el.innerHTML);\n';
   softHtml+='    if(!d||typeof d!=="object") return false;\n';
@@ -9694,6 +9695,7 @@ function downloadSoftCopy(){
   // IMPORTANT: inject bhs-resp-data and bootstrap before closing tags.
   softHtml+='  if(isDraft){\n';
   softHtml+='    var rawHtml=document.documentElement.outerHTML;\n';
+  softHtml+='    rawHtml=rawHtml.replace(/<script[^>]+id="bhs-resp-data"[^>]*>[\\s\\S]*?<\\/script>/i,"");\n';
   softHtml+='    var headClose=rawHtml.indexOf("<\\/head>");\n';
   softHtml+='    var injTag=\'<script id="bhs-resp-data" type="application/json">\'+json+\'<\\/script>\';\n';
   softHtml+='    var updatedHtml= headClose!==-1\n';
@@ -10489,7 +10491,9 @@ function loadAuditeeFile(evt){
     var loadedObs=[];
 
     // Primary: embedded JSON block (new format — reliable)
-    var respDataEl=doc.getElementById('bhs-resp-data');
+    // Use the LAST bhs-resp-data script (most recent save — partial saves can produce duplicates)
+    var _allRespEls=doc.querySelectorAll('script[id="bhs-resp-data"]');
+    var respDataEl=_allRespEls.length?_allRespEls[_allRespEls.length-1]:null;
     if(respDataEl){
       try{
         var rawJson=(respDataEl.textContent||respDataEl.innerHTML||'').trim();
