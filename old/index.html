@@ -5542,6 +5542,29 @@ function renderRpt(){
           h+='<span style="font-size:13px;font-weight:700;color:#1a6030">'+esc(etaVal)+'</span>';
           h+='</div>';
         }
+        // RO/HO Decision panel (shown after loading RO response with decisions)
+        var _rd=window.roDecisions&&window.roDecisions[o.id];
+        if(_rd&&_rd.decision){
+          var _rdBg=_rd.decision==='Approved'?'#e9f7ef':_rd.decision==='Suggestion'?'#fef3e2':'#fdecea';
+          var _rdBd=_rd.decision==='Approved'?'#a9dfbf':_rd.decision==='Suggestion'?'#f5cba7':'#f1948a';
+          var _rdCol=_rd.decision==='Approved'?'#1a6030':_rd.decision==='Suggestion'?'#7a4800':'#8a1000';
+          h+='<div style="margin-top:8px;padding:9px 13px;background:'+_rdBg+';border:2px solid '+_rdBd+';border-radius:6px">';
+          h+='<div style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:'+_rdCol+';margin-bottom:4px">&#9997; RO/HO Decision: '+esc(_rd.decision)+'</div>';
+          if(_rd.rejReason) h+='<div style="font-size:12px;color:'+_rdCol+';white-space:pre-wrap;line-height:1.55">'+esc(_rd.rejReason)+'</div>';
+          if(_rd.wcObsDec){
+            h+='<div style="margin-top:7px;border-top:1px solid '+_rdBd+';padding-top:6px;font-size:10.5px">';
+            h+='<strong style="color:'+_rdCol+'">Observation text amendment:</strong> <span style="font-weight:700;color:'+(_rd.wcObsDec==='approved'?'#1a6030':'#8a1000')+'">'+esc(_rd.wcObsDec.toUpperCase())+'</span>';
+            if(_rd.wcObsRej) h+=' &nbsp;&#8212;&nbsp; <span style="color:#8a1000;font-style:italic">'+esc(_rd.wcObsRej)+'</span>';
+            h+='</div>';
+          }
+          if(_rd.wcRecDec){
+            h+='<div style="margin-top:5px;font-size:10.5px">';
+            h+='<strong style="color:'+_rdCol+'">Recommendation text amendment:</strong> <span style="font-weight:700;color:'+(_rd.wcRecDec==='approved'?'#1a6030':'#8a1000')+'">'+esc(_rd.wcRecDec.toUpperCase())+'</span>';
+            if(_rd.wcRecRej) h+=' &nbsp;&#8212;&nbsp; <span style="color:#8a1000;font-style:italic">'+esc(_rd.wcRecRej)+'</span>';
+            h+='</div>';
+          }
+          h+='</div>';
+        }
       }
       // 5 & 6: Assessment-driven (after response load) or original mode
       if(responseLoaded){
@@ -6473,7 +6496,7 @@ function _performFullClear(){
   // Data maps
   selIds={}; annexMap={}; obsTypeMap={}; obsOrder={repeated:[],new:[]}; lastRefMap={}; sensitivityMap={}; cosoMap={}; avMap={}; actMap={}; respMap={}; etaMap={}; respBHMap={}; respROMap={}; respSectROMap={}; respSectHOMap={}; respHistory={}; respAttachMap={}; obsNotesMap={}; assessMap={}; obsEdits={}; refMap={}; instCountMap={}; instAmountMap={}; instSourceMap={}; customs=[]; annexures=[]; window._pfWaivers={}; window.pendingSel={};
   try{localStorage.removeItem('bss_obs_overrides');}catch(e){}
-  roCustomApprovals={}; hoCustomApprovals={}; pendingAmendments={};
+  roCustomApprovals={}; hoCustomApprovals={}; pendingAmendments={}; window.roDecisions={};
   // SRR / Risk Mapping state
   if(typeof srr_flagged!=='undefined') srr_flagged={};
   if(typeof srr_reassigned!=='undefined') srr_reassigned={};
@@ -10236,6 +10259,24 @@ function applyRespLoad(){
     }
   }
 
+  // ── Store RO/HO decisions for display in BRAINS ─────────────────────────
+  var _decKeys=Object.keys(parsed).filter(function(k){return k.indexOf('obs_dec_')===0;});
+  if(_decKeys.length){
+    if(!window.roDecisions) window.roDecisions={};
+    for(var _dki=0;_dki<_decKeys.length;_dki++){
+      var _dkObs=_decKeys[_dki].replace('obs_dec_','');
+      window.roDecisions[_dkObs]={
+        decision: parsed['obs_dec_'+_dkObs]||'',
+        rejReason: parsed['obs_rej_'+_dkObs]||'',
+        wcObsDec:  parsed['wc_obs_dec_'+_dkObs]||'',
+        wcObsRej:  parsed['wc_obs_rej_'+_dkObs]||'',
+        wcRecDec:  parsed['wc_rec_dec_'+_dkObs]||'',
+        wcRecRej:  parsed['wc_rec_rej_'+_dkObs]||''
+      };
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
   responseLoaded=true;
   renderStepGuide();
 
@@ -11389,13 +11430,19 @@ function generateIssuedReport(forROCopy){
   var saveScript='<script>'+
     'var _roAutoKey="bhs_ro_draft_"+location.pathname;'+
     'var _roUnsaved=false;'+
-    'function _roCollect(){var tas=document.querySelectorAll("textarea[name]");var data={};for(var i=0;i<tas.length;i++){if(tas[i].name)data[tas[i].name]=tas[i].value;}return data;}'+
+    'function _roCollect(){var tas=document.querySelectorAll("textarea[name],input[name]");var data={};for(var i=0;i<tas.length;i++){if(tas[i].name)data[tas[i].name]=tas[i].value;}return data;}'+
     'function _roAutoSave(){try{localStorage.setItem(_roAutoKey,JSON.stringify(_roCollect()));_roUnsaved=false;}catch(e){}}'+
-    'function _roRestoreAuto(){try{var saved=localStorage.getItem(_roAutoKey);if(!saved)return;var data=JSON.parse(saved);var tas=document.querySelectorAll("textarea[name]");for(var i=0;i<tas.length;i++){if(tas[i].name&&data[tas[i].name]!=null)tas[i].value=data[tas[i].name];}var lbl=document.getElementById("_roAutolbl");if(lbl)lbl.textContent="&#10003; Draft restored from auto-save";}catch(e){}}'+
+    'function _roRestoreAuto(){try{var saved=localStorage.getItem(_roAutoKey);if(!saved)return;var data=JSON.parse(saved);var tas=document.querySelectorAll("textarea[name],input[name]");for(var i=0;i<tas.length;i++){if(tas[i].name&&data[tas[i].name]!=null)tas[i].value=data[tas[i].name];}var lbl=document.getElementById("_roAutolbl");if(lbl)lbl.textContent="&#10003; Draft restored from auto-save";}catch(e){}}'+
+    'function _rvValidateSave(){var missing=[];var decs=document.querySelectorAll("input[name^=\'obs_dec_\']");for(var i=0;i<decs.length;i++){var id=decs[i].name.replace("obs_dec_","");if(decs[i].value==="Rejected"){var r=document.querySelector("textarea[name=\'obs_rej_"+id+"\']");if(!r||!r.value.trim()){missing.push("Obs "+id+": rejection reason required");}}}var wdecs=document.querySelectorAll("input[name^=\'wc_obs_dec_\'],input[name^=\'wc_rec_dec_\']");for(var j=0;j<wdecs.length;j++){var nm=wdecs[j].name;if(wdecs[j].value==="rejected"){var rn=nm.replace("wc_obs_dec_","wc_obs_rej_").replace("wc_rec_dec_","wc_rec_rej_");var rt=document.querySelector("textarea[name=\'"+rn+"\']");if(!rt||!rt.value.trim()){missing.push("Amendment rejection reason required for: "+nm);}}}if(missing.length){alert("Please complete mandatory fields before saving:\\n\\n"+missing.join("\\n"));return false;}return true;}'+
+    'function _rvSetObsDec(obsId,dec){var hi=document.getElementById("obs_dec_inp_"+obsId);if(hi)hi.value=dec;var row=document.getElementById("sum-row-"+obsId);if(row){var bd=row.querySelector(".sum-dec-badge");if(bd){bd.textContent=dec;bd.style.background=dec==="Approved"?"#27ae60":dec==="Suggestion"?"#e67e22":"#c0392b";bd.style.display="inline-block";}}var btns=["obs_btn_A_"+obsId,"obs_btn_S_"+obsId,"obs_btn_R_"+obsId];var decs=["Approved","Suggestion","Rejected"];for(var i=0;i<btns.length;i++){var b=document.getElementById(btns[i]);if(b)b.style.opacity=decs[i]===dec?"1":"0.4";}var rb=document.getElementById("obs_rej_box_"+obsId);if(rb)rb.style.display=dec==="Rejected"?"block":"none";}'+
+    'function _rvSetWCDec(obsId,field,dec){var hi=document.getElementById("wc_"+field+"_dec_inp_"+obsId);if(hi)hi.value=dec;var ab=document.getElementById("wc_"+field+"_btn_A_"+obsId);var rb=document.getElementById("wc_"+field+"_btn_R_"+obsId);if(ab)ab.style.opacity=dec==="approved"?"1":"0.4";if(rb)rb.style.opacity=dec==="rejected"?"1":"0.4";var rejBox=document.getElementById("wc_"+field+"_rej_box_"+obsId);if(rejBox)rejBox.style.display=dec==="rejected"?"block":"none";}'+
+    'function _rvBulkDec(dec){var cbs=document.querySelectorAll(".sum-cb:checked");for(var i=0;i<cbs.length;i++){var id=cbs[i].getAttribute("data-obsid");if(id)_rvSetObsDec(id,dec);}}'+
+    'function _rvSelectAll(checked){var cbs=document.querySelectorAll(".sum-cb");for(var i=0;i<cbs.length;i++)cbs[i].checked=checked;}'+
+    'function _rvToggleGroup(el){var grp=el.closest(".sum-grp");if(!grp)return;var body=grp.querySelector(".sum-grp-body");if(!body)return;var collapsed=body.style.display==="none";body.style.display=collapsed?"":"none";el.textContent=collapsed?"&#9660;":"&#9658;";}'+
     'window.addEventListener("load",function(){_roRestoreAuto();var tas=document.querySelectorAll("textarea[name]");for(var i=0;i<tas.length;i++){tas[i].addEventListener("input",function(){_roUnsaved=true;clearTimeout(tas._rot);tas._rot=setTimeout(_roAutoSave,2000);});}});'+
     'window.addEventListener("beforeunload",function(e){if(_roUnsaved){e.preventDefault();e.returnValue="You have unsaved responses. Please click Save My Responses before closing.";}});'+
     'function _roLegacySave(blob,name){var url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},2000);}'+
-    'function saveDraftResponses(){var data=_roCollect();var json=JSON.stringify(data).replace(/<\\/script>/gi,"<\\\\/script>");var respCount=Object.keys(data).filter(function(k){return k.indexOf("resp_")===0&&data[k];}).length;var noteCount=Object.keys(data).filter(function(k){return k.indexOf("ro_note_")===0&&data[k];}).length;var out="<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>RO\\/HO Responses<\\/title>"+\'<script id="bhs-resp-data" type="application/json">\'+json+\'<\\/script>\'+"<\\/head><body style=\\"font-family:Arial,sans-serif;padding:30px;color:#333\\"><h2>&#128203; RO\\/HO Response File<\\/h2><p>Please email this file back to the auditor to load via the <strong>Load Auditee Response<\\/strong> button.<\\/p><p style=\\"color:#555;font-size:12px\\">Auditee responses: "+respCount+" &nbsp;|&nbsp; RO review notes: "+noteCount+"<\\/p><p style=\\"color:#888;font-size:11px\\">This file was generated by the BSS Branch Audit Management System.<\\/p><\\/body><\\/html>";var blob=new Blob([out],{type:"text/html"});var fname=document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_RO_HO_Responded.html";try{localStorage.removeItem(_roAutoKey);}catch(e){}_roUnsaved=false;var lbl=document.getElementById("_roAutolbl");if(lbl)lbl.textContent="&#10003; Saved — please send this file to the auditor";if(window.showSaveFilePicker){window.showSaveFilePicker({suggestedName:fname,types:[{description:"HTML Document",accept:{"text/html":[".html"]}}]}).then(function(h){return h.createWritable();}).then(function(w){w.write(blob).then(function(){w.close();});}).catch(function(e){_roLegacySave(blob,fname);});}else{_roLegacySave(blob,fname);}}'+
+    'function saveDraftResponses(){if(!_rvValidateSave())return;var data=_roCollect();var json=JSON.stringify(data).replace(/<\\/script>/gi,"<\\\\/script>");var respCount=Object.keys(data).filter(function(k){return k.indexOf("resp_")===0&&data[k];}).length;var noteCount=Object.keys(data).filter(function(k){return k.indexOf("ro_note_")===0&&data[k];}).length;var out="<!DOCTYPE html><html><head><meta charset=\\"UTF-8\\"><title>RO\\/HO Responses<\\/title>"+\'<script id="bhs-resp-data" type="application/json">\'+json+\'<\\/script>\'+"<\\/head><body style=\\"font-family:Arial,sans-serif;padding:30px;color:#333\\"><h2>&#128203; RO\\/HO Response File<\\/h2><p>Please email this file back to the auditor to load via the <strong>Load Auditee Response<\\/strong> button.<\\/p><p style=\\"color:#555;font-size:12px\\">Auditee responses: "+respCount+" &nbsp;|&nbsp; RO review notes: "+noteCount+"<\\/p><p style=\\"color:#888;font-size:11px\\">This file was generated by the BSS Branch Audit Management System.<\\/p><\\/body><\\/html>";var blob=new Blob([out],{type:"text/html"});var fname=document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_RO_HO_Responded.html";try{localStorage.removeItem(_roAutoKey);}catch(e){}_roUnsaved=false;var lbl=document.getElementById("_roAutolbl");if(lbl)lbl.textContent="&#10003; Saved — please send this file to the auditor";if(window.showSaveFilePicker){window.showSaveFilePicker({suggestedName:fname,types:[{description:"HTML Document",accept:{"text/html":[".html"]}}]}).then(function(h){return h.createWritable();}).then(function(w){w.write(blob).then(function(){w.close();});}).catch(function(e){_roLegacySave(blob,fname);});}else{_roLegacySave(blob,fname);}}'+
     '<\/script>';
 
   // Read live text from DOM
@@ -11449,6 +11496,61 @@ function generateIssuedReport(forROCopy){
   var _irPfx=0;
   if(repeated.length){_irPfx++;assignLabels(repeated,_irPfx);}
   if(newObs.length){_irPfx++;assignLabels(newObs,_irPfx);}
+
+  // ── Observation Summary Panel (for review copies only) ───────────────────
+  var summaryPanelHtml='';
+  if(isReview){
+    var _spGrps={};
+    for(var _spi=0;_spi<all.length;_spi++){
+      var _spo=all[_spi]; var _spCat=_spo.category||'Others';
+      if(!_spGrps[_spCat])_spGrps[_spCat]=[];
+      _spGrps[_spCat].push(_spo);
+    }
+    var _spCatOrder=Object.keys(_spGrps).sort();
+    var _spRows='';
+    for(var _sci=0;_sci<_spCatOrder.length;_sci++){
+      var _scCat=_spCatOrder[_sci]; var _scObs=_spGrps[_scCat];
+      _spRows+='<div class="sum-grp" style="margin-bottom:.4rem;border:1px solid #d0daea;border-radius:6px;overflow:hidden">';
+      _spRows+='<div style="display:flex;align-items:center;gap:.6rem;padding:.5rem .9rem;background:#1a3557;color:#fff;cursor:pointer" onclick="_rvToggleGroup(this)">';
+      _spRows+='<span style="font-size:.8rem;user-select:none">&#9660;</span>';
+      _spRows+='<span style="font-weight:700;font-size:.85rem;flex:1">'+e(_scCat)+'</span>';
+      _spRows+='<span style="font-size:.75rem;opacity:.75">'+_scObs.length+' obs</span>';
+      _spRows+='</div>';
+      _spRows+='<div class="sum-grp-body" style="padding:.4rem .6rem">';
+      for(var _srj=0;_srj<_scObs.length;_srj++){
+        var _sro=_scObs[_srj]; var _srLbl=labMap[_sro.id]||'?';
+        var _srId=_srLbl.replace('.','-'); var _srSk=sensitivityMap[_sro.id]||'';
+        var _srRc=riskClass(_srSk);
+        var _srRk=_srRc?'<span class="risk '+_srRc+'" style="font-size:.68rem;padding:.1rem .4rem">'+e(_srSk)+'</span>':'';
+        var _srWc=wordingChanges[_sro.id]?'<span style="font-size:.7rem;background:#fff3cd;border:1px solid #ffc107;border-radius:3px;padding:.05rem .35rem;color:#7a5000;margin-left:.35rem" title="Wording changes detected">&#9998; Amendment</span>':'';
+        _spRows+='<div id="sum-row-'+e(_sro.id)+'" style="display:flex;align-items:center;gap:.5rem;padding:.35rem .4rem;border-radius:4px;'+((_srj%2===0)?'background:#f8f9fb':'background:#fff')+'">';
+        _spRows+='<input type="checkbox" class="sum-cb" data-obsid="'+e(_sro.id)+'" style="width:14px;height:14px;accent-color:#1a3557;cursor:pointer">';
+        _spRows+='<span style="background:#1a3557;color:#fff;border-radius:4px;padding:.1rem .4rem;font-size:.72rem;font-weight:700;white-space:nowrap">'+e(_srLbl)+'</span>';
+        _spRows+='<a href="#obs-'+_srId+'" style="flex:1;font-size:.85rem;font-weight:600;color:#1a3557;text-decoration:none" title="Jump to full observation">'+e(_sro.title||_sro.id)+'</a>';
+        _spRows+=_srRk+_srWc;
+        _spRows+='<span class="sum-dec-badge" style="display:none;font-size:.7rem;font-weight:700;color:#fff;border-radius:4px;padding:.1rem .5rem"></span>';
+        _spRows+='</div>';
+      }
+      _spRows+='</div>';
+      _spRows+='</div>';
+    }
+    summaryPanelHtml='<div style="max-width:1100px;margin:1.5rem auto 0;padding:0 1.5rem 1.5rem">'
+      +'<div style="border:2px solid #1a3557;border-radius:8px;overflow:hidden">'
+      +'<div style="background:#1a3557;color:#fff;padding:.75rem 1.2rem;display:flex;align-items:center;gap:.8rem;flex-wrap:wrap">'
+      +'<span style="font-weight:800;font-size:.95rem;flex:1">&#128203; Observation Summary &mdash; '+e(stageLabel)+'</span>'
+      +'<label style="display:flex;align-items:center;gap:.35rem;font-size:.8rem;cursor:pointer">'
+      +'<input type="checkbox" onchange="_rvSelectAll(this.checked)" style="accent-color:#c8960c;cursor:pointer"> Select All</label>'
+      +'<button onclick="_rvBulkDec(\'Approved\')" style="padding:.3rem .8rem;background:#27ae60;color:#fff;border:none;border-radius:5px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.78rem;font-weight:700;cursor:pointer">&#10003; Approve Selected</button>'
+      +'<button onclick="_rvBulkDec(\'Suggestion\')" style="padding:.3rem .8rem;background:#e67e22;color:#fff;border:none;border-radius:5px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.78rem;font-weight:700;cursor:pointer">&#128161; Suggestion</button>'
+      +'<button onclick="_rvBulkDec(\'Rejected\')" style="padding:.3rem .8rem;background:#c0392b;color:#fff;border:none;border-radius:5px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.78rem;font-weight:700;cursor:pointer">&#10007; Reject Selected</button>'
+      +'</div>'
+      +'<div style="padding:.7rem .9rem;background:#f8f9fb;font-size:.75rem;color:#555;border-bottom:1px solid #d8e0ea">'
+      +'Click an observation title to jump to its full detail. Use checkboxes + bulk buttons for group decisions. Individual decisions are set inside each observation card below.'
+      +'</div>'
+      +'<div style="padding:.6rem .8rem">'+_spRows+'</div>'
+      +'</div>'
+      +'</div>';
+  }
 
   // KPI counts
   var kpi={High:0,mh:0,lm:0,Low:0,total:all.length};
@@ -11746,7 +11848,69 @@ function generateIssuedReport(forROCopy){
       h+='<div style="margin-top:.65rem;background:#fff8e0;border:1.5px solid #e0c040;border-radius:6px;padding:.75rem 1rem">';
       h+='<div style="font-size:.73rem;font-weight:800;color:#7a4800;text-transform:uppercase;letter-spacing:.4px;margin-bottom:.3rem">&#9997; RO Manager Review Notes <span style="font-weight:400;color:#888;text-transform:none;font-size:.7rem">(correction instructions for auditor — not printed in final report)</span></div>';
       h+='<textarea name="ro_note_'+o.id+'" style="width:100%;box-sizing:border-box;border:1px solid #e0c060;border-radius:4px;padding:.5rem .75rem;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.85rem;color:#4a3000;background:#fffdf0;resize:vertical;min-height:52px;outline:none" placeholder="e.g. Please revise observation wording... / Update audit view... / Add financial figure..."></textarea>';
-      h+='</div></div>';
+      h+='</div>';
+      // ── Observation Decision ───────────────────────────────────────────────
+      h+='<div style="margin-top:.9rem;padding:.9rem 1rem;background:#f4f6fb;border:1.5px solid #b0c0dc;border-radius:7px">';
+      h+='<div style="font-size:.73rem;font-weight:800;color:#1a3557;text-transform:uppercase;letter-spacing:.4px;margin-bottom:.55rem">&#9997; Observation Decision <span style="font-weight:400;color:#888;text-transform:none;font-size:.7rem">(advisory — auditor acts on this)</span></div>';
+      h+='<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">';
+      h+='<button id="obs_btn_A_'+e(o.id)+'" onclick="_rvSetObsDec(\''+e(o.id)+'\',\'Approved\')" style="padding:.4rem 1rem;background:#27ae60;color:#fff;border:none;border-radius:5px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;opacity:0.5">&#10003; Approve</button>';
+      h+='<button id="obs_btn_S_'+e(o.id)+'" onclick="_rvSetObsDec(\''+e(o.id)+'\',\'Suggestion\')" style="padding:.4rem 1rem;background:#e67e22;color:#fff;border:none;border-radius:5px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;opacity:0.5">&#128161; Suggestion</button>';
+      h+='<button id="obs_btn_R_'+e(o.id)+'" onclick="_rvSetObsDec(\''+e(o.id)+'\',\'Rejected\')" style="padding:.4rem 1rem;background:#c0392b;color:#fff;border:none;border-radius:5px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;opacity:0.5">&#10007; Reject</button>';
+      h+='<input type="hidden" id="obs_dec_inp_'+e(o.id)+'" name="obs_dec_'+e(o.id)+'" value="">';
+      h+='</div>';
+      h+='<div id="obs_rej_box_'+e(o.id)+'" style="display:none;margin-top:.55rem">';
+      h+='<div style="font-size:.7rem;font-weight:700;color:#c0392b;margin-bottom:.25rem">Rejection Reason <span style="color:#c0392b">*</span> (mandatory)</div>';
+      h+='<textarea name="obs_rej_'+e(o.id)+'" style="width:100%;box-sizing:border-box;border:1.5px solid #e08080;border-radius:4px;padding:.45rem .7rem;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.84rem;color:#5a1010;background:#fff8f8;resize:vertical;min-height:48px;outline:none" placeholder="State the reason for rejection — auditor will see this..."></textarea>';
+      h+='</div>';
+      h+='</div>';
+      // ── Amendment Decision (only if wording changes detected) ──────────────
+      var _wcRo=wordingChanges[o.id];
+      if(_wcRo){
+        h+='<div style="margin-top:.9rem;padding:.9rem 1rem;background:#fffbf0;border:1.5px solid #e0c850;border-radius:7px">';
+        h+='<div style="font-size:.73rem;font-weight:800;color:#7a4800;text-transform:uppercase;letter-spacing:.4px;margin-bottom:.6rem">&#9998; Amendment Decision — Observation Wording Changes</div>';
+        if(_wcRo.obsOrig!=null&&_wcRo.obsEdit!=null&&_wcRo.obsOrig!==_wcRo.obsEdit){
+          h+='<div style="margin-bottom:.8rem">';
+          h+='<div style="font-size:.7rem;font-weight:700;color:#555;text-transform:uppercase;margin-bottom:.35rem">Observation Text</div>';
+          h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.45rem">';
+          h+='<div><div style="font-size:.68rem;font-weight:700;color:#555;text-transform:uppercase;margin-bottom:.2rem">Original (Bank Standard)</div>';
+          h+='<div style="border-left:3px solid #c0392b;padding:.45rem .7rem;background:#fdecea;border-radius:0 4px 4px 0;font-size:.83rem;white-space:pre-wrap;line-height:1.5">'+e(_wcRo.obsOrig)+'</div></div>';
+          h+='<div><div style="font-size:.68rem;font-weight:700;color:#555;text-transform:uppercase;margin-bottom:.2rem">Auditor\'s Version</div>';
+          h+='<div style="border-left:3px solid #e67e22;padding:.45rem .7rem;background:#fef9f0;border-radius:0 4px 4px 0;font-size:.83rem;white-space:pre-wrap;line-height:1.5">'+e(_wcRo.obsEdit)+'</div></div>';
+          h+='</div>';
+          h+='<div style="display:flex;gap:.45rem;align-items:center;flex-wrap:wrap">';
+          h+='<button id="wc_obs_btn_A_'+e(o.id)+'" onclick="_rvSetWCDec(\''+e(o.id)+'\',\'obs\',\'approved\')" style="padding:.35rem .85rem;background:#27ae60;color:#fff;border:none;border-radius:5px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;opacity:0.5">&#10003; Approve Amendment</button>';
+          h+='<button id="wc_obs_btn_R_'+e(o.id)+'" onclick="_rvSetWCDec(\''+e(o.id)+'\',\'obs\',\'rejected\')" style="padding:.35rem .85rem;background:#c0392b;color:#fff;border:none;border-radius:5px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;opacity:0.5">&#10007; Reject (use original)</button>';
+          h+='<input type="hidden" id="wc_obs_dec_inp_'+e(o.id)+'" name="wc_obs_dec_'+e(o.id)+'" value="">';
+          h+='</div>';
+          h+='<div id="wc_obs_rej_box_'+e(o.id)+'" style="display:none;margin-top:.4rem">';
+          h+='<div style="font-size:.7rem;font-weight:700;color:#c0392b;margin-bottom:.2rem">Rejection Reason <span style="color:#c0392b">*</span> (mandatory)</div>';
+          h+='<textarea name="wc_obs_rej_'+e(o.id)+'" style="width:100%;box-sizing:border-box;border:1.5px solid #e08080;border-radius:4px;padding:.4rem .65rem;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.82rem;color:#5a1010;background:#fff8f8;resize:vertical;min-height:40px;outline:none" placeholder="Why is this observation text amendment rejected?..."></textarea>';
+          h+='</div>';
+          h+='</div>';
+        }
+        if(_wcRo.recOrig!=null&&_wcRo.recEdit!=null&&_wcRo.recOrig!==_wcRo.recEdit){
+          h+='<div style="'+((_wcRo.obsOrig!=null&&_wcRo.obsEdit!=null&&_wcRo.obsOrig!==_wcRo.obsEdit)?'margin-top:.8rem;border-top:1px solid #e8d890;padding-top:.8rem':'')+'">';
+          h+='<div style="font-size:.7rem;font-weight:700;color:#555;text-transform:uppercase;margin-bottom:.35rem">Recommendation Text</div>';
+          h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.45rem">';
+          h+='<div><div style="font-size:.68rem;font-weight:700;color:#555;text-transform:uppercase;margin-bottom:.2rem">Original (Bank Standard)</div>';
+          h+='<div style="border-left:3px solid #1a6030;padding:.45rem .7rem;background:#e9f7ef;border-radius:0 4px 4px 0;font-size:.83rem;white-space:pre-wrap;line-height:1.5">'+e(_wcRo.recOrig)+'</div></div>';
+          h+='<div><div style="font-size:.68rem;font-weight:700;color:#555;text-transform:uppercase;margin-bottom:.2rem">Auditor\'s Version</div>';
+          h+='<div style="border-left:3px solid #2980b9;padding:.45rem .7rem;background:#eaf4fb;border-radius:0 4px 4px 0;font-size:.83rem;white-space:pre-wrap;line-height:1.5">'+e(_wcRo.recEdit)+'</div></div>';
+          h+='</div>';
+          h+='<div style="display:flex;gap:.45rem;align-items:center;flex-wrap:wrap">';
+          h+='<button id="wc_rec_btn_A_'+e(o.id)+'" onclick="_rvSetWCDec(\''+e(o.id)+'\',\'rec\',\'approved\')" style="padding:.35rem .85rem;background:#27ae60;color:#fff;border:none;border-radius:5px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;opacity:0.5">&#10003; Approve Amendment</button>';
+          h+='<button id="wc_rec_btn_R_'+e(o.id)+'" onclick="_rvSetWCDec(\''+e(o.id)+'\',\'rec\',\'rejected\')" style="padding:.35rem .85rem;background:#c0392b;color:#fff;border:none;border-radius:5px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;opacity:0.5">&#10007; Reject (use original)</button>';
+          h+='<input type="hidden" id="wc_rec_dec_inp_'+e(o.id)+'" name="wc_rec_dec_'+e(o.id)+'" value="">';
+          h+='</div>';
+          h+='<div id="wc_rec_rej_box_'+e(o.id)+'" style="display:none;margin-top:.4rem">';
+          h+='<div style="font-size:.7rem;font-weight:700;color:#c0392b;margin-bottom:.2rem">Rejection Reason <span style="color:#c0392b">*</span> (mandatory)</div>';
+          h+='<textarea name="wc_rec_rej_'+e(o.id)+'" style="width:100%;box-sizing:border-box;border:1.5px solid #e08080;border-radius:4px;padding:.4rem .65rem;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.82rem;color:#5a1010;background:#fff8f8;resize:vertical;min-height:40px;outline:none" placeholder="Why is this recommendation text amendment rejected?..."></textarea>';
+          h+='</div>';
+          h+='</div>';
+        }
+        h+='</div>';
+      }
+      h+='</div>';
     }
     h+='</div>';
     // Store verbatim data for shared modal
@@ -12369,6 +12533,7 @@ function generateIssuedReport(forROCopy){
     +((H.pbn||H.pb)?'<div class="meta-item"><div class="label">Prepared By</div><div class="value">'+e((H.pbn&&H.pb)?H.pbn+' ('+H.pb+')':(H.pbn||H.pb))+'</div></div>':'')
     +'</div>'
     +'</div>\n'
+    +(isReview ? summaryPanelHtml : '')
 
     // Synopsis section
     +'<div class="section" id="synopsis">'
