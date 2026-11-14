@@ -12573,7 +12573,7 @@ function generateIssuedReport(forROCopy){
     // Top nav
     +'<nav class="topnav">'
     +'<div class="brand">Beaconhouse &nbsp;<span>Systems &amp; Audit</span></div>'
-    +'<div style="display:flex;align-items:center;gap:.5rem"><a href="#synopsis">Synopsis</a><a href="#repeated-syn">Repeated</a><a href="#new-syn">New Findings</a>'+(annexures.length?'<a href="#annexures">Annexures</a>':'')+'<a href="#methodology">Methodology</a></div>'
+    +'<div style="display:flex;align-items:center;gap:.5rem"><a href="#synopsis">Synopsis</a><a href="#repeated-syn">Repeated</a><a href="#new-syn">New Findings</a>'+(annexures.length?'<a href="#annexures">Annexures</a>':'')+(!isReview&&!forROCopy&&wcList.length?'<a href="#part2-amendments" style="color:#27ae60;font-weight:800">&#10003; Amendments</a>':'')+'<a href="#methodology">Methodology</a></div>'
     +(isReview?'<span style="font-size:.8rem;font-weight:700;color:#c8960c;letter-spacing:.5px">'+stageLabel.toUpperCase()+'</span>':'')
     +(forROCopy&&!isReview?'<button onclick="saveDraftResponses()" style="padding:.35rem 1rem;background:#c8960c;color:#fff;border:none;border-radius:20px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.3px">&#128190; Save My Responses</button>':'')
     +'</nav>\n'
@@ -12619,6 +12619,41 @@ function generateIssuedReport(forROCopy){
     +'<div class="kpi kpi-btn" style="border-top:3px solid var(--low)" onclick="openKpiModal(\'resolved\')" title="Resolved This Cycle"><div class="num" style="color:var(--low)">'+totRes+'</div><div class="lbl">Resolved This Cycle</div><div class="kpi-hint">click to view</div></div>'
     +'</div>'
 
+    // Amendments summary card (final issuance only, when amendments exist)
+    +(!isReview&&!forROCopy&&wcList.length?(function(){
+      var ac='';
+      ac+='<div style="margin-bottom:1.5rem;border:2px solid #a9dfbf;border-radius:10px;overflow:hidden" id="amend-synopsis">';
+      ac+='<div style="background:#1a6030;color:#fff;padding:.7rem 1.2rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">';
+      ac+='<div style="font-size:.88rem;font-weight:800;letter-spacing:.4px">&#9998; AMENDMENTS TO STANDARD OBSERVATION TEXT ('+wcList.length+' observation'+(wcList.length!==1?'s':'')+')</div>';
+      ac+='<a href="#part2-amendments" style="font-size:.75rem;font-weight:700;color:#a9dfbf;text-decoration:none">&#8595; View Full Amendments Section</a>';
+      ac+='</div>';
+      ac+='<div style="background:#f0fff4;padding:.8rem 1.2rem">';
+      ac+='<table style="width:100%;border-collapse:collapse;font-size:.82rem">';
+      ac+='<thead><tr style="border-bottom:2px solid #c0d8c0">';
+      ac+='<th style="text-align:left;padding:.35rem .5rem;color:#1a3557;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;width:60px">Obs #</th>';
+      ac+='<th style="text-align:left;padding:.35rem .5rem;color:#1a3557;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px">Observation Title</th>';
+      ac+='<th style="text-align:left;padding:.35rem .5rem;color:#1a3557;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;width:120px">Field Amended</th>';
+      ac+='<th style="text-align:left;padding:.35rem .5rem;color:#1a3557;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;width:140px">RO Decision</th>';
+      ac+='</tr></thead><tbody>';
+      for(var _asi=0;_asi<wcList.length;_asi++){
+        var _aw=wcList[_asi];
+        var _fields=[];
+        if(_aw.hasObs) _fields.push('Observation text');
+        if(_aw.hasRec)  _fields.push('Recommendation');
+        var _decBadge=(_aw.obsApproved||_aw.recApproved)
+          ?'<span style="background:#27ae60;color:#fff;border-radius:4px;padding:.12rem .5rem;font-size:.7rem;font-weight:800">&#10003; Approved</span>'
+          :'<span style="background:#fff8e0;color:#7a4800;border:1px solid #e0c060;border-radius:4px;padding:.12rem .5rem;font-size:.7rem;font-weight:700">&#9203; Pending</span>';
+        ac+='<tr style="border-bottom:1px solid #d0ecd8'+((_asi%2===0)?';background:#f8fffe':';background:#f0fff8')+'">';
+        ac+='<td style="padding:.4rem .5rem"><span style="background:#1a6030;color:#fff;border-radius:4px;padding:.1rem .45rem;font-size:.72rem;font-weight:700">'+e(_aw.lbl)+'</span></td>';
+        ac+='<td style="padding:.4rem .5rem;font-weight:600;color:#1e2d40"><a href="#obs-'+e(_aw.lbl.replace('.','-'))+'" style="color:#1a3557;text-decoration:none">'+e(_aw.title)+'</a></td>';
+        ac+='<td style="padding:.4rem .5rem;color:#555">'+_fields.join(', ')+'</td>';
+        ac+='<td style="padding:.4rem .5rem">'+_decBadge+'</td>';
+        ac+='</tr>';
+      }
+      ac+='</tbody></table>';
+      ac+='</div></div>';
+      return ac;
+    })():'')
     +resTable
     +highBox
     +cosoHtml
