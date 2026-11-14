@@ -11368,7 +11368,7 @@ function generateIssuedReport(forROCopy){
   var isReview=(forROCopy==='ro_review'||forROCopy==='ho_review');
   var reviewRole=isReview?forROCopy.replace('_review',''):null;
   var stageLabel=reviewRole==='ro'?'RO Manager Review':reviewRole==='ho'?'HO Final Review':'';
-  if(isReview) WC_detectAll();
+  WC_detectAll();
   var dbObs=_getSelObs(selIds);
   var cuObs=[]; for(var k=0;k<customs.length;k++){if(selIds[customs[k].id])cuObs.push(customs[k]);}
   var all=dbObs.concat(cuObs);
@@ -12139,11 +12139,87 @@ function generateIssuedReport(forROCopy){
       +'});\n'
       +'<\/script>\n';
   }
+  // ── Part 2: Amendments section (final issuance only) ────────────────────────
+  var amendHtml='';
+  var amendDataJson='[]';
+  if(!isReview&&!forROCopy){
+    var wcIds2=Object.keys(wordingChanges);
+    var wcList=[];
+    for(var wci2=0;wci2<wcIds2.length;wci2++){
+      var wcId2=wcIds2[wci2]; var wc2=wordingChanges[wcId2]; if(!wc2) continue;
+      var wcObs2=null;
+      for(var wco2=0;wco2<all.length;wco2++){if(all[wco2].id===wcId2){wcObs2=all[wco2];break;}}
+      if(!wcObs2) continue;
+      wcList.push({lbl:labMap[wcId2]||'?',title:wcObs2.title,id:wcId2,wc:wc2});
+    }
+    wcList.sort(function(a,b){return a.lbl.localeCompare(b.lbl,void 0,{numeric:true});});
+    var adArr=[];
+    for(var adi=0;adi<wcList.length;adi++){
+      var adw=wcList[adi];
+      adArr.push({lbl:adw.lbl,title:adw.title,obsOrig:adw.wc.obsOrig||null,obsEdit:adw.wc.obsEdit||null,recOrig:adw.wc.recOrig||null,recEdit:adw.wc.recEdit||null});
+    }
+    amendDataJson=JSON.stringify(adArr).replace(/<\/script>/gi,'<\\/script>');
+    if(wcList.length){
+      amendHtml='<div id="part2-amendments" style="background:#fff8f8;border-top:4px solid #c0392b;margin-top:3rem">'
+        +'<div style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem">'
+        +'<div style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:1.5rem;padding:1rem 1.2rem;background:#fdecea;border:2px solid #c0392b;border-radius:8px">'
+        +'<span style="font-size:1.5rem;flex-shrink:0">&#128683;</span>'
+        +'<div style="flex:1"><div style="font-size:1rem;font-weight:800;color:#c0392b;text-transform:uppercase;letter-spacing:.5px">Part 2 &mdash; Amendments to Standard Observation Text</div>'
+        +'<div style="font-size:.82rem;color:#8a2020;margin-top:.2rem">INTERNAL &mdash; NOT FOR CIRCULATION &nbsp;|&nbsp; Use buttons to save copies before forwarding to branch</div></div>'
+        +'<div style="display:flex;gap:.7rem;flex-shrink:0;flex-wrap:wrap">'
+        +'<button onclick="saveCirculationCopy()" style="padding:.5rem 1rem;background:#1a3557;color:#fff;border:none;border-radius:6px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap">&#128196; Save Circulation Copy</button>'
+        +'<button onclick="saveAmendmentsCopy()" style="padding:.5rem 1rem;background:#c0392b;color:#fff;border:none;border-radius:6px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap">&#128229; Save Amendments Copy</button>'
+        +'</div></div>'
+        +'<div id="amend-items-wrap">';
+      for(var wai=0;wai<wcList.length;wai++){
+        var wa=wcList[wai];
+        amendHtml+='<div style="border:1px solid #f0b0b0;border-radius:8px;padding:1rem 1.2rem;margin-bottom:1rem;background:#fffbfb">'
+          +'<div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.8rem">'
+          +'<span style="background:#c0392b;color:#fff;border-radius:5px;padding:.18rem .55rem;font-size:.75rem;font-weight:700">'+e(wa.lbl)+'</span>'
+          +'<span style="font-size:.95rem;font-weight:700;color:#1e2d40">'+e(wa.title)+'</span>'
+          +'</div>';
+        if(wa.wc.obsOrig!==null&&wa.wc.obsEdit!==null){
+          amendHtml+='<div style="margin-bottom:.8rem">'
+            +'<div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#8a2020;margin-bottom:.4rem">&#9998; Observation Text &mdash; Amended</div>'
+            +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">'
+            +'<div><div style="font-size:.7rem;font-weight:700;color:#555;margin-bottom:.2rem;text-transform:uppercase">Original (Bank Standard)</div>'
+            +'<div style="border-left:3px solid #c0392b;padding:.5rem .8rem;background:#fdecea;border-radius:0 5px 5px 0;font-size:.83rem;white-space:pre-wrap;line-height:1.5">'+e(wa.wc.obsOrig)+'</div></div>'
+            +'<div><div style="font-size:.7rem;font-weight:700;color:#555;margin-bottom:.2rem;text-transform:uppercase">Auditor\'s Version (Proposed Amendment)</div>'
+            +'<div style="border-left:3px solid #e67e22;padding:.5rem .8rem;background:#fef9f0;border-radius:0 5px 5px 0;font-size:.83rem;white-space:pre-wrap;line-height:1.5">'+e(wa.wc.obsEdit)+'</div></div>'
+            +'</div></div>';
+        }
+        if(wa.wc.recOrig!==null&&wa.wc.recEdit!==null){
+          amendHtml+='<div style="margin-bottom:.8rem">'
+            +'<div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#1a6030;margin-bottom:.4rem">&#9998; Recommendation Text &mdash; Amended</div>'
+            +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">'
+            +'<div><div style="font-size:.7rem;font-weight:700;color:#555;margin-bottom:.2rem;text-transform:uppercase">Original (Bank Standard)</div>'
+            +'<div style="border-left:3px solid #1a6030;padding:.5rem .8rem;background:#e9f7ef;border-radius:0 5px 5px 0;font-size:.83rem;white-space:pre-wrap;line-height:1.5">'+e(wa.wc.recOrig)+'</div></div>'
+            +'<div><div style="font-size:.7rem;font-weight:700;color:#555;margin-bottom:.2rem;text-transform:uppercase">Auditor\'s Version (Proposed Amendment)</div>'
+            +'<div style="border-left:3px solid #2980b9;padding:.5rem .8rem;background:#eaf4fb;border-radius:0 5px 5px 0;font-size:.83rem;white-space:pre-wrap;line-height:1.5">'+e(wa.wc.recEdit)+'</div></div>'
+            +'</div></div>';
+        }
+        amendHtml+='</div>';
+      }
+      amendHtml+='</div></div></div>';
+    } else {
+      amendHtml='<div id="part2-amendments" style="background:#f0faf4;border-top:4px solid #27ae60;margin-top:3rem">'
+        +'<div style="max-width:1100px;margin:0 auto;padding:1.5rem">'
+        +'<div style="display:flex;align-items:center;gap:.8rem;padding:.8rem 1.2rem;background:#e9f7ef;border:1.5px solid #a9dfbf;border-radius:8px">'
+        +'<span style="font-size:1.3rem">&#10003;</span>'
+        +'<div style="flex:1"><div style="font-weight:700;color:#1a6030">Part 2 &mdash; Amendments: None Detected</div>'
+        +'<div style="font-size:.8rem;color:#3a7050;margin-top:.1rem">All observation and recommendation text matches the standard bank text. No amendments to report to Administrator.</div></div>'
+        +'<button onclick="saveCirculationCopy()" style="padding:.5rem 1rem;background:#1a3557;color:#fff;border:none;border-radius:6px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">&#128196; Save Circulation Copy</button>'
+        +'</div>'
+        +'</div></div>';
+    }
+  }
+
   var html='<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n'
     +'<meta name="viewport" content="width=device-width,initial-scale=1.0">\n'
     +'<title>'+(isReview?stageLabel+' Copy':forROCopy?'RO Manager Review Copy':'Issued Audit Report')+' | '+e(brDisp)+(H.rno?' | Report No. '+e(H.rno):'')+'</title>\n'
     +(isReview?'<script type="application/json" id="bss-session">'+_rvSessJson+'<\/script>\n<script type="application/json" id="bss-decisions">null<\/script>\n'
                :(forROCopy?saveScript:''))
+    +(!isReview&&!forROCopy?'<script type="application/json" id="bss-amend-data">'+amendDataJson+'<\/script>\n':'')
     +'<style>\n'
     +'  :root{--primary:#1a3557;--accent:#c8960c;--high:#c0392b;--mh:#e67e22;--lm:#2980b9;--low:#27ae60;--bg:#f4f6f9;--card:#fff;--border:#dde2ea;--text:#2c3e50;--muted:#7f8c8d}\n'
     +'  *{box-sizing:border-box;margin:0;padding:0}\n'
@@ -12751,6 +12827,63 @@ function generateIssuedReport(forROCopy){
     +'  _hlRow=null;\n'
     +'});\n'
 
+    +'function saveCirculationCopy(){\n'
+    +'  var el=document.getElementById("part2-amendments");\n'
+    +'  if(el){el.style.display="none";}\n'
+    +'  var src=new XMLSerializer().serializeToString(document);\n'
+    +'  if(el){el.style.display="";}\n'
+    +'  var blob=new Blob([src],{type:"text/html"});\n'
+    +'  var a=document.createElement("a");\n'
+    +'  a.href=URL.createObjectURL(blob);\n'
+    +'  a.download=document.title.replace(/[^a-zA-Z0-9\\-_ ]/g,"_")+"_Circulation.html";\n'
+    +'  document.body.appendChild(a);a.click();document.body.removeChild(a);\n'
+    +'  URL.revokeObjectURL(a.href);\n'
+    +'}\n'
+    +'function saveAmendmentsCopy(){\n'
+    +'  var el=document.getElementById("part2-amendments");\n'
+    +'  if(!el){alert("No amendments section found.");return;}\n'
+    +'  var sc=document.getElementById("bss-amend-data");\n'
+    +'  var rows=[];\n'
+    +'  try{if(sc){rows=JSON.parse(sc.textContent||"[]");}}\n'
+    +'  catch(x){}\n'
+    +'  var body="";\n'
+    +'  for(var i=0;i<rows.length;i++){\n'
+    +'    var r=rows[i];\n'
+    +'    body+=\'<div style="border:1px solid #f0b0b0;border-radius:8px;padding:1rem 1.2rem;margin-bottom:1rem;background:#fffbfb">\';\n'
+    +'    body+=\'<div style="font-weight:700;color:#1e2d40;margin-bottom:.6rem">\'+r.lbl+\'. \'+r.title+\'</div>\';\n'
+    +'    if(r.obsOrig!==null&&r.obsEdit!==null){\n'
+    +'      body+=\'<div style="margin-bottom:.6rem"><div style="font-size:.75rem;font-weight:800;text-transform:uppercase;color:#8a2020;margin-bottom:.3rem">Observation</div>\';\n'
+    +'      body+=\'<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">\';\n'
+    +'      body+=\'<div><div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#555;margin-bottom:.2rem">Original</div><div style="border-left:3px solid #c0392b;padding:.5rem .7rem;background:#fdecea;white-space:pre-wrap;font-size:.82rem">\'+r.obsOrig+\'</div></div>\';\n'
+    +'      body+=\'<div><div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#555;margin-bottom:.2rem">Proposed Amendment</div><div style="border-left:3px solid #e67e22;padding:.5rem .7rem;background:#fef9f0;white-space:pre-wrap;font-size:.82rem">\'+r.obsEdit+\'</div></div>\';\n'
+    +'      body+=\'</div></div>\';\n'
+    +'    }\n'
+    +'    if(r.recOrig!==null&&r.recEdit!==null){\n'
+    +'      body+=\'<div style="margin-bottom:.6rem"><div style="font-size:.75rem;font-weight:800;text-transform:uppercase;color:#1a6030;margin-bottom:.3rem">Recommendation</div>\';\n'
+    +'      body+=\'<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">\';\n'
+    +'      body+=\'<div><div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#555;margin-bottom:.2rem">Original</div><div style="border-left:3px solid #1a6030;padding:.5rem .7rem;background:#e9f7ef;white-space:pre-wrap;font-size:.82rem">\'+r.recOrig+\'</div></div>\';\n'
+    +'      body+=\'<div><div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#555;margin-bottom:.2rem">Proposed Amendment</div><div style="border-left:3px solid #2980b9;padding:.5rem .7rem;background:#eaf4fb;white-space:pre-wrap;font-size:.82rem">\'+r.recEdit+\'</div></div>\';\n'
+    +'      body+=\'</div></div>\';\n'
+    +'    }\n'
+    +'    body+=\'</div>\';\n'
+    +'  }\n'
+    +'  var out="<!DOCTYPE html><html><head><meta charset=\'UTF-8\'><title>Amendments Copy</title>";\n'
+    +'  out+="<style>body{font-family:\'Segoe UI\',Arial,sans-serif;max-width:1100px;margin:0 auto;padding:2rem;background:#fff8f8;color:#2c3e50}";\n'
+    +'  out+="h1{font-size:1.1rem;color:#c0392b;text-transform:uppercase;letter-spacing:.5px;border-bottom:3px solid #c0392b;padding-bottom:.5rem}</style>";\n'
+    +'  out+="</head><body>";\n'
+    +'  out+="<div style=\'padding:.8rem 1.2rem;background:#fdecea;border:2px solid #c0392b;border-radius:8px;margin-bottom:1.5rem\'>";\n'
+    +'  out+="<div style=\'font-weight:800;color:#c0392b;font-size:.9rem;text-transform:uppercase\'>&#128683; Amendments to Standard Observation Text &mdash; INTERNAL</div>";\n'
+    +'  out+="<div style=\'font-size:.78rem;color:#8a2020;margin-top:.2rem\'>For Administrator use only. Update the observation bank accordingly.</div></div>";\n'
+    +'  out+="<h1>Amendments ("+rows.length+" observation"+(rows.length!==1?"s":"")+")</h1>";\n'
+    +'  out+=body;\n'
+    +'  out+="</body></html>";\n'
+    +'  var blob=new Blob([out],{type:"text/html"});\n'
+    +'  var a=document.createElement("a");\n'
+    +'  a.href=URL.createObjectURL(blob);\n'
+    +'  a.download=document.title.replace(/[^a-zA-Z0-9\\-_ ]/g,"_")+"_Amendments.html";\n'
+    +'  document.body.appendChild(a);a.click();document.body.removeChild(a);\n'
+    +'  URL.revokeObjectURL(a.href);\n'
+    +'}\n'
     +'<\/script>\n'
     +(!isReview&&!forROCopy?'<script id="bhs-session-data" type="application/json">'+JSON.stringify((function(){var s=captureSession();s.ts=new Date().toISOString();s.ver=0;return s;})())+'<\/script>\n':'')
     +(forROCopy&&!isReview
@@ -12761,6 +12894,7 @@ function generateIssuedReport(forROCopy){
         +'</div>'
       :'')
     +(isReview ? _rvTrailer : '')
+    +(!isReview&&!forROCopy ? amendHtml : '')
     +'</body>\n</html>';
 
   if(forROCopy||isReview){ return html; }
