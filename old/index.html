@@ -12386,17 +12386,18 @@ function generateIssuedReport(forROCopy){
     }
     amendDataJson=JSON.stringify(adArr).replace(/<\/script>/gi,'<\\/script>');
     if(wcList.length){
-      amendHtml='<div id="part2-amendments" style="background:#fff8f8;border-top:4px solid #c0392b;margin-top:3rem">'
-        +'<div style="max-width:1100px;margin:0 auto;padding:2rem 1.5rem">'
-        +'<div style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:1.5rem;padding:1rem 1.2rem;background:#fdecea;border:2px solid #c0392b;border-radius:8px">'
+      amendHtml='<div id="amend-modal-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.55);z-index:9999;overflow-y:auto" onclick="if(event.target===this)closeAmendModal()">'
+        +'<div style="max-width:1000px;margin:2rem auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.35)">'
+        +'<div style="display:flex;align-items:flex-start;gap:1rem;padding:1rem 1.2rem;background:#fdecea;border-bottom:2px solid #c0392b">'
         +'<span style="font-size:1.5rem;flex-shrink:0">&#128683;</span>'
         +'<div style="flex:1"><div style="font-size:1rem;font-weight:800;color:#c0392b;text-transform:uppercase;letter-spacing:.5px">Part 2 &mdash; Amendments to Standard Observation Text</div>'
-        +'<div style="font-size:.82rem;color:#8a2020;margin-top:.2rem">INTERNAL &mdash; NOT FOR CIRCULATION &nbsp;|&nbsp; Use buttons to save copies before forwarding to branch</div></div>'
-        +'<div style="display:flex;gap:.7rem;flex-shrink:0;flex-wrap:wrap">'
+        +'<div style="font-size:.82rem;color:#8a2020;margin-top:.2rem">INTERNAL &mdash; NOT FOR CIRCULATION &nbsp;|&nbsp; Use buttons below to save copies before forwarding to branch</div></div>'
+        +'<div style="display:flex;gap:.7rem;flex-shrink:0;flex-wrap:wrap;align-items:center;margin-top:.4rem">'
         +'<button onclick="saveCirculationCopy()" style="padding:.5rem 1rem;background:#1a3557;color:#fff;border:none;border-radius:6px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap">&#128196; Save Circulation Copy</button>'
         +'<button onclick="saveAmendmentsCopy()" style="padding:.5rem 1rem;background:#c0392b;color:#fff;border:none;border-radius:6px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap">&#128229; Save Amendments Copy</button>'
+        +'<button onclick="closeAmendModal()" style="padding:.5rem .9rem;background:#555;color:#fff;border:none;border-radius:6px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;white-space:nowrap">&#10005; Close</button>'
         +'</div></div>'
-        +'<div id="amend-items-wrap">';
+        +'<div style="padding:1.5rem" id="amend-items-wrap">';
       for(var wai=0;wai<wcList.length;wai++){
         var wa=wcList[wai];
         amendHtml+='<div style="border:1px solid #f0b0b0;border-radius:8px;padding:1rem 1.2rem;margin-bottom:1rem;background:#fffbfb">'
@@ -12435,11 +12436,11 @@ function generateIssuedReport(forROCopy){
       }
       amendHtml+='</div></div></div>';
     } else {
-      amendHtml='<div id="part2-amendments" style="background:#f0faf4;border-top:4px solid #27ae60;margin-top:3rem">'
+      amendHtml='<div id="amend-no-changes" style="background:#f0faf4;border-top:4px solid #27ae60;margin-top:3rem">'
         +'<div style="max-width:1100px;margin:0 auto;padding:1.5rem">'
         +'<div style="display:flex;align-items:center;gap:.8rem;padding:.8rem 1.2rem;background:#e9f7ef;border:1.5px solid #a9dfbf;border-radius:8px">'
         +'<span style="font-size:1.3rem">&#10003;</span>'
-        +'<div style="flex:1"><div style="font-weight:700;color:#1a6030">Part 2 &mdash; Amendments: None Detected</div>'
+        +'<div style="flex:1"><div style="font-weight:700;color:#1a6030">No Amendments Detected</div>'
         +'<div style="font-size:.8rem;color:#3a7050;margin-top:.1rem">All observation and recommendation text matches the standard bank text. No amendments to report to Administrator.</div></div>'
         +'<button onclick="saveCirculationCopy()" style="padding:.5rem 1rem;background:#1a3557;color:#fff;border:none;border-radius:6px;font-family:\'Segoe UI\',Arial,sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">&#128196; Save Circulation Copy</button>'
         +'</div>'
@@ -12573,7 +12574,7 @@ function generateIssuedReport(forROCopy){
     // Top nav
     +'<nav class="topnav">'
     +'<div class="brand">Beaconhouse &nbsp;<span>Systems &amp; Audit</span></div>'
-    +'<div style="display:flex;align-items:center;gap:.5rem"><a href="#synopsis">Synopsis</a><a href="#repeated-syn">Repeated</a><a href="#new-syn">New Findings</a>'+(annexures.length?'<a href="#annexures">Annexures</a>':'')+(!isReview&&!forROCopy&&wcList.length?'<a href="#part2-amendments" style="color:#27ae60;font-weight:800">&#10003; Amendments</a>':'')+'<a href="#methodology">Methodology</a></div>'
+    +'<div style="display:flex;align-items:center;gap:.5rem"><a href="#synopsis">Synopsis</a><a href="#repeated-syn">Repeated</a><a href="#new-syn">New Findings</a>'+(annexures.length?'<a href="#annexures">Annexures</a>':'')+(!isReview&&!forROCopy&&wcList.length?'<a id="amend-nav-link" href="#" onclick="openAmendModal();return false;" style="color:#27ae60;font-weight:800">&#10003; Amendments</a>':'')+'<a href="#methodology">Methodology</a></div>'
     +(isReview?'<span style="font-size:.8rem;font-weight:700;color:#c8960c;letter-spacing:.5px">'+stageLabel.toUpperCase()+'</span>':'')
     +(forROCopy&&!isReview?'<button onclick="saveDraftResponses()" style="padding:.35rem 1rem;background:#c8960c;color:#fff;border:none;border-radius:20px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.3px">&#128190; Save My Responses</button>':'')
     +'</nav>\n'
@@ -12625,7 +12626,7 @@ function generateIssuedReport(forROCopy){
       ac+='<div style="margin-bottom:1.5rem;border:2px solid #a9dfbf;border-radius:10px;overflow:hidden" id="amend-synopsis">';
       ac+='<div style="background:#1a6030;color:#fff;padding:.7rem 1.2rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">';
       ac+='<div style="font-size:.88rem;font-weight:800;letter-spacing:.4px">&#9998; AMENDMENTS TO STANDARD OBSERVATION TEXT ('+wcList.length+' observation'+(wcList.length!==1?'s':'')+')</div>';
-      ac+='<a href="#part2-amendments" style="font-size:.75rem;font-weight:700;color:#a9dfbf;text-decoration:none">&#8595; View Full Amendments Section</a>';
+      ac+='<button onclick="openAmendModal()" style="font-size:.75rem;font-weight:700;color:#a9dfbf;background:transparent;border:1px solid #a9dfbf;border-radius:4px;padding:.2rem .7rem;cursor:pointer;font-family:\'Segoe UI\',Arial,sans-serif">&#8595; View Full Amendments</button>';
       ac+='</div>';
       ac+='<div style="background:#f0fff4;padding:.8rem 1.2rem">';
       ac+='<table style="width:100%;border-collapse:collapse;font-size:.82rem">';
@@ -13097,10 +13098,10 @@ function generateIssuedReport(forROCopy){
     +'});\n'
 
     +'function saveCirculationCopy(){\n'
-    +'  var _hide=["part2-amendments","amend-synopsis"];\n'
+    +'  var _hide=["amend-modal-overlay","amend-no-changes","amend-synopsis"];\n'
     +'  var _hidden=[];\n'
     +'  for(var _hi=0;_hi<_hide.length;_hi++){var _hel=document.getElementById(_hide[_hi]);if(_hel){_hel.style.display="none";_hidden.push(_hel);}}\n'
-    +'  var _navAmend=document.querySelector("a[href=\'#part2-amendments\']");\n'
+    +'  var _navAmend=document.getElementById("amend-nav-link");\n'
     +'  if(_navAmend){_navAmend.style.display="none";}\n'
     +'  var src=new XMLSerializer().serializeToString(document);\n'
     +'  for(var _ri=0;_ri<_hidden.length;_ri++){_hidden[_ri].style.display="";}\n'
@@ -13113,7 +13114,7 @@ function generateIssuedReport(forROCopy){
     +'  URL.revokeObjectURL(a.href);\n'
     +'}\n'
     +'function saveAmendmentsCopy(){\n'
-    +'  var el=document.getElementById("part2-amendments");\n'
+    +'  var el=document.getElementById("amend-modal-overlay");\n'
     +'  if(!el){alert("No amendments section found.");return;}\n'
     +'  var sc=document.getElementById("bss-amend-data");\n'
     +'  var rows=[];\n'
@@ -13156,6 +13157,14 @@ function generateIssuedReport(forROCopy){
     +'  a.download=document.title.replace(/[^a-zA-Z0-9\\-_ ]/g,"_")+"_Amendments.html";\n'
     +'  document.body.appendChild(a);a.click();document.body.removeChild(a);\n'
     +'  URL.revokeObjectURL(a.href);\n'
+    +'}\n'
+    +'function openAmendModal(){\n'
+    +'  var m=document.getElementById("amend-modal-overlay");\n'
+    +'  if(m){m.style.display="block";document.body.style.overflow="hidden";}\n'
+    +'}\n'
+    +'function closeAmendModal(){\n'
+    +'  var m=document.getElementById("amend-modal-overlay");\n'
+    +'  if(m){m.style.display="none";document.body.style.overflow="";}\n'
     +'}\n'
     +'<\/script>\n'
     +(!isReview&&!forROCopy?'<script id="bhs-session-data" type="application/json">'+JSON.stringify((function(){var s=captureSession();s.ts=new Date().toISOString();s.ver=0;return s;})())+'<\/script>\n':'')
