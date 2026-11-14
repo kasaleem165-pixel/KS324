@@ -282,6 +282,23 @@ When telling Kamran "sanity check done", explicitly state:
 - Which in-memory maps were confirmed unaffected
 - Result of syntax validation
 
+### Step 8 — File-generating features: mandatory round-trip test
+
+This step was added after the Save Draft bug (Nov 2026) where only the first save was tested. The second save — what real auditees actually do — was never checked, causing duplicate `bhs-resp-data` scripts and lost responses.
+
+Any feature that **generates a file for use outside BRAINS** (Auditee Copy, response files, export files, follow-up files) must pass ALL of the following before being marked done:
+
+| # | Test | What to verify |
+|---|---|---|
+| 1 | **Generate** | File is produced without errors |
+| 2 | **Open fresh** | Open the file as if on a new machine (clear localStorage or use a private window) — all data appears correctly |
+| 3 | **Edit and save once** | Make a change, save → verify the saved file contains the change |
+| 4 | **Save a second time** (repeat-save test) | Save again without closing the file → verify the second save still contains all data, no data from the first save is lost or duplicated |
+| 5 | **Load back into BRAINS** | Use the Load function to import the file → verify BRAINS shows all data correctly — text, attachments, order, every field |
+| 6 | **Multi-auditee chain** (where applicable) | If the file can be forwarded to a second person, simulate: Person A fills partly → saves → Person B opens → fills rest → saves → auditor loads → verify both sets of responses are present |
+
+**The rule**: never mark a file-generating feature complete after testing only the first use. Always test the second save and the full round-trip back into BRAINS.
+
 **If any step raises doubt — STOP and ask Kamran before proceeding.**
 
 ## Database Structure
