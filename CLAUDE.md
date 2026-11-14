@@ -475,6 +475,125 @@ Data stored in `DB.budget[]` only — never touches sales, animals, or payments.
 - **To unlock for editing**: Review → Unprotect Sheet → enter `brains2026`
 - **Tabs**: Branch Calculator (navy) · Scoring Criteria (gold) · Audit Report (green)
 
+## Final Issuance Report — Format Reference
+
+**Source file**: `Audit_Report_51_FCC_Lahore_3.html` (Report No. 206-LMA, 51 FCC Campus, Lahore — shared by Kamran Nov 2026 as the agreed standard format)
+
+This is the agreed format for the final audit issuance report that BRAINS must generate. Every future session must use this as the reference when building or improving the report generation feature.
+
+### Color Palette (CSS variables)
+```css
+--primary: #1a3557   /* dark navy */
+--accent:  #c8960c   /* gold */
+--high:    #c0392b   /* red — High risk */
+--mh:      #e67e22   /* orange — Medium-High */
+--lm:      #2980b9   /* blue — Low-Medium */
+--low:     #27ae60   /* green — Low risk */
+--bg:      #f4f6f9
+--card:    #fff
+--border:  #dde2ea
+--text:    #2c3e50
+--muted:   #7f8c8d
+```
+
+### Page Structure (top to bottom)
+
+#### 1. Sticky Top Nav
+- Left: "Beaconhouse **Systems & Audit**" brand
+- Right links: Synopsis · Background · Repeated · New Findings · Annexures
+
+#### 2. Cover Section
+- Badge pill: "Confidential | Internal Audit" (gold)
+- Title: "Audit Report — [Branch Name]" with sub-line "Report No. [XXX-CODE] | Systems & Audit Department"
+- "⚠ Confidential & Proprietary Document" warning bar (gold border)
+- Meta grid (auto-fit, 2–4 columns): Branch · Region · Audit Visit (date range) · Period Covered · Branch Head · Branch Accountant · Audit Type · Report Date
+
+#### 3. Management Synopsis & Executive Dashboard (id="synopsis")
+- Intro paragraph explaining how to use the interactive features
+- **KPI tiles row** (6 clickable tiles, open filter modal):
+  - High Risk (red) · Medium-High (orange) · Low-Medium (blue) · Low (green) · Total Unresolved (navy) · Resolved This Cycle (green)
+- **Observation Resolution Summary table** (columns: Referred To | Last Audit Total | Resolved | Unresolved | New Obs. | New Resolved | New Unresolved | Total Unresolved) — rows for Regional Office and Branch Head, plus total row
+- **HIGH RISK alert box** (red background) — links to all High risk observations
+- **E. Analysis of Observations & Controls (COSO Framework)** — brief text + 4 risk tier badges
+- **F. Sensitivity Matrix** — 3×3 table (Impact: High/Medium/Low × Likelihood: High/Medium/Low) with color-coded cells showing risk level and observation numbers
+- **Synopsis Table — Section 1 (Repeated Observations)**
+  - Columns: # · Observation (title + category sub-line) · Risk badge · Ref. (BH/RO) · Detail button
+  - Each row expandable inline (▼ Detail button): shows Finding, Recommendation, Auditee Response, [RO Response], [Audit View], [Action Taken] boxes + "📄 View as Written in Report" button
+- **Synopsis Table — Section 2 (New Observations)** — same structure
+
+#### 4. Section 1 — Repeated (Unresolved) Observations (id="repeated-obs")
+- Section title heading
+- Category sub-headers (e.g., "Branch Imprest, Payments & Accounts")
+- Each observation as a **card** (`.obs-block`):
+  - Header row: obs-num badge (e.g., "1.1") + obs-title + risk badge
+  - Meta tags: Category · "Referred To: BH/RO" · "Last Audit Ref: [num]"
+  - **Finding box** (gold left-border, yellow bg) — always visible (not accordion)
+  - **Recommendation** — accordion (collapsed by default)
+  - **Auditee Response** — accordion
+  - **RO Response** — accordion (only if Referred To: RO)
+  - **Audit View** — accordion (orange left-border) — auditor's view on RO response
+  - **Action Taken box** (green, bold) — shown only if observation resolved
+  - "↑ Back to Synopsis" link (bottom of card)
+
+#### 5. Section 2 — New Observations (id="new-obs")
+- Same card structure as Section 1
+- High risk cards have `border-top: 3px solid var(--high)` for visual prominence
+- No "Last Audit Ref:" tag (these are new)
+
+#### 6. Annexures (id="annexures")
+- ann-table: Annexure letter | Description | Observation reference
+
+#### 7. Footer
+- Navy background, "Beaconhouse Systems & Audit" branding
+
+### Interactive JavaScript Features
+| Feature | How it works |
+|---|---|
+| KPI tile click | Opens modal filtered by risk level (or resolved/unresolved) — lists obs with Detail + View buttons |
+| ▼ Detail button (synopsis) | Toggles inline detail-row beneath synopsis row |
+| "View as Written in Report" | Opens modal with verbatim text from report (uses `VB` object) |
+| Accordion toggles | Recommendation/Response sections in full obs cards |
+| "Back to Synopsis" link | Scrolls back + highlights synopsis row in gold (`syn-highlight` class) |
+| KPI back-banner | Floating bottom-right pill — appears when navigating from KPI modal to observation |
+| Escape key | Closes any open modal |
+
+### JavaScript Data Objects (embedded in `<script>` at bottom)
+```javascript
+OBS_INDEX = [{id:"1-1", num:"1.1", title:"...", cat:"...", risk:"mh", resolved:false}, ...]
+VB = {"1-1": {title:"...", body:"<HTML verbatim text>"}, ...}
+RISK_LABELS = {high:"High Risk", mh:"Medium-High", lm:"Low-Medium", low:"Low Risk"}
+RISK_COLORS = {high:"var(--high)", mh:"var(--mh)", lm:"var(--lm)", low:"var(--low)"}
+RISK_BG     = {high:"#fdecea", mh:"#fef3e2", lm:"#eaf4fb", low:"#e9f7ef"}
+```
+
+### Key CSS Classes
+| Class | Purpose |
+|---|---|
+| `.kpi` + `.red/.org/.blu/.grn` | KPI stat tiles |
+| `.kpi-btn` | Makes KPI tile clickable (hover lift effect) |
+| `.syn-table` | Synopsis table (navy header, hover rows) |
+| `.det-btn` | Dark navy pill button — expands inline detail |
+| `.detail-row` / `.detail-panel` | Inline expanded row in synopsis |
+| `.ibox.ifind/.irec/.iresp/.iview/.iaction` | Colour-coded info boxes in detail panel |
+| `.obs-block` | Full observation card wrapper (scroll anchor) |
+| `.obs-header` / `.obs-num` / `.obs-title` | Observation card header elements |
+| `.obs-meta .tag` | Small grey metadata tags |
+| `.finding-box` | Always-visible finding box (gold left-border) |
+| `.view-box` | Audit View box (orange left-border) |
+| `.action-box` | Action Taken box (green, bold) |
+| `.accordion` / `.acc-toggle` / `.acc-body` | Collapsible sections |
+| `.back-link` | "↑ Back to Synopsis" pill link |
+| `.cat-header` | Navy-left-border category divider |
+| `.matrix` | Sensitivity matrix 3×3 table |
+| `.syn-highlight` | Gold highlight on synopsis row (applied by JS on back-link click) |
+| `.modal-overlay` / `.modal-box` | Verbatim report modal |
+| `#kpi-back-banner` | Floating bottom-right return banner |
+
+### Print behaviour
+`@media print`: hides top nav, back-links, detail/view buttons; forces accordion bodies and detail rows to display.
+
+---
+
 ## Change Log
 
 | Date | File(s) | Change | Details |
