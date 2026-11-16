@@ -792,11 +792,28 @@ function _umShowLoginBadge(userObj){
   if(!tb) return;
   var ex=document.getElementById('_um_badge');
   if(ex) ex.parentNode.removeChild(ex);
+
+  // Detect version: local file, DEV (GitHub Pages), or LIVE (intranet)
+  var href=window.location.href;
+  var isLocal=(href.indexOf('file://')===0);
+  var isGhPages=(href.indexOf('github.io')>-1);
+  var vLabel=''; var vBg=''; var vColor='#fff';
+  if(isLocal){
+    vLabel='DESKTOP'; vBg='#7a4800';
+  } else if(isGhPages){
+    vLabel='DEV'; vBg='#c9962a';
+  } else {
+    vLabel='LIVE'; vBg='#1a6030';
+  }
+
+  var displayName=userObj.name||userObj.username||userObj.role||'User';
+
   var d=document.createElement('span');
   d.id='_um_badge';
-  d.title='Logged in as '+((userObj.name||userObj.username||userObj.role));
-  d.style.cssText='font-size:11px;color:#1a6030;font-weight:700;padding:0 8px;cursor:default;white-space:nowrap;display:flex;align-items:center;gap:3px';
-  d.innerHTML='&#128100; '+(userObj.name||userObj.username||userObj.role);
+  d.style.cssText='display:flex;align-items:center;gap:6px;padding:0 6px;white-space:nowrap;flex-shrink:0';
+  d.innerHTML=''
+    +'<span style="background:'+vBg+';color:'+vColor+';font-size:9.5px;font-weight:800;border-radius:3px;padding:2px 6px;letter-spacing:.6px;text-transform:uppercase">'+vLabel+'</span>'
+    +'<span style="font-size:11px;color:#e8f0fb;font-weight:700;display:flex;align-items:center;gap:3px" title="Logged in as '+displayName+'">&#128100; '+displayName+'</span>';
   tb.appendChild(d);
 }
 
