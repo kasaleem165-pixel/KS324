@@ -27942,7 +27942,13 @@ function _adminRenderLinks(c){
     +'<div style="font-size:12.5px;font-weight:700;color:#2a4060;margin-bottom:12px">Generate Setup Link</div>'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">'
     +'<div style="flex:1;min-width:160px"><label style="font-size:11px;font-weight:700;color:#2a4060;display:block;margin-bottom:3px">Auditor Name</label>'
-    +'<input id="_apLink_name" type="text" placeholder="e.g. Muhammad Ali" style="'+inp+';width:100%"></div>'
+    +'<div style="position:relative">'
+    +'<input id="_apLink_name" type="text" placeholder="Type to search users..." autocomplete="off" style="'+inp+';width:100%;padding-right:28px" oninput="_apLinkFilter(this.value)">'
+    +'<span id="_apLink_loading" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;color:#999"></span>'
+    +'</div>'
+    +'<div id="_apLink_dropdown" style="display:none;position:absolute;z-index:999;background:#fff;border:1px solid #c8d8ec;border-radius:5px;box-shadow:0 4px 12px rgba(0,0,0,.12);max-height:180px;overflow-y:auto;width:100%;margin-top:2px"></div>'
+    +'<div id="_apLink_hint" style="font-size:10.5px;color:#999;margin-top:3px"></div>'
+    +'</div>'
     +'<div style="flex:1;min-width:160px"><label style="font-size:11px;font-weight:700;color:#2a4060;display:block;margin-bottom:3px">Token Override <span style="color:#999;font-weight:400">(leave blank = use saved)</span></label>'
     +'<input id="_apLink_token" type="text" placeholder="ghp_... (or leave blank)" style="'+inp+';width:100%"></div>'
     +'</div>'
@@ -27962,6 +27968,66 @@ function _adminRenderLinks(c){
     +'<div style="background:#fffbea;border:1px solid #f0c040;border-radius:8px;padding:14px 16px;margin-top:14px;font-size:11.5px;color:#7a5900">'
     +'<strong>&#9888; Security Note:</strong> The setup link contains your GitHub token in the URL. Share only via a private, trusted channel (e.g. WhatsApp, direct email). Anyone who has the link can access your GitHub repository. If compromised, revoke the token from GitHub settings immediately.'
     +'</div></div>';
+  _apLinkLoadUsers();
+}
+
+var _apLinkUsers=[];
+var _apLinkUsersLoaded=false;
+
+function _apLinkLoadUsers(){
+  _apLinkUsers=[];
+  _apLinkUsersLoaded=false;
+  var loadingEl=document.getElementById('_apLink_loading');
+  var hintEl=document.getElementById('_apLink_hint');
+  if(loadingEl) loadingEl.textContent='...';
+  if(hintEl) hintEl.textContent='';
+  var cfg=_csGetCfg();
+  if(!cfg.owner||!cfg.repo||!cfg.token){
+    if(loadingEl) loadingEl.textContent='';
+    if(hintEl) hintEl.textContent='Cloud Setup not complete — user list unavailable.';
+    return;
+  }
+  var url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/sessions/_system/users.json';
+  fetch(url,{headers:{'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'}})
+  .then(function(r){ return r.json(); })
+  .then(function(f){
+    var users=[]; try{ users=JSON.parse(_csB64Dec(f.content||'')); }catch(e){}
+    _apLinkUsers=users;
+    _apLinkUsersLoaded=true;
+    if(loadingEl) loadingEl.textContent='';
+    if(hintEl) hintEl.textContent=users.length+' user'+(users.length===1?'':'s')+' loaded';
+  })
+  .catch(function(){
+    if(loadingEl) loadingEl.textContent='';
+    if(hintEl) hintEl.textContent='Could not load user list.';
+  });
+}
+
+function _apLinkFilter(val){
+  var dd=document.getElementById('_apLink_dropdown');
+  if(!dd) return;
+  var q=(val||'').trim().toLowerCase();
+  if(!q){ dd.style.display='none'; dd.innerHTML=''; return; }
+  var matches=[];
+  for(var i=0;i<_apLinkUsers.length;i++){
+    var u=_apLinkUsers[i];
+    var nm=(u.name||u.username||'').toLowerCase();
+    if(nm.indexOf(q)>-1) matches.push(u.name||u.username||'');
+  }
+  if(!matches.length){ dd.style.display='none'; dd.innerHTML=''; return; }
+  var html='';
+  for(var j=0;j<matches.length;j++){
+    html+='<div onclick="_apLinkSelect(\''+matches[j].replace(/'/g,'\\\'')+'\')" style="padding:8px 12px;cursor:pointer;font-size:12.5px;border-bottom:1px solid #eef1f6;color:#1a3a5c" onmouseover="this.style.background=\'#f0f6ff\'" onmouseout="this.style.background=\'\'">'+matches[j]+'</div>';
+  }
+  dd.innerHTML=html;
+  dd.style.display='block';
+}
+
+function _apLinkSelect(name){
+  var inp=document.getElementById('_apLink_name');
+  var dd=document.getElementById('_apLink_dropdown');
+  if(inp) inp.value=name;
+  if(dd){ dd.style.display='none'; dd.innerHTML=''; }
 }
 
 function _adminGenLink(){
