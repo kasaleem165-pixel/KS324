@@ -27951,20 +27951,34 @@ function _adminGenLink(){
   var tokenOverride=(document.getElementById('_apLink_token').value||'').trim();
   var hideToken=document.getElementById('_apLink_hideToken').checked;
   var cfg=_csGetCfg();
+  if(!name){ toast('Please enter the auditor name.'); document.getElementById('_apLink_name').focus(); return; }
   if(!cfg.owner||!cfg.repo){ toast('Cloud Setup not complete. Configure owner and repo first.'); return; }
-  var token=hideToken?'':(tokenOverride||cfg.token||'');
+  var token=tokenOverride||cfg.token||'';
   if(!hideToken&&!token){ toast('No token available. Enter a token or check Cloud Setup.'); return; }
-  var base=window.location.href.split('?')[0].split('#')[0];
-  var params='?mode=setup';
-  if(name) params+='&auditor='+encodeURIComponent(name);
-  params+='&owner='+encodeURIComponent(cfg.owner)+'&repo='+encodeURIComponent(cfg.repo);
-  if(!hideToken) params+='&token='+encodeURIComponent(token);
-  if(cfg.driveClientId) params+='&driveClientId='+encodeURIComponent(cfg.driveClientId);
-  var url=base+params;
-  document.getElementById('_apLinkResult').style.display='block';
-  document.getElementById('_apLinkUrl').textContent=url;
-  window._adminLastLink=url;
-  window._adminLastLinkName=name||'Auditor';
+  // Validate name against users list
+  var url2='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/sessions/_system/users.json';
+  fetch(url2,{headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}})
+  .then(function(r){ return r.json(); })
+  .then(function(f){
+    var users=[]; try{ users=JSON.parse(_csB64Dec(f.content||'')); }catch(e){}
+    var nameL=name.toLowerCase();
+    var found=false;
+    for(var i=0;i<users.length;i++){
+      if((users[i].name||'').toLowerCase()===nameL||(users[i].username||'').toLowerCase()===nameL){ found=true; break; }
+    }
+    if(!found){ toast('Name "'+name+'" not found in user list. Add this user in the Users tab first.'); return; }
+    var base=window.location.href.split('?')[0].split('#')[0];
+    var params='?mode=setup&auditor='+encodeURIComponent(name);
+    params+='&owner='+encodeURIComponent(cfg.owner)+'&repo='+encodeURIComponent(cfg.repo);
+    if(!hideToken) params+='&token='+encodeURIComponent(token);
+    if(cfg.driveClientId) params+='&driveClientId='+encodeURIComponent(cfg.driveClientId);
+    var link=base+params;
+    document.getElementById('_apLinkResult').style.display='block';
+    document.getElementById('_apLinkUrl').textContent=link;
+    window._adminLastLink=link;
+    window._adminLastLinkName=name;
+  })
+  .catch(function(){ toast('Could not verify user list. Check cloud connection and try again.'); });
 }
 
 function _adminCopyLink(){
