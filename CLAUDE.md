@@ -36,13 +36,26 @@ Go fully live/online for all auditors, supervisors, and administrator. Auditors 
 | Badge | 🟢 LIVE (green) | 🟡 DEV (amber) |
 | Hosted on | Beaconhouse intranet (`beams.beaconhouse.edu.pk`) | GitHub Pages |
 | URL | Intranet URL — internal only | `https://kasaleem165-pixel.github.io/KS324/` |
-| Users | All auditors & supervisors (production) | Kamran only (testing) |
+| Users | All auditors & supervisors (production) | Kamran + auditors during DEV rollout |
 | Update method | Download `old/index.html` from GitHub → upload to intranet server | Auto on push — just refresh browser |
 | Changes allowed | **Bug fixes only** | All new features + improvements |
 
+### Future Plan (DO NOT act on this until Kamran explicitly says so)
+- Kamran plans to eventually retire LIVE (intranet) once BRAINS DEV is fully launched and stable
+- Until Kamran explicitly says "stop maintaining Old Live", treat LIVE as active production — keep updating it for bugs
+- Do NOT assume retirement has happened — always maintain both files according to the amendment rule below
+
 ### Amendment Rule (NEVER violate)
+
+#### Determine which file to work on FIRST — read Kamran's instruction carefully each session:
+- If Kamran says he is working on **BRAINS Old Live** (`old/index.html`): make the change there, then ALSO apply to DEV (`index.html`) — new features go to DEV too, bug fixes go to both
+- If Kamran says he is working on **BRAINS Dev** (`index.html`): make the change in DEV only, UNLESS it is a bug that also affects LIVE — then fix both
+- If Kamran does not specify: **ask before proceeding** — never assume which file
+
+#### The rules:
 - **Bug** (something broken for auditors NOW) → fix in **BOTH** files
-- **New feature / improvement** → fix in `index.html` (DEV) **ONLY**
+- **New feature / improvement started on LIVE** → apply to LIVE first, then also apply to DEV
+- **New feature / improvement started on DEV** → DEV only, do NOT touch LIVE
 - **When DEV is ready for release** → copy `index.html` → `old/index.html` → Kamran uploads to intranet
 
 ## Infrastructure & Services
