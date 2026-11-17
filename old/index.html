@@ -985,7 +985,22 @@ function _viewerBlocked(){
 // Called after login and on page startup if already authenticated.
 function _applyRoleUI(){
   var r = _userRole();
-  if(r === 'administrator') return; // Full access — all buttons visible
+
+  // ── Old Live: hide DEV-cloud-workflow buttons for ALL roles ───────────────
+  // Old Live uses JSON file review workflow; cloud submission/load buttons,
+  // the HO auth-modal Issue Report button, and DEV databank tools do not apply.
+  var _href=window.location.href;
+  var _isDevEnv=(_href.indexOf('file://')===0||_href.indexOf('github.io')>-1);
+  if(!_isDevEnv){
+    var _olHide=['rev-send-ro','rev-load-ro','rev-send-ho','rev-load-ho',
+                 'rev-sep-1','rev-sep-2','rev-issue',
+                 'admin-pending-btn','admin-amend-btn','updb-btn'];
+    for(var _oi=0;_oi<_olHide.length;_oi++){
+      var _oel=document.getElementById(_olHide[_oi]); if(_oel) _oel.style.display='none';
+    }
+  }
+
+  if(r === 'administrator') return; // Full access — all remaining buttons visible
 
   // Viewer sees all tabs but must NOT see the protected-copy / decode buttons
   if(r === 'viewer'){
