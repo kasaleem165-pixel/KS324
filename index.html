@@ -1002,6 +1002,7 @@ function _applyRoleUI(){
   // Pending Databank Additions/Amendments, Methodology and admin-only RA tabs
   if(r === 'auditor'){
     ['dd-admin','dd-tools','rev-issue','rev-send-ho','rev-load-ho',
+     'rv-ho-import-btn','rv-ho-import-btn',
      'dist-refer-ho','dist-load-ho',
      'admin-pending-btn','admin-amend-btn','ra-method-btn','ra-stab-23','ra-stab-cx'].forEach(hide);
     var s1=document.getElementById('ra-stab-1'); if(s1) s1.style.borderRadius='4px 4px 0 0';
@@ -1025,16 +1026,18 @@ function _applyRoleUI(){
     // RO sees: Load Report, Save/Versions, Load RO Supervisor Review, Send to HO
     // RO hides: Issue Report, sep1, Load HO Review, sep2
     // RO shows: JSON import/export for JSON-based review workflow
-    ['rev-send-ro','rev-sep-1','rev-load-ho','rev-sep-2','rev-issue'].forEach(hide);
+    ['rev-send-ro','rev-sep-1','rev-load-ho','rev-sep-2','rev-issue','rv-ho-import-btn'].forEach(hide);
     var rvImpBtn=document.getElementById('rv-import-ro-json');
     if(rvImpBtn){ rvImpBtn.style.display=''; rvImpBtn.innerHTML='<span class="di">&#128229;</span> Import Auditor JSON for Review'; rvImpBtn.onclick=function(){ document.getElementById('rv-json-inp').click(); }; }
     var rvExpBtn=document.getElementById('rv-export-ro-json');
     if(rvExpBtn){ rvExpBtn.style.display=''; rvExpBtn.innerHTML='<span class="di">&#128228;</span> Export RO-Reviewed JSON'; rvExpBtn.setAttribute('data-tip','Export this session with your review decisions for the auditor or for final issuance'); rvExpBtn.onclick=function(){ tbDDClose(); _rvRoExportMenu(); }; }
     var rvSep=document.getElementById('rv-json-sep'); if(rvSep) rvSep.style.display='';
   } else {
-    // HO sees: Load Report, Save/Versions, Load HO Supervisor Review
-    // HO hides: Issue Report (admin-only), Send to RO, Load RO Review, sep1, Send to HO, sep2
-    ['rev-send-ro','rev-load-ro','rev-sep-1','rev-send-ho','rev-sep-2','rev-issue','rv-export-ro-json','rv-import-ro-json','rv-json-sep'].forEach(hide);
+    // HO sees: Import RO JSON for HO Review + Issue Report only
+    // HO hides: Send to RO, Load RO Review, sep1, Export JSON for HO, Import HO Response, sep2, RO JSON export/import
+    ['rev-send-ro','rev-load-ro','rev-sep-1','rev-send-ho','rev-load-ho','rev-sep-2','rv-export-ro-json','rv-import-ro-json','rv-json-sep'].forEach(hide);
+    var rvHoImp=document.getElementById('rv-ho-import-btn'); if(rvHoImp) rvHoImp.style.display='';
+    var rvHoIss=document.getElementById('rev-issue'); if(rvHoIss) rvHoIss.style.display='';
   }
   // Show Review Custom Observations button for all supervisors
   var custBtn=document.getElementById('rev-custobs-btn');
@@ -1473,10 +1476,13 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <button id="rv-import-ro-json" class="tb-dd-item rpt-btn" onclick="document.getElementById('rv-json-inp').click();tbDDClose()" data-tip="Import a JSON file returned by the RO Supervisor with their review decisions"><span class="di">&#128229;</span> Import RO-Reviewed JSON</button>
         <input type="file" id="rv-json-inp" accept=".json" style="display:none" onchange="_rvImportJson(event)">
         <div id="rev-sep-1" class="tb-dd-sep"></div>
-        <button id="rev-send-ho" class="tb-dd-item rpt-btn" onclick="_csSubmitReviewRequest('ho');tbDDClose()" data-tip="Send report to HO Supervisor for review (cloud first, file fallback)"><span class="di">&#128228;</span> Send to HO Audit Supervisor</button>
-        <button id="rev-load-ho" class="tb-dd-item rpt-btn" onclick="if(_canIssue()){triggerLoadReviewerHtml('ho');tbDDClose();}else{tbDDClose();showHOAuthModal(function(){triggerLoadReviewerHtml('ho');});}" data-tip="Import the reviewed and annotated file returned by the HO supervisor"><span class="di">&#128194;</span> Load HO Supervisor Review</button>
+        <button id="rev-send-ho" class="tb-dd-item rpt-btn" onclick="_rvRoExportForHo();tbDDClose()" data-tip="Export this session as JSON for HO Supervisor review"><span class="di">&#128228;</span> Export JSON for HO Review</button>
+        <button id="rev-load-ho" class="tb-dd-item rpt-btn" onclick="document.getElementById('rv-ho-resp-inp').click();tbDDClose()" data-tip="Import the JSON response returned by HO Supervisor"><span class="di">&#128229;</span> Import HO Response JSON</button>
+        <input type="file" id="rv-ho-resp-inp" accept=".json" style="display:none" onchange="_rvRoImportHoResponse(event)">
         <div id="rev-sep-2" class="tb-dd-sep"></div>
-        <button id="rev-issue" class="tb-dd-item rpt-btn" onclick="if(_canIssue()){generateIssuedReport();tbDDClose();}else{tbDDClose();showHOAuthModal(function(){generateIssuedReport();});}" data-tip="Finalise and officially issue the completed audit report"><span class="di">&#10003;</span> Issue Report</button>
+        <button id="rv-ho-import-btn" class="tb-dd-item rpt-btn" onclick="document.getElementById('rv-ho-json-inp').click();tbDDClose()" data-tip="Import JSON from RO Supervisor to begin HO review"><span class="di">&#128229;</span> Import RO JSON for HO Review</button>
+        <input type="file" id="rv-ho-json-inp" accept=".json" style="display:none" onchange="_rvHoImportJson(event)">
+        <button id="rev-issue" class="tb-dd-item rpt-btn" onclick="_rvHoIssueReport();tbDDClose()" data-tip="Finalise and officially issue the completed audit report (HO Supervisor only)"><span class="di">&#10003;</span> Issue Report</button>
         <div class="tb-dd-sep"></div>
         <button class="tb-dd-item" id="admin-pending-btn" onclick="showPendingDatabankModal();tbDDClose()" data-tip="Review and approve new observations proposed by auditors for the databank"><span class="di">&#128196;</span> Pending Databank Additions <span id="admin-pending-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
         <button class="tb-dd-item" id="admin-amend-btn" onclick="showPendingAmendmentsModal();tbDDClose()" data-tip="Review and approve edits or corrections to existing databank observations"><span class="di">&#9999;</span> Pending Databank Amendments <span id="admin-amend-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
@@ -26228,6 +26234,8 @@ var _rvInMemDecisions = {}; // {obsId: {decision:'approved'|'suggestion'|'reject
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+function _rvEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 function _rvFileStem(){
   var H=getHdrVals();
   var br=(H.brcode||'BR').replace(/[^A-Za-z0-9_\-]/g,'_');
@@ -26553,6 +26561,454 @@ function _rvRoExport(isFinal){
     var stem2=stem.replace(/_/g,' ');
     _emailNotifyAuditor(cfg2,stem2,roName,round);
   }
+}
+
+// ── RO: Export JSON for HO Review ────────────────────────────────────────────
+
+function _rvRoExportForHo(){
+  var sess=captureSession();
+  var meta=sess._rvMeta||{};
+  if(!meta.ro_decisions||Object.keys(meta.ro_decisions).length===0){
+    alert('No RO review decisions found.\n\nPlease complete your review (Import Auditor JSON and record decisions) before exporting for HO.'); return;
+  }
+  var roName=prompt('Enter your name as RO Supervisor:','');
+  if(roName===null) return;
+  if(!roName.trim()) roName='RO Supervisor';
+  meta.ro_name=roName;
+  meta.ro_reviewed_at=new Date().toISOString().slice(0,10);
+  meta.status='submitted_to_ho';
+  meta.ho_round=(meta.ho_round||0)+1;
+  sess._rvMeta=meta;
+  var stem=_rvFileStem();
+  var filename=stem+'_v'+(meta.round||1)+'_HO_round'+(meta.ho_round)+'_ForHOReview.json';
+  _rvDownloadJson(sess,filename);
+  toast('Exported for HO Review: '+filename+'. Send this file to the HO Supervisor.');
+}
+
+// ── RO: Import HO Response JSON ───────────────────────────────────────────────
+
+function _rvRoImportHoResponse(e){
+  var file=e.target.files[0];
+  e.target.value='';
+  if(!file) return;
+  var rd=new FileReader();
+  rd.onload=function(ev){
+    var sess;
+    try{ sess=JSON.parse(ev.target.result); }catch(ex){ alert('Invalid JSON file.'); return; }
+    var meta=sess._rvMeta||{};
+    if(meta.status!=='ho_reviewed'&&meta.status!=='ho_send_back'){
+      if(!confirm('This file does not appear to be an HO Review Response.\n\nStatus: '+(meta.status||'unknown')+'\n\nLoad anyway?')) return;
+    }
+    restoreSession(sess);
+    var hoStatus=meta.status;
+    if(hoStatus==='ho_send_back'){
+      showToast('HO Supervisor has sent back with comments.\nHO: '+(meta.ho_name||''), 5000);
+      _rvShowRoHoResponsePanel(sess);
+    } else {
+      showToast('HO review loaded. HO: '+(meta.ho_name||''), 3000);
+      _rvShowRoHoResponsePanel(sess);
+    }
+  };
+  rd.readAsText(file);
+}
+
+function _rvShowRoHoResponsePanel(sess){
+  var meta=sess._rvMeta||{};
+  var hoDecisions=meta.ho_decisions||{};
+  var hoName=meta.ho_name||'HO Supervisor';
+  var hoDate=meta.ho_reviewed_at||'';
+  var amendedIds=meta.amended_obs_ids||_rvGetAmendedObs();
+  var ids=amendedIds.length?amendedIds:Object.keys(hoDecisions);
+  var ex=document.getElementById('_rv_ho_resp_panel');
+  if(ex) ex.remove();
+  var wrap=document.createElement('div');
+  wrap.id='_rv_ho_resp_panel';
+  wrap.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;z-index:9100;background:rgba(0,0,0,.55);overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:30px 10px';
+  var statusLabel=meta.status==='ho_send_back'?'<span style="background:#c0392b;color:#fff;padding:2px 10px;border-radius:12px;font-size:10px;font-weight:800;letter-spacing:.5px">SENT BACK</span>':'<span style="background:#1a6030;color:#fff;padding:2px 10px;border-radius:12px;font-size:10px;font-weight:800;letter-spacing:.5px">HO REVIEWED</span>';
+  var h='<div style="background:#fff;border-radius:10px;max-width:860px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.35);font-family:Inter,sans-serif">';
+  h+='<div style="background:#1a3557;color:#fff;border-radius:10px 10px 0 0;padding:14px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+  h+='<span style="font-size:13px;font-weight:800;flex:1">&#128228; HO Supervisor Response &nbsp;'+statusLabel+'</span>';
+  h+='<span style="font-size:11px;opacity:.8">'+hoName+(hoDate?' &nbsp;|&nbsp; '+hoDate:'')+'</span>';
+  h+='<button onclick="document.getElementById(\'_rv_ho_resp_panel\').remove()" style="background:rgba(255,255,255,.12);border:none;color:#fff;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:inherit">&#x2715; Close</button>';
+  h+='</div>';
+  if(meta.ho_overall_comment){
+    h+='<div style="background:#fff8e1;border-left:4px solid #f0a500;margin:14px 18px 0;padding:10px 13px;border-radius:4px;font-size:12px"><strong>HO Overall Comment:</strong> '+_rvEsc(meta.ho_overall_comment)+'</div>';
+  }
+  h+='<div style="padding:14px 18px">';
+  h+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  h+='<thead><tr style="background:#f0f4fa">';
+  h+='<th style="padding:7px 8px;text-align:left;border:1px solid #dde2ea">#</th>';
+  h+='<th style="padding:7px 8px;text-align:left;border:1px solid #dde2ea">Observation</th>';
+  h+='<th style="padding:7px 8px;text-align:center;border:1px solid #dde2ea">HO Decision</th>';
+  h+='<th style="padding:7px 8px;text-align:left;border:1px solid #dde2ea">HO Comment</th>';
+  h+='</tr></thead><tbody>';
+  for(var i=0;i<ids.length;i++){
+    var obsId=ids[i];
+    var dec=hoDecisions[obsId]||{};
+    var obs=DB.observations?DB.observations[obsId]:null;
+    var title=obs?obs.title:obsId;
+    var d=dec.decision||'';
+    var dColor=d==='approved'?'#1a6030':d==='rejected'?'#c0392b':d==='suggestion'?'#7a4800':'#888';
+    var dLabel=d==='approved'?'&#10003; Approved':d==='rejected'?'&#10005; Rejected':d==='suggestion'?'&#9998; Suggestion':'—';
+    var rowBg=(i%2===0)?'#fff':'#f9fafc';
+    h+='<tr style="background:'+rowBg+'">';
+    h+='<td style="padding:6px 8px;border:1px solid #dde2ea;color:#888">'+(i+1)+'</td>';
+    h+='<td style="padding:6px 8px;border:1px solid #dde2ea;font-weight:600">'+_rvEsc(title)+'</td>';
+    h+='<td style="padding:6px 8px;border:1px solid #dde2ea;text-align:center;color:'+dColor+';font-weight:700">'+dLabel+'</td>';
+    h+='<td style="padding:6px 8px;border:1px solid #dde2ea;color:#445">'+_rvEsc(dec.comment||'—')+'</td>';
+    h+='</tr>';
+  }
+  h+='</tbody></table></div>';
+  if(meta.status==='ho_send_back'){
+    h+='<div style="padding:0 18px 16px;display:flex;gap:10px">';
+    h+='<button onclick="document.getElementById(\'_rv_ho_resp_panel\').remove()" style="background:#c0392b;color:#fff;border:none;border-radius:5px;padding:8px 18px;font-family:Inter,sans-serif;font-size:12px;font-weight:700;cursor:pointer">&#8617; Review HO Comments &amp; Correct</button>';
+    h+='</div>';
+  }
+  h+='</div></div>';
+  wrap.innerHTML=h;
+  document.body.appendChild(wrap);
+}
+
+// ── HO: Import JSON from RO ───────────────────────────────────────────────────
+
+var _rvHoInMemDecisions={};
+
+function _rvHoImportJson(e){
+  var file=e.target.files[0];
+  e.target.value='';
+  if(!file) return;
+  var rd=new FileReader();
+  rd.onload=function(ev){
+    var sess;
+    try{ sess=JSON.parse(ev.target.result); }catch(ex){ alert('Invalid JSON file.'); return; }
+    var meta=sess._rvMeta||{};
+    if(meta.status!=='submitted_to_ho'){
+      if(!confirm('This file status is "'+( meta.status||'unknown')+'".\n\nIt may not have been prepared for HO review.\n\nLoad anyway?')) return;
+    }
+    restoreSession(sess);
+    _rvHoInMemDecisions={};
+    _rvShowHoPanel(sess);
+  };
+  rd.readAsText(file);
+}
+
+// ── HO: Review Panel ──────────────────────────────────────────────────────────
+
+function _rvShowHoPanel(sess){
+  var meta=sess._rvMeta||{};
+  var roDecisions=meta.ro_decisions||{};
+  var amendedIds=meta.amended_obs_ids||_rvGetAmendedObs();
+  var round=meta.ho_round||1;
+  var roName=meta.ro_name||'RO Supervisor';
+  var roDate=meta.ro_reviewed_at||'';
+
+  // Split into clean (RO approved all) vs flagged (RO suggested/rejected any)
+  var cleanIds=[];
+  var flaggedIds=[];
+  for(var ii=0;ii<amendedIds.length;ii++){
+    var oid=amendedIds[ii];
+    var rod=roDecisions[oid]||{};
+    var roD=rod.decision||'';
+    var roWc=rod.wcDecision||'';
+    if(roD==='suggestion'||roD==='rejected'||roWc==='suggestion'||roWc==='rejected'){
+      flaggedIds.push(oid);
+    } else {
+      cleanIds.push(oid);
+    }
+  }
+
+  var totalDecisions=amendedIds.length;
+  var ex=document.getElementById('_rv_ho_panel');
+  if(ex) ex.remove();
+  var wrap=document.createElement('div');
+  wrap.id='_rv_ho_panel';
+  wrap.setAttribute('data-all-ids',JSON.stringify(amendedIds));
+  wrap.setAttribute('data-clean-ids',JSON.stringify(cleanIds));
+  wrap.setAttribute('data-flagged-ids',JSON.stringify(flaggedIds));
+  wrap.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;z-index:9100;background:rgba(0,0,0,.55);overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:30px 10px';
+
+  var h='<div style="background:#fff;border-radius:10px;max-width:960px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.35);font-family:Inter,sans-serif">';
+
+  // Header
+  h+='<div style="background:#1a3557;color:#fff;border-radius:10px 10px 0 0;padding:14px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+  h+='<span style="font-size:13px;font-weight:800;flex:1">&#128228; HO Review Panel &nbsp;<span style="font-size:10px;font-weight:400;opacity:.7">Round '+round+' &nbsp;&#183;&nbsp; RO: '+_rvEsc(roName)+(roDate?' &nbsp;&#183;&nbsp; '+roDate:'')+'</span></span>';
+  h+='<span id="_rv_ho_progress" style="font-size:11px;background:rgba(255,255,255,.1);border-radius:4px;padding:3px 10px;white-space:nowrap">0 / '+totalDecisions+' decided</span>';
+  h+='<button onclick="_rvShowRoDecisionsPopup()" style="background:#c9962a;border:none;color:#fff;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#128204; View RO Decisions</button>';
+  h+='<button onclick="_rvHoExportMenu()" style="background:#1a6030;border:none;color:#fff;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#128228; Export / Issue</button>';
+  h+='<button onclick="document.getElementById(\'_rv_ho_panel\').remove()" style="background:rgba(255,255,255,.12);border:none;color:#fff;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:inherit">&#x2715; Close</button>';
+  h+='</div>';
+
+  // Part 1 — Clean observations
+  h+='<div style="padding:14px 18px 0">';
+  h+='<div style="font-size:12px;font-weight:800;color:#1a3557;margin-bottom:8px;padding:7px 12px;background:#e8f4ed;border-left:4px solid #1a6030;border-radius:4px">&#10003; Part 1 — Clean Observations (RO Approved &nbsp;·&nbsp; '+cleanIds.length+' obs)';
+  if(cleanIds.length>0){
+    h+=' &nbsp;<button onclick="_rvHoApproveAll(\'clean\')" style="background:#1a6030;color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;margin-left:8px">&#10003; Approve All</button>';
+  }
+  h+='</div>';
+  if(cleanIds.length===0){
+    h+='<div style="padding:8px 12px;font-size:12px;color:#888;font-style:italic">No clean observations — all were flagged by RO.</div>';
+  } else {
+    h+=_rvHoBuildSummaryTable(cleanIds,roDecisions,'clean');
+  }
+  h+='</div>';
+
+  // Part 2 — Flagged observations
+  h+='<div style="padding:12px 18px 0">';
+  h+='<div style="font-size:12px;font-weight:800;color:#7a2020;margin-bottom:8px;padding:7px 12px;background:#fdecea;border-left:4px solid #c0392b;border-radius:4px">&#9888; Part 2 — Flagged Observations (RO Suggested / Rejected &nbsp;·&nbsp; '+flaggedIds.length+' obs)</div>';
+  if(flaggedIds.length===0){
+    h+='<div style="padding:8px 12px;font-size:12px;color:#888;font-style:italic">No flagged observations — RO approved all without concerns.</div>';
+  } else {
+    h+=_rvHoBuildSummaryTable(flaggedIds,roDecisions,'flagged');
+  }
+  h+='</div>';
+
+  // Footer progress
+  h+='<div style="padding:12px 18px;border-top:1px solid #dde2ea;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">';
+  h+='<span id="_rv_ho_progress_foot" style="font-size:11.5px;color:#445">Decisions: <strong>0</strong> of <strong>'+totalDecisions+'</strong> completed</span>';
+  h+='<div style="display:flex;gap:8px">';
+  h+='<button onclick="_rvHoExportMenu()" style="background:#1a6030;color:#fff;border:none;border-radius:5px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128228; Export / Issue</button>';
+  h+='</div></div>';
+  h+='</div>';
+
+  wrap.innerHTML=h;
+  document.body.appendChild(wrap);
+  _rvInjectBackButton();
+}
+
+function _rvHoBuildSummaryTable(ids,roDecisions,part){
+  var h='<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px">';
+  h+='<thead><tr style="background:#f0f4fa">';
+  h+='<th style="padding:7px 8px;text-align:left;border:1px solid #dde2ea;width:32px">#</th>';
+  h+='<th style="padding:7px 8px;text-align:left;border:1px solid #dde2ea">Observation</th>';
+  if(part==='flagged') h+='<th style="padding:7px 8px;text-align:left;border:1px solid #dde2ea;width:220px">RO Comment</th>';
+  h+='<th style="padding:7px 8px;text-align:center;border:1px solid #dde2ea;width:220px">HO Decision</th>';
+  h+='</tr></thead><tbody>';
+  for(var i=0;i<ids.length;i++){
+    var obsId=ids[i];
+    var obs=null;
+    if(DB&&DB.observations) obs=DB.observations[obsId];
+    var title=obs?obs.title:obsId;
+    var rowBg=(i%2===0)?'#fff':'#f9fafc';
+    var rod=roDecisions[obsId]||{};
+    var roD=rod.decision||'';
+    var roCmt=rod.comment||'';
+    var roWcD=rod.wcDecision||'';
+    var roCmtWc=rod.wcComment||'';
+    var roDLabel='';
+    if(roD==='suggestion') roDLabel='<span style="color:#7a4800">&#9998; Suggest</span>'+(roCmt?': <em>'+_rvEsc(roCmt)+'</em>':'');
+    else if(roD==='rejected') roDLabel='<span style="color:#c0392b">&#10005; Reject</span>'+(roCmt?': <em>'+_rvEsc(roCmt)+'</em>':'');
+    if(roWcD==='suggestion'||roWcD==='rejected'){
+      roDLabel+=(roDLabel?'<br>':'')+'<span style="font-size:10px;color:#666">Wording: '+(roWcD==='suggestion'?'&#9998; Suggest':'&#10005; Reject')+(roCmtWc?' — '+_rvEsc(roCmtWc):'')+'</span>';
+    }
+    h+='<tr style="background:'+rowBg+'">';
+    h+='<td style="padding:6px 8px;border:1px solid #dde2ea;color:#888">'+(i+1)+'</td>';
+    h+='<td style="padding:6px 8px;border:1px solid #dde2ea;font-weight:600">'+_rvEsc(title)+'</td>';
+    if(part==='flagged') h+='<td style="padding:6px 8px;border:1px solid #dde2ea;font-size:11px;color:#445">'+roDLabel+'</td>';
+    // Decision radio row
+    h+='<td style="padding:5px 8px;border:1px solid #dde2ea">';
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
+    h+=_rvHoRadioBtn(obsId,'approved','&#10003; Approve','#1a6030');
+    h+=_rvHoRadioBtn(obsId,'suggestion','&#9998; Suggest','#7a4800');
+    h+=_rvHoRadioBtn(obsId,'rejected','&#10005; Reject','#c0392b');
+    h+='</div>';
+    h+='<textarea id="_rv_hocmt_'+obsId+'" placeholder="Comment (required for Suggest/Reject)..." style="display:none;width:100%;box-sizing:border-box;margin-top:4px;padding:4px 7px;font-size:11px;font-family:Inter,sans-serif;border:1px solid #c0392b;border-radius:4px;resize:vertical" rows="2" onchange="_rvHoCmtChange(\''+obsId+'\',this.value)" oninput="_rvHoCmtChange(\''+obsId+'\',this.value)"></textarea>';
+    h+='</td>';
+    h+='</tr>';
+  }
+  h+='</tbody></table>';
+  return h;
+}
+
+function _rvHoRadioBtn(obsId,decision,label,color){
+  return '<button id="_rv_hobtn_'+decision+'_'+obsId+'" onclick="_rvHoDecide(\''+obsId+'\',\''+decision+'\')" '
+    +'style="border:1.5px solid '+color+';background:#fff;color:'+color+';border-radius:4px;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap">'+label+'</button>';
+}
+
+function _rvHoDecide(obsId,decision){
+  if(!_rvHoInMemDecisions[obsId]) _rvHoInMemDecisions[obsId]={decision:'',comment:''};
+  _rvHoInMemDecisions[obsId].decision=decision;
+  // Show/hide comment box
+  var cmtEl=document.getElementById('_rv_hocmt_'+obsId);
+  if(cmtEl){
+    var needsCmt=(decision==='suggestion'||decision==='rejected');
+    cmtEl.style.display=needsCmt?'block':'none';
+    if(!needsCmt) _rvHoInMemDecisions[obsId].comment='';
+    cmtEl.style.borderColor=decision==='rejected'?'#c0392b':'#c9962a';
+  }
+  // Update button styles
+  var decs=['approved','suggestion','rejected'];
+  var colors={'approved':'#1a6030','suggestion':'#7a4800','rejected':'#c0392b'};
+  for(var i=0;i<decs.length;i++){
+    var btn=document.getElementById('_rv_hobtn_'+decs[i]+'_'+obsId);
+    if(!btn) continue;
+    if(decs[i]===decision){
+      btn.style.background=colors[decs[i]];
+      btn.style.color='#fff';
+    } else {
+      btn.style.background='#fff';
+      btn.style.color=colors[decs[i]];
+    }
+  }
+  _rvHoUpdateProgress();
+}
+
+function _rvHoCmtChange(obsId,val){
+  if(!_rvHoInMemDecisions[obsId]) _rvHoInMemDecisions[obsId]={decision:'',comment:''};
+  _rvHoInMemDecisions[obsId].comment=val;
+}
+
+function _rvHoApproveAll(part){
+  var panelEl=document.getElementById('_rv_ho_panel');
+  if(!panelEl) return;
+  var attrKey=part==='clean'?'data-clean-ids':'data-flagged-ids';
+  var ids=JSON.parse(panelEl.getAttribute(attrKey)||'[]');
+  for(var i=0;i<ids.length;i++) _rvHoDecide(ids[i],'approved');
+}
+
+function _rvHoUpdateProgress(){
+  var panelEl=document.getElementById('_rv_ho_panel');
+  if(!panelEl) return;
+  var allIds=JSON.parse(panelEl.getAttribute('data-all-ids')||'[]');
+  var total=allIds.length;
+  var done=0;
+  for(var i=0;i<allIds.length;i++){
+    var dec=_rvHoInMemDecisions[allIds[i]];
+    if(dec&&dec.decision) done++;
+  }
+  var badge=document.getElementById('_rv_ho_progress');
+  if(badge) badge.innerHTML=done+' / '+total+' decided';
+  var foot=document.getElementById('_rv_ho_progress_foot');
+  if(foot) foot.innerHTML='Decisions: <strong>'+done+'</strong> of <strong>'+total+'</strong> completed';
+}
+
+function _rvHoExportMenu(){
+  var panelEl=document.getElementById('_rv_ho_panel');
+  if(!panelEl) return;
+  var allIds=JSON.parse(panelEl.getAttribute('data-all-ids')||'[]');
+  // Sync DOM comment values into memory
+  for(var i=0;i<allIds.length;i++){
+    var cEl=document.getElementById('_rv_hocmt_'+allIds[i]);
+    if(cEl&&_rvHoInMemDecisions[allIds[i]]) _rvHoInMemDecisions[allIds[i]].comment=cEl.value;
+  }
+  // Validate — all must have decision
+  var missing=[];
+  var needsCmt=[];
+  for(var j=0;j<allIds.length;j++){
+    var id=allIds[j];
+    var dec=_rvHoInMemDecisions[id]||{};
+    if(!dec.decision) missing.push(id);
+    else if((dec.decision==='suggestion'||dec.decision==='rejected')&&!dec.comment.trim()) needsCmt.push(id);
+  }
+  if(missing.length>0){
+    alert('Please record a decision for all '+allIds.length+' observations before exporting.\n\nMissing: '+missing.length+' observation(s).'); return;
+  }
+  if(needsCmt.length>0){
+    alert('Comment is mandatory for Suggest and Reject decisions.\n\nPlease add comments for '+needsCmt.length+' observation(s).'); return;
+  }
+  // Check if all approved → offer Issue Report; else only Send Back
+  var allApproved=true;
+  for(var k=0;k<allIds.length;k++){
+    if(_rvHoInMemDecisions[allIds[k]].decision!=='approved'){ allApproved=false; break; }
+  }
+  if(allApproved){
+    var choice=confirm('All observations are approved.\n\nClick OK to ISSUE the Final Report.\nClick Cancel to export HO decisions JSON (send back to RO).');
+    if(choice){ _rvHoDoIssue(); } else { _rvHoExportJson('ho_reviewed'); }
+  } else {
+    var choice2=confirm('Some observations have Suggestions or Rejections.\n\nClick OK to export HO decisions JSON (send back to RO for corrections).\nClick Cancel to go back and review.');
+    if(choice2) _rvHoExportJson('ho_send_back');
+  }
+}
+
+function _rvHoExportJson(status){
+  var hoName=prompt('Enter your name as HO Supervisor:','');
+  if(hoName===null) return;
+  if(!hoName.trim()) hoName='HO Supervisor';
+  var sess=captureSession();
+  var meta=sess._rvMeta||{};
+  meta.ho_decisions=_rvHoInMemDecisions;
+  meta.ho_name=hoName;
+  meta.ho_reviewed_at=new Date().toISOString().slice(0,10);
+  meta.status=status;
+  sess._rvMeta=meta;
+  var stem=_rvFileStem();
+  var filename=stem+'_v'+(meta.round||1)+'_HO_round'+(meta.ho_round||1)+'_'+(status==='ho_send_back'?'SendBack':'HOReviewed')+'.json';
+  _rvDownloadJson(sess,filename);
+  toast('Exported: '+filename+'. Send this file back to the RO Supervisor.');
+}
+
+function _rvHoDoIssue(){
+  var hoName=prompt('Enter your name as HO Supervisor (will appear on the issued report):','');
+  if(hoName===null) return;
+  if(!hoName.trim()) hoName='HO Supervisor';
+  var sess=captureSession();
+  var meta=sess._rvMeta||{};
+  meta.ho_decisions=_rvHoInMemDecisions;
+  meta.ho_name=hoName;
+  meta.ho_reviewed_at=new Date().toISOString().slice(0,10);
+  meta.status='ho_issued';
+  sess._rvMeta=meta;
+  restoreSession(sess);
+  document.getElementById('_rv_ho_panel').remove();
+  if(typeof generateIssuedReport==='function') generateIssuedReport();
+  else alert('Issue Report function not available.');
+}
+
+function _rvHoIssueReport(){
+  var r=_userRole();
+  if(r!=='ho_supervisor'&&r!=='administrator'){ alert('Issue Report is available to HO Supervisor only.'); return; }
+  if(typeof generateIssuedReport==='function') generateIssuedReport();
+}
+
+// ── RO Decisions Popup (for HO reference) ────────────────────────────────────
+
+function _rvShowRoDecisionsPopup(){
+  var panelEl=document.getElementById('_rv_ho_panel');
+  if(!panelEl) return;
+  var sess=captureSession();
+  var meta=sess._rvMeta||{};
+  var roDecisions=meta.ro_decisions||{};
+  var allIds=JSON.parse(panelEl.getAttribute('data-all-ids')||'[]');
+  var ex=document.getElementById('_rv_ro_dec_popup');
+  if(ex) ex.remove();
+  var wrap=document.createElement('div');
+  wrap.id='_rv_ro_dec_popup';
+  wrap.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;z-index:9200;background:rgba(0,0,0,.6);overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:40px 10px';
+  var h='<div style="background:#fff;border-radius:10px;max-width:820px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.4);font-family:Inter,sans-serif">';
+  h+='<div style="background:#c9962a;color:#fff;border-radius:10px 10px 0 0;padding:12px 18px;display:flex;align-items:center;gap:10px">';
+  h+='<span style="font-size:13px;font-weight:800;flex:1">&#128204; RO Supervisor Decisions (Reference)</span>';
+  h+='<span style="font-size:11px;opacity:.85">RO: '+(meta.ro_name||'')+(meta.ro_reviewed_at?' &nbsp;|&nbsp; '+meta.ro_reviewed_at:'')+'</span>';
+  h+='<button onclick="document.getElementById(\'_rv_ro_dec_popup\').remove()" style="background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:inherit">&#x2715; Close</button>';
+  h+='</div>';
+  h+='<div style="padding:14px 18px">';
+  h+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  h+='<thead><tr style="background:#f0f4fa"><th style="padding:7px 8px;text-align:left;border:1px solid #dde2ea">#</th>';
+  h+='<th style="padding:7px 8px;text-align:left;border:1px solid #dde2ea">Observation</th>';
+  h+='<th style="padding:7px 8px;text-align:center;border:1px solid #dde2ea">Obs Decision</th>';
+  h+='<th style="padding:7px 8px;text-align:left;border:1px solid #dde2ea">Comment</th>';
+  h+='<th style="padding:7px 8px;text-align:center;border:1px solid #dde2ea">Wording</th>';
+  h+='</tr></thead><tbody>';
+  for(var i=0;i<allIds.length;i++){
+    var obsId=allIds[i];
+    var dec=roDecisions[obsId]||{};
+    var obs=DB&&DB.observations?DB.observations[obsId]:null;
+    var title=obs?obs.title:obsId;
+    var d=dec.decision||'—';
+    var dColor=d==='approved'?'#1a6030':d==='rejected'?'#c0392b':d==='suggestion'?'#7a4800':'#888';
+    var dLabel=d==='approved'?'&#10003; Approved':d==='rejected'?'&#10005; Rejected':d==='suggestion'?'&#9998; Suggestion':'—';
+    var wcD=dec.wcDecision||'';
+    var wcLabel=wcD==='approved'?'&#10003;':wcD==='rejected'?'&#10005;':wcD==='suggestion'?'&#9998;':'—';
+    var rowBg=(i%2===0)?'#fff':'#f9fafc';
+    h+='<tr style="background:'+rowBg+'"><td style="padding:6px 8px;border:1px solid #dde2ea;color:#888">'+(i+1)+'</td>';
+    h+='<td style="padding:6px 8px;border:1px solid #dde2ea;font-weight:600">'+_rvEsc(title)+'</td>';
+    h+='<td style="padding:6px 8px;border:1px solid #dde2ea;text-align:center;color:'+dColor+';font-weight:700">'+dLabel+'</td>';
+    h+='<td style="padding:6px 8px;border:1px solid #dde2ea;font-size:11px;color:#445">'+_rvEsc(dec.comment||'—')+'</td>';
+    h+='<td style="padding:6px 8px;border:1px solid #dde2ea;text-align:center;color:#445">'+wcLabel+'</td>';
+    h+='</tr>';
+  }
+  h+='</tbody></table></div></div>';
+  wrap.innerHTML=h;
+  document.body.appendChild(wrap);
+  wrap.addEventListener('click',function(ev){ if(ev.target===wrap) wrap.remove(); });
 }
 
 // ── Scroll to observation + floating back button ───────────────────────────────
