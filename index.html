@@ -1002,7 +1002,7 @@ function _applyRoleUI(){
   // Pending Databank Additions/Amendments, Methodology and admin-only RA tabs
   if(r === 'auditor'){
     ['dd-admin','dd-tools','rev-issue','rev-send-ho','rev-load-ho',
-     'rv-ho-import-btn','rv-ho-import-btn',
+     'rv-ho-import-btn',
      'dist-refer-ho','dist-load-ho',
      'admin-pending-btn','admin-amend-btn','ra-method-btn','ra-stab-23','ra-stab-cx'].forEach(hide);
     var s1=document.getElementById('ra-stab-1'); if(s1) s1.style.borderRadius='4px 4px 0 0';
@@ -1026,7 +1026,7 @@ function _applyRoleUI(){
     // RO sees: Load Report, Save/Versions, Load RO Supervisor Review, Send to HO
     // RO hides: Issue Report, sep1, Load HO Review, sep2
     // RO shows: JSON import/export for JSON-based review workflow
-    ['rev-send-ro','rev-sep-1','rev-load-ho','rev-sep-2','rev-issue','rv-ho-import-btn'].forEach(hide);
+    ['rev-send-ro','rev-load-ro','rev-sep-2','rev-issue','rv-ho-import-btn'].forEach(hide);
     var rvImpBtn=document.getElementById('rv-import-ro-json');
     if(rvImpBtn){ rvImpBtn.style.display=''; rvImpBtn.innerHTML='<span class="di">&#128229;</span> Import Auditor JSON for Review'; rvImpBtn.onclick=function(){ document.getElementById('rv-json-inp').click(); }; }
     var rvExpBtn=document.getElementById('rv-export-ro-json');
@@ -26343,6 +26343,8 @@ function _rvImportJson(e){
         msg='Import RO-reviewed session?\nRound: '+meta.round+'\nReviewed by: '+(meta.ro_name||'RO Supervisor')+'\n\nRO decisions will be shown in the Amendment Summary Panel.';
       } else if(meta.status==='ro_final'){
         msg='Import FINAL APPROVED session?\nRound: '+meta.round+'\nApproved by: '+(meta.ro_name||'RO Supervisor')+' on '+(meta.ro_reviewed_at||'?')+'\n\nAll RO decisions will be loaded. You can then generate the Final Issuance Report.';
+      } else if(meta.status==='submitted_to_ho'){
+        msg='Import session for HO Review?\nRO: '+(meta.ro_name||'RO Supervisor')+(meta.ro_reviewed_at?' on '+meta.ro_reviewed_at:'')+'\n\nRO decisions are included. The HO Review Panel will open.';
       } else {
         msg='Import this session?\nFile: '+file.name;
       }
@@ -26356,6 +26358,7 @@ function _rvImportJson(e){
         if(meta.status==='submitted_to_ro'&&isRO) _rvShowRoPanel(sess);
         else if(meta.status==='ro_reviewed') _rvShowAuditorPanel(sess);
         else if(meta.status==='ro_final') _rvApplyFinalApproval(sess);
+        else if(meta.status==='submitted_to_ho'){ _rvHoInMemDecisions={}; _rvShowHoPanel(sess); }
       },600);
     }catch(err){ alert('Could not load file: '+err.message); }
     e.target.value='';
@@ -26579,6 +26582,8 @@ function _rvRoExportForHo(){
   meta.status='submitted_to_ho';
   meta.ho_round=(meta.ho_round||0)+1;
   sess._rvMeta=meta;
+  // Also update live session so meta is consistent if RO later re-exports
+  if(typeof currentSession!=='undefined'&&currentSession) currentSession._rvMeta=meta;
   var stem=_rvFileStem();
   var filename=stem+'_v'+(meta.round||1)+'_HO_round'+(meta.ho_round)+'_ForHOReview.json';
   _rvDownloadJson(sess,filename);
@@ -26897,7 +26902,7 @@ function _rvHoExportMenu(){
     var id=allIds[j];
     var dec=_rvHoInMemDecisions[id]||{};
     if(!dec.decision) missing.push(id);
-    else if((dec.decision==='suggestion'||dec.decision==='rejected')&&!dec.comment.trim()) needsCmt.push(id);
+    else if((dec.decision==='suggestion'||dec.decision==='rejected')&&!(dec.comment||'').trim()) needsCmt.push(id);
   }
   if(missing.length>0){
     alert('Please record a decision for all '+allIds.length+' observations before exporting.\n\nMissing: '+missing.length+' observation(s).'); return;
