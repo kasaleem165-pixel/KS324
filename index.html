@@ -26312,7 +26312,7 @@ function _rvImportJson(e){
       var meta=sess._rvMeta||{};
       var role=_userRole();
       var isRO=(role==='ro_supervisor'||role==='administrator');
-      var statusOk=(meta.status==='submitted_to_ro'&&isRO)||(meta.status==='ro_reviewed');
+      var statusOk=(meta.status==='submitted_to_ro'&&isRO)||(meta.status==='ro_reviewed')||(meta.status==='ro_final');
       if(!statusOk && !meta.status){
         // Plain session JSON — normal import
         if(!confirm('Import session from file "'+file.name+'"?\n\nThis will replace your current work.')) return;
@@ -26325,6 +26325,8 @@ function _rvImportJson(e){
         msg='Import auditor session for RO review?\nRound: '+meta.round+'\nSubmitted by: '+(meta.submitted_by||'Auditor')+'\n\nThis will load their session into BRAINS for your review.';
       } else if(meta.status==='ro_reviewed'){
         msg='Import RO-reviewed session?\nRound: '+meta.round+'\nReviewed by: '+(meta.ro_name||'RO Supervisor')+'\n\nRO decisions will be shown in the Amendment Summary Panel.';
+      } else if(meta.status==='ro_final'){
+        msg='Import FINAL APPROVED session?\nRound: '+meta.round+'\nApproved by: '+(meta.ro_name||'RO Supervisor')+' on '+(meta.ro_reviewed_at||'?')+'\n\nAll RO decisions will be loaded. You can then generate the Final Issuance Report.';
       } else {
         msg='Import this session?\nFile: '+file.name;
       }
@@ -26337,6 +26339,7 @@ function _rvImportJson(e){
       setTimeout(function(){
         if(meta.status==='submitted_to_ro'&&isRO) _rvShowRoPanel(sess);
         else if(meta.status==='ro_reviewed') _rvShowAuditorPanel(sess);
+        else if(meta.status==='ro_final') _rvApplyFinalApproval(sess);
       },600);
     }catch(err){ alert('Could not load file: '+err.message); }
     e.target.value='';
@@ -26579,12 +26582,64 @@ function _rvShowBackBtn(){
   if(btn) btn.style.display='block';
 }
 
-// ── Auditor: Import Final Approval JSON → unlock Export for Issuance ──────────
+// ── Auditor: Import Final Approval JSON → populate window.roDecisions + unlock banner ──
 
-function _rvCheckFinalApproval(sess){
+function _rvApplyFinalApproval(sess){
   var meta=sess._rvMeta||{};
-  if(meta.status!=='ro_final') return false;
-  return true;
+  var decisions=meta.ro_decisions||{};
+  // Populate window.roDecisions for generateIssuedReport()
+  window.roDecisions={};
+  var ids=Object.keys(decisions);
+  for(var i=0;i<ids.length;i++){
+    var obsId=ids[i];
+    var dec=decisions[obsId]||{};
+    var d=dec.decision||'';
+    var wcObsDec=''; var wcRecDec='';
+    if(d==='approved'){ wcObsDec='approved'; wcRecDec='approved'; }
+    else if(d==='rejected'){ wcObsDec='rejected'; wcRecDec='rejected'; }
+    // suggestion → leave blank (pending — will appear as-is in report)
+    window.roDecisions[obsId]={
+      wcObsDec:wcObsDec,
+      wcRecDec:wcRecDec,
+      decision:d,
+      rejReason:dec.comment||'',
+      wcObsRej:dec.comment||'',
+      wcRecRej:dec.comment||''
+    };
+  }
+  // Remove any stale banner
+  var ex=document.getElementById('_rv_final_banner');
+  if(ex) ex.remove();
+  // Build unlock banner (green, prominent)
+  var banner=document.createElement('div');
+  banner.id='_rv_final_banner';
+  banner.style.cssText='position:fixed;top:54px;left:0;right:0;z-index:901;background:#0d4020;color:#fff;border-bottom:3px solid #27ae60;font-family:Inter,sans-serif;font-size:13px;padding:10px 18px;display:flex;align-items:center;gap:12px';
+  var approved=0; var rejected=0; var suggestion=0;
+  for(var j=0;j<ids.length;j++){
+    var jd=(decisions[ids[j]]||{}).decision||'';
+    if(jd==='approved') approved++;
+    else if(jd==='rejected') rejected++;
+    else if(jd==='suggestion') suggestion++;
+  }
+  var by=meta.ro_name||'RO Supervisor';
+  var dt=meta.ro_reviewed_at||'';
+  var summary='Approved: '+approved+' &nbsp;·&nbsp; Rejected: '+rejected+(suggestion?' &nbsp;·&nbsp; Suggestion: '+suggestion:'');
+  banner.innerHTML='<span style="font-size:18px">&#10004;</span>'
+    +'<span style="flex:1"><strong>FINAL APPROVAL received from '+esc(by)+(dt?' on '+esc(dt):'')+'.</strong>'
+    +' &nbsp;Amendments — '+summary+'</span>'
+    +'<button onclick="_rvLaunchIssuedReport()" style="background:#27ae60;border:none;color:#fff;border-radius:5px;padding:6px 18px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:.3px">&#128196; Generate Final Issuance Report</button>'
+    +'<button onclick="document.getElementById(\'_rv_final_banner\').remove()" style="background:rgba(255,255,255,.12);border:none;color:#fff;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit;margin-left:8px">&#x2715;</button>';
+  document.body.appendChild(banner);
+  _rvInjectBackButton();
+  toast('Final Approval loaded. Click "Generate Final Issuance Report" to proceed.');
+}
+
+function _rvLaunchIssuedReport(){
+  if(typeof generateIssuedReport==='function'){
+    generateIssuedReport();
+  } else {
+    alert('generateIssuedReport function not found. Please refresh and try again.');
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */
