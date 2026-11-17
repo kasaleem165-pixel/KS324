@@ -26432,6 +26432,8 @@ function _rvShowRoPanel(sess){
   if(ex) ex.remove();
   _rvInMemDecisions={};
 
+  var totalDecisions=amendedIds.length+wordingChangedIds.length;
+
   // Build panel — inserted at top of report content, not a fixed overlay
   var panel=document.createElement('div');
   panel.id='_rv_ro_panel';
@@ -26444,24 +26446,32 @@ function _rvShowRoPanel(sess){
   h+='<div style="font-size:13.5px;font-weight:800;letter-spacing:.2px">RO Supervisor Review Summary</div>';
   h+='<div style="font-size:11px;opacity:.65;margin-top:1px">Round '+round+' &nbsp;&middot;&nbsp; Submitted by: '+(meta.submitted_by||'Auditor')+' on '+(meta.submitted_at||'')+'</div>';
   h+='</div>';
-  h+='<span id="_rv_ro_progress" style="font-size:11px;background:rgba(201,150,42,.2);border:1px solid rgba(201,150,42,.4);border-radius:12px;padding:3px 12px;white-space:nowrap;color:#f5d98b">0 / '+amendedIds.length+' decided</span>';
+  h+='<span id="_rv_ro_progress" style="font-size:11px;background:rgba(201,150,42,.2);border:1px solid rgba(201,150,42,.4);border-radius:12px;padding:3px 12px;white-space:nowrap;color:#f5d98b">0 / '+totalDecisions+' decided</span>';
   h+='<button onclick="_rvRoExportMenu()" style="background:#1a6030;border:none;color:#fff;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">&#128228; Export Response</button>';
   h+='<button onclick="document.getElementById(\'_rv_ro_panel\').remove()" style="background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:4px;padding:4px 10px;font-size:13px;cursor:pointer;font-family:inherit;line-height:1" title="Close">&#x2715;</button>';
   h+='</div>';
 
   // ── Instruction bar ───────────────────────────────────────────────────────
   h+='<div style="padding:8px 16px;background:rgba(201,150,42,.1);font-size:11.5px;color:#f0d070;border-bottom:1px solid rgba(201,150,42,.2)">';
-  h+='&#9432;&nbsp; For each observation: mark <strong>Approve</strong>, <strong>Suggest</strong> or <strong>Reject</strong> — then click <strong>View Detail</strong> to read the full text before deciding. When all are decided, click <strong>Export Response</strong>.';
+  h+='&#9432;&nbsp; For each observation decide <strong>Observation Decision</strong> (all rows) and <strong>Wording Decision</strong> (rows marked <span style="font-size:9px;background:#c9962a;color:#fff;border-radius:3px;padding:1px 5px">WORDING EDITED</span>). Click <strong>View Detail</strong> to read the full text. When all decisions are recorded, click <strong>Export Response</strong>.';
   h+='</div>';
 
   // ── Summary table ─────────────────────────────────────────────────────────
-  h+='<table style="width:100%;border-collapse:collapse">';
+  // Two decision columns side by side per row
+  h+='<table style="width:100%;border-collapse:collapse;table-layout:fixed">';
+  h+='<colgroup>';
+  h+='<col style="width:36px">';
+  h+='<col>';
+  h+='<col style="width:245px">';
+  h+='<col style="width:245px">';
+  h+='<col style="width:90px">';
+  h+='</colgroup>';
   h+='<thead><tr style="background:#0a0800;font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:rgba(255,255,255,.45)">';
-  h+='<th style="padding:7px 10px 7px 14px;text-align:left;width:32px">#</th>';
+  h+='<th style="padding:7px 10px 7px 14px;text-align:left">#</th>';
   h+='<th style="padding:7px 10px;text-align:left">Observation</th>';
-  h+='<th style="padding:7px 10px;text-align:left;width:220px">Decision</th>';
-  h+='<th style="padding:7px 10px;text-align:left">Comment</th>';
-  h+='<th style="padding:7px 14px 7px 10px;text-align:center;width:90px">Detail</th>';
+  h+='<th style="padding:7px 10px;text-align:left;border-left:1px solid rgba(255,255,255,.08)">Observation Decision</th>';
+  h+='<th style="padding:7px 10px;text-align:left;border-left:1px solid rgba(255,255,255,.08)">Wording Decision</th>';
+  h+='<th style="padding:7px 14px 7px 10px;text-align:center;border-left:1px solid rgba(255,255,255,.08)">Detail</th>';
   h+='</tr></thead><tbody>';
 
   for(var i=0;i<amendedIds.length;i++){
@@ -26480,22 +26490,33 @@ function _rvShowRoPanel(sess){
     if(hasWc) h+='<div style="margin-top:4px"><span style="font-size:9px;background:#c9962a;color:#fff;border-radius:3px;padding:1px 6px;letter-spacing:.3px">WORDING EDITED</span></div>';
     h+='</td>';
 
-    // Decision buttons column
-    h+='<td style="padding:10px;vertical-align:middle">';
-    h+='<div style="display:flex;gap:5px;flex-wrap:wrap">';
-    h+='<button id="_rv_btn_appr_'+id+'" onclick="_rvRoDecide(\''+id+'\',\'approved\')" style="padding:5px 10px;border:2px solid #27ae60;border-radius:4px;background:rgba(39,174,96,.1);color:#7ae090;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Approve</button>';
-    h+='<button id="_rv_btn_sugg_'+id+'" onclick="_rvRoDecide(\''+id+'\',\'suggestion\')" style="padding:5px 10px;border:2px solid #c9962a;border-radius:4px;background:rgba(201,150,42,.1);color:#f0c060;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#9999; Suggest</button>';
-    h+='<button id="_rv_btn_rejt_'+id+'" onclick="_rvRoDecide(\''+id+'\',\'rejected\')" style="padding:5px 10px;border:2px solid #c0392b;border-radius:4px;background:rgba(192,57,43,.1);color:#f08080;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#10007; Reject</button>';
-    h+='</div></td>';
+    // ── Column 1: Observation Decision (all rows) ─────────────────────────
+    h+='<td style="padding:10px;vertical-align:top;border-left:1px solid rgba(255,255,255,.08)">';
+    h+='<div style="display:flex;gap:4px;flex-wrap:wrap">';
+    h+='<button id="_rv_btn_appr_'+id+'" onclick="_rvRoDecide(\''+id+'\',\'approved\',\'obs\')" style="padding:4px 9px;border:2px solid #27ae60;border-radius:4px;background:rgba(39,174,96,.1);color:#7ae090;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Approve</button>';
+    h+='<button id="_rv_btn_sugg_'+id+'" onclick="_rvRoDecide(\''+id+'\',\'suggestion\',\'obs\')" style="padding:4px 9px;border:2px solid #c9962a;border-radius:4px;background:rgba(201,150,42,.1);color:#f0c060;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#9999; Suggest</button>';
+    h+='<button id="_rv_btn_rejt_'+id+'" onclick="_rvRoDecide(\''+id+'\',\'rejected\',\'obs\')" style="padding:4px 9px;border:2px solid #c0392b;border-radius:4px;background:rgba(192,57,43,.1);color:#f08080;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#10007; Reject</button>';
+    h+='</div>';
+    h+='<input id="_rv_cmt_'+id+'" type="text" placeholder="Comment (required)..." style="display:none;margin-top:6px;width:100%;padding:5px 8px;border:1px solid rgba(255,255,255,.25);border-radius:4px;background:rgba(255,255,255,.07);color:#fff;font-family:inherit;font-size:11px;box-sizing:border-box">';
+    h+='</td>';
 
-    // Comment column
-    h+='<td style="padding:10px;vertical-align:middle">';
-    h+='<input id="_rv_cmt_'+id+'" type="text" placeholder="Required for Suggest / Reject..." style="display:none;width:100%;padding:5px 8px;border:1px solid rgba(255,255,255,.25);border-radius:4px;background:rgba(255,255,255,.07);color:#fff;font-family:inherit;font-size:12px;box-sizing:border-box">';
+    // ── Column 2: Wording Decision (wording-edited rows only) ────────────
+    h+='<td style="padding:10px;vertical-align:top;border-left:1px solid rgba(255,255,255,.08)">';
+    if(hasWc){
+      h+='<div style="display:flex;gap:4px;flex-wrap:wrap">';
+      h+='<button id="_rv_wcbtn_appr_'+id+'" onclick="_rvRoDecide(\''+id+'\',\'approved\',\'wc\')" style="padding:4px 9px;border:2px solid #27ae60;border-radius:4px;background:rgba(39,174,96,.1);color:#7ae090;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#10003; Approve</button>';
+      h+='<button id="_rv_wcbtn_sugg_'+id+'" onclick="_rvRoDecide(\''+id+'\',\'suggestion\',\'wc\')" style="padding:4px 9px;border:2px solid #c9962a;border-radius:4px;background:rgba(201,150,42,.1);color:#f0c060;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#9999; Suggest</button>';
+      h+='<button id="_rv_wcbtn_rejt_'+id+'" onclick="_rvRoDecide(\''+id+'\',\'rejected\',\'wc\')" style="padding:4px 9px;border:2px solid #c0392b;border-radius:4px;background:rgba(192,57,43,.1);color:#f08080;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#10007; Reject</button>';
+      h+='</div>';
+      h+='<input id="_rv_wccmt_'+id+'" type="text" placeholder="Comment (required)..." style="display:none;margin-top:6px;width:100%;padding:5px 8px;border:1px solid rgba(255,255,255,.25);border-radius:4px;background:rgba(255,255,255,.07);color:#fff;font-family:inherit;font-size:11px;box-sizing:border-box">';
+    } else {
+      h+='<span style="font-size:11px;color:rgba(255,255,255,.25);font-style:italic">No wording edit</span>';
+    }
     h+='</td>';
 
     // View Detail column
-    h+='<td style="padding:10px 14px 10px 10px;text-align:center;vertical-align:middle">';
-    h+='<button onclick="_rvScrollToObs(\''+id+'\')" style="background:rgba(201,150,42,.18);border:1px solid rgba(201,150,42,.4);color:#f5d98b;border-radius:5px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">&#8595; View Detail</button>';
+    h+='<td style="padding:10px 14px 10px 10px;text-align:center;vertical-align:middle;border-left:1px solid rgba(255,255,255,.08)">';
+    h+='<button onclick="_rvScrollToObs(\''+id+'\')" style="background:rgba(201,150,42,.18);border:1px solid rgba(201,150,42,.4);color:#f5d98b;border-radius:5px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">&#8595; View</button>';
     h+='</td>';
 
     h+='</tr>';
@@ -26510,6 +26531,7 @@ function _rvShowRoPanel(sess){
 
   panel.innerHTML=h;
   panel.setAttribute('data-amended-ids',JSON.stringify(amendedIds));
+  panel.setAttribute('data-wc-ids',JSON.stringify(wordingChangedIds));
 
   // Insert at top of report content (#rpcont), before the report body
   var rpcont=document.getElementById('rpcont');
@@ -26524,46 +26546,57 @@ function _rvShowRoPanel(sess){
   _rvInjectBackButton();
 }
 
-function _rvRoDecide(obsId, decision){
-  if(!_rvInMemDecisions[obsId]) _rvInMemDecisions[obsId]={decision:'',comment:''};
-  _rvInMemDecisions[obsId].decision=decision;
-  var cmtEl=document.getElementById('_rv_cmt_'+obsId);
+// decisionType: 'obs' (observation decision) or 'wc' (wording change decision)
+function _rvRoDecide(obsId, decision, decisionType){
+  if(!_rvInMemDecisions[obsId]) _rvInMemDecisions[obsId]={decision:'',comment:'',wcDecision:'',wcComment:''};
+  var isWc=(decisionType==='wc');
+  if(isWc){
+    _rvInMemDecisions[obsId].wcDecision=decision;
+  } else {
+    _rvInMemDecisions[obsId].decision=decision;
+  }
+  var cmtKey=isWc?'_rv_wccmt_':'_rv_cmt_';
+  var cmtEl=document.getElementById(cmtKey+obsId);
   if(cmtEl){
-    cmtEl.style.display=(decision==='suggestion'||decision==='rejected')?'inline-block':'none';
-    cmtEl.oninput=function(){ _rvInMemDecisions[obsId].comment=cmtEl.value; };
+    cmtEl.style.display=(decision==='suggestion'||decision==='rejected')?'block':'none';
+    (function(el,id,wc){ el.oninput=function(){ if(wc) _rvInMemDecisions[id].wcComment=el.value; else _rvInMemDecisions[id].comment=el.value; }; })(cmtEl,obsId,isWc);
   }
-  var row=document.getElementById('_rv_ro_row_'+obsId);
-  if(row){
-    var btns={'approved':'appr','suggestion':'sugg','rejected':'rejt'};
-    var allKeys=['appr','sugg','rejt'];
-    var styles={
-      'appr':{'active':'background:#27ae60;color:#fff;border-color:#27ae60','idle':'background:rgba(39,174,96,.1);color:#7ae090;border-color:#27ae60'},
-      'sugg':{'active':'background:#c9962a;color:#fff;border-color:#c9962a','idle':'background:rgba(201,150,42,.1);color:#f0c060;border-color:#c9962a'},
-      'rejt':{'active':'background:#c0392b;color:#fff;border-color:#c0392b','idle':'background:rgba(192,57,43,.1);color:#f08080;border-color:#c0392b'}
-    };
-    for(var k=0;k<allKeys.length;k++){
-      var btn=document.getElementById('_rv_btn_'+allKeys[k]+'_'+obsId);
-      if(btn) btn.style.cssText='padding:5px 10px;border:2px solid;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;'+
-        (btns[decision]===allKeys[k]?styles[allKeys[k]].active:styles[allKeys[k]].idle);
-    }
-    row.style.background='background:rgba(255,255,255,.1)';
+  // Update button highlight styles
+  var prefix=isWc?'_rv_wcbtn_':'_rv_btn_';
+  var allKeys=['appr','sugg','rejt'];
+  var styles={
+    'appr':{'active':'background:#27ae60;color:#fff;border-color:#27ae60','idle':'background:rgba(39,174,96,.1);color:#7ae090;border-color:#27ae60'},
+    'sugg':{'active':'background:#c9962a;color:#fff;border-color:#c9962a','idle':'background:rgba(201,150,42,.1);color:#f0c060;border-color:#c9962a'},
+    'rejt':{'active':'background:#c0392b;color:#fff;border-color:#c0392b','idle':'background:rgba(192,57,43,.1);color:#f08080;border-color:#c0392b'}
+  };
+  var keyMap={'approved':'appr','suggestion':'sugg','rejected':'rejt'};
+  for(var k=0;k<allKeys.length;k++){
+    var btn=document.getElementById(prefix+allKeys[k]+'_'+obsId);
+    if(btn) btn.style.cssText='padding:4px 9px;border:2px solid;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;'+
+      (keyMap[decision]===allKeys[k]?styles[allKeys[k]].active:styles[allKeys[k]].idle);
   }
+  _rvUpdateProgress();
+}
+
+function _rvUpdateProgress(){
   var panelEl=document.getElementById('_rv_ro_panel');
-  if(panelEl){
-    var ids=JSON.parse(panelEl.getAttribute('data-amended-ids')||'[]');
-    var doneCount=0;
-    for(var i=0;i<ids.length;i++){ if(_rvInMemDecisions[ids[i]]&&_rvInMemDecisions[ids[i]].decision) doneCount++; }
-    var progEl=document.getElementById('_rv_ro_progress');
-    if(progEl) progEl.textContent=doneCount+' / '+ids.length+' decided';
-    var footEl=document.getElementById('_rv_ro_progress_foot');
-    if(footEl){
-      if(doneCount===ids.length){
-        footEl.textContent='All '+ids.length+' observations decided. Ready to export.';
-        footEl.style.color='#7ae090';
-      } else {
-        footEl.textContent=(ids.length-doneCount)+' observation(s) still need a decision.';
-        footEl.style.color='rgba(255,255,255,.5)';
-      }
+  if(!panelEl) return;
+  var ids=JSON.parse(panelEl.getAttribute('data-amended-ids')||'[]');
+  var wcIds=JSON.parse(panelEl.getAttribute('data-wc-ids')||'[]');
+  var total=ids.length+wcIds.length;
+  var done=0;
+  for(var i=0;i<ids.length;i++){ if(_rvInMemDecisions[ids[i]]&&_rvInMemDecisions[ids[i]].decision) done++; }
+  for(var j=0;j<wcIds.length;j++){ if(_rvInMemDecisions[wcIds[j]]&&_rvInMemDecisions[wcIds[j]].wcDecision) done++; }
+  var progEl=document.getElementById('_rv_ro_progress');
+  if(progEl) progEl.textContent=done+' / '+total+' decided';
+  var footEl=document.getElementById('_rv_ro_progress_foot');
+  if(footEl){
+    if(done===total){
+      footEl.textContent='All decisions recorded. Ready to export.';
+      footEl.style.color='#7ae090';
+    } else {
+      footEl.textContent=(total-done)+' decision(s) still needed.';
+      footEl.style.color='rgba(255,255,255,.5)';
     }
   }
 }
@@ -26571,27 +26604,40 @@ function _rvRoDecide(obsId, decision){
 function _rvRoExportMenu(){
   var panelEl=document.getElementById('_rv_ro_panel');
   var amendedIds=panelEl?JSON.parse(panelEl.getAttribute('data-amended-ids')||'[]'):[];
-  var allDecided=true;
-  var missingComment=[];
+  var wcIds=panelEl?JSON.parse(panelEl.getAttribute('data-wc-ids')||'[]'):[];
+  var missing=[];
+  // Check all observation decisions
   for(var i=0;i<amendedIds.length;i++){
     var id=amendedIds[i];
     var dec=_rvInMemDecisions[id]||{};
-    if(!dec.decision){ allDecided=false; break; }
+    if(!dec.decision){ missing.push(_rvObsTitle(id)+' — Observation decision missing'); continue; }
     if((dec.decision==='suggestion'||dec.decision==='rejected')&&!(dec.comment||'').trim()){
-      missingComment.push(_rvObsTitle(id));
+      missing.push(_rvObsTitle(id)+' — Observation comment required');
     }
   }
-  if(!allDecided){
-    toast('Please decide on all amendments before exporting.'); return;
+  // Check wording decisions for wording-edited obs
+  for(var j=0;j<wcIds.length;j++){
+    var wid=wcIds[j];
+    var wdec=_rvInMemDecisions[wid]||{};
+    if(!wdec.wcDecision){ missing.push(_rvObsTitle(wid)+' — Wording decision missing'); continue; }
+    if((wdec.wcDecision==='suggestion'||wdec.wcDecision==='rejected')&&!(wdec.wcComment||'').trim()){
+      missing.push(_rvObsTitle(wid)+' — Wording comment required');
+    }
   }
-  if(missingComment.length){
-    alert('Comment is required for Suggest / Reject decisions.\n\nMissing comments for:\n'+missingComment.join('\n'));
+  if(missing.length){
+    alert('Cannot export — the following items are incomplete:\n\n'+missing.join('\n'));
     return;
   }
-  for(var j=0;j<amendedIds.length;j++){
-    var jid=amendedIds[j];
-    var cEl=document.getElementById('_rv_cmt_'+jid);
-    if(cEl&&_rvInMemDecisions[jid]) _rvInMemDecisions[jid].comment=cEl.value||_rvInMemDecisions[jid].comment||'';
+  // Sync comment values from DOM
+  for(var a=0;a<amendedIds.length;a++){
+    var aid=amendedIds[a];
+    var cEl=document.getElementById('_rv_cmt_'+aid);
+    if(cEl&&_rvInMemDecisions[aid]) _rvInMemDecisions[aid].comment=cEl.value||_rvInMemDecisions[aid].comment||'';
+  }
+  for(var b=0;b<wcIds.length;b++){
+    var bid=wcIds[b];
+    var wEl=document.getElementById('_rv_wccmt_'+bid);
+    if(wEl&&_rvInMemDecisions[bid]) _rvInMemDecisions[bid].wcComment=wEl.value||_rvInMemDecisions[bid].wcComment||'';
   }
   var isFinal=confirm('Click OK to export as FINAL APPROVAL (ready for Final Issuance Report).\n\nClick Cancel to export as "Send Back" — auditor will make corrections and return.');
   _rvRoExport(isFinal);
@@ -26611,7 +26657,12 @@ function _rvRoExport(isFinal){
   var round=meta.round||1;
   var filename=isFinal ? stem+'_v'+round+'_RO_FINAL_APPROVAL.json' : stem+'_v'+round+'_RO_Reviewed.json';
   _rvDownloadJson(sess,filename);
-  toast('Exported: '+filename+'.'+(isFinal?' Send to auditor for Final Issuance Report generation.':' Send back to auditor for corrections.'));
+  toast('Exported: '+filename+'.'+(isFinal?' RO Supervisor: generate the Final Issuance Report from this session.':' Send back to auditor for corrections.'));
+  if(!isFinal){
+    var cfg2=_csGetCfg();
+    var stem2=stem.replace(/_/g,' ');
+    _emailNotifyAuditor(cfg2,stem2,roName,round);
+  }
 }
 
 // ── Scroll to observation + floating back button ───────────────────────────────
