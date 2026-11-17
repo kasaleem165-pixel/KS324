@@ -10724,7 +10724,7 @@ function applyRespLoad(){
       _faBanner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#1a6030;color:#fff;padding:12px 20px;display:flex;align-items:center;gap:14px;box-shadow:0 3px 16px rgba(0,0,0,.3);font-family:\'Segoe UI\',Arial,sans-serif';
       _faBanner.innerHTML='<span style="font-size:1.6rem;flex-shrink:0">&#10003;&#10003;</span>'
         +'<div style="flex:1"><div style="font-size:.95rem;font-weight:800;letter-spacing:.3px">RO SUPERVISOR FINAL APPROVAL RECEIVED</div>'
-        +'<div style="font-size:.8rem;opacity:.9;margin-top:2px">The Issue Report button is now unlocked. Please generate the Final Issuance Report and forward to RO Supervisor.</div></div>'
+        +'<div style="font-size:.8rem;opacity:.9;margin-top:2px">The RO Supervisor will now generate the Final Issuance Report.</div></div>'
         +'<button onclick="this.parentNode.remove()" style="background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:50%;width:28px;height:28px;font-size:16px;cursor:pointer;flex-shrink:0;line-height:1">&#10005;</button>';
       document.body.prepend(_faBanner);
     }
@@ -17914,6 +17914,12 @@ function _csDoSubmitReviewRequest(role, cfg, roleLabel, year, brFolder, reviewKe
       _csLastCloudSaveTs=Date.now();
       _csBrowseCache=null;
       toast('✅ Review request sent to '+roleLabel+' Supervisor via cloud');
+      if(role==='ro'){
+        var _sess2=captureSession(); var _fd2=(_sess2&&_sess2.formData)||{};
+        var _br2=brFolder.replace(/_/g,' ');
+        var _reg2=_fd2.brregion||_fd2.region||'';
+        _emailNotifyRO(cfg,_br2,_reg2);
+      }
     } else {
       throw new Error('Review record save failed');
     }
@@ -26541,7 +26547,12 @@ function _rvRoExport(isFinal){
   var round=meta.round||1;
   var filename=isFinal ? stem+'_v'+round+'_RO_FINAL_APPROVAL.json' : stem+'_v'+round+'_RO_Reviewed.json';
   _rvDownloadJson(sess,filename);
-  toast('Exported: '+filename+'.'+(isFinal?' Send to auditor for Final Issuance Report generation.':' Send back to auditor for corrections.'));
+  toast('Exported: '+filename+'.'+(isFinal?' RO Supervisor: generate the Final Issuance Report from this session.':' Send back to auditor for corrections.'));
+  if(!isFinal){
+    var cfg2=_csGetCfg();
+    var stem2=stem.replace(/_/g,' ');
+    _emailNotifyAuditor(cfg2,stem2,roName,round);
+  }
 }
 
 // ── Scroll to observation + floating back button ───────────────────────────────
@@ -26629,14 +26640,24 @@ function _rvApplyFinalApproval(sess){
   banner.innerHTML='<span style="font-size:18px">&#10004;</span>'
     +'<span style="flex:1"><strong>FINAL APPROVAL received from '+esc(by)+(dt?' on '+esc(dt):'')+'.</strong>'
     +' &nbsp;Amendments — '+summary+'</span>'
-    +'<button onclick="_rvLaunchIssuedReport()" style="background:#27ae60;border:none;color:#fff;border-radius:5px;padding:6px 18px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:.3px">&#128196; Generate Final Issuance Report</button>'
+    +'<span style="font-size:12px;opacity:.85;font-style:italic">Your RO Supervisor will now generate the Final Issuance Report.</span>'
     +'<button onclick="document.getElementById(\'_rv_final_banner\').remove()" style="background:rgba(255,255,255,.12);border:none;color:#fff;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit;margin-left:8px">&#x2715;</button>';
   document.body.appendChild(banner);
   _rvInjectBackButton();
-  toast('Final Approval loaded. Click "Generate Final Issuance Report" to proceed.');
+  var _r=_userRole();
+  if(_r==='ro_supervisor'||_r==='administrator'){
+    toast('Final Approval loaded. Click "Generate Final Issuance Report" to proceed.');
+  } else {
+    toast('Final Approval received from RO Supervisor. The RO Supervisor will now generate the Final Issuance Report.');
+  }
 }
 
 function _rvLaunchIssuedReport(){
+  var r=_userRole();
+  if(r!=='ro_supervisor'&&r!=='administrator'){
+    toast('Only the RO Supervisor can generate the Final Issuance Report.');
+    return;
+  }
   if(typeof generateIssuedReport==='function'){
     generateIssuedReport();
   } else {
@@ -26649,6 +26670,75 @@ function _rvLaunchIssuedReport(){
 /* ─────────────────────────────────────────────────────────────────────────── */
 
 var _HO_NOTIF_PATH = 'sessions/_system/ho_notifications.json';
+
+// ── Email RO Supervisor when auditor submits for review ───────────────────────
+function _emailNotifyRO(cfg, branchDisplay, region){
+  _umFetchUsers(function(users, err){
+    if(err||!users) return;
+    var reg=(region||'').toLowerCase();
+    var roEmail=''; var roName='';
+    for(var i=0;i<users.length;i++){
+      var u=users[i];
+      if(u.role!=='ro_supervisor') continue;
+      var uReg=(u.region||'').toLowerCase();
+      if(!uReg||uReg===reg){ roEmail=u.email||''; roName=u.name||u.username||'RO Supervisor'; }
+      if(uReg===reg) break;
+    }
+    var auditorName=cfg.auditor||'Auditor';
+    var branch=branchDisplay||'';
+    var noEmailNote=(!roEmail)?'[NOTE: No RO Supervisor email found for region "'+region+'". Add the email in Admin Panel → Users before sending.]\n\n':'';
+    var subject='BRAINS — Audit Report Submitted for Review: '+branch;
+    var greeting=roName?'Dear '+roName+',':'Dear RO Supervisor,';
+    var body=noEmailNote+greeting+'\n\n'
+      +'An audit report has been submitted for your review in BRAINS:\n\n'
+      +'Branch: '+branch+'\n'
+      +'Region: '+(region||'')+'\n'
+      +'Submitted by: '+auditorName+'\n'
+      +'Submitted at: '+(new Date().toISOString().slice(0,16).replace('T',' '))+' UTC\n\n'
+      +'Please log in to BRAINS and check the Supervisor Dashboard for pending reviews:\n'
+      +window.location.href.split('?')[0]+'\n\n'
+      +'Regards,\nBRAINS — Beaconhouse Systems & Audit';
+    setTimeout(function(){
+      window.open('mailto:'+roEmail+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body),'_blank');
+    },600);
+  });
+}
+
+// ── Email auditor when RO Supervisor sends back for amendments ────────────────
+function _emailNotifyAuditor(cfg, branchDisplay, roName, round){
+  _umFetchUsers(function(users, err){
+    if(err||!users) return;
+    var auditorSlug=(cfg.auditor||'').toLowerCase().replace(/\s+/g,'-');
+    var auditorEmail=''; var auditorDisplayName='';
+    for(var i=0;i<users.length;i++){
+      var u=users[i];
+      if(u.role!=='auditor') continue;
+      var uSlug=(u.name||u.username||'').toLowerCase().replace(/\s+/g,'-');
+      if(uSlug===auditorSlug||(u.username||'').toLowerCase()===auditorSlug){
+        auditorEmail=u.email||'';
+        auditorDisplayName=u.name||u.username||'Auditor';
+        break;
+      }
+    }
+    var branch=branchDisplay||'';
+    var rv=roName||'RO Supervisor';
+    var noEmailNote=(!auditorEmail)?'[NOTE: No auditor email found for "'+cfg.auditor+'". Add the email in Admin Panel → Users before sending.]\n\n':'';
+    var subject='BRAINS — Amendments Requested: '+branch+(round?' (Round '+round+')':'');
+    var greeting=auditorDisplayName?'Dear '+auditorDisplayName+',':'Dear Auditor,';
+    var body=noEmailNote+greeting+'\n\n'
+      +'Your RO Supervisor has reviewed the audit report and has requested amendments:\n\n'
+      +'Branch: '+branch+'\n'
+      +'Reviewed by: '+rv+'\n'
+      +'Review date: '+(new Date().toISOString().slice(0,10))+'\n'
+      +(round?'Round: '+round+'\n':'')+'\n'
+      +'Please log in to BRAINS, load the report, and use the Review tab → Load RO Supervisor Review to see the supervisor\'s comments:\n'
+      +window.location.href.split('?')[0]+'\n\n'
+      +'Regards,\nBRAINS — Beaconhouse Systems & Audit';
+    setTimeout(function(){
+      window.open('mailto:'+auditorEmail+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body),'_blank');
+    },600);
+  });
+}
 
 function _hoNotifyAndEmail(H){
   // Silently write notification to GitHub and open mailto for HO Supervisor
