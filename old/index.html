@@ -26292,6 +26292,10 @@ function _rvObsTitle(obsId){
   var o=DB.observations.find(function(x){return x.id===obsId;});
   if(o) return o.title||obsId;
   for(var i=0;i<customs.length;i++){if(customs[i].id===obsId) return customs[i].title||obsId;}
+  // Check retired observations
+  if(typeof _retiredObs!=='undefined'){
+    for(var r=0;r<_retiredObs.length;r++){if(_retiredObs[r].id===obsId) return _retiredObs[r].title||obsId;}
+  }
   return obsId;
 }
 
@@ -26541,10 +26545,13 @@ function _rvShowRoPanel(sess){
   // ── Observation cards ─────────────────────────────────────────────────────
   h+='<div style="padding:14px 16px;display:flex;flex-direction:column;gap:14px">';
 
+  var _rvLabels=(typeof getObsReportLabels==='function')?getObsReportLabels():{};
+
   for(var i=0;i<amendedIds.length;i++){
     var id=amendedIds[i];
     var title=_rvObsTitle(id);
     var hasWc=(wordingChangedIds.indexOf(id)>=0);
+    var obsLabel=_rvLabels[id]||(i+1);
 
     // Get texts for diff if wording changed
     var origTxt='', revTxt='', diffRes={orig:'',rev:''};
@@ -26560,7 +26567,7 @@ function _rvShowRoPanel(sess){
 
     // ── Card header: observation title ─────────────────────────────────────
     h+='<div style="display:flex;align-items:center;gap:10px;padding:11px 14px;background:#edf2f7;border-bottom:1px solid #d0dce8">';
-    h+='<span style="background:#1a3a5c;color:#fff;border-radius:50%;min-width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">'+(i+1)+'</span>';
+    h+='<span style="background:#1a3a5c;color:#fff;border-radius:4px;min-width:28px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;padding:0 5px">'+obsLabel+'</span>';
     h+='<div style="flex:1;font-size:13.5px;font-weight:700;color:#1a3a5c;line-height:1.45">'+esc(title)+'</div>';
     if(hasWc) h+='<span style="font-size:10px;background:#c9962a;color:#fff;border-radius:3px;padding:2px 8px;font-weight:700;flex-shrink:0">WORDING EDITED</span>';
     h+='<button onclick="_rvScrollToObs(\''+id+'\')" style="background:#fff;border:1px solid #c0d0e0;color:#1a3a5c;border-radius:4px;padding:4px 12px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0">&#8595; View in Report</button>';
@@ -26759,12 +26766,20 @@ function _rvRoExport(isFinal){
 function _rvScrollToObs(obsId){
   var el=document.getElementById('obs-card-'+obsId)||document.getElementById('obs-block-'+obsId);
   if(!el){
-    var report=document.getElementById('report-panel')||document.getElementById('rptpanel');
-    if(report) report.scrollIntoView({behavior:'smooth'});
+    // Report not yet rendered — generate it first, then scroll
+    if(typeof renderRpt==='function') renderRpt();
     setTimeout(function(){
       var el2=document.getElementById('obs-card-'+obsId)||document.getElementById('obs-block-'+obsId);
-      if(el2) el2.scrollIntoView({behavior:'smooth',block:'center'});
-    },400);
+      if(el2){
+        el2.scrollIntoView({behavior:'smooth',block:'center'});
+        el2.style.outline='3px solid #c9962a';
+        setTimeout(function(){ el2.style.outline=''; },2500);
+        _rvShowBackBtn();
+      } else {
+        var report=document.getElementById('report-panel')||document.getElementById('rptpanel');
+        if(report) report.scrollIntoView({behavior:'smooth'});
+      }
+    },800);
     return;
   }
   el.scrollIntoView({behavior:'smooth',block:'center'});
