@@ -30035,7 +30035,7 @@ function _alGetMerged(){
   try{ var q=JSON.parse(localStorage.getItem('_BRAINS_ACT_QUEUE')||'[]'); if(Array.isArray(q)) local=q; }catch(e){}
   var cloud=Array.isArray(_alCloudData)?_alCloudData:[];
   var merged=cloud.concat(local);
-  merged.sort(function(a,b){ return (b.ts||0)-(a.ts||0); });
+  merged.sort(function(a,b){ var ta=a.ts||'',tb=b.ts||''; return tb>ta?1:tb<ta?-1:0; });
   return merged;
 }
 
@@ -30067,9 +30067,9 @@ function _alRender(overrideData){
     var bg=i%2===0?'#fff':'#f7f9fc';
     h+='<tr style="background:'+bg+';border-bottom:1px solid #eee">'
       +'<td style="padding:7px 12px;white-space:nowrap;color:#555">'+dt+'</td>'
-      +'<td style="padding:7px 12px;font-weight:600;color:#1a3a5c">'+_alEsc(ev.user||'—')+'</td>'
+      +'<td style="padding:7px 12px;font-weight:600;color:#1a3a5c">'+_alEsc(ev.auditor||ev.user||'—')+'</td>'
       +'<td style="padding:7px 12px"><span style="background:'+color+';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap">'+_alEsc(label)+'</span></td>'
-      +'<td style="padding:7px 12px;color:#555;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_alEsc(ev.branch||'—')+'</td>'
+      +'<td style="padding:7px 12px;color:#555;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_alEsc((ev.brcode||ev.branch||'—')+((ev.brcode&&ev.brname)?(' — '+ev.brname):''))+'</td>'
       +'<td style="padding:7px 12px;color:#666;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_alEsc(ev.detail||'—')+'</td>'
       +'</tr>';
   }
@@ -30091,7 +30091,7 @@ function _alApplyFilter(){
   for(var i=0;i<data.length;i++){
     var ev=data[i];
     if(fType && (ev.type||'').toLowerCase().indexOf(fType.toLowerCase())<0) continue;
-    if(fUser && (ev.user||'').toLowerCase().indexOf(fUser.toLowerCase())<0) continue;
+    if(fUser && (ev.auditor||ev.user||'').toLowerCase().indexOf(fUser.toLowerCase())<0) continue;
     if(fDate){
       var d=ev.ts?new Date(ev.ts).toISOString().slice(0,10):'';
       if(d!==fDate) continue;
@@ -30116,7 +30116,8 @@ function _alExportCsv(){
   for(var i=0;i<data.length;i++){
     var ev=data[i];
     var dt=ev.ts?new Date(ev.ts).toISOString().replace('T',' ').slice(0,19):'';
-    rows.push([dt,ev.user||'',ACT_LABELS[ev.type]||ev.type||'',ev.branch||'',ev.detail||'']);
+    var brStr=(ev.brcode||ev.branch||'')+((ev.brcode&&ev.brname)?(' — '+ev.brname):'');
+    rows.push([dt,ev.auditor||ev.user||'',ACT_LABELS[ev.type]||ev.type||'',brStr,ev.detail||'']);
   }
   var csv=rows.map(function(r){ return r.map(function(f){ var s=String(f||''); return s.indexOf(',')>=0||s.indexOf('"')>=0||s.indexOf('\n')>=0?'"'+s.replace(/"/g,'""')+'"':s; }).join(','); }).join('\n');
   var blob=new Blob([csv],{type:'text/csv'});
