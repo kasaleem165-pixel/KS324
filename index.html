@@ -31500,13 +31500,40 @@ function _gdFindOrCreate(name,parentId,token,cb){
   });
 }
 
+function _gdRegionFolder(){
+  var H=getHdrVals();
+  var r=(H.brregion||'').trim();
+  if(!r){
+    // Fall back to branch list if header not yet filled
+    var code=(H.brcode||'').trim();
+    if(code){
+      for(var i=0;i<BSS_BRANCHES.length;i++){
+        if(BSS_BRANCHES[i].code===code&&BSS_BRANCHES[i].region){
+          r=BSS_BRANCHES[i].region; break;
+        }
+      }
+    }
+  }
+  return (r||'Unknown-Region').replace(/[^a-zA-Z0-9 \-]/g,'_').replace(/_+/g,'_').trim();
+}
+
 function _gdGetSubfolderId(subfolder,token,cb){
-  var cfg=_gdCfg(); var branch=_csBranchFolder();
+  var cfg=_gdCfg();
+  var branch=_csBranchFolder();
+  var region=_gdRegionFolder();
+  var year=new Date().getFullYear()+'';
+  try{ var H=getHdrVals(); if(H.rper_from) year=H.rper_from.slice(0,4)||year; }catch(e){}
   _gdFindOrCreate(cfg.rootFolder,'root',token,function(err,rootId){
     if(err){cb(err);return;}
-    _gdFindOrCreate(branch,rootId,token,function(err2,branchId){
+    _gdFindOrCreate(year,rootId,token,function(err2,yearId){
       if(err2){cb(err2);return;}
-      _gdFindOrCreate(subfolder,branchId,token,cb);
+      _gdFindOrCreate(region,yearId,token,function(err3,regionId){
+        if(err3){cb(err3);return;}
+        _gdFindOrCreate(branch,regionId,token,function(err4,branchId){
+          if(err4){cb(err4);return;}
+          _gdFindOrCreate(subfolder,branchId,token,cb);
+        });
+      });
     });
   });
 }
