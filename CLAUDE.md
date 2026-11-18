@@ -163,12 +163,17 @@ Daily use:
 - Print / PDF from browser
 
 ### ✅ Working in DEV only (GitHub Pages — index.html)
-- Admin Panel with 4 tabs ✅ tested by Kamran
+- Admin Panel with 7 tabs ✅ tested by Kamran (originally 4; expanded to 7)
 - User Management — add/edit/delete named users ✅ tested (2 auditors + 1 supervisor created)
 - Single-URL role-based login (no ?mode= needed) ✅ tested
 - Setup Links tab — one-click URL to auto-configure auditor Cloud Settings
 - System tab — version info, change admin password
 - LIVE/DEV version badges on login screen and footer
+- Formula Settings tab — all planning score, sensitivity, complexity formula parameters configurable
+- Branches tab — admin manages branch list (225 branches), syncs to cloud via `sessions/_system/branches.json`
+- Branch Picker — full-screen overlay after auditor login; searchable list of all branches, pre-fills header fields, checks cloud for existing sessions, supports loading partner's session directly
+- Branch Switcher — File › Switch Branch shows only THIS auditor's open cloud sessions for quick switching between multiple active branch audits
+- Cloud Activity Log — 13-event audit trail; local queue flushed to per-auditor cloud files every 10 minutes; Admin Panel Activity Log tab shows merged log for all auditors with filter and CSV export
 
 ### ⏳ Pending
 - Full supervisor review cycle end-to-end test on live intranet
@@ -179,6 +184,9 @@ Daily use:
 2. **Cloud Setup** — GitHub token, owner, repo name, Google Drive Client ID
 3. **Setup Links** — Generate one-click URL that auto-fills Cloud Settings on any computer
 4. **System** — BRAINS version info, change administrator password
+5. **Formula Settings** — Planning score weights, sensitivity rating weights, complexity default, suggestion thresholds
+6. **Branches** — Add/edit/delete branches; sync to `sessions/_system/branches.json`; load built-in 225 branches
+7. **Activity Log** — View merged audit trail for all auditors; filter by event/auditor/date; export CSV; load from cloud
 
 ## Setup Link Flow (for new auditors)
 1. Admin opens Admin Panel → Setup Links → Generate → Copy URL
@@ -209,7 +217,7 @@ sed -n '/<script>/,/<\/script>/p' /home/user/KS324/old/index.html | grep -v "<sc
 | `_csGetCfg()` | Returns Cloud Settings config object from localStorage |
 | `_CS_CFG_KEY` | localStorage key for cloud settings |
 | `_csB64Dec()` | Base64 decode for GitHub API responses |
-| `showAdminPanel()` | Opens the 4-tab Admin Panel overlay (DEV only) |
+| `showAdminPanel()` | Opens the 7-tab Admin Panel overlay (DEV only) |
 | `_supShowDashboard()` | Opens Supervisor Dashboard |
 | `_pwGrantAccess(userObj)` | Called after successful login — routes to correct panel by role |
 | `saveDraftResponses()` | Generates RO/HO response HTML file |
@@ -622,3 +630,7 @@ RISK_BG     = {high:"#fdecea", mh:"#fef3e2", lm:"#eaf4fb", low:"#e9f7ef"}
 | Nov 2026 | Both DEV + LIVE | Bug fix: `_rvScrollToObs` wrong element ID | `_rvFindObsEl()` now tries `oc-{id}` first — the actual ID used in the report (`id="oc-{obsId}"` at renderRpt line 5809). Previous lookups for `obs-card-{id}` and `obs-block-{id}` never matched anything. |
 | Nov 2026 | Both DEV + LIVE | Bug fix: `_rvObsTitle` retired obs showing raw ID | Added `_retiredObs` array lookup so retired observations (not in `DB.observations`) show their correct title instead of the raw ID string. |
 | Nov 2026 | Old LIVE only | Bug fix: RO Review Panel — back button scroll + banner position | (1) `_rvFindObsEl()` was searching for `obs-{id}`, `obs-card-{id}`, `obs-block-{id}` — none exist. Report uses `id="oc-{obsId}"` (line 5809). Fixed to try `oc-{id}` first — now scrolls to the correct observation with gold outline highlight. (2) Back banner (`_rvInjectBackButton`) and inline back link (`_rvShowBackBtn`) both now use `document.getElementById('RP').scrollTop = 0` to return to the top of the right panel scroll container where `_rv_ro_panel` always lives — previously used `scrollIntoView` which was unreliable. Banner positioned at `top:44px` (below toolbar). |
+| Nov 2026 | DEV only | New feature: Branch management from Admin Panel (6th tab) | Admin can add, edit, delete branches (code, name, region, city) in Admin Panel › Branches tab. Working copy held in `_adminBranchWorkingCopy()` and in `localStorage` key `_BRAINS_BRANCH_DB`. "Save to Cloud" pushes to `sessions/_system/branches.json` in `brains-sessions` repo. "Load Built-in" restores the 225 embedded branches. "Fetch from Cloud" pulls the saved list. `_branchDbInit()` is called at login to fetch cloud branches and update `BSS_BRANCHES` + `initBranchDataLists()` silently. |
+| Nov 2026 | DEV only | New feature: Branch Picker at auditor login | After auditor login, full-screen overlay appears listing all 225 branches (searchable by code, name, region, city). Selecting a branch pre-fills all header fields; a cloud check shows existing sessions for that branch so the auditor can load a partner's session directly. "Continue Last Session" button skips the picker and resumes the previous session. Admin, supervisor, and viewer roles skip the picker. Stored in `_brPickerBranch`; functions: `_brPickerShow()`, `_brPickerFilter()`, `_brPickerSelect()`, `_brPickerCheckCloud()`, `_brPickerLoadSession()`, `_brPickerStartNew()`, `_brPickerFillHeader()`, `_brPickerDismiss()`, `_brPickerClose()`. |
+| Nov 2026 | DEV only | New feature: Branch Switcher — File › Switch Branch | Shows all sessions saved by THIS auditor (filtered by `_csAuditorSlug`) for the current year, so the auditor can jump between multiple open branch audit reports. Currently open branch is marked "Open now". "Open Different Branch" goes to the full branch picker. Functions: `_brSwitcherShow()`, `_brSwPaint()`, `_brSwFetch()`, `_brSwRender()`, `_brSwLoad()`. |
+| Nov 2026 | DEV only | New feature: Cloud Activity Log — operational audit trail | Logs 13 event types (login, branch_open, branch_switch, session_load, partner_load, cloud_save, merge, send_ro, send_ho, issuance, admin_action, sensitivity, coso) to a localStorage queue (`_BRAINS_ACT_QUEUE`). `_actStartTimer()` starts a 10-minute interval batch flush (`_actFlush`) that appends events to per-auditor files `sessions/_system/activity_{slug}.json` in `brains-sessions`. Per-auditor files eliminate write conflicts; batching keeps API calls well under the 5,000/hour GitHub limit. Hooks placed in: `_pwGrantAccess` (login), `_brPickerStartNew`/`_brPickerLoadSession` (branch_open/partner_load/session_load), `_brSwLoad` (branch_switch), `cloudSave` (cloud_save), `_csLoadFile` (session_load/partner_load), `_csDoSubmitReviewRequest` (send_ro/send_ho), `_adminBranchSaveToCloud` (admin_action). Page also flushes on `beforeunload`. Admin Panel 7th tab "Activity Log": `_adminRenderActLog()` — merges local queue + all cloud auditor files, displays timeline table, filters by event type/auditor/date, exports CSV. Key functions: `_actLog()`, `_actFlush()`, `_actStartTimer()`, `_actCurrentUser()`, `_actCurrentBranch()`, `_alGetMerged()`, `_alRender()`, `_alApplyFilter()`, `_alExportCsv()`, `_alLoadCloud()`. |
