@@ -752,7 +752,7 @@ function _pwGrantAccess(userObj){
     _applyRoleUI();
     // Supervisors and admins never need to resume an audit session
     var isSupervisorOrAdmin=(userObj.role==='ro_supervisor'||userObj.role==='ho_supervisor'||userObj.role==='supervisor'||userObj.role==='administrator');
-    if(!isSupervisorOrAdmin){ _startRestore(); }
+    if(!isSupervisorOrAdmin){ _brPickerCheck(userObj); }
     // Auto-launch supervisor dashboard for supervisor roles
     if(userObj.role==='ro_supervisor'||userObj.role==='ho_supervisor'||userObj.role==='supervisor'){
       setTimeout(_supShowDashboard, 400);
@@ -29670,6 +29670,199 @@ function _adminBranchSaveToCloud(){
 }
 
 // ── End Admin Tab: Branches ───────────────────────────────────────────────────
+
+// ============================================================
+// BRANCH PICKER — shown to auditors after login
+// ============================================================
+var _brPickerBranch = null; // branch selected in picker
+
+function _brPickerCheck(userObj){
+  if(userObj.role==='viewer'){ _startRestore(); return; }
+  _brPickerShow();
+}
+
+function _brPickerShow(){
+  var ex=document.getElementById('_brPickerOverlay');
+  if(ex) ex.parentNode.removeChild(ex);
+  var el=document.createElement('div');
+  el.id='_brPickerOverlay';
+  el.style.cssText='position:fixed;inset:0;background:#f0f4f8;z-index:9700;display:flex;flex-direction:column;font-family:Inter,Arial,sans-serif;overflow:hidden';
+  el.innerHTML=''
+    +'<div style="background:#1a3a5c;color:#fff;padding:0 20px;display:flex;align-items:center;gap:14px;flex-shrink:0;min-height:54px">'
+    +'<div style="font-size:20px">&#127968;</div>'
+    +'<div style="flex:1">'
+    +'<div style="font-size:15px;font-weight:700;letter-spacing:.3px">Select Branch to Audit</div>'
+    +'<div style="font-size:11px;opacity:.75;margin-top:1px">Choose the branch you are auditing today, or continue your last session.</div>'
+    +'</div>'
+    +'<button onclick="_brPickerClose()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:5px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap">&#8594; Continue Last Session</button>'
+    +'</div>'
+    +'<div style="padding:14px 20px 10px;flex-shrink:0;border-bottom:1px solid #d0dcea;background:#fff">'
+    +'<input id="_brPickerSearch" type="text" placeholder="Search by branch code, name, region or city..." oninput="_brPickerFilter()" autocomplete="off"'
+    +' style="width:100%;box-sizing:border-box;padding:9px 14px;border:1.5px solid #b0bdd0;border-radius:6px;font-size:13.5px;font-family:Inter,sans-serif;outline:none">'
+    +'<div id="_brPickerCount" style="font-size:11.5px;color:#888;margin-top:6px"></div>'
+    +'</div>'
+    +'<div style="flex:1;overflow-y:auto;padding:0">'
+    +'<table id="_brPickerTable" style="width:100%;border-collapse:collapse;font-family:Inter,sans-serif;font-size:13px"></table>'
+    +'</div>'
+    +'<div id="_brPickerDetail" style="flex-shrink:0;border-top:2px solid #1a3a5c;background:#fff;display:none;padding:16px 20px"></div>';
+  document.body.appendChild(el);
+  _brPickerFilter();
+  setTimeout(function(){ var s=document.getElementById('_brPickerSearch'); if(s) s.focus(); },150);
+}
+
+function _brPickerFilter(){
+  var q=(document.getElementById('_brPickerSearch')||{value:''}).value.toLowerCase().trim();
+  var list=BSS_BRANCHES;
+  var rows='';
+  var count=0;
+  for(var i=0;i<list.length;i++){
+    var b=list[i];
+    var txt=(b.code||'').toLowerCase()+(b.name||'').toLowerCase()+(b.region||'').toLowerCase()+(b.city||'').toLowerCase();
+    if(q && txt.indexOf(q)<0) continue;
+    count++;
+    var bg=count%2===0?'#f8fafc':'#fff';
+    rows+='<tr onclick="_brPickerSelect(\''+esc(b.code)+'\')" style="background:'+bg+';border-bottom:1px solid #e8edf4;cursor:pointer" onmouseover="this.style.background=\'#eef4ff\'" onmouseout="this.style.background=\''+bg+'\'">'
+      +'<td style="padding:10px 12px;white-space:nowrap;font-weight:700;color:#1a3a5c;width:60px">'+esc(b.code||'')+'</td>'
+      +'<td style="padding:10px 12px;font-weight:600">'+esc(b.name||'')+'</td>'
+      +'<td style="padding:10px 12px;color:#555;white-space:nowrap">'+esc(b.region||'')+'</td>'
+      +'<td style="padding:10px 12px;color:#555">'+esc(b.city||'')+'</td>'
+      +'<td style="padding:10px 14px;text-align:right;width:80px"><button onclick="event.stopPropagation();_brPickerSelect(\''+esc(b.code)+'\')" style="padding:5px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Select</button></td>'
+      +'</tr>';
+  }
+  if(!rows) rows='<tr><td colspan="5" style="padding:30px;text-align:center;color:#888;font-size:13px">No branches match your search.</td></tr>';
+  var tbl=document.getElementById('_brPickerTable');
+  if(tbl){
+    tbl.innerHTML='<thead><tr style="background:#1a3a5c;color:#fff;position:sticky;top:0">'
+      +'<th style="padding:9px 12px;text-align:left;font-weight:700;font-size:12px;white-space:nowrap">Code</th>'
+      +'<th style="padding:9px 12px;text-align:left;font-weight:700;font-size:12px">Branch Name</th>'
+      +'<th style="padding:9px 12px;text-align:left;font-weight:700;font-size:12px">Region</th>'
+      +'<th style="padding:9px 12px;text-align:left;font-weight:700;font-size:12px">City</th>'
+      +'<th style="padding:9px 12px"></th>'
+      +'</tr></thead><tbody>'+rows+'</tbody>';
+  }
+  var cEl=document.getElementById('_brPickerCount');
+  if(cEl) cEl.textContent=count+' branch'+(count===1?'':'es')+(q?' matching "'+q+'"':' total — type to search');
+}
+
+function _brPickerSelect(code){
+  var b=null;
+  for(var i=0;i<BSS_BRANCHES.length;i++){ if(BSS_BRANCHES[i].code===code){ b=BSS_BRANCHES[i]; break; } }
+  if(!b) return;
+  _brPickerBranch=b;
+  _brPickerFillHeader(b);
+  var det=document.getElementById('_brPickerDetail');
+  if(!det) return;
+  det.style.display='block';
+  det.innerHTML=''
+    +'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+    +'<div style="flex:1">'
+    +'<div style="font-size:14px;font-weight:700;color:#1a3a5c">'+esc(b.code)+' &mdash; '+esc(b.name)+'</div>'
+    +'<div style="font-size:12px;color:#666;margin-top:2px">'+esc(b.region||'')+(b.city?' &bull; '+esc(b.city):'')+'</div>'
+    +'</div>'
+    +'<div id="_brPickerCloudStatus" style="font-size:12px;color:#888">Checking cloud for existing sessions&hellip;</div>'
+    +'<button onclick="_brPickerStartNew()" style="padding:8px 20px;background:#27ae60;color:#fff;border:none;border-radius:5px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap">&#9998; Start / Continue New Audit</button>'
+    +'<button onclick="_brPickerCancelDetail()" style="padding:8px 14px;background:#888;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#8592; Back</button>'
+    +'</div>'
+    +'<div id="_brPickerCloudSessions" style="margin-top:10px"></div>';
+  _brPickerCheckCloud(b);
+}
+
+function _brPickerCheckCloud(b){
+  var cfg=_csGetCfg();
+  var statusEl=document.getElementById('_brPickerCloudStatus');
+  var sessEl=document.getElementById('_brPickerCloudSessions');
+  if(!cfg.token||!cfg.owner||!cfg.repo){
+    if(statusEl) statusEl.textContent='Cloud not configured — will start locally.';
+    return;
+  }
+  var folderName=b.code+'_'+b.name.replace(/[^a-zA-Z0-9]+/g,'_').replace(/_+/g,'_').substring(0,25);
+  var year=cfg.auditYear||(new Date().getFullYear()+'');
+  var url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/sessions/'+year+'/'+folderName;
+  fetch(url,{headers:{'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'}})
+  .then(function(r){ if(r.status===404){ return null; } return r.json(); })
+  .then(function(files){
+    if(!files||!Array.isArray(files)||!files.length){
+      if(statusEl) statusEl.textContent='No existing cloud sessions for this branch.';
+      return;
+    }
+    var sessions=files.filter(function(f){ return f.name&&f.name.slice(-5)==='.json'; });
+    if(!sessions.length){ if(statusEl) statusEl.textContent='No existing cloud sessions for this branch.'; return; }
+    if(statusEl) statusEl.textContent='Found '+sessions.length+' existing session'+(sessions.length>1?'s':'')+' in cloud:';
+    var h='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">';
+    for(var i=0;i<sessions.length;i++){
+      var f=sessions[i];
+      var audName=f.name.replace('.json','').replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+      h+='<button onclick="_brPickerLoadSession(\''+esc(f.path)+'\',\''+esc(f.sha||'')+'\',\''+esc(audName)+'\')" '
+        +'style="padding:7px 14px;background:#2980b9;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">'
+        +'&#9729; Load: '+esc(audName)+'</button>';
+    }
+    h+='</div>';
+    if(sessEl) sessEl.innerHTML=h;
+  })
+  .catch(function(){ if(statusEl) statusEl.textContent='Cloud check failed — you can still start new.'; });
+}
+
+function _brPickerLoadSession(path, sha, audName){
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo){ alert('Cloud not configured.'); return; }
+  var mySlug=_csAuditorSlug(cfg);
+  var fileSlug=path.split('/').pop().replace('.json','');
+  var isOwn=(fileSlug===mySlug);
+  var msg=isOwn
+    ?'Load your existing session for this branch? Your current unsaved work will be replaced.'
+    :'Load session by '+audName+'?\n\nYou can work on it, but saving to cloud will store it under YOUR name.';
+  if(!confirm(msg)) return;
+  var url=sha
+    ?'https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/git/blobs/'+sha
+    :'https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+path;
+  var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'};
+  fetch(url,{headers:hdrs})
+  .then(function(r){ return r.json(); })
+  .then(function(file){
+    if(!file||!file.content){ alert('Could not read session file.'); return; }
+    var sess=JSON.parse(_csB64Dec(file.content.replace(/\s/g,'')));
+    if(!sess||!sess.ts){ alert('Invalid session file.'); return; }
+    if(!isOwn){ sess._loadedFrom=fileSlug; sess._loadedFromAt=new Date().toISOString(); sess._loadedByName=cfg.auditor; }
+    _brPickerDismiss();
+    restoreSession(sess);
+    toast('Session loaded from cloud ✓');
+  })
+  .catch(function(e){ alert('Load error: '+(e&&e.message?e.message:e)); });
+}
+
+function _brPickerStartNew(){
+  _brPickerDismiss();
+  _startRestore();
+}
+
+function _brPickerCancelDetail(){
+  _brPickerBranch=null;
+  var det=document.getElementById('_brPickerDetail');
+  if(det){ det.style.display='none'; det.innerHTML=''; }
+}
+
+function _brPickerFillHeader(b){
+  function sf(id,v){ var el=document.getElementById(id); if(el) el.value=v||''; }
+  sf('brcode', b.code||'');
+  sf('brname', b.name||'');
+  sf('brregion', b.region||'');
+  sf('brcity', b.city||'');
+  if(b.head) sf('brhead', b.head);
+  // Auto-fill saved address if any
+  try{ var saved=JSON.parse(localStorage.getItem('bss_br_addr')||'{}'); if(saved[b.code]) sf('braddress', saved[b.code]); else if(b.address) sf('braddress', b.address); }catch(e){}
+}
+
+function _brPickerDismiss(){
+  var el=document.getElementById('_brPickerOverlay');
+  if(el) el.parentNode.removeChild(el);
+}
+
+function _brPickerClose(){
+  _brPickerDismiss();
+  _startRestore();
+}
+
+// ── End Branch Picker ─────────────────────────────────────────────────────────
 
 function _adminFormulaExample(fc){
   // ── Fixed scenario inputs ──────────────────────────────────────────────────
