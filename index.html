@@ -2075,7 +2075,7 @@ function _getSelObs(sIds){
 // ============================================================
 // BRANCH AUTO-FILL
 // ============================================================
-(function initBranchDataLists(){
+function initBranchDataLists(){
   var dlCode=document.getElementById('dl-brcode');
   var dlName=document.getElementById('dl-brname');
   var dlRegion=document.getElementById('dl-brregion');
@@ -2096,7 +2096,37 @@ function _getSelObs(sIds){
   for(var c in cities)  citH+='<option value="'+esc(c)+'"></option>';
   if(dlRegion) dlRegion.innerHTML=regH;
   if(dlCity)   dlCity.innerHTML=citH;
-})();
+}
+initBranchDataLists();
+
+// ============================================================
+// BRANCH DB — cloud-synced branch list (Admin-managed)
+// ============================================================
+var _BRANCH_DB_KEY = '_BRAINS_BRANCH_DB';
+var _BRANCH_CLOUD_PATH = 'sessions/_system/branches.json';
+
+function _branchDbGet(){
+  try{ var v=localStorage.getItem(_BRANCH_DB_KEY); if(v){ var arr=JSON.parse(v); if(Array.isArray(arr)&&arr.length) return arr; } }catch(e){}
+  return null;
+}
+function _branchDbSet(arr){
+  try{ localStorage.setItem(_BRANCH_DB_KEY, JSON.stringify(arr)); }catch(e){}
+}
+
+function _branchDbInit(){
+  // Try cloud first; fall back to localStorage; fall back to embedded
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo){
+    var local=_branchDbGet();
+    if(local){ BSS_BRANCHES=local; initBranchDataLists(); }
+    return;
+  }
+  var url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+_BRANCH_CLOUD_PATH;
+  fetch(url,{headers:{'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'}})
+  .then(function(r){ if(r.status===404){ var local=_branchDbGet(); if(local){ BSS_BRANCHES=local; initBranchDataLists(); } return null; } return r.json(); })
+  .then(function(f){ if(!f||!f.content) return; try{ var arr=JSON.parse(_csB64Dec(f.content.replace(/\s/g,''))); if(Array.isArray(arr)&&arr.length){ BSS_BRANCHES=arr; _branchDbSet(arr); initBranchDataLists(); } }catch(e){} })
+  .catch(function(){}); // silent — embedded data already in use
+}
 
 function brAutoFill(field, val){
   if(!val) return;
@@ -2574,6 +2604,7 @@ function _doAutoRestore(sessions, autoSaved){
   showPrompt();
 }
 function _startRestore(){
+  _branchDbInit();
   if(_idbReady){
     idbGet(VH_KEY, [], function(sessions){
       idbGet(AS_KEY, null, function(autoSaved){
@@ -28867,6 +28898,7 @@ function showAdminPanel(){
     +'<button id="_apTab_links" onclick="_adminSetTab(\'links\')" style="padding:11px 18px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:Inter,sans-serif">&#128279; Setup Links</button>'
     +'<button id="_apTab_system" onclick="_adminSetTab(\'system\')" style="padding:11px 18px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:Inter,sans-serif">&#9989; System</button>'
     +'<button id="_apTab_formula" onclick="_adminSetTab(\'formula\')" style="padding:11px 18px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:Inter,sans-serif">&#9881; Formula Settings</button>'
+    +'<button id="_apTab_branches" onclick="_adminSetTab(\'branches\')" style="padding:11px 18px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:Inter,sans-serif">&#127968; Branches</button>'
     +'</div>'
     +'<div id="_apContent" style="flex:1;overflow-y:auto;padding:20px"></div>';
   document.body.appendChild(el);
@@ -28876,7 +28908,7 @@ function showAdminPanel(){
 
 function _adminSetTab(tab){
   _adminTab=tab;
-  var tabs=['users','cloud','links','system','formula'];
+  var tabs=['users','cloud','links','system','formula','branches'];
   for(var i=0;i<tabs.length;i++){
     var btn=document.getElementById('_apTab_'+tabs[i]);
     if(!btn) continue;
@@ -28895,6 +28927,7 @@ function _adminSetTab(tab){
   else if(tab==='links') _adminRenderLinks(c);
   else if(tab==='system') _adminRenderSystem(c);
   else if(tab==='formula') _adminRenderFormulaSettings(c);
+  else if(tab==='branches') _adminRenderBranches(c);
 }
 
 // ── Admin Tab: Users ──────────────────────────────────────────────────────────
@@ -29434,6 +29467,209 @@ function _adminResetFormulaSettings(){
   var c=document.getElementById('_apContent');
   if(c) _adminRenderFormulaSettings(c);
 }
+
+// ── Admin Tab: Branches ───────────────────────────────────────────────────────
+
+var _adminBranchList = null; // working copy while Admin Panel is open
+var _adminBranchEditIdx = -1;
+
+function _adminBranchWorkingCopy(){
+  if(!_adminBranchList) _adminBranchList = JSON.parse(JSON.stringify(BSS_BRANCHES));
+  return _adminBranchList;
+}
+
+function _adminRenderBranches(c){
+  _adminBranchList = JSON.parse(JSON.stringify(BSS_BRANCHES));
+  _adminBranchEditIdx = -1;
+  _adminBranchPaint(c);
+}
+
+function _adminBranchPaint(c){
+  if(!c) c = document.getElementById('_apContent');
+  if(!c) return;
+  var list = _adminBranchWorkingCopy();
+  var search = document.getElementById('_apBrSearch') ? document.getElementById('_apBrSearch').value.toLowerCase() : '';
+  var filtered = list.filter(function(b){
+    return !search || (b.code||'').toLowerCase().indexOf(search)>=0
+      || (b.name||'').toLowerCase().indexOf(search)>=0
+      || (b.region||'').toLowerCase().indexOf(search)>=0
+      || (b.city||'').toLowerCase().indexOf(search)>=0;
+  });
+  var h = ''
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">'
+    +'<div style="font-size:15px;font-weight:700;color:#1a3a5c;flex:1">&#127968; Branch Directory</div>'
+    +'<button onclick="_adminBranchStartAdd()" style="padding:7px 16px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">+ Add Branch</button>'
+    +'<button onclick="_adminBranchSaveToCloud()" style="padding:7px 16px;background:#27ae60;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#9729; Save to Cloud</button>'
+    +'<button onclick="_adminBranchFetchFromCloud()" style="padding:7px 16px;background:#2980b9;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#8595; Fetch from Cloud</button>'
+    +'<button onclick="_adminBranchLoadBuiltIn()" style="padding:7px 16px;background:#e67e22;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#8635; Load Built-in Data</button>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
+    +'<input id="_apBrSearch" type="text" placeholder="Search by code, name, region or city..." oninput="_adminBranchPaint()" style="flex:1;padding:7px 11px;border:1px solid #cdd5e0;border-radius:5px;font-size:13px;font-family:Inter,sans-serif">'
+    +'<span style="font-size:12px;color:#888">'+filtered.length+' of '+list.length+' branches</span>'
+    +'</div>'
+    +'<div id="_apBrEditForm"></div>'
+    +'<div style="overflow-x:auto">'
+    +'<table style="width:100%;border-collapse:collapse;font-size:12.5px;font-family:Inter,sans-serif">'
+    +'<thead><tr style="background:#1a3a5c;color:#fff">'
+    +'<th style="padding:8px 10px;text-align:left;white-space:nowrap">Code</th>'
+    +'<th style="padding:8px 10px;text-align:left">Branch Name</th>'
+    +'<th style="padding:8px 10px;text-align:left;white-space:nowrap">Region</th>'
+    +'<th style="padding:8px 10px;text-align:left">City</th>'
+    +'<th style="padding:8px 10px;text-align:left">Head of School</th>'
+    +'<th style="padding:8px 10px;text-align:center;white-space:nowrap">Actions</th>'
+    +'</tr></thead><tbody>';
+  for(var i=0;i<filtered.length;i++){
+    var b=filtered[i];
+    var realIdx = list.indexOf(b);
+    var row = i%2===0 ? '#f8fafc' : '#fff';
+    h += '<tr style="background:'+row+';border-bottom:1px solid #e8edf4">'
+      +'<td style="padding:7px 10px;white-space:nowrap;font-weight:600;color:#1a3a5c">'+esc(b.code||'')+'</td>'
+      +'<td style="padding:7px 10px">'+esc(b.name||'')+'</td>'
+      +'<td style="padding:7px 10px;white-space:nowrap">'+esc(b.region||'')+'</td>'
+      +'<td style="padding:7px 10px">'+esc(b.city||'')+'</td>'
+      +'<td style="padding:7px 10px">'+esc(b.head||'')+'</td>'
+      +'<td style="padding:7px 10px;text-align:center;white-space:nowrap">'
+      +'<button onclick="_adminBranchStartEdit('+realIdx+')" style="padding:4px 10px;background:#1a3a5c;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;margin-right:4px">Edit</button>'
+      +'<button onclick="_adminBranchDelete('+realIdx+')" style="padding:4px 10px;background:#c0392b;color:#fff;border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Delete</button>'
+      +'</td></tr>';
+  }
+  h += '</tbody></table></div>'
+    +'<div id="_apBrMsg" style="margin-top:12px;font-size:13px;font-weight:600;min-height:20px"></div>';
+  c.innerHTML = h;
+}
+
+function _adminBranchStartAdd(){
+  _adminBranchEditIdx = -1;
+  _adminBranchShowForm(null);
+}
+
+function _adminBranchStartEdit(idx){
+  _adminBranchEditIdx = idx;
+  _adminBranchShowForm(_adminBranchWorkingCopy()[idx]);
+}
+
+function _adminBranchShowForm(b){
+  var ef = document.getElementById('_apBrEditForm');
+  if(!ef) return;
+  var isNew = !b;
+  ef.innerHTML = ''
+    +'<div style="background:#fff;border:2px solid #1a3a5c;border-radius:8px;padding:16px;margin-bottom:14px">'
+    +'<div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:12px">'+(isNew?'&#10010; Add New Branch':'&#9998; Edit Branch')+'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 2fr 1fr 1fr;gap:10px;margin-bottom:10px">'
+    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">Branch Code</label>'
+    +'<input id="_apBrF_code" type="text" value="'+(b?esc(b.code||''):'')+'" placeholder="e.g. 240" style="width:100%;box-sizing:border-box;padding:6px 9px;border:1px solid #cdd5e0;border-radius:4px;font-size:12.5px;font-family:Inter,sans-serif"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">Branch Name</label>'
+    +'<input id="_apBrF_name" type="text" value="'+(b?esc(b.name||''):'')+'" placeholder="e.g. LMA 11-FCC Gulberg" style="width:100%;box-sizing:border-box;padding:6px 9px;border:1px solid #cdd5e0;border-radius:4px;font-size:12.5px;font-family:Inter,sans-serif"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">Region</label>'
+    +'<input id="_apBrF_region" type="text" value="'+(b?esc(b.region||''):'')+'" placeholder="e.g. Center" style="width:100%;box-sizing:border-box;padding:6px 9px;border:1px solid #cdd5e0;border-radius:4px;font-size:12.5px;font-family:Inter,sans-serif"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">City</label>'
+    +'<input id="_apBrF_city" type="text" value="'+(b?esc(b.city||''):'')+'" placeholder="e.g. Lahore" style="width:100%;box-sizing:border-box;padding:6px 9px;border:1px solid #cdd5e0;border-radius:4px;font-size:12.5px;font-family:Inter,sans-serif"></div>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:2fr 2fr;gap:10px;margin-bottom:12px">'
+    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">Head of School</label>'
+    +'<input id="_apBrF_head" type="text" value="'+(b?esc(b.head||''):'')+'" placeholder="e.g. Sana Omer" style="width:100%;box-sizing:border-box;padding:6px 9px;border:1px solid #cdd5e0;border-radius:4px;font-size:12.5px;font-family:Inter,sans-serif"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#555;display:block;margin-bottom:3px">Address</label>'
+    +'<input id="_apBrF_addr" type="text" value="'+(b?esc(b.address||''):'')+'" placeholder="e.g. 12-FCC, Gulberg III, Lahore" style="width:100%;box-sizing:border-box;padding:6px 9px;border:1px solid #cdd5e0;border-radius:4px;font-size:12.5px;font-family:Inter,sans-serif"></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button onclick="_adminBranchSaveForm()" style="padding:7px 18px;background:#27ae60;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#10003; Save</button>'
+    +'<button onclick="_adminBranchCancelForm()" style="padding:7px 14px;background:#888;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>'
+    +'</div>'
+    +'</div>';
+  ef.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function _adminBranchCancelForm(){
+  var ef=document.getElementById('_apBrEditForm'); if(ef) ef.innerHTML='';
+  _adminBranchEditIdx=-1;
+}
+
+function _adminBranchSaveForm(){
+  var code=(document.getElementById('_apBrF_code')||{}).value||'';
+  var name=(document.getElementById('_apBrF_name')||{}).value||'';
+  code=code.trim(); name=name.trim();
+  if(!code||!name){ alert('Branch Code and Branch Name are required.'); return; }
+  var list=_adminBranchWorkingCopy();
+  var rec={
+    code:code,
+    name:name,
+    region:((document.getElementById('_apBrF_region')||{}).value||'').trim(),
+    city:((document.getElementById('_apBrF_city')||{}).value||'').trim(),
+    head:((document.getElementById('_apBrF_head')||{}).value||'').trim(),
+    address:((document.getElementById('_apBrF_addr')||{}).value||'').trim()
+  };
+  if(_adminBranchEditIdx>=0){
+    list[_adminBranchEditIdx]=rec;
+  } else {
+    // Check duplicate code
+    for(var i=0;i<list.length;i++){ if(list[i].code===code){ alert('Branch code "'+code+'" already exists.'); return; } }
+    list.push(rec);
+  }
+  _adminBranchEditIdx=-1;
+  BSS_BRANCHES=list;
+  _branchDbSet(list);
+  initBranchDataLists();
+  _adminBranchPaint();
+}
+
+function _adminBranchDelete(idx){
+  var list=_adminBranchWorkingCopy();
+  var b=list[idx];
+  if(!b||!confirm('Delete branch "'+b.name+'" ('+b.code+')?\nThis cannot be undone until you fetch from cloud or reload built-in data.')) return;
+  list.splice(idx,1);
+  BSS_BRANCHES=list;
+  _branchDbSet(list);
+  initBranchDataLists();
+  _adminBranchPaint();
+}
+
+function _adminBranchLoadBuiltIn(){
+  if(!confirm('Replace the current working list with the original 225 built-in branches?\nAny unsaved changes will be lost.')) return;
+  localStorage.removeItem(_BRANCH_DB_KEY);
+  BSS_BRANCHES=JSON.parse(document.getElementById('branch-data').textContent);
+  _adminBranchList=JSON.parse(JSON.stringify(BSS_BRANCHES));
+  initBranchDataLists();
+  _adminBranchPaint();
+  _adminBranchMsg('Built-in branch data loaded ('+BSS_BRANCHES.length+' branches).');
+}
+
+function _adminBranchMsg(txt){
+  var el=document.getElementById('_apBrMsg'); if(el){ el.textContent=txt; setTimeout(function(){ if(el) el.textContent=''; },4000); }
+}
+
+function _adminBranchFetchFromCloud(){
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo){ alert('Cloud not configured. Go to Cloud Setup tab first.'); return; }
+  _adminBranchMsg('Fetching from cloud...');
+  var url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+_BRANCH_CLOUD_PATH;
+  fetch(url,{headers:{'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'}})
+  .then(function(r){ if(r.status===404){ _adminBranchMsg('No branch list found in cloud. Using current list.'); return null; } return r.json(); })
+  .then(function(f){ if(!f) return; try{ var arr=JSON.parse(_csB64Dec(f.content.replace(/\s/g,''))); if(Array.isArray(arr)&&arr.length){ BSS_BRANCHES=arr; _adminBranchList=JSON.parse(JSON.stringify(arr)); _branchDbSet(arr); initBranchDataLists(); _adminBranchPaint(); _adminBranchMsg('Loaded '+arr.length+' branches from cloud.'); } }catch(e){ _adminBranchMsg('Error reading cloud file: '+e.message); } })
+  .catch(function(e){ _adminBranchMsg('Cloud fetch failed: '+(e&&e.message?e.message:e)); });
+}
+
+function _adminBranchSaveToCloud(){
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo){ alert('Cloud not configured. Go to Cloud Setup tab first.'); return; }
+  var list=_adminBranchWorkingCopy();
+  if(!list.length){ alert('Branch list is empty — nothing to save.'); return; }
+  _adminBranchMsg('Saving to cloud...');
+  var url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+_BRANCH_CLOUD_PATH;
+  var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+  // First check if file exists to get sha for update
+  fetch(url,{headers:hdrs})
+  .then(function(r){ return r.status===404?null:r.json(); })
+  .then(function(existing){
+    var body={message:'[BRAINS] Admin updated branch directory ('+list.length+' branches)',content:_csB64Enc(JSON.stringify(list,null,2))};
+    if(existing&&existing.sha) body.sha=existing.sha;
+    return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+  })
+  .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+  .then(function(res){ if(res.ok){ _branchDbSet(list); BSS_BRANCHES=list; initBranchDataLists(); _adminBranchMsg('Saved '+list.length+' branches to cloud successfully.'); } else { _adminBranchMsg('Save failed: '+(res.d&&res.d.message?res.d.message:'Unknown error')); } })
+  .catch(function(e){ _adminBranchMsg('Save failed: '+(e&&e.message?e.message:e)); });
+}
+
+// ── End Admin Tab: Branches ───────────────────────────────────────────────────
 
 function _adminFormulaExample(fc){
   // ── Fixed scenario inputs ──────────────────────────────────────────────────
