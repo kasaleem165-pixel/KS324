@@ -26812,6 +26812,21 @@ function _rvLaunchIssuedReport(){
 function _supShowDashboard(){
   var ex=document.getElementById('_supDashboard');
   if(ex) ex.remove();
+  // Check cloud config — if not set up, show notice instead of full dashboard
+  var _cfg=_csGetCfg();
+  if(!_cfg.token||!_cfg.owner||!_cfg.repo){
+    var _nd=document.createElement('div');
+    _nd.id='_supDashboard';
+    _nd.style.cssText='position:fixed;inset:0;z-index:9990;background:#f0f4f8;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+    _nd.innerHTML='<div style="background:#fff;border:1px solid #e0e8f0;border-radius:10px;padding:48px 48px 40px;max-width:420px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.08)">'
+      +'<div style="font-size:36px;margin-bottom:16px">&#9728;</div>'
+      +'<div style="font-size:16px;font-weight:700;color:#1a3a5c;margin-bottom:10px">Cloud Not Configured</div>'
+      +'<div style="font-size:13px;color:#555;line-height:1.6;margin-bottom:28px">The Supervisor Dashboard requires Cloud Settings to be configured.<br><br>Please contact your administrator to set up the cloud connection for this device.</div>'
+      +'<button onclick="document.getElementById(\'_supDashboard\').remove()" style="background:#1a3a5c;color:#fff;border:none;border-radius:6px;padding:10px 32px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Close</button>'
+      +'</div>';
+    document.body.appendChild(_nd);
+    return;
+  }
   var role=(_umGetCurrentUser().role||'');
   var isHO=(role==='ho_supervisor');
   var el=document.createElement('div');
