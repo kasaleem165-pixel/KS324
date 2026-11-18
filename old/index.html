@@ -26764,28 +26764,34 @@ function _rvRoExport(isFinal){
 // ── Scroll to observation + floating back button ───────────────────────────────
 
 function _rvScrollToObs(obsId){
-  var el=document.getElementById('obs-card-'+obsId)||document.getElementById('obs-block-'+obsId);
+  function _rvFindObsEl(id){
+    return document.getElementById('obs-'+id)
+      ||document.getElementById('obs-card-'+id)
+      ||document.getElementById('obs-block-'+id);
+  }
+  function _rvDoScroll(el, id){
+    el.scrollIntoView({behavior:'smooth',block:'center'});
+    el.style.outline='3px solid #c9962a';
+    setTimeout(function(){ el.style.outline=''; },2500);
+    _rvShowBackBtn(id);
+  }
+  var el=_rvFindObsEl(obsId);
   if(!el){
     // Report not yet rendered — generate it first, then scroll
     if(typeof renderRpt==='function') renderRpt();
     setTimeout(function(){
-      var el2=document.getElementById('obs-card-'+obsId)||document.getElementById('obs-block-'+obsId);
+      var el2=_rvFindObsEl(obsId);
       if(el2){
-        el2.scrollIntoView({behavior:'smooth',block:'center'});
-        el2.style.outline='3px solid #c9962a';
-        setTimeout(function(){ el2.style.outline=''; },2500);
-        _rvShowBackBtn(obsId);
+        _rvDoScroll(el2, obsId);
       } else {
-        var report=document.getElementById('report-panel')||document.getElementById('rptpanel');
+        var report=document.getElementById('rpcont')||document.getElementById('report-panel');
         if(report) report.scrollIntoView({behavior:'smooth'});
+        _rvShowBackBtn(obsId);
       }
-    },800);
+    },900);
     return;
   }
-  el.scrollIntoView({behavior:'smooth',block:'center'});
-  el.style.outline='3px solid #c9962a';
-  setTimeout(function(){ el.style.outline=''; },2500);
-  _rvShowBackBtn(obsId);
+  _rvDoScroll(el, obsId);
 }
 
 function _rvInjectBackButton(){
@@ -26814,7 +26820,7 @@ function _rvShowBackBtn(obsId){
     // Remove any previous inline links
     var old=document.querySelectorAll('._rv_obs_backlink');
     for(var ll=0;ll<old.length;ll++) old[ll].remove();
-    var target=document.getElementById('obs-card-'+obsId)||document.getElementById('obs-block-'+obsId);
+    var target=document.getElementById('obs-'+obsId)||document.getElementById('obs-card-'+obsId)||document.getElementById('obs-block-'+obsId);
     if(target){
       var lk=document.createElement('div');
       lk.className='_rv_obs_backlink';
