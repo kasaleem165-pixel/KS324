@@ -1430,6 +1430,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
       <button class="tb-dd-tab" onclick="tbDDToggle('dd-file')">File <span class="arr">&#9660;</span></button>
       <div class="tb-dd-menu">
         <button id="file-new" class="tb-dd-item rpt-btn" onclick="doNewReport();tbDDClose()" data-tip="Start a fresh audit report for a new branch visit"><span class="di">&#43;</span> New Report</button>
+        <button id="file-switch" class="tb-dd-item rpt-btn" onclick="_brSwitcherShow();tbDDClose()" data-tip="Switch to another branch you are currently working on"><span class="di">&#8644;</span> Switch Branch</button>
         <button id="file-load" class="tb-dd-item rpt-btn" onclick="triggerLoadOfflineSave();tbDDClose()" data-tip="Load a report file saved on your local machine (offline). This does NOT upload or sync to cloud."><span class="di">&#128228;</span> Load Offline Save</button>
         <button id="file-versions" class="tb-dd-item rpt-btn" onclick="showVersionHistory();tbDDClose()" data-tip="Save the current report and browse version history"><span class="di">&#128190;</span> Save / Versions</button>
         <div id="file-sep" class="tb-dd-sep"></div>
@@ -29863,6 +29864,136 @@ function _brPickerClose(){
 }
 
 // ── End Branch Picker ─────────────────────────────────────────────────────────
+
+// ============================================================
+// BRANCH SWITCHER — shows only THIS auditor's open cloud sessions
+// ============================================================
+function _brSwitcherShow(){
+  var cfg=_csGetCfg();
+  var ex=document.getElementById('_brSwitcherOverlay');
+  if(ex) ex.parentNode.removeChild(ex);
+  var el=document.createElement('div');
+  el.id='_brSwitcherOverlay';
+  el.style.cssText='position:fixed;inset:0;background:rgba(10,20,35,.72);z-index:9750;display:flex;align-items:center;justify-content:center;font-family:Inter,Arial,sans-serif';
+  el.innerHTML=''
+    +'<div style="background:#fff;border-radius:10px;width:min(620px,96vw);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 12px 48px rgba(0,0,0,.45);overflow:hidden">'
+    +'<div style="background:#1a3a5c;color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0">'
+    +'<span style="font-size:18px">&#8644;</span>'
+    +'<div style="flex:1"><div style="font-size:14px;font-weight:700">Switch Branch</div>'
+    +'<div style="font-size:11px;opacity:.7;margin-top:1px">Your open branch audit reports saved to cloud</div></div>'
+    +'<button onclick="document.getElementById(\'_brSwitcherOverlay\').remove()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:5px;padding:4px 11px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#x2715;</button>'
+    +'</div>'
+    +'<div id="_brSwContent" style="flex:1;overflow-y:auto;padding:16px">'
+    +'<div style="text-align:center;padding:28px;color:#888;font-size:13px">Fetching your sessions from cloud&hellip;</div>'
+    +'</div>'
+    +'<div style="padding:12px 16px;border-top:1px solid #e0e6ef;background:#f8fafc;flex-shrink:0;display:flex;gap:8px;align-items:center">'
+    +'<button onclick="document.getElementById(\'_brSwitcherOverlay\').remove();_brPickerShow()" style="padding:7px 16px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#127968; Open Different Branch</button>'
+    +'<span style="font-size:11.5px;color:#888;flex:1">Open a branch not in your list above</span>'
+    +'<button onclick="document.getElementById(\'_brSwitcherOverlay\').remove()" style="padding:7px 14px;background:#ccc;color:#333;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Cancel</button>'
+    +'</div>'
+    +'</div>';
+  document.body.appendChild(el);
+  if(!cfg.token||!cfg.owner||!cfg.repo){
+    _brSwPaint('<div style="text-align:center;padding:28px">'
+      +'<div style="font-size:28px;margin-bottom:10px">&#9729;</div>'
+      +'<div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:6px">Cloud Not Configured</div>'
+      +'<div style="font-size:12.5px;color:#666">Configure cloud in Cloud &rsaquo; Cloud Settings to enable branch switching.<br>Your sessions must be saved to cloud to appear here.</div>'
+      +'</div>');
+    return;
+  }
+  _brSwFetch(cfg);
+}
+
+function _brSwPaint(html){
+  var el=document.getElementById('_brSwContent');
+  if(el) el.innerHTML=html;
+}
+
+function _brSwFetch(cfg){
+  var mySlug=_csAuditorSlug(cfg);
+  var year=_csAuditYear(cfg);
+  var base='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo;
+  var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'};
+  // Fetch the year folder to list branches
+  fetch(base+'/contents/sessions/'+year,{headers:hdrs})
+  .then(function(r){ if(r.status===404){ _brSwPaint('<div style="text-align:center;padding:28px;color:#888;font-size:13px">No sessions found for year '+year+'.</div>'); return null; } return r.json(); })
+  .then(function(dirs){
+    if(!dirs) return;
+    if(!Array.isArray(dirs)||!dirs.length){ _brSwPaint('<div style="text-align:center;padding:28px;color:#888;font-size:13px">No branch sessions found in cloud for '+year+'.</div>'); return; }
+    var branches=dirs.filter(function(d){ return d.type==='dir'; });
+    if(!branches.length){ _brSwPaint('<div style="text-align:center;padding:28px;color:#888;font-size:13px">No branch folders found in cloud.</div>'); return; }
+    var pending=branches.length;
+    var found=[];
+    branches.forEach(function(br){
+      fetch(br.url,{headers:hdrs})
+      .then(function(r){ return r.json(); })
+      .then(function(files){
+        if(Array.isArray(files)){
+          files.forEach(function(f){
+            if(f.name&&f.name.slice(-5)==='.json'&&f.name!=='locks.json'){
+              var slug=f.name.replace('.json','');
+              if(slug===mySlug){
+                found.push({branchRaw:br.name,path:f.path,sha:f.sha||'',size:f.size||0,lastModified:f.last_modified||''});
+              }
+            }
+          });
+        }
+        pending--;
+        if(!pending) _brSwRender(found, year);
+      })
+      .catch(function(){ pending--; if(!pending) _brSwRender(found, year); });
+    });
+  })
+  .catch(function(e){ _brSwPaint('<div style="text-align:center;padding:24px;color:#c0392b;font-size:13px">Cloud error: '+(e&&e.message?esc(e.message):'Unknown error')+'</div>'); });
+}
+
+function _brSwRender(sessions, year){
+  if(!sessions.length){
+    _brSwPaint('<div style="text-align:center;padding:28px">'
+      +'<div style="font-size:28px;margin-bottom:10px">&#128194;</div>'
+      +'<div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:6px">No Open Sessions Found</div>'
+      +'<div style="font-size:12.5px;color:#666">You have no sessions saved to cloud for '+year+'.<br>Save your current work using Cloud &rsaquo; Save to Cloud, then use Switch Branch to find it here.</div>'
+      +'</div>');
+    return;
+  }
+  // Current branch
+  var curCode='';
+  var cEl=document.getElementById('brcode');
+  if(cEl) curCode=cEl.value.trim();
+  var h='<div style="font-size:11.5px;color:#888;margin-bottom:10px">'+sessions.length+' open branch'+(sessions.length===1?'':'es')+' found in cloud ('+year+'):</div>';
+  for(var i=0;i<sessions.length;i++){
+    var s=sessions[i];
+    var parts=s.branchRaw.split('_');
+    var bCode=parts[0]||s.branchRaw;
+    var bName=parts.slice(1).join(' ')||s.branchRaw;
+    var isCurrent=(bCode===curCode);
+    var bg=isCurrent?'#eef4ff':'#fff';
+    var border=isCurrent?'border:2px solid #1a3a5c':'border:1px solid #d0dcea';
+    var kb=Math.round(s.size/1024*10)/10;
+    h+='<div style="'+border+';border-radius:7px;padding:12px 14px;margin-bottom:8px;background:'+bg+';display:flex;align-items:center;gap:12px">'
+      +'<div style="flex:1">'
+      +'<div style="font-size:13.5px;font-weight:700;color:#1a3a5c">'+esc(bCode)+' &mdash; '+esc(bName)+'</div>'
+      +(isCurrent?'<div style="font-size:11px;color:#1a6ea8;font-weight:600;margin-top:2px">&#10003; Currently open</div>':'')
+      +'<div style="font-size:11px;color:#888;margin-top:2px">'+kb+'KB &bull; '+esc(s.path)+'</div>'
+      +'</div>'
+      +(isCurrent
+        ?'<span style="font-size:11px;color:#1a6ea8;font-weight:700;padding:5px 12px;border:1.5px solid #1a6ea8;border-radius:5px">Open now</span>'
+        :'<button onclick="_brSwLoad(\''+esc(s.path)+'\',\''+esc(s.sha)+'\')" style="padding:7px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap">&#8594; Open</button>'
+      )
+      +'</div>';
+  }
+  _brSwPaint(h);
+}
+
+function _brSwLoad(path, sha){
+  var cfg=_csGetCfg();
+  if(!confirm('Switch to this branch?\n\nMake sure you have saved your current work to cloud before switching (Cloud → Save to Cloud).\n\nUnsaved work on the current branch will be lost.')) return;
+  var el=document.getElementById('_brSwitcherOverlay');
+  if(el) el.remove();
+  _csLoadFile(path, sha);
+}
+
+// ── End Branch Switcher ───────────────────────────────────────────────────────
 
 function _adminFormulaExample(fc){
   // ── Fixed scenario inputs ──────────────────────────────────────────────────
