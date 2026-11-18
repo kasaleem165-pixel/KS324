@@ -751,6 +751,8 @@ function _pwGrantAccess(userObj){
     _umShowLoginBadge(userObj);
     _applyRoleUI();
     // Supervisors and admins never need to resume an audit session
+    _actLog('login', 'Role: '+(userObj.role||'unknown')+' | Name: '+(userObj.name||userObj.username||'unknown'));
+    _actStartTimer();
     var isSupervisorOrAdmin=(userObj.role==='ro_supervisor'||userObj.role==='ho_supervisor'||userObj.role==='supervisor'||userObj.role==='administrator');
     if(!isSupervisorOrAdmin){ _brPickerCheck(userObj); }
     // Auto-launch supervisor dashboard for supervisor roles
@@ -17951,6 +17953,7 @@ function _csDoSubmitReviewRequest(role, cfg, roleLabel, year, brFolder, reviewKe
     if(r&&(r.status===200||r.status===201)){
       _csLastCloudSaveTs=Date.now();
       _csBrowseCache=null;
+      _actLog('send_'+role,'Branch: '+brFolder.replace(/_/g,' ')+' | To: '+roleLabel+' Supervisor');
       toast('✅ Review request sent to '+roleLabel+' Supervisor via cloud');
       if(role==='ro'){
         var _sess2=captureSession(); var _fd2=(_sess2&&_sess2.formData)||{};
@@ -25207,7 +25210,7 @@ function cloudSave(opts){
       _csLastCloudSaveTs=Date.now();
       _csAutoSaveStatus='ok';
       _csCloudSaveIndicatorTick();
-      if(!silent) toast('Saved to cloud ✓');
+      if(!silent){ toast('Saved to cloud ✓'); _actLog('cloud_save','Path: '+path); }
       _csUpdateIndicator();
       // Re-check for merge situation after saving (another auditor may have saved too)
       _csMergeAlertDismissed=false;
@@ -25580,6 +25583,7 @@ function _csLoadFile(path, sha){
     var bm=document.getElementById('_csBrowserModal');
     if(bm) bm.remove();
     restoreSession(sess);
+    _actLog(isOwn?'session_load':'partner_load',(isOwn?'Own session':('Partner: '+fileSlug.replace(/_/g,' ')))+' | Path: '+path);
     toast('Session loaded from cloud ✓');
   })
   .catch(function(e){ toast('Load error: '+(e&&e.message?e.message:e)); });
@@ -28900,6 +28904,7 @@ function showAdminPanel(){
     +'<button id="_apTab_system" onclick="_adminSetTab(\'system\')" style="padding:11px 18px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:Inter,sans-serif">&#9989; System</button>'
     +'<button id="_apTab_formula" onclick="_adminSetTab(\'formula\')" style="padding:11px 18px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:Inter,sans-serif">&#9881; Formula Settings</button>'
     +'<button id="_apTab_branches" onclick="_adminSetTab(\'branches\')" style="padding:11px 18px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:Inter,sans-serif">&#127968; Branches</button>'
+    +'<button id="_apTab_actlog" onclick="_adminSetTab(\'actlog\')" style="padding:11px 18px;border:none;border-bottom:3px solid transparent;background:none;font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:Inter,sans-serif">&#128196; Activity Log</button>'
     +'</div>'
     +'<div id="_apContent" style="flex:1;overflow-y:auto;padding:20px"></div>';
   document.body.appendChild(el);
@@ -28909,7 +28914,7 @@ function showAdminPanel(){
 
 function _adminSetTab(tab){
   _adminTab=tab;
-  var tabs=['users','cloud','links','system','formula','branches'];
+  var tabs=['users','cloud','links','system','formula','branches','actlog'];
   for(var i=0;i<tabs.length;i++){
     var btn=document.getElementById('_apTab_'+tabs[i]);
     if(!btn) continue;
@@ -28929,6 +28934,7 @@ function _adminSetTab(tab){
   else if(tab==='system') _adminRenderSystem(c);
   else if(tab==='formula') _adminRenderFormulaSettings(c);
   else if(tab==='branches') _adminRenderBranches(c);
+  else if(tab==='actlog') _adminRenderActLog(c);
 }
 
 // ── Admin Tab: Users ──────────────────────────────────────────────────────────
@@ -29666,7 +29672,7 @@ function _adminBranchSaveToCloud(){
     return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
   })
   .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
-  .then(function(res){ if(res.ok){ _branchDbSet(list); BSS_BRANCHES=list; initBranchDataLists(); _adminBranchMsg('Saved '+list.length+' branches to cloud successfully.'); } else { _adminBranchMsg('Save failed: '+(res.d&&res.d.message?res.d.message:'Unknown error')); } })
+  .then(function(res){ if(res.ok){ _branchDbSet(list); BSS_BRANCHES=list; initBranchDataLists(); _actLog('admin_action','Branch directory saved: '+list.length+' branches'); _adminBranchMsg('Saved '+list.length+' branches to cloud successfully.'); } else { _adminBranchMsg('Save failed: '+(res.d&&res.d.message?res.d.message:'Unknown error')); } })
   .catch(function(e){ _adminBranchMsg('Save failed: '+(e&&e.message?e.message:e)); });
 }
 
@@ -29823,7 +29829,11 @@ function _brPickerLoadSession(path, sha, audName){
     if(!file||!file.content){ alert('Could not read session file.'); return; }
     var sess=JSON.parse(_csB64Dec(file.content.replace(/\s/g,'')));
     if(!sess||!sess.ts){ alert('Invalid session file.'); return; }
-    if(!isOwn){ sess._loadedFrom=fileSlug; sess._loadedFromAt=new Date().toISOString(); sess._loadedByName=cfg.auditor; }
+    if(!isOwn){ sess._loadedFrom=fileSlug; sess._loadedFromAt=new Date().toISOString(); sess._loadedByName=cfg.auditor;
+      _actLog('partner_load','Loaded: '+audName+' | Branch: '+((_brPickerBranch&&_brPickerBranch.code)||''));
+    } else {
+      _actLog('session_load','Branch: '+((_brPickerBranch&&_brPickerBranch.code)||''));
+    }
     _brPickerDismiss();
     restoreSession(sess);
     toast('Session loaded from cloud ✓');
@@ -29832,6 +29842,7 @@ function _brPickerLoadSession(path, sha, audName){
 }
 
 function _brPickerStartNew(){
+  if(_brPickerBranch) _actLog('branch_open','Code: '+(_brPickerBranch.code||'')+' | Name: '+(_brPickerBranch.name||''));
   _brPickerDismiss();
   _startRestore();
 }
@@ -29990,10 +30001,265 @@ function _brSwLoad(path, sha){
   if(!confirm('Switch to this branch?\n\nMake sure you have saved your current work to cloud before switching (Cloud → Save to Cloud).\n\nUnsaved work on the current branch will be lost.')) return;
   var el=document.getElementById('_brSwitcherOverlay');
   if(el) el.remove();
+  _actLog('branch_switch','Switched to: '+path);
   _csLoadFile(path, sha);
 }
 
 // ── End Branch Switcher ───────────────────────────────────────────────────────
+
+// ── Admin Tab: Activity Log ───────────────────────────────────────────────────
+
+function _adminRenderActLog(c){
+  c.innerHTML='<div style="max-width:900px;margin:0 auto">'
+    +'<h3 style="margin:0 0 4px;font-size:16px;color:#1a3a5c">Activity Log</h3>'
+    +'<p style="margin:0 0 16px;font-size:12.5px;color:#666">Audit trail of key actions by all auditors. Logs are stored per-auditor in the cloud and merged here for review.</p>'
+    +'<div id="_alFilters" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'
+    +'<input id="_alFType" type="text" placeholder="Filter by event type..." style="padding:7px 10px;border:1px solid #ccc;border-radius:5px;font-size:12px;font-family:Inter,sans-serif;width:170px">'
+    +'<input id="_alFUser" type="text" placeholder="Filter by auditor..." style="padding:7px 10px;border:1px solid #ccc;border-radius:5px;font-size:12px;font-family:Inter,sans-serif;width:170px">'
+    +'<input id="_alFDate" type="date" style="padding:6px 8px;border:1px solid #ccc;border-radius:5px;font-size:12px;font-family:Inter,sans-serif">'
+    +'<button onclick="_alApplyFilter()" style="padding:7px 14px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Filter</button>'
+    +'<button onclick="_alClearFilter()" style="padding:7px 14px;background:#eee;color:#333;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Clear</button>'
+    +'<button onclick="_alExportCsv()" style="padding:7px 14px;background:#27ae60;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#11015; Export CSV</button>'
+    +'<button onclick="_alLoadCloud()" style="padding:7px 14px;background:#e67e22;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">&#9729; Load from Cloud</button>'
+    +'</div>'
+    +'<div id="_alStatus" style="font-size:12px;color:#888;margin-bottom:8px"></div>'
+    +'<div id="_alBody" style="overflow:auto;max-height:460px;border:1px solid #dde2ea;border-radius:6px"></div>'
+    +'</div>';
+  _alRender(null);
+}
+
+var _alCloudData = null;
+
+function _alGetMerged(){
+  var local=[];
+  try{ var q=JSON.parse(localStorage.getItem('_BRAINS_ACT_QUEUE')||'[]'); if(Array.isArray(q)) local=q; }catch(e){}
+  var cloud=Array.isArray(_alCloudData)?_alCloudData:[];
+  var merged=cloud.concat(local);
+  merged.sort(function(a,b){ return (b.ts||0)-(a.ts||0); });
+  return merged;
+}
+
+function _alRender(overrideData){
+  var bd=document.getElementById('_alBody');
+  var st=document.getElementById('_alStatus');
+  if(!bd) return;
+  var data=overrideData||_alGetMerged();
+  if(!data.length){
+    bd.innerHTML='<div style="text-align:center;padding:32px;color:#aaa;font-size:13px">No activity log entries found.<br><small>Load from Cloud to fetch auditor logs, or start working to generate local events.</small></div>';
+    if(st) st.textContent='Showing 0 entries';
+    return;
+  }
+  var ACT_LABELS={login:'Login',branch_open:'Branch Opened',branch_switch:'Branch Switched',session_load:'Session Loaded',partner_load:'Partner Session Loaded',cloud_save:'Saved to Cloud',merge:'Co-work Merge',send_ro:'Sent to RO Supervisor',send_ho:'Sent to HO Supervisor',issuance:'Official Issuance',admin_action:'Admin Action',sensitivity:'Sensitivity Override',coso:'COSO Change'};
+  var ACT_COLORS={login:'#27ae60',branch_open:'#1a3a5c',branch_switch:'#8e44ad',session_load:'#2980b9',partner_load:'#e67e22',cloud_save:'#16a085',merge:'#d35400',send_ro:'#c0392b',send_ho:'#c0392b',issuance:'#8e44ad',admin_action:'#7f8c8d',sensitivity:'#f39c12',coso:'#e74c3c'};
+  var h='<table style="width:100%;border-collapse:collapse;font-size:12px;font-family:Inter,Arial,sans-serif">'
+    +'<thead><tr style="background:#1a3a5c;color:#fff;position:sticky;top:0">'
+    +'<th style="padding:9px 12px;text-align:left;font-weight:600;white-space:nowrap">Date &amp; Time</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-weight:600">Auditor</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-weight:600">Event</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-weight:600">Branch</th>'
+    +'<th style="padding:9px 12px;text-align:left;font-weight:600">Detail</th>'
+    +'</tr></thead><tbody>';
+  for(var i=0;i<data.length;i++){
+    var ev=data[i];
+    var dt=ev.ts?new Date(ev.ts).toLocaleString('en-PK',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+    var color=ACT_COLORS[ev.type]||'#555';
+    var label=ACT_LABELS[ev.type]||ev.type||'—';
+    var bg=i%2===0?'#fff':'#f7f9fc';
+    h+='<tr style="background:'+bg+';border-bottom:1px solid #eee">'
+      +'<td style="padding:7px 12px;white-space:nowrap;color:#555">'+dt+'</td>'
+      +'<td style="padding:7px 12px;font-weight:600;color:#1a3a5c">'+_alEsc(ev.user||'—')+'</td>'
+      +'<td style="padding:7px 12px"><span style="background:'+color+';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap">'+_alEsc(label)+'</span></td>'
+      +'<td style="padding:7px 12px;color:#555;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_alEsc(ev.branch||'—')+'</td>'
+      +'<td style="padding:7px 12px;color:#666;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_alEsc(ev.detail||'—')+'</td>'
+      +'</tr>';
+  }
+  h+='</tbody></table>';
+  bd.innerHTML=h;
+  if(st) st.textContent='Showing '+data.length+' entries'+(overrideData?' (filtered)':'');
+}
+
+function _alEsc(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function _alApplyFilter(){
+  var fType=(document.getElementById('_alFType')||{}).value||'';
+  var fUser=(document.getElementById('_alFUser')||{}).value||'';
+  var fDate=(document.getElementById('_alFDate')||{}).value||'';
+  var data=_alGetMerged();
+  var out=[];
+  for(var i=0;i<data.length;i++){
+    var ev=data[i];
+    if(fType && (ev.type||'').toLowerCase().indexOf(fType.toLowerCase())<0) continue;
+    if(fUser && (ev.user||'').toLowerCase().indexOf(fUser.toLowerCase())<0) continue;
+    if(fDate){
+      var d=ev.ts?new Date(ev.ts).toISOString().slice(0,10):'';
+      if(d!==fDate) continue;
+    }
+    out.push(ev);
+  }
+  _alRender(out);
+}
+
+function _alClearFilter(){
+  var ft=document.getElementById('_alFType'); if(ft) ft.value='';
+  var fu=document.getElementById('_alFUser'); if(fu) fu.value='';
+  var fd=document.getElementById('_alFDate'); if(fd) fd.value='';
+  _alRender(null);
+}
+
+function _alExportCsv(){
+  var data=_alGetMerged();
+  if(!data.length){ alert('No data to export.'); return; }
+  var ACT_LABELS={login:'Login',branch_open:'Branch Opened',branch_switch:'Branch Switched',session_load:'Session Loaded',partner_load:'Partner Session Loaded',cloud_save:'Saved to Cloud',merge:'Co-work Merge',send_ro:'Sent to RO Supervisor',send_ho:'Sent to HO Supervisor',issuance:'Official Issuance',admin_action:'Admin Action',sensitivity:'Sensitivity Override',coso:'COSO Change'};
+  var rows=[['Date/Time','Auditor','Event','Branch','Detail']];
+  for(var i=0;i<data.length;i++){
+    var ev=data[i];
+    var dt=ev.ts?new Date(ev.ts).toISOString().replace('T',' ').slice(0,19):'';
+    rows.push([dt,ev.user||'',ACT_LABELS[ev.type]||ev.type||'',ev.branch||'',ev.detail||'']);
+  }
+  var csv=rows.map(function(r){ return r.map(function(f){ var s=String(f||''); return s.indexOf(',')>=0||s.indexOf('"')>=0||s.indexOf('\n')>=0?'"'+s.replace(/"/g,'""')+'"':s; }).join(','); }).join('\n');
+  var blob=new Blob([csv],{type:'text/csv'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='BRAINS_ActivityLog_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+function _alLoadCloud(){
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo){ alert('Cloud not configured. Set up Cloud Settings first.'); return; }
+  var st=document.getElementById('_alStatus');
+  if(st) st.textContent='Fetching activity log files from cloud...';
+  var url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/sessions/_system';
+  var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'};
+  fetch(url,{headers:hdrs})
+  .then(function(r){ return r.ok?r.json():[]; })
+  .then(function(files){
+    if(!Array.isArray(files)){ if(st) st.textContent='Could not read _system folder.'; return; }
+    var actFiles=[];
+    for(var i=0;i<files.length;i++){
+      if(files[i].name&&files[i].name.indexOf('activity_')===0&&files[i].name.slice(-5)==='.json'){
+        actFiles.push(files[i]);
+      }
+    }
+    if(!actFiles.length){ if(st) st.textContent='No activity log files found in cloud.'; _alRender(null); return; }
+    if(st) st.textContent='Loading '+actFiles.length+' auditor log file(s)...';
+    var fetches=actFiles.map(function(f){
+      return fetch('https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+f.path,{headers:hdrs})
+        .then(function(r){ return r.ok?r.json():null; })
+        .then(function(d){
+          if(!d||!d.content) return [];
+          try{ return JSON.parse(_csB64Dec(d.content.replace(/\s/g,'')))||[]; }catch(e){ return []; }
+        })
+        .catch(function(){ return []; });
+    });
+    return Promise.all(fetches).then(function(results){
+      var merged=[];
+      for(var i=0;i<results.length;i++){
+        if(Array.isArray(results[i])) merged=merged.concat(results[i]);
+      }
+      _alCloudData=merged;
+      _alRender(null);
+      if(st) st.textContent='Loaded '+merged.length+' cloud events from '+actFiles.length+' auditor(s).';
+    });
+  })
+  .catch(function(e){ if(st) st.textContent='Load failed: '+(e&&e.message?e.message:e); });
+}
+
+// ============================================================
+// ACTIVITY LOG — local queue + periodic cloud flush
+// ============================================================
+var _ACT_QUEUE_KEY = '_BRAINS_ACT_QUEUE';
+var _ACT_FLUSH_MS  = 10 * 60 * 1000; // 10 minutes
+var _actFlushTimer = null;
+
+var _ACT_LABELS = {
+  login:          'Login',
+  branch_open:    'Branch Opened',
+  branch_switch:  'Branch Switched',
+  session_load:   'Session Loaded (Own)',
+  partner_load:   'Partner Session Loaded',
+  cloud_save:     'Saved to Cloud',
+  merge:          'Co-work Merge',
+  send_ro:        'Sent to RO Supervisor',
+  send_ho:        'Sent to HO Supervisor',
+  issuance:       'Official Issuance',
+  admin_action:   'Admin Action',
+  sensitivity:    'Sensitivity Override',
+  coso:           'COSO Change'
+};
+var _ACT_COLORS = {
+  login:'#27ae60', branch_open:'#1a3a5c', branch_switch:'#2980b9',
+  session_load:'#2980b9', partner_load:'#e67e22', cloud_save:'#27ae60',
+  merge:'#8e44ad', send_ro:'#c0392b', send_ho:'#c0392b',
+  issuance:'#c0392b', admin_action:'#555', sensitivity:'#e67e22', coso:'#8e44ad'
+};
+
+function _actCurrentUser(){
+  try{ return JSON.parse(sessionStorage.getItem('sa_current_user')||'{}'); }catch(e){ return {}; }
+}
+function _actCurrentBranch(){
+  var code='',name='';
+  try{ var c=document.getElementById('brcode'); if(c) code=c.value.trim(); }catch(e){}
+  try{ var n=document.getElementById('brname'); if(n) name=n.value.trim(); }catch(e){}
+  return {code:code,name:name};
+}
+
+function _actLog(type, detail){
+  var u=_actCurrentUser();
+  var b=_actCurrentBranch();
+  var ev={type:type,ts:new Date().toISOString(),auditor:u.name||u.username||'unknown',brcode:b.code,brname:b.name,detail:detail||''};
+  var q=[];
+  try{ q=JSON.parse(localStorage.getItem(_ACT_QUEUE_KEY)||'[]'); }catch(e){}
+  q.push(ev);
+  try{ localStorage.setItem(_ACT_QUEUE_KEY,JSON.stringify(q)); }catch(e){}
+}
+
+function _actFlush(opts){
+  var silent=(opts&&opts.silent);
+  var cfg=_csGetCfg();
+  if(!cfg.token||!cfg.owner||!cfg.repo) return;
+  var q=[];
+  try{ q=JSON.parse(localStorage.getItem(_ACT_QUEUE_KEY)||'[]'); }catch(e){}
+  if(!q.length) return;
+  // Clear queue immediately — re-queue on failure
+  try{ localStorage.removeItem(_ACT_QUEUE_KEY); }catch(e){}
+  var slug=_csAuditorSlug(cfg);
+  var path='sessions/_system/activity_'+slug+'.json';
+  var url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+path;
+  var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+  fetch(url,{headers:hdrs})
+  .then(function(r){ return r.status===404?null:r.json(); })
+  .then(function(existing){
+    var prev=[]; var sha=null;
+    if(existing&&existing.content){ try{ prev=JSON.parse(_csB64Dec(existing.content.replace(/\s/g,''))); }catch(e){} sha=existing.sha||null; }
+    var merged=prev.concat(q);
+    if(merged.length>2000) merged=merged.slice(merged.length-2000);
+    var body={message:'[BRAINS-ACT] '+slug+' ('+q.length+' events)',content:_csB64Enc(JSON.stringify(merged,null,2))};
+    if(sha) body.sha=sha;
+    return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+  })
+  .then(function(r){
+    if(!r||!r.ok){
+      // Re-queue on failure
+      try{ var cur=JSON.parse(localStorage.getItem(_ACT_QUEUE_KEY)||'[]'); localStorage.setItem(_ACT_QUEUE_KEY,JSON.stringify(q.concat(cur))); }catch(e){}
+    }
+  })
+  .catch(function(){
+    try{ var cur=JSON.parse(localStorage.getItem(_ACT_QUEUE_KEY)||'[]'); localStorage.setItem(_ACT_QUEUE_KEY,JSON.stringify(q.concat(cur))); }catch(e){}
+  });
+}
+
+function _actStartTimer(){
+  if(_actFlushTimer) clearInterval(_actFlushTimer);
+  _actFlushTimer=setInterval(function(){ _actFlush({silent:true}); }, _ACT_FLUSH_MS);
+}
+
+// Flush on page unload (best effort)
+window.addEventListener('beforeunload',function(){ _actFlush({silent:true}); });
+
+// ── End Activity Log ──────────────────────────────────────────────────────────
 
 function _adminFormulaExample(fc){
   // ── Fixed scenario inputs ──────────────────────────────────────────────────
