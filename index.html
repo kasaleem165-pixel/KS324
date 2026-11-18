@@ -4783,7 +4783,7 @@ function captureSession() {
   }
   formData.avmode = 'auto';
 
-  return {
+  var sess = {
     ts       : new Date().toISOString(),
     formData : formData,
     selIds   : selIds,
@@ -4831,6 +4831,12 @@ function captureSession() {
     obsAmendments: (function(){ try{ return JSON.parse(localStorage.getItem(DB_AMEND_KEY)||'{}'); }catch(e){ return {}; } })(),
     obsExtensions: (function(){ try{ return JSON.parse(localStorage.getItem(DB_EXT_KEY)||'[]'); }catch(e){ return []; } })()
   };
+  // Merge any pending issuance metadata without triggering a full restoreSession
+  if(_issueSessionMeta){
+    var _imk=Object.keys(_issueSessionMeta);
+    for(var _imi=0;_imi<_imk.length;_imi++) sess[_imk[_imi]]=_issueSessionMeta[_imk[_imi]];
+  }
+  return sess;
 }
 
 function restoreSession(sess) {
@@ -14171,6 +14177,7 @@ function saveAsFinal(fmt){
 
     toast('3 files saved: HTML, Word, and Session. For PDF — use the PDF option separately.');
     lockBrInfo();
+    _issueMarkAndSave();
     return;
   }
 
@@ -14181,6 +14188,7 @@ function saveAsFinal(fmt){
     saveFileAs(blob, pf.fname);
     toast('Saved as HTML: '+pf.fname);
     lockBrInfo();
+    _issueMarkAndSave();
 
   } else if(fmt==='word'){
     var wordHtml='<html xmlns:o="urn:schemas-microsoft-com:office:office" '+
@@ -14201,12 +14209,14 @@ function saveAsFinal(fmt){
     saveFileAs(wblob, wname);
     toast('Saved as Word: '+wname);
     lockBrInfo();
+    _issueMarkAndSave();
 
   } else if(fmt==='pdf'){
     var H3=getHdrVals();
     _openPdfWindow(pf.html, 'Audit Report'+(H3.brcode?' – '+H3.brcode:'')+(H3.brname?' '+H3.brname:''));
     toast('Report opened — use Print → Save as PDF');
     lockBrInfo();
+    _issueMarkAndSave();
 
   } else if(fmt==='json'){
     var sess=pf.sess||captureSession();
@@ -14216,6 +14226,62 @@ function saveAsFinal(fmt){
     toast('Session saved: '+jname);
     lockBrInfo();
   }
+}
+
+// ============================================================
+// ISSUANCE — mark session as issued + update per-auditor index
+// ============================================================
+
+// Lightweight session stamp — sets fields directly without a full restoreSession()
+var _issueSessionMeta = null; // { _reportStatus, _issuedAt, ... } merged into captureSession output
+
+function _issueMarkAndSave(){
+  var cfg=_csGetCfg();
+  var H=getHdrVals();
+  var now=new Date().toISOString();
+  // Store the issued meta so captureSession() includes it on the next call
+  _issueSessionMeta={
+    _reportStatus: 'issued',
+    _issuedAt: now,
+    _issuedBrcode: H.brcode||'',
+    _issuedBrname: H.brname||''
+  };
+  _actLog('issuance','Branch: '+(H.brcode||'')+(H.brname?' — '+H.brname:''));
+  // Auto-save to cloud (silent) so the issued status is persisted
+  if(cfg.token&&cfg.owner&&cfg.repo&&cfg.auditor){
+    cloudSave({silent:true});
+    _issueWriteIndex(cfg, H, now);
+  }
+}
+
+function _issueWriteIndex(cfg, H, now){
+  var slug=_csAuditorSlug(cfg);
+  var year=_csAuditYear(cfg)||new Date().getFullYear()+'';
+  var path='sessions/_system/issued_'+slug+'.json';
+  var url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+path;
+  var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+  var entry={
+    year: year,
+    brcode: H.brcode||'',
+    brname: H.brname||'',
+    region: H.brregion||'',
+    city: H.brcity||'',
+    path: _csSessionPath(cfg),
+    issuedAt: now
+  };
+  fetch(url,{headers:hdrs})
+  .then(function(r){ return r.status===404?null:r.json(); })
+  .then(function(existing){
+    var prev=[]; var sha=null;
+    if(existing&&existing.content){ try{ prev=JSON.parse(_csB64Dec(existing.content.replace(/\s/g,''))); }catch(e){} sha=existing.sha||null; }
+    // Remove any existing entry for the same session path (re-issuance)
+    prev=prev.filter(function(e){ return e.path!==entry.path; });
+    prev.push(entry);
+    var body={message:'[BRAINS-ISSUED] '+entry.brcode+' '+entry.brname+' ('+year+')',content:_csB64Enc(JSON.stringify(prev,null,2))};
+    if(sha) body.sha=sha;
+    return fetch(url,{method:'PUT',headers:hdrs,body:JSON.stringify(body)});
+  })
+  .catch(function(){}); // silent — index update is best-effort
 }
 
 // ============================================================
@@ -25171,6 +25237,12 @@ function _csCloudSaveIndicatorTick(){
 
 function cloudSave(opts){
   var silent=(opts&&opts.silent);
+  // Block saving over an issued/read-only session
+  var _chkSess=captureSession();
+  if(_chkSess&&_chkSess._readOnly){
+    if(!silent) alert('This is an issued (read-only) report.\n\nCloud save is disabled to protect the finalized record.\n\nTo work on this branch again, use File → Switch Branch to open a fresh session.');
+    return;
+  }
   var cfg=_csGetCfg();
   if(!cfg.token||!cfg.owner||!cfg.repo||!cfg.auditor){
     if(!silent) showCloudSettings();
@@ -29925,84 +29997,171 @@ function _brSwFetch(cfg){
   var year=_csAuditYear(cfg);
   var base='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo;
   var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'};
-  // Fetch the year folder to list branches
-  fetch(base+'/contents/sessions/'+year,{headers:hdrs})
-  .then(function(r){ if(r.status===404){ _brSwPaint('<div style="text-align:center;padding:28px;color:#888;font-size:13px">No sessions found for year '+year+'.</div>'); return null; } return r.json(); })
+  // Fetch issued index + current year sessions in parallel
+  var issuedIndex=[];
+  var issuedUrl=base+'/contents/sessions/_system/issued_'+mySlug+'.json';
+  var indexPromise=fetch(issuedUrl,{headers:hdrs})
+    .then(function(r){ return r.ok?r.json():null; })
+    .then(function(d){ if(d&&d.content){ try{ issuedIndex=JSON.parse(_csB64Dec(d.content.replace(/\s/g,'')))||[]; }catch(e){} } })
+    .catch(function(){});
+  var sessionsPromise=fetch(base+'/contents/sessions/'+year,{headers:hdrs})
+  .then(function(r){ if(r.status===404){ return null; } return r.json(); })
   .then(function(dirs){
-    if(!dirs) return;
-    if(!Array.isArray(dirs)||!dirs.length){ _brSwPaint('<div style="text-align:center;padding:28px;color:#888;font-size:13px">No branch sessions found in cloud for '+year+'.</div>'); return; }
+    if(!dirs||!Array.isArray(dirs)||!dirs.length) return [];
     var branches=dirs.filter(function(d){ return d.type==='dir'; });
-    if(!branches.length){ _brSwPaint('<div style="text-align:center;padding:28px;color:#888;font-size:13px">No branch folders found in cloud.</div>'); return; }
+    if(!branches.length) return [];
     var pending=branches.length;
     var found=[];
-    branches.forEach(function(br){
-      fetch(br.url,{headers:hdrs})
-      .then(function(r){ return r.json(); })
-      .then(function(files){
-        if(Array.isArray(files)){
-          files.forEach(function(f){
-            if(f.name&&f.name.slice(-5)==='.json'&&f.name!=='locks.json'){
-              var slug=f.name.replace('.json','');
-              if(slug===mySlug){
-                found.push({branchRaw:br.name,path:f.path,sha:f.sha||'',size:f.size||0,lastModified:f.last_modified||''});
+    return new Promise(function(resolve){
+      branches.forEach(function(br){
+        fetch(br.url,{headers:hdrs})
+        .then(function(r){ return r.json(); })
+        .then(function(files){
+          if(Array.isArray(files)){
+            files.forEach(function(f){
+              if(f.name&&f.name.slice(-5)==='.json'&&f.name!=='locks.json'){
+                var slug=f.name.replace('.json','');
+                if(slug===mySlug){
+                  found.push({branchRaw:br.name,path:f.path,sha:f.sha||'',size:f.size||0});
+                }
               }
-            }
-          });
-        }
-        pending--;
-        if(!pending) _brSwRender(found, year);
-      })
-      .catch(function(){ pending--; if(!pending) _brSwRender(found, year); });
+            });
+          }
+          pending--;
+          if(!pending) resolve(found);
+        })
+        .catch(function(){ pending--; if(!pending) resolve(found); });
+      });
     });
   })
-  .catch(function(e){ _brSwPaint('<div style="text-align:center;padding:24px;color:#c0392b;font-size:13px">Cloud error: '+(e&&e.message?esc(e.message):'Unknown error')+'</div>'); });
+  .catch(function(){ return []; });
+  Promise.all([indexPromise, sessionsPromise]).then(function(res){
+    var sessions=res[1]||[];
+    _brSwRender(sessions, year, issuedIndex);
+  });
 }
 
-function _brSwRender(sessions, year){
-  if(!sessions.length){
-    _brSwPaint('<div style="text-align:center;padding:28px">'
-      +'<div style="font-size:28px;margin-bottom:10px">&#128194;</div>'
-      +'<div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:6px">No Open Sessions Found</div>'
-      +'<div style="font-size:12.5px;color:#666">You have no sessions saved to cloud for '+year+'.<br>Save your current work using Cloud &rsaquo; Save to Cloud, then use Switch Branch to find it here.</div>'
-      +'</div>');
-    return;
+function _brSwRender(sessions, year, issuedIndex){
+  issuedIndex=issuedIndex||[];
+  // Build a lookup of issued paths for fast filtering
+  var issuedPaths={};
+  for(var ii=0;ii<issuedIndex.length;ii++) issuedPaths[issuedIndex[ii].path]=true;
+
+  // Split into active (not issued) and issued (current year — for quick reference)
+  var active=[];
+  for(var si=0;si<sessions.length;si++){
+    if(!issuedPaths[sessions[si].path]) active.push(sessions[si]);
   }
-  // Current branch
+
+  // Current branch code
   var curCode='';
   var cEl=document.getElementById('brcode');
   if(cEl) curCode=cEl.value.trim();
-  var h='<div style="font-size:11.5px;color:#888;margin-bottom:10px">'+sessions.length+' open branch'+(sessions.length===1?'':'es')+' found in cloud ('+year+'):</div>';
-  for(var i=0;i<sessions.length;i++){
-    var s=sessions[i];
-    var parts=s.branchRaw.split('_');
-    var bCode=parts[0]||s.branchRaw;
-    var bName=parts.slice(1).join(' ')||s.branchRaw;
-    var isCurrent=(bCode===curCode);
-    var bg=isCurrent?'#eef4ff':'#fff';
-    var border=isCurrent?'border:2px solid #1a3a5c':'border:1px solid #d0dcea';
-    var kb=Math.round(s.size/1024*10)/10;
-    h+='<div style="'+border+';border-radius:7px;padding:12px 14px;margin-bottom:8px;background:'+bg+';display:flex;align-items:center;gap:12px">'
-      +'<div style="flex:1">'
-      +'<div style="font-size:13.5px;font-weight:700;color:#1a3a5c">'+esc(bCode)+' &mdash; '+esc(bName)+'</div>'
-      +(isCurrent?'<div style="font-size:11px;color:#1a6ea8;font-weight:600;margin-top:2px">&#10003; Currently open</div>':'')
-      +'<div style="font-size:11px;color:#888;margin-top:2px">'+kb+'KB &bull; '+esc(s.path)+'</div>'
-      +'</div>'
-      +(isCurrent
-        ?'<span style="font-size:11px;color:#1a6ea8;font-weight:700;padding:5px 12px;border:1.5px solid #1a6ea8;border-radius:5px">Open now</span>'
-        :'<button onclick="_brSwLoad(\''+esc(s.path)+'\',\''+esc(s.sha)+'\')" style="padding:7px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap">&#8594; Open</button>'
-      )
+
+  var h='';
+
+  // ── Active sessions ──
+  if(!active.length){
+    h+='<div style="text-align:center;padding:28px 20px 16px">'
+      +'<div style="font-size:28px;margin-bottom:10px">&#128194;</div>'
+      +'<div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:6px">No Active Sessions Found</div>'
+      +'<div style="font-size:12.5px;color:#666">You have no in-progress sessions saved to cloud for '+year+'.<br>Save your current work using Cloud &rsaquo; Save to Cloud, then use Switch Branch to find it here.</div>'
       +'</div>';
+  } else {
+    h+='<div style="font-size:11.5px;color:#888;margin-bottom:10px;font-weight:600">IN PROGRESS &mdash; '+active.length+' branch'+(active.length===1?'':'es')+' ('+year+')</div>';
+    for(var i=0;i<active.length;i++){
+      var s=active[i];
+      var parts=s.branchRaw.split('_');
+      var bCode=parts[0]||s.branchRaw;
+      var bName=parts.slice(1).join(' ')||s.branchRaw;
+      var isCurrent=(bCode===curCode);
+      var bg=isCurrent?'#eef4ff':'#fff';
+      var border=isCurrent?'border:2px solid #1a3a5c':'border:1px solid #d0dcea';
+      var kb=Math.round(s.size/1024*10)/10;
+      h+='<div style="'+border+';border-radius:7px;padding:12px 14px;margin-bottom:8px;background:'+bg+';display:flex;align-items:center;gap:12px">'
+        +'<div style="flex:1">'
+        +'<div style="font-size:13.5px;font-weight:700;color:#1a3a5c">'+esc(bCode)+' &mdash; '+esc(bName)+'</div>'
+        +(isCurrent?'<div style="font-size:11px;color:#1a6ea8;font-weight:600;margin-top:2px">&#10003; Currently open</div>':'')
+        +'<div style="font-size:11px;color:#888;margin-top:2px">'+kb+' KB</div>'
+        +'</div>'
+        +(isCurrent
+          ?'<span style="font-size:11px;color:#1a6ea8;font-weight:700;padding:5px 12px;border:1.5px solid #1a6ea8;border-radius:5px">Open now</span>'
+          :'<button onclick="_brSwLoad(\''+esc(s.path)+'\',\''+esc(s.sha)+'\')" style="padding:7px 18px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap">&#8594; Open</button>'
+        )
+        +'</div>';
+    }
   }
+
+  // ── Past / Issued reports ──
+  if(issuedIndex.length){
+    // Sort most recent first
+    var pastList=issuedIndex.slice();
+    pastList.sort(function(a,b){ var ta=a.issuedAt||'',tb=b.issuedAt||''; return tb>ta?1:tb<ta?-1:0; });
+    h+='<div style="margin-top:18px;border-top:2px solid #e0e6ef;padding-top:14px">'
+      +'<div style="font-size:11.5px;color:#27ae60;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px">'
+      +'<span style="font-size:14px">&#10004;</span> PAST REPORTS &mdash; Issued ('+issuedIndex.length+' total across all years)'
+      +'</div>';
+    for(var pi=0;pi<pastList.length;pi++){
+      var pr=pastList[pi];
+      var prDate=pr.issuedAt?pr.issuedAt.slice(0,10):'';
+      h+='<div style="border:1px solid #c3e6cb;border-radius:7px;padding:10px 14px;margin-bottom:7px;background:#f0faf3;display:flex;align-items:center;gap:12px">'
+        +'<div style="flex:1">'
+        +'<div style="font-size:13px;font-weight:700;color:#1a5c2e">'+esc(pr.brcode||'')+(pr.brname?' &mdash; '+esc(pr.brname):'')+'</div>'
+        +'<div style="font-size:11px;color:#555;margin-top:2px">'
+        +(pr.region?esc(pr.region)+' &bull; ':'')
+        +'Year: '+esc(pr.year||'')
+        +(prDate?' &bull; Issued: '+prDate:'')
+        +'</div>'
+        +'</div>'
+        +'<button onclick="_brSwLoadReadOnly(\''+esc(pr.path)+'\')" style="padding:6px 14px;background:#27ae60;color:#fff;border:none;border-radius:5px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap">&#128065; View</button>'
+        +'</div>';
+    }
+    h+='</div>';
+  }
+
   _brSwPaint(h);
 }
 
 function _brSwLoad(path, sha){
-  var cfg=_csGetCfg();
   if(!confirm('Switch to this branch?\n\nMake sure you have saved your current work to cloud before switching (Cloud → Save to Cloud).\n\nUnsaved work on the current branch will be lost.')) return;
   var el=document.getElementById('_brSwitcherOverlay');
   if(el) el.remove();
   _actLog('branch_switch','Switched to: '+path);
   _csLoadFile(path, sha);
+}
+
+function _brSwLoadReadOnly(path){
+  if(!confirm('Open this issued report?\n\nIt will load in READ-ONLY mode.\nYou can view and print the report but any changes will NOT be saved to cloud (the issued report is protected).\n\nContinue?')) return;
+  var el=document.getElementById('_brSwitcherOverlay');
+  if(el) el.remove();
+  var cfg=_csGetCfg();
+  var url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/'+path;
+  var hdrs={'Authorization':'token '+cfg.token,'Accept':'application/vnd.github.v3+json'};
+  toast('Loading issued report...');
+  fetch(url,{headers:hdrs})
+  .then(function(r){ return r.json(); })
+  .then(function(file){
+    if(!file||!file.content){ toast('Could not read report file.'); return; }
+    var sess=JSON.parse(_csB64Dec(file.content.replace(/\s/g,'')));
+    if(!sess||!sess.ts){ toast('Invalid session file.'); return; }
+    // Keep the issued status — do not allow overwrite
+    sess._reportStatus='issued';
+    sess._readOnly=true;
+    restoreSession(sess);
+    toast('Issued report loaded (read-only) ✔');
+    // Show a persistent banner so the auditor always knows this is read-only
+    setTimeout(function(){
+      var ex=document.getElementById('_roIssuedBanner');
+      if(ex) ex.remove();
+      var b=document.createElement('div');
+      b.id='_roIssuedBanner';
+      b.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#27ae60;color:#fff;text-align:center;padding:9px 16px;font-size:12.5px;font-weight:700;font-family:Inter,sans-serif;z-index:9500;letter-spacing:.2px;box-shadow:0 -2px 8px rgba(0,0,0,.2)';
+      b.innerHTML='&#10004; READ-ONLY — Issued Report. Changes will not be saved to cloud. '
+        +'<button onclick="document.getElementById(\'_roIssuedBanner\').remove()" style="margin-left:12px;background:rgba(255,255,255,.25);border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:4px;padding:3px 10px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Dismiss</button>';
+      document.body.appendChild(b);
+    }, 500);
+  })
+  .catch(function(e){ toast('Load error: '+(e&&e.message?e.message:e)); });
 }
 
 // ── End Branch Switcher ───────────────────────────────────────────────────────
