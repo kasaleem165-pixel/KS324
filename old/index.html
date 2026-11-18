@@ -26343,6 +26343,24 @@ function _rvImportJson(e){
       var role=_userRole();
       var isRO=(role==='ro_supervisor'||role==='administrator');
       var statusOk=(meta.status==='submitted_to_ro'&&isRO)||(meta.status==='ro_reviewed')||(meta.status==='ro_final');
+      // If no recognized status but user is RO — offer to open for review
+      if(!statusOk && isRO && !meta.status){
+        var roChoice=confirm('Open this session for RO Review?\nFile: '+file.name+'\n\nClick OK to open the RO Review Panel (Approve / Suggest / Reject).\nClick Cancel to do a plain import only.');
+        if(roChoice===null){ e.target.value=''; return; }
+        _rvInMemDecisions={};
+        restoreSession(sess);
+        // Inject minimal _rvMeta so RO panel works
+        sess._rvMeta=sess._rvMeta||{};
+        sess._rvMeta.status='submitted_to_ro';
+        sess._rvMeta.round=sess._rvMeta.round||1;
+        if(roChoice){
+          toast('Session loaded for RO review.');
+          setTimeout(function(){ _rvShowRoPanel(sess); },600);
+        } else {
+          toast('Session imported.');
+        }
+        e.target.value=''; return;
+      }
       if(!statusOk && !meta.status){
         if(!confirm('Import session from file "'+file.name+'"?\n\nThis will replace your current work.')) return;
         restoreSession(sess);
