@@ -26812,9 +26812,6 @@ function _rvLaunchIssuedReport(){
 function _supShowDashboard(){
   var ex=document.getElementById('_supDashboard');
   if(ex) ex.remove();
-  // Check cloud config — if not set up, do not open dashboard
-  var _cfg=_csGetCfg();
-  if(!_cfg.token||!_cfg.owner||!_cfg.repo){ return; }
   var role=(_umGetCurrentUser().role||'');
   var isHO=(role==='ho_supervisor');
   var el=document.createElement('div');
@@ -26847,7 +26844,6 @@ function _supShowDashboard(){
 
   // ── Main content area ────────────────────────────────────────────────────
   h+='<div id="_supContent" style="flex:1;overflow-y:auto;padding:20px">';
-  h+='<div style="text-align:center;padding:60px 20px;color:#888;font-size:13px">&#9203; Loading sessions from cloud...</div>';
   h+='</div>';
 
   el.innerHTML=h;
@@ -26874,7 +26870,7 @@ function _supSetTab(tab){
 function _supLoadData(){
   var cfg=_csGetCfg();
   if(!cfg.token||!cfg.owner||!cfg.repo){
-    _supSetContent('<div style="text-align:center;padding:60px;color:#c0392b;font-size:13px">&#9888; Cloud not configured. Please set up Cloud Settings first.</div>');
+    _supSetContent('');
     return;
   }
   var u=_umGetCurrentUser();
