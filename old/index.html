@@ -26765,7 +26765,9 @@ function _rvRoExport(isFinal){
 
 function _rvScrollToObs(obsId){
   function _rvFindObsEl(id){
-    return document.getElementById('obs-'+id)
+    // Actual observation element ID in the report is oc-{id}
+    return document.getElementById('oc-'+id)
+      ||document.getElementById('obs-'+id)
       ||document.getElementById('obs-card-'+id)
       ||document.getElementById('obs-block-'+id);
   }
@@ -26784,9 +26786,14 @@ function _rvScrollToObs(obsId){
       if(el2){
         _rvDoScroll(el2, obsId);
       } else {
-        var report=document.getElementById('rpcont')||document.getElementById('report-panel');
-        if(report) report.scrollIntoView({behavior:'smooth'});
-        _rvShowBackBtn(obsId);
+        // Still not found — try once more after a longer delay
+        setTimeout(function(){
+          var el3=_rvFindObsEl(obsId);
+          if(el3){ _rvDoScroll(el3, obsId); return; }
+          var report=document.getElementById('rpcont')||document.getElementById('report-panel');
+          if(report) report.scrollIntoView({behavior:'smooth'});
+          _rvShowBackBtn(obsId);
+        },1200);
       }
     },900);
     return;
@@ -26802,12 +26809,16 @@ function _rvInjectBackButton(){
   btn.style.cssText='display:none;position:fixed;top:44px;left:0;right:0;z-index:10000;background:#1a3a5c;color:#fff;border:none;padding:10px 20px;font-family:Inter,sans-serif;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.35);text-align:left;border-bottom:3px solid #c9962a';
   btn.innerHTML='&#8593; Back to Review Summary &nbsp;&nbsp;<span style="font-size:11px;font-weight:400;opacity:.75">— You are viewing the observation in the full report. Click here to return to the review panel.</span>';
   btn.onclick=function(){
-    var panel=document.getElementById('_rv_ro_panel')||document.getElementById('_rv_aud_panel');
-    if(panel){ panel.scrollIntoView({behavior:'smooth'}); }
     btn.style.display='none';
-    // Remove any inline back links
     var links=document.querySelectorAll('._rv_obs_backlink');
     for(var ll=0;ll<links.length;ll++) links[ll].remove();
+    var panel=document.getElementById('_rv_ro_panel')||document.getElementById('_rv_aud_panel');
+    if(panel){
+      panel.scrollIntoView({behavior:'smooth',block:'start'});
+    } else {
+      var rpc=document.getElementById('rpcont');
+      if(rpc) rpc.scrollIntoView({behavior:'smooth',block:'start'});
+    }
   };
   document.body.appendChild(btn);
 }
@@ -26820,18 +26831,23 @@ function _rvShowBackBtn(obsId){
     // Remove any previous inline links
     var old=document.querySelectorAll('._rv_obs_backlink');
     for(var ll=0;ll<old.length;ll++) old[ll].remove();
-    var target=document.getElementById('obs-'+obsId)||document.getElementById('obs-card-'+obsId)||document.getElementById('obs-block-'+obsId);
+    var target=document.getElementById('oc-'+obsId)||document.getElementById('obs-'+obsId)||document.getElementById('obs-card-'+obsId)||document.getElementById('obs-block-'+obsId);
     if(target){
       var lk=document.createElement('div');
       lk.className='_rv_obs_backlink';
       lk.style.cssText='background:#1a3a5c;border-radius:5px;padding:7px 14px;margin-bottom:6px;display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-family:Inter,sans-serif;font-size:12px;font-weight:700;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.2)';
       lk.innerHTML='&#8593; Back to Review Summary';
       lk.onclick=function(){
-        var panel=document.getElementById('_rv_ro_panel')||document.getElementById('_rv_aud_panel');
-        if(panel){ panel.scrollIntoView({behavior:'smooth'}); }
-        btn.style.display='none';
+        if(btn) btn.style.display='none';
         var links=document.querySelectorAll('._rv_obs_backlink');
         for(var l2=0;l2<links.length;l2++) links[l2].remove();
+        var panel=document.getElementById('_rv_ro_panel')||document.getElementById('_rv_aud_panel');
+        if(panel){
+          panel.scrollIntoView({behavior:'smooth',block:'start'});
+        } else {
+          var rpc=document.getElementById('rpcont');
+          if(rpc) rpc.scrollIntoView({behavior:'smooth',block:'start'});
+        }
       };
       target.parentNode.insertBefore(lk, target);
     }
