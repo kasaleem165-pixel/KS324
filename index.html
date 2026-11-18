@@ -26286,6 +26286,9 @@ function _rvObsTitle(obsId){
   var o=DB.observations.find(function(x){return x.id===obsId;});
   if(o) return o.title||obsId;
   for(var i=0;i<customs.length;i++){if(customs[i].id===obsId) return customs[i].title||obsId;}
+  if(typeof _retiredObs!=='undefined'){
+    for(var r=0;r<_retiredObs.length;r++){if(_retiredObs[r].id===obsId) return _retiredObs[r].title||obsId;}
+  }
   return obsId;
 }
 
@@ -27019,15 +27022,26 @@ function _rvShowRoDecisionsPopup(){
 // ── Scroll to observation + floating back button ───────────────────────────────
 
 function _rvScrollToObs(obsId){
-  var el=document.getElementById('obs-card-'+obsId)||document.getElementById('obs-block-'+obsId);
+  function _rvFindObsEl(id){
+    return document.getElementById('oc-'+id)
+      ||document.getElementById('obs-card-'+id)
+      ||document.getElementById('obs-block-'+id);
+  }
+  var el=_rvFindObsEl(obsId);
   if(!el){
-    // Try the main report panel
-    var report=document.getElementById('report-panel')||document.getElementById('rptpanel');
-    if(report) report.scrollIntoView({behavior:'smooth'});
+    if(typeof renderRpt==='function') renderRpt();
     setTimeout(function(){
-      var el2=document.getElementById('obs-card-'+obsId)||document.getElementById('obs-block-'+obsId);
-      if(el2) el2.scrollIntoView({behavior:'smooth',block:'center'});
-    },400);
+      var el2=_rvFindObsEl(obsId);
+      if(el2){
+        el2.scrollIntoView({behavior:'smooth',block:'center'});
+        el2.style.outline='3px solid #c9962a';
+        setTimeout(function(){ el2.style.outline=''; },2500);
+        _rvShowBackBtn();
+      } else {
+        var rp=document.getElementById('RP');
+        if(rp) rp.scrollTop=0;
+      }
+    },900);
     return;
   }
   el.scrollIntoView({behavior:'smooth',block:'center'});
