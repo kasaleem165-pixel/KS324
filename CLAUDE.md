@@ -58,6 +58,20 @@ Go fully live/online for all auditors, supervisors, and administrator. Auditors 
 - **New feature / improvement started on DEV** → DEV only, do NOT touch LIVE
 - **When DEV is ready for release** → copy `index.html` → `old/index.html` → Kamran uploads to intranet
 
+#### ⛔ HARD STOP — Read before touching any file (added after session violation Nov 2026)
+
+A session violation occurred where Claude applied a DEV-only fix (`_rvShowHoPanel`, `_rvShowRoHoResponsePanel`) during a declared LIVE session. These functions do not exist in LIVE at all, so there was no LIVE bug to fix. Claude had no business touching DEV.
+
+**Before editing ANY file, run this mental checklist:**
+
+1. Which file did Kamran say he is working on THIS session? (LIVE or DEV)
+2. Does the bug / feature exist in LIVE (`old/index.html`)? If NO → do NOT touch DEV either; report to Kamran and stop.
+3. Does the bug / feature exist in DEV (`index.html`)? If the session is LIVE and the bug is in LIVE, apply to LIVE first, then DEV — but ONLY for the exact same bug.
+4. Am I about to edit DEV for a feature that does not exist in LIVE? → STOP. This is not permitted in a LIVE session.
+5. Am I about to do "extra" work in DEV beyond what Kamran asked? → STOP. Do exactly what was asked, nothing more.
+
+**Rule in one sentence:** In a LIVE session, only touch DEV if the exact same bug exists there too. Never touch DEV for DEV-only features during a LIVE session, even if the fix seems beneficial.
+
 ## Infrastructure & Services
 
 ### 1. GitHub — App Files
