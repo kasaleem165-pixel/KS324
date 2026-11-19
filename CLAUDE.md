@@ -70,6 +70,13 @@ Go fully live/online for all auditors, supervisors, and administrator. Auditors 
 
 That is the only check needed. Kamran always states which BRAINS he is working on. Read that statement, follow it, do nothing beyond it.
 
+#### Recommending changes in the other BRAINS
+
+If Claude notices the same issue (or a related improvement) in the other BRAINS while working on the declared one:
+- **Do the work in the declared BRAINS first and complete it fully.**
+- Then **mention it as a recommendation** — e.g. "I also see this in DEV — should I apply it there too?"
+- **Wait for Kamran's answer before touching the other file.** Never apply it silently.
+
 ## Infrastructure & Services
 
 ### 1. GitHub — App Files
