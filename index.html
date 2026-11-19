@@ -26339,6 +26339,7 @@ function _supScanPendingReplies(cfg,cb){
    ═══════════════════════════════════════════════════════════════════════ */
 
 var _rvInMemDecisions = {}; // {obsId: {decision:'approved'|'suggestion'|'rejected', comment:''}}
+var _rvCurrentMeta = {}; // preserves original _rvMeta from imported auditor session for use at export
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -26529,6 +26530,7 @@ function _rvShowAuditorPanel(sess){
 
 function _rvShowRoPanel(sess){
   var meta=sess._rvMeta||{};
+  _rvCurrentMeta=meta; // store original meta so _rvRoExport can preserve it
   // Rebuild obs list from restored in-memory session state (more reliable than the
   // snapshot stored in meta, which may be missing on old exports or partial exports)
   var _fbSel=_getSelObs(selIds);
@@ -26678,7 +26680,9 @@ function _rvRoExport(isFinal){
   var roName=prompt('Enter your name as RO Supervisor (will appear on the report):','');
   if(!roName) roName='RO Supervisor';
   var sess=captureSession();
-  var meta=sess._rvMeta||{};
+  // Start from original auditor meta to preserve amended_obs_ids, wording_changed_ids, round, submitted_by, etc.
+  var meta={};
+  for(var _rk in _rvCurrentMeta){ if(_rvCurrentMeta.hasOwnProperty(_rk)) meta[_rk]=_rvCurrentMeta[_rk]; }
   meta.ro_decisions=_rvInMemDecisions;
   meta.ro_name=roName;
   meta.ro_reviewed_at=new Date().toISOString().slice(0,10);
