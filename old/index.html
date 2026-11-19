@@ -26547,8 +26547,20 @@ function _rvShowRoPanel(sess){
 
   var _rvLabels=(typeof getObsReportLabels==='function')?getObsReportLabels():{};
 
-  for(var i=0;i<amendedIds.length;i++){
-    var id=amendedIds[i];
+  // Sort observations by their report label number (1.1, 1.2, 2.1 …)
+  var _rvSortedIds=amendedIds.slice();
+  _rvSortedIds.sort(function(a,b){
+    var la=(_rvLabels[a]||'').toString(), lb=(_rvLabels[b]||'').toString();
+    var pa=la.split('.').map(Number), pb=lb.split('.').map(Number);
+    for(var _si=0;_si<Math.max(pa.length,pb.length);_si++){
+      var df=(pa[_si]||0)-(pb[_si]||0);
+      if(df!==0) return df;
+    }
+    return 0;
+  });
+
+  for(var i=0;i<_rvSortedIds.length;i++){
+    var id=_rvSortedIds[i];
     var title=_rvObsTitle(id);
     var hasWc=(wordingChangedIds.indexOf(id)>=0);
     var obsLabel=_rvLabels[id]||(i+1);
