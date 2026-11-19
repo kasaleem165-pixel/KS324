@@ -26504,7 +26504,13 @@ function _rvToggleWcCompare(id){
 
 function _rvShowRoPanel(sess){
   var meta=sess._rvMeta||{};
-  var amendedIds=meta.amended_obs_ids||_rvGetAmendedObs();
+  // Rebuild obs list from restored in-memory session state (more reliable than the
+  // snapshot stored in meta, which may be missing on old exports or partial exports)
+  var _fbSel=_getSelObs(selIds);
+  var amendedIds=[];
+  for(var _fbi=0;_fbi<_fbSel.length;_fbi++) amendedIds.push(_fbSel[_fbi].id);
+  for(var _fci2=0;_fci2<customs.length;_fci2++){ if(amendedIds.indexOf(customs[_fci2].id)<0) amendedIds.push(customs[_fci2].id); }
+  if(!amendedIds.length) amendedIds=meta.amended_obs_ids||_rvGetAmendedObs();
   var wordingChangedIds=meta.wording_changed_ids||Object.keys(wordingChanges);
   var round=meta.round||1;
   var isRound1=(round===1);
