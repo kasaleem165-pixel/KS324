@@ -9287,6 +9287,7 @@ function downloadSoftCopy(){
     var scOeEl=document.getElementById('oe-'+o.id); if(scOeEl) scObsText=scOeEl.value;
     var scReEl=document.getElementById('re-'+o.id); if(scReEl) scRecText=scReEl.value;
     var scBsNotes=obsNotesMap[o.id]||'';
+    h+='<span style="display:none" data-rec-id="'+esc(o.id)+'" data-rec-title="'+esc(o.title)+'" data-rec-cat="'+esc(o.category||'')+'" data-rec-obs="'+esc(scObsText)+'" data-rec-rec="'+esc(scRecText)+'"></span>';
     if(scObsText){h+='<div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#1a3a5c;margin-bottom:3px">Observation</div>';h+=_renderText(scObsText,{fontSize:'12.5px',lineHeight:'1.65',color:'#2a3a50',marginBottom:'4px'});if(scBsNotes)h+=_renderText(scBsNotes,{fontSize:'12.5px',color:'#2a3a50',lineHeight:'1.65',marginBottom:'10px'});else h+='<div style="margin-bottom:10px"></div>';}
     var scInstCount=instCountMap[o.id]||'';
     var scInstAmt=instAmountMap[o.id]||'';
@@ -10810,20 +10811,30 @@ function applyRespLoad(){
   for(var _oi=0;_oi<loadedObs.length;_oi++){
     var _lid=loadedObs[_oi];
     if(!_dbIdx[_lid]){
-      // Recover title from the response HTML (obs-block id="obs-OBS_XXX" > .obs-title)
-      var _obsEl=doc?doc.getElementById('obs-'+_lid):null;
-      var _titleEl=_obsEl?_obsEl.querySelector('.obs-title'):null;
-      var _recovTitle=_titleEl?(_titleEl.textContent||'').trim():'';
-      // Recover category from first .tag element
-      var _tagEls=_obsEl?_obsEl.querySelectorAll('.obs-meta .tag'):[];
-      var _recovCat=_tagEls&&_tagEls.length?(_tagEls[0].textContent||'').trim():'';
+      // Try obs-sc-{id} (auditee copy format) first, then obs-{id} (older/builder format)
+      var _obsEl=doc?(doc.getElementById('obs-sc-'+_lid)||doc.getElementById('obs-'+_lid)):null;
+      // Read recovery data from hidden span embedded by obsHtml() (new auditee copy format)
+      var _recSpan=_obsEl?_obsEl.querySelector('[data-rec-id]'):null;
+      var _recovTitle='',_recovCat='',_recovObs='',_recovRec='';
+      if(_recSpan){
+        _recovTitle=(_recSpan.getAttribute('data-rec-title')||'').trim();
+        _recovCat=(_recSpan.getAttribute('data-rec-cat')||'').trim();
+        _recovObs=(_recSpan.getAttribute('data-rec-obs')||'').trim();
+        _recovRec=(_recSpan.getAttribute('data-rec-rec')||'').trim();
+      } else {
+        // Fallback: older files without recovery span — try .obs-title class and .tag elements
+        var _titleEl=_obsEl?_obsEl.querySelector('.obs-title'):null;
+        _recovTitle=_titleEl?(_titleEl.textContent||'').trim():'';
+        var _tagEls=_obsEl?_obsEl.querySelectorAll('.obs-meta .tag'):[];
+        _recovCat=_tagEls&&_tagEls.length?(_tagEls[0].textContent||'').trim():'';
+      }
       customs.push({
         id:_lid,
         title:_recovTitle||_lid,
         category:_recovCat||'',
         type:'New',
-        observation:'',
-        recommendation:'',
+        observation:_recovObs||'',
+        recommendation:_recovRec||'',
         _orphaned:true
       });
       _dbIdx[_lid]=true;
