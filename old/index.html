@@ -26542,7 +26542,13 @@ function _rvShowRoPanel(sess){
   for(var _fbi=0;_fbi<_fbSel.length;_fbi++) amendedIds.push(_fbSel[_fbi].id);
   for(var _fci2=0;_fci2<customs.length;_fci2++){ if(amendedIds.indexOf(customs[_fci2].id)<0) amendedIds.push(customs[_fci2].id); }
   if(!amendedIds.length) amendedIds=meta.amended_obs_ids||_rvGetAmendedObs();
-  var wordingChangedIds=meta.wording_changed_ids||Object.keys(wordingChanges);
+  // Filter wording-changed list to only obs actually in the report — an obs removed from
+  // the report may still appear in meta.wording_changed_ids (edited before being deselected)
+  var _allWcIds=meta.wording_changed_ids||Object.keys(wordingChanges);
+  var wordingChangedIds=[];
+  for(var _wfi=0;_wfi<_allWcIds.length;_wfi++){
+    if(amendedIds.indexOf(_allWcIds[_wfi])>=0) wordingChangedIds.push(_allWcIds[_wfi]);
+  }
   var round=meta.round||1;
   var isRound1=(round===1);
   if(!isRound1 && meta.prev_obsEdits){
