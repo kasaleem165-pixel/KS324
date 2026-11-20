@@ -26272,6 +26272,7 @@ function _supScanPendingReplies(cfg,cb){
 
 var _rvInMemDecisions = {}; // {obsId: {decision:'approved'|'suggestion'|'rejected', comment:''}}
 var _rvCurrentMeta = {}; // preserves original _rvMeta from imported auditor session for use at export
+var _rvFinalSess = null; // stores sess for Final Approval so auditor can open detail panel
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -26924,6 +26925,7 @@ function _rvApplyFinalApproval(sess){
       wcRecRej:dec.comment||''
     };
   }
+  _rvFinalSess = sess;
   var ex=document.getElementById('_rv_final_banner');
   if(ex) ex.remove();
   var banner=document.createElement('div');
@@ -26942,11 +26944,12 @@ function _rvApplyFinalApproval(sess){
   banner.innerHTML='<span style="font-size:18px">&#10004;</span>'
     +'<span style="flex:1"><strong>FINAL APPROVAL received from '+esc(by)+(dt?' on '+esc(dt):'')+'.</strong>'
     +' &nbsp;Amendments — '+summary+'</span>'
+    +'<button onclick="if(_rvFinalSess) _rvShowAuditorPanel(_rvFinalSess)" style="background:#1a5c8a;border:none;color:#fff;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.2px">&#128203; View Supervisor Comments</button>'
     +'<button onclick="_rvLaunchIssuedReport()" style="background:#27ae60;border:none;color:#fff;border-radius:5px;padding:6px 18px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:.3px">&#128196; Generate Final Issuance Report</button>'
     +'<button onclick="document.getElementById(\'_rv_final_banner\').remove()" style="background:rgba(255,255,255,.12);border:none;color:#fff;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit;margin-left:8px">&#x2715;</button>';
   document.body.appendChild(banner);
   _rvInjectBackButton();
-  toast('Final Approval loaded. Click "Generate Final Issuance Report" to proceed.');
+  toast('Final Approval loaded. Click "View Supervisor Comments" to see per-observation decisions.');
 }
 
 function _rvLaunchIssuedReport(){
