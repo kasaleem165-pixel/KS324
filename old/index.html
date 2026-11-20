@@ -26462,13 +26462,12 @@ function _rvShowAuditorPanel(sess){
     else if(dec.decision==='suggestion'){ decLabel='&#9999; Suggestion'; decBg='#c9962a'; }
     else if(dec.decision==='rejected'){ decLabel='&#10007; Rejected'; decBg='#c0392b'; }
     else { decLabel='—'; decBg='#444'; }
-    // Wording decision badge
+    // Wording decision badge — show actual decision if recorded, regardless of hasWc
     var wcLabel=''; var wcBg='';
-    if(!hasWc){ wcLabel=''; wcBg=''; }
-    else if(dec.wcDecision==='approved'){ wcLabel='&#10003; Approved'; wcBg='#1a6030'; }
+    if(dec.wcDecision==='approved'){ wcLabel='&#10003; Approved'; wcBg='#1a6030'; }
     else if(dec.wcDecision==='suggestion'){ wcLabel='&#9999; Suggestion'; wcBg='#c9962a'; }
     else if(dec.wcDecision==='rejected'){ wcLabel='&#10007; Rejected'; wcBg='#c0392b'; }
-    else { wcLabel='Pending'; wcBg='#444'; }
+    else if(hasWc){ wcLabel='Pending'; wcBg='#444'; }
     var rowBg=(i%2===0)?'rgba(255,255,255,.04)':'rgba(255,255,255,.08)';
     h+='<tr style="background:'+rowBg+';border-bottom:1px solid rgba(255,255,255,.07)">';
     h+='<td style="padding:7px 14px;color:rgba(255,255,255,.5);font-size:11px">'+(i+1)+'</td>';
@@ -26479,7 +26478,7 @@ function _rvShowAuditorPanel(sess){
     h+='<td style="padding:7px 10px;border-left:1px solid rgba(255,255,255,.07)"><span style="background:'+decBg+';color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">'+decLabel+'</span></td>';
     h+='<td style="padding:7px 10px;color:rgba(255,255,255,.75);font-size:11px;word-break:break-word">'+esc(dec.comment||'')+'</td>';
     h+='<td style="padding:7px 10px;border-left:1px solid rgba(255,255,255,.07)">';
-    if(hasWc){
+    if(wcLabel){
       h+='<span style="background:'+wcBg+';color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">'+wcLabel+'</span>';
     } else {
       h+='<span style="color:rgba(255,255,255,.25);font-size:11px;font-style:italic">No edit</span>';
