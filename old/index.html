@@ -9097,6 +9097,21 @@ function downloadDraft(individual){
         'if(lbl){lbl.style.color="#1a4a1a";lbl.style.fontWeight="bold";lbl.textContent="&#10003; Final response saved. Email that file to the auditor.";}'+
       '});'+
     '}'+
+    'function saveRoRecordCopy(){'+
+      'var data=_roCollect();'+
+      'var json=JSON.stringify(data).replace(/<\\/script>/gi,"<\\\\/script>");'+
+      'var el=document.getElementById("bhs-resp-data");'+
+      'if(el){el.textContent=json;}else{var sc=document.createElement("script");sc.id="bhs-resp-data";sc.type="application/json";sc.textContent=json;document.head.appendChild(sc);}'+
+      'var el2=document.getElementById("bhs-sect-role");'+
+      'if(el2)el2.textContent=JSON.stringify(_sectRole);'+
+      'var html=document.documentElement.outerHTML;'+
+      'var blob=new Blob([html],{type:"application/octet-stream"});'+
+      'var fname=document.title.replace(/[^a-zA-Z0-9_\\-]/g,"_")+"_"+(_sectRole==="ho"?"HO":"RO")+"_MyRecord.html";'+
+      'var lbl=document.getElementById("_roAutolbl");'+
+      '_roPickerSave(blob,fname,function(){'+
+        'if(lbl){lbl.style.color="#1a3a5c";lbl.style.fontWeight="bold";lbl.textContent="&#128190; Record copy saved — keep this file for your own reference.";}'+
+      '});'+
+    '}'+
     '<\/script>';
 
   function buildFullHtml(parts, filename){
@@ -9107,10 +9122,11 @@ function downloadDraft(individual){
       '<strong>&#9432; Instructions:</strong> Please read each observation carefully and enter your formal response in the <em>RO/HO Auditee Response</em> fields. '+
       'Use <strong>Save Draft</strong> to save progress and continue later. When all responses are complete, click <strong>Save Final Response</strong> to send to the auditor.</div>';
     var saveBtn='<div style="text-align:center;margin-top:30px;padding:20px 0;border-top:2px solid #1a3a5c">'+
-      '<button onclick="saveDraftTemp()" style="padding:10px 24px;background:#5a7a9c;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:Arial,sans-serif;margin-right:14px">&#128190; Save Draft (Resume Later)</button>'+
-      '<button onclick="saveDraftResponses()" style="padding:12px 32px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;font-family:Arial,sans-serif;box-shadow:0 3px 10px rgba(0,0,0,.2)">&#10003; Save Final Response</button>'+
+      '<button onclick="saveDraftTemp()" style="padding:10px 24px;background:#5a7a9c;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:Arial,sans-serif;margin-right:10px">&#128190; Save Draft (Resume Later)</button>'+
+      '<button onclick="saveDraftResponses()" style="padding:12px 32px;background:#1a3a5c;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;font-family:Arial,sans-serif;box-shadow:0 3px 10px rgba(0,0,0,.2);margin-right:10px">&#10003; Save Final Response</button>'+
+      '<button onclick="saveRoRecordCopy()" style="padding:10px 24px;background:#6a4a8c;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:Arial,sans-serif">&#128196; Save My Record Copy</button>'+
       '<div id="_roAutolbl" style="margin-top:8px;font-size:11.5px;color:#2a6040;min-height:16px"></div>'+
-      '<div style="margin-top:6px;font-size:11px;color:#888"><strong>Save Draft</strong> = save progress &amp; open later to continue &nbsp;|&nbsp; <strong>Save Final Response</strong> = completed file to email to auditor</div>'+
+      '<div style="margin-top:6px;font-size:11px;color:#888"><strong>Save Draft</strong> = resume later &nbsp;|&nbsp; <strong>Save Final Response</strong> = send to auditor &nbsp;|&nbsp; <strong>Save My Record Copy</strong> = full readable copy for your own records</div>'+
       '</div>';
     return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+filename+'</title>'+saveScript+annexHead+'</head><body>'+notice+html+saveBtn+annexData+'</body></html>';
   }
