@@ -4697,7 +4697,9 @@ function captureSession() {
     srrFiles: srr_files.map(function(f){return {name:f.name,type:f.type,dataUrl:f.dataUrl};}),
     srrKwProposals: (window._srrKwProposals||[]).slice(),
     obsAmendments: (function(){ try{ return JSON.parse(localStorage.getItem(DB_AMEND_KEY)||'{}'); }catch(e){ return {}; } })(),
-    obsExtensions: (function(){ try{ return JSON.parse(localStorage.getItem(DB_EXT_KEY)||'[]'); }catch(e){ return []; } })()
+    obsExtensions: (function(){ try{ return JSON.parse(localStorage.getItem(DB_EXT_KEY)||'[]'); }catch(e){ return []; } })(),
+    cgDec: window._cgDec||null,
+    cgFromRole: window._cgFromRole||''
   };
 }
 
@@ -4805,6 +4807,28 @@ function restoreSession(sess) {
   _lastSavedTs = Date.now();
   _lastChangedTs = 0;
   _distChangeWarnShown = false;
+  // Recreate the correction-guide restore button if a send-back was active
+  var _oldCgPanel=document.getElementById('correction-guide-panel');
+  if(_oldCgPanel) _oldCgPanel.remove();
+  var _oldCgRBtn=document.getElementById('cg-restore-btn');
+  if(_oldCgRBtn) _oldCgRBtn.remove();
+  if(sess.cgDec){
+    var _cgRFlagged=Object.keys(roFlags).filter(function(id){return roFlags[id];});
+    if(!_cgRFlagged.length) _cgRFlagged=Object.keys(hoFlags).filter(function(id){return hoFlags[id];});
+    if(_cgRFlagged.length){
+      window._cgDec=sess.cgDec;
+      window._cgFromRole=sess.cgFromRole||'RO';
+      window._cgFlagged=_cgRFlagged;
+      window._cgDone={};
+      var _cgRBtn=document.createElement('button');
+      _cgRBtn.id='cg-restore-btn';
+      _cgRBtn.title='Open Correction Guide';
+      _cgRBtn.innerHTML='&#9888; Corrections';
+      _cgRBtn.style.cssText='position:fixed;right:0;bottom:70px;background:#8a2020;color:#fff;border:none;border-radius:6px 0 0 6px;padding:10px 8px;font-family:Inter,sans-serif;font-size:11px;font-weight:700;cursor:pointer;z-index:7999;writing-mode:vertical-rl;letter-spacing:.5px;box-shadow:-2px 0 8px rgba(0,0,0,.3)';
+      _cgRBtn.onclick=function(){ _showReviewSendBackModal(window._cgDec, window._cgFromRole); };
+      document.body.appendChild(_cgRBtn);
+    }
+  }
   // Load observation locks for this branch session (async, non-blocking)
   if(typeof _lkOnSessionLoad==='function') _lkOnSessionLoad();
 }
