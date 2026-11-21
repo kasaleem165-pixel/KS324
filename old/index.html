@@ -4474,10 +4474,6 @@ function restoreSession(sess) {
   _lastChangedTs = 0;
   _distChangeWarnShown = false;
   // Recreate the correction-guide restore button if a send-back was active
-  var _oldCgPanel=document.getElementById('correction-guide-panel');
-  if(_oldCgPanel) _oldCgPanel.remove();
-  var _oldCgRBtn=document.getElementById('cg-restore-btn');
-  if(_oldCgRBtn) _oldCgRBtn.remove();
   if(sess.cgDec){
     var _cgRFlagged=Object.keys(roFlags).filter(function(id){return roFlags[id];});
     if(!_cgRFlagged.length) _cgRFlagged=Object.keys(hoFlags).filter(function(id){return hoFlags[id];});
@@ -4486,6 +4482,8 @@ function restoreSession(sess) {
       window._cgFromRole=sess.cgFromRole||'RO';
       window._cgFlagged=_cgRFlagged;
       window._cgDone={};
+      var _oldCgRBtn=document.getElementById('cg-restore-btn');
+      if(_oldCgRBtn) _oldCgRBtn.remove();
       var _cgRBtn=document.createElement('button');
       _cgRBtn.id='cg-restore-btn';
       _cgRBtn.title='Open Correction Guide';
@@ -16931,9 +16929,11 @@ function loadReviewerHtml(evt, role){
 }
 
 function _showReviewSendBackModal(dec, fromRole){
-  // Remove any existing correction guide
+  // Remove any existing correction guide panel and restore button
   var existing=document.getElementById('correction-guide-panel');
   if(existing) existing.remove();
+  var existingBtn=document.getElementById('cg-restore-btn');
+  if(existingBtn) existingBtn.remove();
 
   var flags=dec.flags||{}, cmts=dec.comments||{};
   var flagged=Object.keys(flags).filter(function(id){return flags[id];});
