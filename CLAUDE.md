@@ -172,6 +172,24 @@ Daily use:
 4. BRAINS shows "Cloud Settings configured automatically!" → auditor logs in normally
 5. Cloud sync ready — no manual setup needed
 
+## Minimum-Change Rule (CRITICAL — Kamran has stated this repeatedly)
+
+**When Kamran says "do not disturb other functionality", this means:**
+- Add ONLY the lines strictly needed for the requested feature/fix
+- Do NOT add "defensive cleanup", "just in case" removals, or duplicate logic from elsewhere
+- If a function already handles its own cleanup internally, do NOT repeat that cleanup outside it
+- Do not add error handling, fallbacks, or initialization code for scenarios that cannot happen in the requested change
+- Three extra lines that seem "safe" can break working functionality — every added line is a risk
+
+**Real example of what went wrong (Nov 2026):**
+- Task: add a re-open button for the correction guide panel after session restore
+- Mistake: added `_oldCgPanel.remove()` and `_oldCgRBtn.remove()` unconditionally in `restoreSession()` as "cleanup before recreating"
+- Result: these lines ran every time `restoreSession()` was called (including cloud sync), removing the panel right after it was just created
+- The cleanup already existed inside `_showReviewSendBackModal()` — duplicating it in the wrong place caused a regression
+- Kamran had to report the regression; two extra commits were needed to fix it
+
+**Rule: if Kamran asks "will this disturb anything?" — only answer YES if you have checked every call site of every function you are touching. If you cannot guarantee no disturbance, say so before making changes.**
+
 ## ES5-Only Rule (CRITICAL — all code changes)
 - **No arrow functions** (`=>`) — use `function(){}` instead
 - **No `const`/`let`** — use `var` only
