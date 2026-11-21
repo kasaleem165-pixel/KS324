@@ -31,7 +31,7 @@ Go fully live/online for all auditors, supervisors, and administrator. Auditors 
 | | LIVE | DEV |
 |---|---|---|
 | File | `old/index.html` | `index.html` |
-| Badge | 🟢 LIVE (green) | 🟡 DEV (amber) |
+| Badge | 🟢 OLD (green) | 🟡 DEV (amber) |
 | Hosted on | Beaconhouse intranet (`beams.beaconhouse.edu.pk`) | GitHub Pages |
 | URL | Intranet URL — internal only | `https://kasaleem165-pixel.github.io/KS324/` |
 | Users | All auditors & supervisors (production) | Kamran only (testing) |
