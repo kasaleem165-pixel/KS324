@@ -26369,6 +26369,8 @@ function _supScanPendingReplies(cfg,cb){
 var _rvInMemDecisions = {}; // {obsId: {decision:'approved'|'suggestion'|'rejected', comment:''}}
 var _rvCurrentMeta = {}; // preserves original _rvMeta from imported auditor session for use at export
 var _rvFinalSess = null; // stores sess for Final Approval so auditor can open detail panel
+var _rvReviewedSess = null; // stores sess for Send Back so auditor can reopen amendment summary
+var _rvRoSess = null; // stores sess for RO Supervisor so they can reopen the review panel
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -26514,6 +26516,16 @@ function _rvShowAuditorPanel(sess){
   var decisions=meta.ro_decisions||{};
   var amendedIds=meta.amended_obs_ids||Object.keys(decisions);
   if(!amendedIds.length){ toast('No amendments found in this file.'); return; }
+  _rvReviewedSess = sess;
+  if(!document.getElementById('_rv_aud_reopen_bar') && !document.getElementById('_rv_final_banner')){
+    var bar=document.createElement('div');
+    bar.id='_rv_aud_reopen_bar';
+    bar.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:850;background:#14304d;color:#fff;border-top:2px solid #c9962a;font-family:Inter,sans-serif;font-size:12px;padding:6px 14px;display:flex;align-items:center;gap:10px';
+    bar.innerHTML='<span style="flex:1">&#128203; <strong>RO Review loaded</strong> &nbsp;<span style="opacity:.7;font-size:11px">Round '+(meta.round||'1')+' \xb7 '+esc(meta.ro_name||'RO Supervisor')+'</span></span>'
+      +'<button onclick="_rvShowAuditorPanel(_rvReviewedSess)" style="background:#c9962a;border:none;color:#fff;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#128065; View Comments</button>'
+      +'<button onclick="document.getElementById(\'_rv_aud_reopen_bar\').remove()" style="background:rgba(255,255,255,.12);border:none;color:#fff;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">&#x2715;</button>';
+    document.body.appendChild(bar);
+  }
   var ex=document.getElementById('_rv_aud_panel');
   if(ex) ex.remove();
   var panel=document.createElement('div');
@@ -26557,9 +26569,10 @@ function _rvShowAuditorPanel(sess){
 
 // ── RO Panel: show amendments + decision controls after importing auditor JSON ─
 
-function _rvShowRoPanel(sess){
+function _rvShowRoPanel(sess, keepDecisions){
   var meta=sess._rvMeta||{};
   _rvCurrentMeta=meta; // store original meta so _rvRoExport can preserve it
+  _rvRoSess = sess;
   // Rebuild obs list from restored in-memory session state (more reliable than the
   // snapshot stored in meta, which may be missing on old exports or partial exports)
   var _fbSel=_getSelObs(selIds);
@@ -26577,7 +26590,7 @@ function _rvShowRoPanel(sess){
   if(!amendedIds.length){ toast('No amendments found in this session.'); return; }
   var ex=document.getElementById('_rv_ro_panel');
   if(ex) ex.remove();
-  _rvInMemDecisions={};
+  if(!keepDecisions) _rvInMemDecisions={};
   var panel=document.createElement('div');
   panel.id='_rv_ro_panel';
   panel.style.cssText='position:fixed;top:54px;left:0;right:0;z-index:900;background:#2a1a00;color:#fff;border-bottom:3px solid #c9962a;font-family:Inter,sans-serif;font-size:12.5px;max-height:65vh;overflow-y:auto';
@@ -26636,6 +26649,15 @@ function _rvShowRoPanel(sess){
   panel.setAttribute('data-amended-ids',JSON.stringify(amendedIds));
   document.body.appendChild(panel);
   _rvInjectBackButton();
+  if(!document.getElementById('_rv_ro_reopen_bar')){
+    var roBar=document.createElement('div');
+    roBar.id='_rv_ro_reopen_bar';
+    roBar.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:850;background:#1a3a5c;color:#fff;border-top:2px solid #c9962a;font-family:Inter,sans-serif;font-size:12px;padding:6px 14px;display:flex;align-items:center;gap:10px';
+    roBar.innerHTML='<span style="flex:1">&#128221; <strong>RO Review session active</strong> &nbsp;<span style="opacity:.7;font-size:11px">Round '+(meta.round||'1')+' \xb7 '+esc(meta.submitted_by||'Auditor')+'</span></span>'
+      +'<button onclick="_rvShowRoPanel(_rvRoSess, true)" style="background:#c9962a;border:none;color:#fff;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#128065; Reopen Panel</button>'
+      +'<button onclick="document.getElementById(\'_rv_ro_reopen_bar\').remove()" style="background:rgba(255,255,255,.12);border:none;color:#fff;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">&#x2715;</button>';
+    document.body.appendChild(roBar);
+  }
 }
 
 function _rvRoDecide(obsId, decision){
