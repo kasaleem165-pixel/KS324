@@ -4829,7 +4829,8 @@ function captureSession() {
     srrFiles: srr_files.map(function(f){return {name:f.name,type:f.type,dataUrl:f.dataUrl};}),
     srrKwProposals: (window._srrKwProposals||[]).slice(),
     obsAmendments: (function(){ try{ return JSON.parse(localStorage.getItem(DB_AMEND_KEY)||'{}'); }catch(e){ return {}; } })(),
-    obsExtensions: (function(){ try{ return JSON.parse(localStorage.getItem(DB_EXT_KEY)||'[]'); }catch(e){ return []; } })()
+    obsExtensions: (function(){ try{ return JSON.parse(localStorage.getItem(DB_EXT_KEY)||'[]'); }catch(e){ return []; } })(),
+    _rvMeta: (function(){ var m=_rvCurrentMeta||{}; return m.status ? m : null; })()
   };
   // Merge any pending issuance metadata without triggering a full restoreSession
   if(_issueSessionMeta){
@@ -4943,6 +4944,8 @@ function restoreSession(sess) {
   _lastSavedTs = Date.now();
   _lastChangedTs = 0;
   _distChangeWarnShown = false;
+  // Restore _rvCurrentMeta from session so JSON workflow panel can be reopened after refresh
+  if(sess._rvMeta && sess._rvMeta.status) _rvCurrentMeta = sess._rvMeta;
   // Load observation locks for this branch session (async, non-blocking)
   if(typeof _lkOnSessionLoad==='function') _lkOnSessionLoad();
 }
@@ -18428,8 +18431,13 @@ function _showReviewSendBackModal(dec, fromRole){
   var flags=dec.flags||{}, cmts=dec.comments||{};
   var flagged=Object.keys(flags).filter(function(id){return flags[id];});
   if(!flagged.length){
-    // No flagged observations — just show a brief toast
+    // No flagged observations — show a brief toast + persistent bar if there is an overall comment
     showToast('Report sent back by '+fromRole+'. No specific observations flagged — check overall comment.', 5000);
+    if(dec.sendBackComment){
+      window._cgDec=dec; window._cgFromRole=fromRole;
+      try{ localStorage.setItem('_BRAINS_CG_STATE', JSON.stringify({dec:dec,fromRole:fromRole})); }catch(e){}
+      _cgCreateBottomBar(fromRole, 0);
+    }
     return;
   }
 
@@ -18438,6 +18446,8 @@ function _showReviewSendBackModal(dec, fromRole){
   window._cgFlagged = flagged;
   window._cgFromRole = fromRole;
   window._cgDec = dec;
+  // Persist for cross-session restore
+  try{ localStorage.setItem('_BRAINS_CG_STATE', JSON.stringify({dec:dec,fromRole:fromRole})); }catch(e){}
 
   // Build the panel
   var panel = document.createElement('div');
@@ -18520,6 +18530,53 @@ function _showReviewSendBackModal(dec, fromRole){
   restoreBtn.style.cssText = 'position:fixed;right:0;bottom:70px;background:#8a2020;color:#fff;border:none;border-radius:6px 0 0 6px;padding:10px 8px;font-family:Inter,sans-serif;font-size:11px;font-weight:700;cursor:pointer;z-index:7999;writing-mode:vertical-rl;letter-spacing:.5px;box-shadow:-2px 0 8px rgba(0,0,0,.3)';
   restoreBtn.onclick = function(){ document.getElementById('correction-guide-panel').style.display='flex'; };
   document.body.appendChild(restoreBtn);
+
+  // Persistent bottom bar (survives panel minimise, persists after page refresh via _cgAutoRestore)
+  _cgCreateBottomBar(fromRole, flagged.length);
+}
+
+function _cgCreateBottomBar(fromRole, flagCount){
+  var existing=document.getElementById('_cg_bottom_bar');
+  if(existing) existing.remove();
+  var bar=document.createElement('div');
+  bar.id='_cg_bottom_bar';
+  bar.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:850;background:#8a2020;color:#fff;border-top:2px solid #c9962a;font-family:Inter,sans-serif;font-size:12px;padding:6px 14px;display:flex;align-items:center;gap:10px';
+  var label=flagCount?' \xb7 <span style="opacity:.7;font-size:11px">'+flagCount+' obs flagged</span>':'';
+  bar.innerHTML='<span style="flex:1">&#9888; <strong>Sent back by '+esc(fromRole)+' Manager</strong>'+label+'</span>'
+    +'<button onclick="_cgOpenGuide()" style="background:#c9962a;border:none;color:#fff;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#128065; Open Correction Guide</button>'
+    +'<button onclick="localStorage.removeItem(\'_BRAINS_CG_STATE\');var b=document.getElementById(\'_cg_bottom_bar\');if(b)b.remove();" style="background:rgba(255,255,255,.12);border:none;color:#fff;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">&#10005;</button>';
+  document.body.appendChild(bar);
+}
+
+function _cgOpenGuide(){
+  var panel=document.getElementById('correction-guide-panel');
+  if(panel){ panel.style.display='flex'; return; }
+  // Panel was removed — recreate from stored state
+  var dec=window._cgDec;
+  var fromRole=window._cgFromRole||'RO';
+  if(!dec){
+    try{
+      var stored=JSON.parse(localStorage.getItem('_BRAINS_CG_STATE')||'null');
+      if(stored){ dec=stored.dec; fromRole=stored.fromRole||'RO'; }
+    }catch(e){}
+  }
+  if(dec){ _showReviewSendBackModal(dec, fromRole); }
+  else{ alert('Please reload the supervisor review file via Review → Load RO Supervisor Review.'); }
+}
+
+function _cgAutoRestore(){
+  if(document.getElementById('_cg_bottom_bar')) return;
+  try{
+    var stored=JSON.parse(localStorage.getItem('_BRAINS_CG_STATE')||'null');
+    if(!stored||!stored.dec) return;
+    var dec=stored.dec;
+    var fromRole=stored.fromRole||'RO';
+    var flags=dec.flags||{};
+    var flagged=Object.keys(flags).filter(function(id){return flags[id];});
+    if(!flagged.length&&!dec.sendBackComment) return;
+    window._cgDec=dec; window._cgFromRole=fromRole;
+    _cgCreateBottomBar(fromRole, flagged.length);
+  }catch(e){}
 }
 
 function _cgGoTo(id){
@@ -26372,6 +26429,23 @@ var _rvFinalSess = null; // stores sess for Final Approval so auditor can open d
 var _rvReviewedSess = null; // stores sess for Send Back so auditor can reopen amendment summary
 var _rvRoSess = null; // stores sess for RO Supervisor so they can reopen the review panel
 
+// ── Auto-restore: recreate reopen bar on login from persisted _rvCurrentMeta ──
+
+function _rvRestoreReopenBar(){
+  if(document.getElementById('_rv_aud_reopen_bar')) return;
+  if(document.getElementById('_rv_final_banner')) return;
+  var meta=_rvCurrentMeta||{};
+  if(meta.status !== 'ro_reviewed' && meta.status !== 'ro_final') return;
+  _rvReviewedSess = {_rvMeta: meta};
+  var bar=document.createElement('div');
+  bar.id='_rv_aud_reopen_bar';
+  bar.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:850;background:#14304d;color:#fff;border-top:2px solid #c9962a;font-family:Inter,sans-serif;font-size:12px;padding:6px 14px;display:flex;align-items:center;gap:10px';
+  bar.innerHTML='<span style="flex:1">&#128203; <strong>RO Review loaded</strong> &nbsp;<span style="opacity:.7;font-size:11px">Round '+(meta.round||'1')+' \xb7 '+esc(meta.ro_name||'RO Supervisor')+'</span></span>'
+    +'<button onclick="_rvShowAuditorPanel(_rvReviewedSess)" style="background:#c9962a;border:none;color:#fff;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">&#128065; View Comments</button>'
+    +'<button onclick="document.getElementById(\'_rv_aud_reopen_bar\').remove()" style="background:rgba(255,255,255,.12);border:none;color:#fff;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">&#x2715;</button>';
+  document.body.appendChild(bar);
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function _rvEsc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -30000,6 +30074,10 @@ function _brPickerStartNew(){
   if(_brPickerBranch) _actLog('branch_open','Code: '+(_brPickerBranch.code||'')+' | Name: '+(_brPickerBranch.name||''));
   _brPickerDismiss();
   _startRestore();
+  setTimeout(function(){
+    if(typeof _rvRestoreReopenBar==='function') _rvRestoreReopenBar();
+    if(typeof _cgAutoRestore==='function') _cgAutoRestore();
+  }, 1200);
 }
 
 function _brPickerCancelDetail(){
@@ -30027,6 +30105,10 @@ function _brPickerDismiss(){
 function _brPickerClose(){
   _brPickerDismiss();
   _startRestore();
+  setTimeout(function(){
+    if(typeof _rvRestoreReopenBar==='function') _rvRestoreReopenBar();
+    if(typeof _cgAutoRestore==='function') _cgAutoRestore();
+  }, 1200);
 }
 
 // ── End Branch Picker ─────────────────────────────────────────────────────────
