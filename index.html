@@ -27298,31 +27298,36 @@ function _rvShowObsAnnotation(el, obsId){
   if(!comment&&!decision&&!wcComment&&!wcDecision) return;
   var LABELS={approved:'&#10003; Approved',suggestion:'&#9999; Suggestion',rejected:'&#10007; Rejected'};
   var COLORS={approved:'#1a6030',suggestion:'#c9962a',rejected:'#c0392b'};
+  var audPanel=document.getElementById('_rv_aud_panel');
+  var topPx=(audPanel?Math.round(audPanel.getBoundingClientRect().bottom)+6:120);
+  var lpEl=document.getElementById('LP')||document.getElementById('left-panel');
+  var leftPx=(lpEl?Math.round(lpEl.getBoundingClientRect().right)+6:548);
   var note=document.createElement('div');
   note.id='_rv_obs_note';
-  note.style.cssText='background:#1a2535;border-left:3px solid #c9962a;border-radius:0 5px 5px 0;padding:8px 12px;margin-bottom:6px;font-family:Inter,sans-serif;font-size:12px;color:#c8e0fa';
-  var html='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">';
+  note.style.cssText='position:fixed;top:'+topPx+'px;left:'+leftPx+'px;right:14px;z-index:820;background:#1a2535;border:1.5px solid #c9962a;border-radius:6px;padding:10px 14px;font-family:Inter,sans-serif;font-size:12px;color:#c8e0fa;box-shadow:0 4px 20px rgba(0,0,0,.5)';
+  var html='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">';
   html+='<div style="flex:1">';
-  html+='<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#c9962a;margin-bottom:5px">&#128203; RO Supervisor Comment</div>';
+  html+='<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#c9962a;margin-bottom:6px">&#128203; RO Supervisor Comment — viewing observation below</div>';
   if(decision){
-    html+='<div style="margin-bottom:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
-    html+='<span style="font-size:10px;color:#8aa0c0">Obs Decision:</span>';
+    html+='<div style="margin-bottom:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
+    html+='<span style="font-size:10px;color:#8aa0c0;white-space:nowrap">Obs Decision:</span>';
     html+='<span style="background:'+(COLORS[decision]||'#555')+';color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">'+(LABELS[decision]||decision)+'</span>';
     if(comment) html+='<span style="font-size:12px;color:#e8c87a">'+esc(comment)+'</span>';
     html+='</div>';
   }
   if(wcDecision){
     html+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
-    html+='<span style="font-size:10px;color:#8aa0c0">Wording Decision:</span>';
+    html+='<span style="font-size:10px;color:#8aa0c0;white-space:nowrap">Wording Decision:</span>';
     html+='<span style="background:'+(COLORS[wcDecision]||'#555')+';color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">'+(LABELS[wcDecision]||wcDecision)+'</span>';
     if(wcComment) html+='<span style="font-size:12px;color:#e8c87a">'+esc(wcComment)+'</span>';
     html+='</div>';
   }
   html+='</div>';
-  html+='<button onclick="document.getElementById(\'_rv_obs_note\').remove()" style="background:none;border:none;color:#6a8aaa;font-size:15px;cursor:pointer;line-height:1;padding:0 2px;flex-shrink:0" title="Dismiss">&#10005;</button>';
+  html+='<button onclick="document.getElementById(\'_rv_obs_note\').remove()" style="background:none;border:none;color:#6a8aaa;font-size:16px;cursor:pointer;line-height:1;padding:0 2px;flex-shrink:0" title="Dismiss">&#10005;</button>';
   html+='</div>';
   note.innerHTML=html;
-  if(el.parentNode) el.parentNode.insertBefore(note, el);
+  document.body.appendChild(note);
+  setTimeout(function(){ var n=document.getElementById('_rv_obs_note'); if(n) n.remove(); },10000);
 }
 
 function _rvScrollToObs(obsId){
@@ -27338,8 +27343,7 @@ function _rvScrollToObs(obsId){
       var el2=_rvFindObsEl(obsId);
       if(el2){
         _rvShowObsAnnotation(el2, obsId);
-        var _n2=document.getElementById('_rv_obs_note');
-        (_n2||el2).scrollIntoView({behavior:'smooth',block:'start'});
+        el2.scrollIntoView({behavior:'smooth',block:'center'});
         el2.style.outline='3px solid #c9962a';
         setTimeout(function(){ el2.style.outline=''; },2500);
         _rvShowBackBtn();
@@ -27351,8 +27355,7 @@ function _rvScrollToObs(obsId){
     return;
   }
   _rvShowObsAnnotation(el, obsId);
-  var _note=document.getElementById('_rv_obs_note');
-  (_note||el).scrollIntoView({behavior:'smooth',block:'start'});
+  el.scrollIntoView({behavior:'smooth',block:'center'});
   el.style.outline='3px solid #c9962a';
   setTimeout(function(){ el.style.outline=''; },2500);
   _rvShowBackBtn();
