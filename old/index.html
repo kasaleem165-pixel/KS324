@@ -4363,9 +4363,7 @@ function captureSession() {
     srrFiles: srr_files.map(function(f){return {name:f.name,type:f.type,dataUrl:f.dataUrl};}),
     srrKwProposals: (window._srrKwProposals||[]).slice(),
     obsAmendments: (function(){ try{ return JSON.parse(localStorage.getItem(DB_AMEND_KEY)||'{}'); }catch(e){ return {}; } })(),
-    obsExtensions: (function(){ try{ return JSON.parse(localStorage.getItem(DB_EXT_KEY)||'[]'); }catch(e){ return []; } })(),
-    cgDec: window._cgDec||null,
-    cgFromRole: window._cgFromRole||''
+    obsExtensions: (function(){ try{ return JSON.parse(localStorage.getItem(DB_EXT_KEY)||'[]'); }catch(e){ return []; } })()
   };
 }
 
@@ -4473,28 +4471,21 @@ function restoreSession(sess) {
   _lastSavedTs = Date.now();
   _lastChangedTs = 0;
   _distChangeWarnShown = false;
-  // Recreate the correction-guide restore button if a send-back was active.
-  // Use roFlags/hoFlags (always saved) so the button appears even when cgDec was not yet captured.
-  var _cgRFlagged=Object.keys(roFlags).filter(function(id){return roFlags[id];});
-  var _cgRFromRole='RO';
-  if(!_cgRFlagged.length){
-    _cgRFlagged=Object.keys(hoFlags).filter(function(id){return hoFlags[id];});
-    if(_cgRFlagged.length) _cgRFromRole='HO';
-  }
-  if(_cgRFlagged.length){
-    var _cgRDec=sess.cgDec||{flags:roFlags,comments:roComments,amendments:respAmendments,wordingDecisions:roAccepted,customApprovals:roCustomApprovals,reviewerName:'',reviewDate:'',action:'send_back'};
-    window._cgDec=_cgRDec;
-    window._cgFromRole=sess.cgFromRole||_cgRFromRole;
-    window._cgFlagged=_cgRFlagged;
+  // Restore correction-guide button if report was sent back for amendments
+  var _cgRF=Object.keys(roFlags).filter(function(id){return roFlags[id];});
+  var _cgRRole='RO';
+  if(!_cgRF.length){ _cgRF=Object.keys(hoFlags).filter(function(id){return hoFlags[id];}); if(_cgRF.length) _cgRRole='HO'; }
+  if(_cgRF.length){
+    window._cgDec={flags:roFlags,comments:roComments,amendments:respAmendments,wordingDecisions:roAccepted,customApprovals:roCustomApprovals,reviewerName:'',reviewDate:'',action:'send_back'};
+    window._cgFromRole=_cgRRole;
+    window._cgFlagged=_cgRF;
     window._cgDone={};
-    var _oldCgRBtn=document.getElementById('cg-restore-btn');
-    if(_oldCgRBtn) _oldCgRBtn.remove();
     var _cgRBtn=document.createElement('button');
     _cgRBtn.id='cg-restore-btn';
     _cgRBtn.title='Open Correction Guide';
     _cgRBtn.innerHTML='&#9888; Corrections';
     _cgRBtn.style.cssText='position:fixed;right:0;bottom:70px;background:#8a2020;color:#fff;border:none;border-radius:6px 0 0 6px;padding:10px 8px;font-family:Inter,sans-serif;font-size:11px;font-weight:700;cursor:pointer;z-index:7999;writing-mode:vertical-rl;letter-spacing:.5px;box-shadow:-2px 0 8px rgba(0,0,0,.3)';
-    _cgRBtn.onclick=function(){ _showReviewSendBackModal(window._cgDec, window._cgFromRole); };
+    _cgRBtn.onclick=function(){_showReviewSendBackModal(window._cgDec,window._cgFromRole);};
     document.body.appendChild(_cgRBtn);
   }
 }
