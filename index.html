@@ -1477,6 +1477,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <div id="rv-json-sep" class="tb-dd-sep"></div>
         <button id="rv-export-ro-json" class="tb-dd-item rpt-btn" onclick="_rvExportForRO();tbDDClose()" data-tip="Export session as JSON file for RO Supervisor review (file-based workflow)"><span class="di">&#128228;</span> Export for RO Review (JSON)</button>
         <button id="rv-import-ro-json" class="tb-dd-item rpt-btn" onclick="document.getElementById('rv-json-inp').click();tbDDClose()" data-tip="Import a JSON file returned by the RO Supervisor with their review decisions"><span class="di">&#128229;</span> Import RO-Reviewed JSON</button>
+        <button id="rv-view-review-btn" class="tb-dd-item rpt-btn" style="display:none" onclick="_rvReopenReviewPanel();tbDDClose()" data-tip="Reopen the RO Supervisor amendment summary panel"><span class="di">&#128203;</span> View RO Review Panel</button>
         <input type="file" id="rv-json-inp" accept=".json" style="display:none" onchange="_rvImportJson(event)">
         <div id="rev-sep-1" class="tb-dd-sep"></div>
         <button id="rev-send-ho" class="tb-dd-item rpt-btn" onclick="_rvRoExportForHo();tbDDClose()" data-tip="Export this session as JSON for HO Supervisor review"><span class="di">&#128228;</span> Export JSON for HO Review</button>
@@ -26585,12 +26586,21 @@ function _rvImportJson(e){
 
 // ── Auditor Panel: show RO decisions after importing ro_reviewed JSON ─────────
 
+function _rvReopenReviewPanel(){
+  var sess=_rvFinalSess||_rvReviewedSess;
+  if(sess){ _rvShowAuditorPanel(sess); return; }
+  alert('No RO review loaded yet. Please use Review → Import RO-Reviewed JSON first.');
+}
+
 function _rvShowAuditorPanel(sess){
   var meta=sess._rvMeta||{};
   var decisions=meta.ro_decisions||{};
   var amendedIds=meta.amended_obs_ids||Object.keys(decisions);
   if(!amendedIds.length){ toast('No amendments found in this file.'); return; }
   _rvReviewedSess = sess;
+  // Show "View RO Review Panel" in menu
+  var _vrbBtn=document.getElementById('rv-view-review-btn');
+  if(_vrbBtn) _vrbBtn.style.display='';
   if(!document.getElementById('_rv_aud_reopen_bar') && !document.getElementById('_rv_final_banner')){
     var bar=document.createElement('div');
     bar.id='_rv_aud_reopen_bar';
@@ -27407,6 +27417,15 @@ function _rvApplyFinalApproval(sess){
     };
   }
   _rvFinalSess = sess;
+  // Show "View RO Review Panel" in menu so user can reopen after dismissing
+  var vrbBtn=document.getElementById('rv-view-review-btn');
+  if(vrbBtn) vrbBtn.style.display='';
+  // Supervisors/admin don't need the auditor-facing banner
+  var _roleNow=_userRole();
+  if(_roleNow==='ro_supervisor'||_roleNow==='ho_supervisor'||_roleNow==='administrator'){
+    toast('Final approval JSON loaded.');
+    return;
+  }
   // Remove any stale banner
   var ex=document.getElementById('_rv_final_banner');
   if(ex) ex.remove();

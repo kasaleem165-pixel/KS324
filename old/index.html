@@ -1513,6 +1513,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <div id="rv-json-sep" class="tb-dd-sep"></div>
         <button id="rv-export-ro-json" class="tb-dd-item rpt-btn" onclick="_rvExportForRO();tbDDClose()" data-tip="Export session as JSON file for RO Supervisor review (file-based workflow)"><span class="di">&#128228;</span> Export for RO Review (JSON)</button>
         <button id="rv-import-ro-json" class="tb-dd-item rpt-btn" onclick="document.getElementById('rv-json-inp').click();tbDDClose()" data-tip="Import a JSON file returned by the RO Supervisor with their review decisions"><span class="di">&#128229;</span> Import RO-Reviewed JSON</button>
+        <button id="rv-view-review-btn" class="tb-dd-item rpt-btn" style="display:none" onclick="_rvReopenReviewPanel();tbDDClose()" data-tip="Reopen the RO Supervisor amendment summary panel"><span class="di">&#128203;</span> View RO Review Panel</button>
         <input type="file" id="rv-json-inp" accept=".json" style="display:none" onchange="_rvImportJson(event)">
         <div class="tb-dd-sep"></div>
         <button class="tb-dd-item" id="admin-pending-btn" onclick="showPendingDatabankModal();tbDDClose()" data-tip="Review and approve new observations proposed by auditors for the databank"><span class="di">&#128196;</span> Pending Databank Additions <span id="admin-pending-badge" style="display:none;background:#c0392b;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px">0</span></button>
@@ -26508,6 +26509,12 @@ function _rvImportJson(e){
 
 // ── Auditor Panel: show RO decisions after importing ro_reviewed JSON ─────────
 
+function _rvReopenReviewPanel(){
+  var sess=_rvFinalSess||_rvReviewedSess;
+  if(sess){ _rvShowAuditorPanel(sess); return; }
+  alert('No RO review loaded yet. Please use Review → Import RO-Reviewed JSON first.');
+}
+
 function _rvShowAuditorPanel(sess){
   var meta=sess._rvMeta||{};
   var decisions=meta.ro_decisions||{};
@@ -26515,6 +26522,9 @@ function _rvShowAuditorPanel(sess){
   if(!amendedIds.length){ toast('No amendments found in this file.'); return; }
   // Store session so auditor can reopen the panel after closing it
   _rvReviewedSess = sess;
+  // Show "View RO Review Panel" in menu
+  var _vrbBtn=document.getElementById('rv-view-review-btn');
+  if(_vrbBtn) _vrbBtn.style.display='';
   // Inject a persistent reopen bar if not already present (only for Send Back, not Final Approval which has its own banner)
   if(!document.getElementById('_rv_aud_reopen_bar') && !document.getElementById('_rv_final_banner')){
     var bar=document.createElement('div');
@@ -27079,6 +27089,15 @@ function _rvApplyFinalApproval(sess){
     };
   }
   _rvFinalSess = sess;
+  // Show "View RO Review Panel" in menu so auditor can reopen after dismissing
+  var vrbBtn=document.getElementById('rv-view-review-btn');
+  if(vrbBtn) vrbBtn.style.display='';
+  // Supervisors/admin don't need the auditor-facing banner
+  var _roleNow=_userRole();
+  if(_roleNow==='ro_supervisor'||_roleNow==='ho_supervisor'||_roleNow==='administrator'){
+    toast('Final approval JSON loaded.');
+    return;
+  }
   var ex=document.getElementById('_rv_final_banner');
   if(ex) ex.remove();
   var banner=document.createElement('div');
