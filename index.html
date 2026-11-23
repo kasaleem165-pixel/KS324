@@ -27285,6 +27285,46 @@ function _rvShowRoDecisionsPopup(){
 
 // ── Scroll to observation + floating back button ───────────────────────────────
 
+function _rvShowObsAnnotation(el, obsId){
+  var prev=document.getElementById('_rv_obs_note');
+  if(prev) prev.remove();
+  if(!_rvReviewedSess) return;
+  var meta=_rvReviewedSess._rvMeta||{};
+  var dec=(meta.ro_decisions||{})[obsId]||{};
+  var comment=dec.comment||'';
+  var wcComment=dec.wcComment||'';
+  var decision=dec.decision||'';
+  var wcDecision=dec.wcDecision||'';
+  if(!comment&&!decision&&!wcComment&&!wcDecision) return;
+  var LABELS={approved:'&#10003; Approved',suggestion:'&#9999; Suggestion',rejected:'&#10007; Rejected'};
+  var COLORS={approved:'#1a6030',suggestion:'#c9962a',rejected:'#c0392b'};
+  var note=document.createElement('div');
+  note.id='_rv_obs_note';
+  note.style.cssText='background:#1a2535;border-left:3px solid #c9962a;border-radius:0 5px 5px 0;padding:8px 12px;margin-bottom:6px;font-family:Inter,sans-serif;font-size:12px;color:#c8e0fa';
+  var html='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">';
+  html+='<div style="flex:1">';
+  html+='<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#c9962a;margin-bottom:5px">&#128203; RO Supervisor Comment</div>';
+  if(decision){
+    html+='<div style="margin-bottom:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
+    html+='<span style="font-size:10px;color:#8aa0c0">Obs Decision:</span>';
+    html+='<span style="background:'+(COLORS[decision]||'#555')+';color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">'+(LABELS[decision]||decision)+'</span>';
+    if(comment) html+='<span style="font-size:12px;color:#e8c87a">'+esc(comment)+'</span>';
+    html+='</div>';
+  }
+  if(wcDecision){
+    html+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
+    html+='<span style="font-size:10px;color:#8aa0c0">Wording Decision:</span>';
+    html+='<span style="background:'+(COLORS[wcDecision]||'#555')+';color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">'+(LABELS[wcDecision]||wcDecision)+'</span>';
+    if(wcComment) html+='<span style="font-size:12px;color:#e8c87a">'+esc(wcComment)+'</span>';
+    html+='</div>';
+  }
+  html+='</div>';
+  html+='<button onclick="document.getElementById(\'_rv_obs_note\').remove()" style="background:none;border:none;color:#6a8aaa;font-size:15px;cursor:pointer;line-height:1;padding:0 2px;flex-shrink:0" title="Dismiss">&#10005;</button>';
+  html+='</div>';
+  note.innerHTML=html;
+  if(el.parentNode) el.parentNode.insertBefore(note, el);
+}
+
 function _rvScrollToObs(obsId){
   function _rvFindObsEl(id){
     return document.getElementById('oc-'+id)
@@ -27301,6 +27341,7 @@ function _rvScrollToObs(obsId){
         el2.style.outline='3px solid #c9962a';
         setTimeout(function(){ el2.style.outline=''; },2500);
         _rvShowBackBtn();
+        _rvShowObsAnnotation(el2, obsId);
       } else {
         var rp=document.getElementById('RP');
         if(rp) rp.scrollTop=0;
@@ -27312,6 +27353,7 @@ function _rvScrollToObs(obsId){
   el.style.outline='3px solid #c9962a';
   setTimeout(function(){ el.style.outline=''; },2500);
   _rvShowBackBtn();
+  _rvShowObsAnnotation(el, obsId);
 }
 
 function _rvInjectBackButton(){
