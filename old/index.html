@@ -1043,7 +1043,7 @@ function _applyRoleUI(){
   var s1b=document.getElementById('ra-stab-1'); if(s1b) s1b.style.borderRadius='4px 4px 0 0';
 
   if(isRO){
-    // RO sees: Load Report, Save/Versions, JSON import/export
+    // RO sees: Load Report, Save/Versions, JSON import/export, Generate Final Issuance Report
     // RO hides: Issue Report, Send to HO (old HTML workflow), sep1, Load HO Review, sep2
     ['rev-send-ro','rev-send-ho','rev-sep-1','rev-load-ho','rev-sep-2','rev-issue'].forEach(hide);
     // RO shows: JSON import/export for JSON-based review workflow
@@ -1052,6 +1052,8 @@ function _applyRoleUI(){
     var rvExpBtn=document.getElementById('rv-export-ro-json');
     if(rvExpBtn){ rvExpBtn.style.display=''; rvExpBtn.innerHTML='<span class="di">&#128228;</span> Export RO-Reviewed JSON'; rvExpBtn.setAttribute('data-tip','Export this session with your review decisions for the auditor or for final issuance'); rvExpBtn.onclick=function(){ tbDDClose(); _rvRoExportMenu(); }; }
     var rvSep=document.getElementById('rv-json-sep'); if(rvSep) rvSep.style.display='';
+    // RO shows: Generate Final Issuance Report
+    var genFinalBtn=document.getElementById('rev-gen-final-btn'); if(genFinalBtn) genFinalBtn.style.display='';
   } else {
     // HO sees: Load Report, Save/Versions, Load HO Supervisor Review
     // HO hides: Issue Report (admin-only), Send to RO, Load RO Review, sep1, Send to HO, sep2
@@ -1510,6 +1512,7 @@ document.getElementById('chpw-modal').addEventListener('click',function(e){
         <button id="rev-load-ho" class="tb-dd-item rpt-btn" onclick="if(_canIssue()){triggerLoadReviewerHtml('ho');tbDDClose();}else{tbDDClose();showHOAuthModal(function(){triggerLoadReviewerHtml('ho');});}" data-tip="Import the reviewed and annotated file returned by the HO supervisor"><span class="di">&#128194;</span> Load HO Supervisor Review</button>
         <div id="rev-sep-2" class="tb-dd-sep"></div>
         <button id="rev-issue" class="tb-dd-item rpt-btn" onclick="if(_canIssue()){generateIssuedReport();tbDDClose();}else{tbDDClose();showHOAuthModal(function(){generateIssuedReport();});}" data-tip="Finalise and officially issue the completed audit report"><span class="di">&#10003;</span> Issue Report</button>
+        <button id="rev-gen-final-btn" class="tb-dd-item rpt-btn" style="display:none" onclick="_rvLaunchIssuedReport();tbDDClose()" data-tip="Generate the final issuance report after RO review is complete"><span class="di">&#128196;</span> Generate Final Issuance Report</button>
         <div id="rv-json-sep" class="tb-dd-sep"></div>
         <button id="rv-export-ro-json" class="tb-dd-item rpt-btn" onclick="_rvExportForRO();tbDDClose()" data-tip="Export session as JSON file for RO Supervisor review (file-based workflow)"><span class="di">&#128228;</span> Export for RO Review (JSON)</button>
         <button id="rv-import-ro-json" class="tb-dd-item rpt-btn" onclick="document.getElementById('rv-json-inp').click();tbDDClose()" data-tip="Import a JSON file returned by the RO Supervisor with their review decisions"><span class="di">&#128229;</span> Import RO-Reviewed JSON</button>
