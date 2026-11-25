@@ -12621,12 +12621,12 @@ function generateIssuedReport(forROCopy){
   // High risk attention box
   var highBox='';
   if(highList.length){
-    highBox='<div style="background:#fdecea;border:1.5px solid #f5b7b1;border-radius:10px;padding:1rem 1.2rem;margin-bottom:1.2rem">'
+    highBox='<div id="high-risk-box" style="background:#fdecea;border:1.5px solid #f5b7b1;border-radius:10px;padding:1rem 1.2rem;margin-bottom:1.2rem">'
       +'<div style="font-weight:800;color:var(--high);font-size:.95rem;margin-bottom:.5rem">&#128308; Immediate Attention — HIGH RISK</div>'
       +'<ul style="list-style:none;display:flex;flex-direction:column;gap:.4rem;font-size:.88rem">';
     for(var i=0;i<highList.length;i++){
       var lbl=labMap[highList[i].id]||'?'; var id=lbl.replace('.','-');
-      highBox+='<li><a href="#syn-row-'+id+'" onclick="event.preventDefault();highlightSynRow(\'syn-row-'+id+'\')" style="color:var(--high);font-weight:700;cursor:pointer">&#8594; '+lbl+' '+e(highList[i].title)+'</a></li>';
+      highBox+='<li><a href="#syn-row-'+id+'" onclick="event.preventDefault();_highRiskNav(\'syn-row-'+id+'\')" style="color:var(--high);font-weight:700;cursor:pointer">&#8594; '+lbl+' '+e(highList[i].title)+'</a></li>';
     }
     highBox+='</ul></div>';
   }
@@ -13632,14 +13632,17 @@ function generateIssuedReport(forROCopy){
     +'    highlightSynRow(this.getAttribute("href").slice(1));\n'
     +'  });\n'
     +'});\n'
-    // full-obs-link intercept — scroll to obs card smoothly
-    +'document.querySelectorAll(\'a.full-obs-link\').forEach(function(link){\n'
-    +'  link.addEventListener("click",function(e){\n'
-    +'    e.preventDefault();\n'
-    +'    var obsEl=document.getElementById(this.getAttribute("href").slice(1));\n'
-    +'    if(obsEl){obsEl.scrollIntoView({behavior:"smooth",block:"start"});}\n'
-    +'  });\n'
-    +'});\n'
+    // _highRiskNav — scroll to synopsis row + show back-to-HIGH-RISK banner
+    +'function _highRiskNav(synId){\n'
+    +'  _removeKpiBanner();\n'
+    +'  var b=document.getElementById("kpi-back-banner");\n'
+    +'  if(b){\n'
+    +'    b.innerHTML="&#8592; Back to <strong>&#128308; HIGH RISK</strong>";\n'
+    +'    b.onclick=function(){_removeKpiBanner();var box=document.getElementById("high-risk-box");if(box){box.scrollIntoView({behavior:"smooth",block:"center"});setTimeout(function(){box.style.outline="2.5px solid #c0392b";setTimeout(function(){box.style.outline="";},1200);},400);}};\n'
+    +'    b.style.display="flex";\n'
+    +'  }\n'
+    +'  highlightSynRow(synId);\n'
+    +'}\n'
 
     // Remove highlight on outside click
     +'document.addEventListener("click",function(e){\n'
