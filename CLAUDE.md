@@ -12,11 +12,12 @@ Standalone single-file HTML app (`animal_sales/AnimalSales.html`) for managing a
   ```
   git push origin HEAD:main --force
   ```
-- **When releasing DEV → LIVE** (copy index.html → old/index.html, commit, then also sync):
+- **Always ALSO push to**: `brains-old-live` (so Kamran's existing GitHub bookmark always shows the latest `old/index.html`)
   ```
   git push origin HEAD:brains-old-live --force
   ```
-- **Why `--force` on main**: Multiple sessions push to `main`; it can diverge between sessions. `--force` is correct and expected here.
+- **When releasing DEV → LIVE** (copy index.html → old/index.html, commit, then push both as above)
+- **Why `--force` on both**: Multiple sessions push to these branches; they can diverge between sessions. `--force` is correct and expected here.
 
 ---
 
